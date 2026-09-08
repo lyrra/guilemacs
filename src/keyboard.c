@@ -3943,60 +3943,6 @@ DEFUN ("--rks-state-stack-pop", Fc_rks_state_stack_pop,
   return Qnil;
 }
 
-DEFUN ("--rks-record-set-int", Fc_rks_record_set_int,
-       Sc_rks_record_set_int, 3, 3, 0,
-       doc: /* Internal: write fixnum VAL to slot SLOT of the
-<rks-state> record REC.  */)
-  (Lisp_Object rec, Lisp_Object slot, Lisp_Object val)
-{
-  CHECK_FIXNUM (slot);
-  CHECK_FIXNUM (val);
-  rks_set_int (rec, XFIXNUM (slot), XFIXNUM (val));
-  return Qnil;
-}
-
-DEFUN ("--rks-record-set-bool", Fc_rks_record_set_bool,
-       Sc_rks_record_set_bool, 3, 3, 0,
-       doc: /* Internal: write bool VAL (non-nil = true) to slot SLOT
-of the <rks-state> record REC.  */)
-  (Lisp_Object rec, Lisp_Object slot, Lisp_Object val)
-{
-  CHECK_FIXNUM (slot);
-  rks_set_bool (rec, XFIXNUM (slot), !NILP (val));
-  return Qnil;
-}
-
-DEFUN ("--rks-record-get-int", Fc_rks_record_get_int,
-       Sc_rks_record_get_int, 2, 2, 0,
-       doc: /* Internal: read fixnum from slot SLOT of the
-<rks-state> record REC.  */)
-  (Lisp_Object rec, Lisp_Object slot)
-{
-  CHECK_FIXNUM (slot);
-  return make_fixnum (rks_get_int (rec, XFIXNUM (slot)));
-}
-
-DEFUN ("--rks-record-get", Fc_rks_record_get,
-       Sc_rks_record_get, 2, 2, 0,
-       doc: /* Internal: read any Lisp_Object from slot SLOT of the
-<rks-state> record REC.  */)
-  (Lisp_Object rec, Lisp_Object slot)
-{
-  CHECK_FIXNUM (slot);
-  return scm_struct_ref (rec, scm_from_int (XFIXNUM (slot)));
-}
-
-DEFUN ("--rks-record-set", Fc_rks_record_set,
-       Sc_rks_record_set, 3, 3, 0,
-       doc: /* Internal: write any Lisp_Object VAL to slot SLOT of
-the <rks-state> record REC.  */)
-  (Lisp_Object rec, Lisp_Object slot, Lisp_Object val)
-{
-  CHECK_FIXNUM (slot);
-  scm_struct_set_x (rec, scm_from_int (XFIXNUM (slot)), val);
-  return Qnil;
-}
-
 DEFUN ("--rks-state-current", Fc_rks_state_current,
        Sc_rks_state_current, 0, 0, 0,
        doc: /* Internal: return the top <rks-state> on the stack,

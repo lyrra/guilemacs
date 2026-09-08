@@ -138,6 +138,7 @@
   "test/keyboard/test-m27-ring-storage.el"     ; M27 imp-4 ring storage store->get->dispatch (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp1.el"              ; M28 imp-1 reclaim 5 residual M8/M10 shims (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp3.el"              ; M28 imp-3 --kbd-empty-p batch + wait-path cut-over (corpus prints PASS/FAIL)
+  "test/keyboard/test-m28-imp4.el"              ; M28 imp-4 Step 1 record-primitive port (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

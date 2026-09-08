@@ -1306,16 +1306,6 @@ elements.  See docs/keyboard.org §M6y."
   (delay (%c '--rks-state-stack-push)))
 (define %rks-state-stack-pop
   (delay (%c '--rks-state-stack-pop)))
-(define %rks-record-get-int
-  (delay (%c '--rks-record-get-int)))
-(define %rks-record-set-int
-  (delay (%c '--rks-record-set-int)))
-(define %rks-record-set-bool
-  (delay (%c '--rks-record-set-bool)))
-(define %rks-record-get
-  (delay (%c '--rks-record-get)))
-(define %rks-record-set
-  (delay (%c '--rks-record-set)))
 (define %set-rks-current-binding
   (delay (%c '--set-rks-current-binding)))
 
@@ -1334,86 +1324,50 @@ elements.  See docs/keyboard.org §M6y."
 (define %set-rks-indec-end     (delay (%c '--set-rks-indec-end)))
 (define %set-rks-t          (delay (%c '--set-rks-t)))
 
-;; RKS_SLOT_* values (must match C enum in src/keyboard.c)
-(define RKS-SLOT-KEY-COUNT         0)
-(define RKS-SLOT-MOCK-INPUT        1)
-(define RKS-SLOT-KEYBUF            2)
-(define RKS-SLOT-KEYS-START        3)
-(define RKS-SLOT-ECHO-START        4)
-(define RKS-SLOT-CURRENT-BINDING   5)
-(define RKS-SLOT-FIRST-UNBOUND     6)
-(define RKS-SLOT-FKEY              7)
-(define RKS-SLOT-KEYTRAN           8)
-(define RKS-SLOT-INDEC             9)
-(define RKS-SLOT-SHIFT-TRANSLATED     10)
-(define RKS-SLOT-DELAYED-SWITCH-FRAME  11)
-(define RKS-SLOT-ORIGINAL-UPPERCASE    12)
-(define RKS-SLOT-ORIGINAL-UPPERCASE-POSITION 13)
-(define RKS-SLOT-FAKE-PREFIXED-KEYS    14)
-(define RKS-SLOT-STARTING-BUFFER       15)
-(define RKS-SLOT-DISABLED-CONVERSION   16)
-(define RKS-SLOT-USED-MOUSE-MENU-HISTORY 17)
-(define RKS-SLOT-ECHO-LOCAL-START       18)
-(define RKS-SLOT-KEYS-LOCAL-START       19)
-(define RKS-SLOT-LAST-REAL-KEY-START    20)
-(define RKS-SLOT-NEW-BINDING            21)
-(define RKS-SLOT-USED-MOUSE-MENU        22)
-(define RKS-SLOT-FIRST-EVENT            23)
-(define RKS-SLOT-KEY                    24)
-(define RKS-SLOT-RAW-KEYBUF             25)
-(define RKS-SLOT-RAW-KEYBUF-COUNT       26)
-
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch
 ;; helpers.  See docs/m6-plan-revised.org.
 ;;
-;; Currently supported fields: `t', `mock-input'.  Keyremap fields
-;; (indec/fkey/keytran .start/.end/.map/.parent) are intentionally
-;; NOT synced through the record — the walks read and mutate them
-;; via C file-statics directly, same as the pre-M6 C bulk subr.
-;; The required record-side accessors (--rks-record-get-slot,
-;; --rks-keyremap-get-int) don't exist yet; they'll be added when
-;; M6i actually retires the keyremap file-statics.
+;; Step 1 (M28 imp-4): the record is now read/written through the
+;; srfi-9 field accessors directly, not via the slot-index primitives
+;; (--rks-record-get-int/set-int/get/set/set-bool, deleted).  Each
+;; `rks-sync-read' branch copies one record slot into its C file-static
+;; mirror; each `rks-sync-write' branch copies one C file-static back
+;; into the record.  The keyremap start/end fields are NOT yet the
+;; source of truth — `keytran-start' is still round-tripped through the
+;; C shim (see the FIX- note at Step 4 / bucket-C).
 
 (define (rks-sync-read rec field)
   "Sync one field FROM record TO C file-static.  Returns #nil."
   (case field
-    ((key-count)       ((force %set-rks-t)
-                        ((force %rks-record-get-int)
-                         rec RKS-SLOT-KEY-COUNT)))
+    ((key-count)       ((force %set-rks-t) (rks-state-key-count rec)))
     ((mock-input)      ((force %set-rks-mock-input)
-                        ((force %rks-record-get-int)
-                         rec RKS-SLOT-MOCK-INPUT)))
+                        (rks-state-mock-input rec)))
     ((current-binding) ((force %set-rks-current-binding)
-                        ((force %rks-record-get)
-                         rec RKS-SLOT-CURRENT-BINDING)))
+                        (rks-state-current-binding rec)))
     ((first-unbound)   ((force %set-rks-first-unbound)
-                        ((force %rks-record-get-int)
-                         rec RKS-SLOT-FIRST-UNBOUND)))
+                        (rks-state-first-unbound rec)))
+    ;; FIX-20260909-guilemacs: bucket-C (Step 4) must make keyremap
+    ;; start/end the record's source of truth; until then this branch
+    ;; still reads the C file-static.
     ((keytran-start)   ((force %set-rks-keytran-start)
-                        ((force %rks-record-get-int)
-                         (force %rks-keytran-start))))  ;; FIXME: read from record
+                        ((force %rks-keytran-start))))
     (else (error "rks-sync-read: unknown field" field)))
   #nil)
 
 (define (rks-sync-write rec field)
   "Sync one field FROM C file-static TO record.  Returns #nil."
   (case field
-    ((mock-input)      ((force %rks-record-set-int)
-                        rec RKS-SLOT-MOCK-INPUT
-                        ((force %rks-mock-input))))
-    ((key-count)       ((force %rks-record-set-int)
-                        rec RKS-SLOT-KEY-COUNT
-                        ((force %rks-t))))
-    ((current-binding) ((force %rks-record-set)
-                        rec RKS-SLOT-CURRENT-BINDING
-                        ((force %rks-current-binding))))
-    ((first-unbound)    ((force %rks-record-set-int)
-                         rec RKS-SLOT-FIRST-UNBOUND
-                         ((force %rks-first-unbound))))
-    ((shift-translated) ((force %rks-record-set-bool)
-                         rec RKS-SLOT-SHIFT-TRANSLATED
-                         (if ((force %rks-shift-translated-p)) #t #nil)))
+    ((mock-input)      (set-rks-state-mock-input!
+                        rec ((force %rks-mock-input))))
+    ((key-count)       (set-rks-state-key-count!
+                        rec ((force %rks-t))))
+    ((current-binding) (set-rks-state-current-binding!
+                        rec ((force %rks-current-binding))))
+    ((first-unbound)   (set-rks-state-first-unbound!
+                        rec ((force %rks-first-unbound))))
+    ((shift-translated) (set-rks-state-shift-translated!
+                         rec (if ((force %rks-shift-translated-p)) #t #nil)))
     (else (error "rks-sync-write: unknown field" field)))
   #nil)
 
