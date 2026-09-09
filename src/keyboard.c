@@ -8542,18 +8542,6 @@ static Lisp_Object     rks_current_binding;
    reads it).  See docs/keyboard.org §M6o.  */
 /* M6o: rks_shift_translated retired — reads go through the record.  */
 
-DEFUN ("--rks-shift-translated-p", Fc_rks_shift_translated_p,
-       Sc_rks_shift_translated_p, 0, 0, 0,
-       doc: /* Internal: read shift_translated from the <rks-state>
-record (slot RKS_SLOT_SHIFT_TRANSLATED).  Returns Qt / Qnil.  */)
-  (void)
-{
-  if (rks_state_depth > 0)
-    return rks_get_bool (rks_state_stack[rks_state_depth - 1],
-                         RKS_SLOT_SHIFT_TRANSLATED) ? Qt : Qnil;
-  return Qnil;
-}
-
 /* M6q — keybuf stack.  `keybuf' is a `Lisp_Object[READ_KEY_ELTS]'
    array allocated by each caller of read_key_sequence.  To let
    Scheme code read/write the current keybuf we maintain a small
@@ -9024,40 +9012,6 @@ See M6ac / Step E6.  */)
    --rks-follow-key shim; rks-follow-key is now pure Scheme.
    See docs/m6-plan.org Step E3.  */
 
-DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
-       0, 0, 0,
-       doc: /* Internal: read new_binding from <rks-state> record.  */)
-  (void)
-{
-  if (rks_state_depth > 0)
-    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
-                           scm_from_int (RKS_SLOT_NEW_BINDING));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-new-binding", Fc_set_rks_new_binding,
-       Sc_set_rks_new_binding, 1, 1, 0,
-       doc: /* Internal: write new_binding to <rks-state> record.  */)
-  (Lisp_Object val)
-{
-  if (rks_state_depth > 0)
-    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-                      scm_from_int (RKS_SLOT_NEW_BINDING), val);
-  return Qnil;
-}
-
-DEFUN ("--set-rks-first-unbound", Fc_set_rks_first_unbound,
-       Sc_set_rks_first_unbound, 1, 1, 0,
-       doc: /* Internal: write first_unbound to <rks-state> record.  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  if (rks_state_depth > 0)
-    rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_FIRST_UNBOUND, XFIXNUM (val));
-  return Qnil;
-}
-
 DEFUN ("--rks-key", Fc_rks_key, Sc_rks_key, 0, 0, 0,
        doc: /* Internal: read the current key from <rks-state> record
 slot 24.  Falls back to file-static rks_key when no call in flight.  */)
@@ -9460,58 +9414,6 @@ last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
   return Qnil;
 }
 
-DEFUN ("--rks-original-uppercase", Fc_rks_original_uppercase,
-       Sc_rks_original_uppercase, 0, 0, 0,
-       doc: /* Internal: read original_uppercase from <rks-state>
-record slot.  Returns nil when no call is in flight.  */)
-  (void)
-{
-  if (rks_state_depth > 0)
-    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
-                           scm_from_int (RKS_SLOT_ORIGINAL_UPPERCASE));
-  return Qnil;
-}
-
-DEFUN ("--rks-original-uppercase-position",
-       Fc_rks_original_uppercase_position,
-       Sc_rks_original_uppercase_position, 0, 0, 0,
-       doc: /* Internal: read original_uppercase_position from
-<rks-state> record slot.  Returns -1 when no call in flight.  */)
-  (void)
-{
-  if (rks_state_depth > 0)
-    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
-                                     RKS_SLOT_ORIGINAL_UPPERCASE_POSITION));
-  return make_fixnum (-1);
-}
-
-DEFUN ("--set-rks-original-uppercase",
-       Fc_set_rks_original_uppercase,
-       Sc_set_rks_original_uppercase, 1, 1, 0,
-       doc: /* Internal: write original_uppercase to <rks-state>
-record slot.  */)
-  (Lisp_Object val)
-{
-  if (rks_state_depth > 0)
-    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-                      scm_from_int (RKS_SLOT_ORIGINAL_UPPERCASE), val);
-  return Qnil;
-}
-
-DEFUN ("--set-rks-original-uppercase-position",
-       Fc_set_rks_original_uppercase_position,
-       Sc_set_rks_original_uppercase_position, 1, 1, 0,
-       doc: /* Internal: write original_uppercase_position to
-<rks-state> record slot.  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  if (rks_state_depth > 0)
-    rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_ORIGINAL_UPPERCASE_POSITION, XFIXNUM (val));
-  return Qnil;
-}
-
 DEFUN ("--rks-t", Fc_rks_t, Sc_rks_t, 0, 0, 0,
        doc: /* Internal: read the file-static rks_t (the C `t' local
 of read_key_sequence — current key-sequence length).  */)
@@ -9539,18 +9441,6 @@ DEFUN ("--set-rks-current-binding", Fc_set_rks_current_binding,
     scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
                       scm_from_int (RKS_SLOT_CURRENT_BINDING),
                       rks_current_binding);
-  return Qnil;
-}
-
-DEFUN ("--set-rks-shift-translated", Fc_set_rks_shift_translated,
-       Sc_set_rks_shift_translated, 1, 1, 0,
-       doc: /* Internal: write shift_translated to the <rks-state>
-record slot.  Non-nil VAL → true.  */)
-  (Lisp_Object val)
-{
-  if (rks_state_depth > 0)
-    rks_set_bool (rks_state_stack[rks_state_depth - 1],
-                  RKS_SLOT_SHIFT_TRANSLATED, !NILP (val));
   return Qnil;
 }
 
@@ -9794,18 +9684,6 @@ adjustment of the first_unbound short-circuit branch.  */)
   return Qnil;
 }
 
-DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
-       Sc_rks_first_unbound, 0, 0, 0,
-       doc: /* Internal: read first_unbound from <rks-state> record.
-Returns 0 when no call is in flight.  */)
-  (void)
-{
-  if (rks_state_depth > 0)
-    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
-                                     RKS_SLOT_FIRST_UNBOUND));
-  return make_fixnum (0);
-}
-
 /* M6x — the three translation-map walks (input-decode-map,
    function-key-map, key-translation-map) plus the in-between
    fkey-shortcut were ported to Scheme in imp-3: rks-walk-translation-maps!
@@ -10009,11 +9887,15 @@ DEFUN ("--rks-replay-sequence-init-rest",
        Sc_rks_replay_sequence_init_rest, 1, 1, 0,
        doc: /* Internal: complete the `replay_sequence:' init given a
 pre-computed CURRENT-BINDING (from `--active-maps').  Sets the
-file-static rks_starting_buffer = current_buffer, rks_first_unbound
-= READ_KEY_ELTS + 1, rks_current_binding = CURRENT-BINDING,
-rks_t = 0, and clears last_nonmenu_event.  Mirrors src/keyboard.c
-lines 10678-10688 (the body of the replay_sequence: label minus
-the active_maps call, which the Scheme caller performs).  */)
+file-statics rks_starting_buffer = current_buffer,
+rks_current_binding = CURRENT-BINDING and rks_t = 0, clears
+last_nonmenu_event, and -- when a <rks-state> is pushed -- writes the
+record slots first_unbound = READ_KEY_ELTS + 1, current_binding =
+CURRENT-BINDING and key_count = 0.  The rks_first_unbound file-static
+is retired (M6m); the DEFUN writes that slot on the record via
+rks_set_int.  Mirrors src/keyboard.c lines 10678-10688 (the body of
+the replay_sequence: label minus the active_maps call, which the
+Scheme caller performs).  */)
   (Lisp_Object current_binding)
 {
   Fc_set_rks_starting_buffer (Fcurrent_buffer ());

@@ -59,6 +59,15 @@
 (define rks-state-shift-translated (@@rk rks-state-shift-translated))
 (define set-rks-state-shift-translated!
   (@@rk set-rks-state-shift-translated!))
+(define rks-state-new-binding     (@@rk rks-state-new-binding))
+(define set-rks-state-new-binding! (@@rk set-rks-state-new-binding!))
+(define rks-state-original-uppercase (@@rk rks-state-original-uppercase))
+(define set-rks-state-original-uppercase!
+  (@@rk set-rks-state-original-uppercase!))
+(define rks-state-original-uppercase-position
+  (@@rk rks-state-original-uppercase-position))
+(define set-rks-state-original-uppercase-position!
+  (@@rk set-rks-state-original-uppercase-position!))
 
 (define make-rks-state            (@@rk make-rks-state))
 (define rks-sync-read             (@@rk rks-sync-read))
@@ -172,3 +181,73 @@
   ;; active record's #t through the typed accessor.
   (check "imp4/s1/write/shift-translated-from-active" #t
          (rks-state-shift-translated target)))
+
+;;; --- 6. Step 2 (bucket-A DELETE set): the 10 shim DEFUNs are gone --
+;; brief.org Step 2 deletes these getter+setter pairs; after a rebuild
+;; each name must read back as nil (same convention as §0 above).
+(for-each
+ (lambda (name)
+   (let ((sym (intern name)))
+     (check (string-append "imp4/s2/no-defun/" name)
+            #t
+            (eq? (%sym sym) #nil))))
+ '("--rks-shift-translated-p"
+   "--set-rks-shift-translated"
+   "--rks-new-binding"
+   "--set-rks-new-binding"
+   "--rks-first-unbound"
+   "--set-rks-first-unbound"
+   "--rks-original-uppercase"
+   "--set-rks-original-uppercase"
+   "--rks-original-uppercase-position"
+   "--set-rks-original-uppercase-position"))
+
+;;; --- 7. Step 2: each bucket-A slot round-trips on a live record ----
+;; brief.org Step 2: the 5 record slots are the single source of truth;
+;; each must round-trip through its srfi-9 accessor on a live record.
+(let ((s (make-rks-state)))
+  (set-rks-state-new-binding! s (string->symbol "imp4-s2-nb"))
+  (check "imp4/s2/record/new-binding" (string->symbol "imp4-s2-nb")
+         (rks-state-new-binding s))
+  (set-rks-state-first-unbound! s 7)
+  (check "imp4/s2/record/first-unbound" 7 (rks-state-first-unbound s))
+  (set-rks-state-original-uppercase! s (string->symbol "imp4-s2-ou"))
+  (check "imp4/s2/record/original-uppercase"
+         (string->symbol "imp4-s2-ou") (rks-state-original-uppercase s))
+  (set-rks-state-original-uppercase-position! s 9)
+  (check "imp4/s2/record/original-uppercase-position" 9
+         (rks-state-original-uppercase-position s))
+  (set-rks-state-shift-translated! s #t)
+  (check "imp4/s2/record/shift-translated" #t
+         (rks-state-shift-translated s)))
+
+;;; --- 8. Step 2: first-unbound sync-write meaning is preserved -------
+;; Mirror §5 for first-unbound: with an active source record pushed,
+;; rks-sync-write 'first-unbound copies its value into an unrelated
+;; target through the accessor (the branch survives Step 2).
+(let* ((push   (%sym '--rks-state-stack-push))
+       (pop    (%sym '--rks-state-stack-pop))
+       (target (make-rks-state))
+       (src    (make-rks-state)))
+  (set-rks-state-first-unbound! src 12)
+  (dynamic-wind
+    (lambda () (push src))
+    (lambda () (rks-sync-write target 'first-unbound))
+    (lambda () (pop)))
+  (check "imp4/s2/write/first-unbound-from-active" 12
+         (rks-state-first-unbound target)))
+
+;;; --- 9. Step 2: live-record accessor reads the pushed record --------
+;; The Generation-B helpers now read/write the bucket-A slots through
+;; the depth-0-safe live-record helpers.  With a record pushed, the
+;; helper must read that record's slot (not a default).
+(let* ((push (%sym '--rks-state-stack-push))
+       (pop  (%sym '--rks-state-stack-pop))
+       (src  (make-rks-state))
+       (live-fu (@@rk rks-live-first-unbound)))
+  (set-rks-state-first-unbound! src 21)
+  (dynamic-wind
+    (lambda () (push src))
+    (lambda ()
+      (check "imp4/s2/live/first-unbound-from-pushed" 21 (live-fu)))
+    (lambda () (pop))))

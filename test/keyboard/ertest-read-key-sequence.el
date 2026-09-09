@@ -383,13 +383,11 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 
 ;;;; M6o — shift-translated install
 
+;; shift_translated is record-resident (bucket-A, Step 2); its shim
+;; getter is deleted.  The done-block install is exercised below; the
+;; record path is covered by test-m28-imp4 §6-9.
 (ert-deftest m6o-helpers/exist ()
-  (should (fboundp '--rks-shift-translated-p))
   (should (fboundp '--rks-done-install-shift-translated!)))
-
-(ert-deftest m6o-shift-translated-p/returns-boolean ()
-  (let ((v (--rks-shift-translated-p)))
-    (should (or (eq v t) (eq v nil)))))
 
 (ert-deftest m6o-install/runs-without-error ()
   (--rks-done-install-shift-translated!)
@@ -448,18 +446,13 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 
 ;;;; M6r — downcase-undo
 
+;; original-uppercase / -position / set-shift-translated are
+;; record-resident (bucket-A, Step 2); their shims are deleted.  The
+;; downcase-undo value path is covered by test-m28-imp4 §6-9.
 (ert-deftest m6r-helpers/exist ()
-  (should (fboundp '--rks-original-uppercase))
-  (should (fboundp '--rks-original-uppercase-position))
   (should (fboundp '--rks-t))
   (should (fboundp '--rks-current-binding))
-  (should (fboundp '--set-rks-shift-translated))
   (should (fboundp '--rks-done-downcase-undo!)))
-
-(ert-deftest m6r-original-uppercase-position/defaults-to-negative-or-zero ()
-  ;; Pre-init the position is -1 (or whatever was last left after a
-  ;; read_key_sequence call).  Just verify it's an integer.
-  (should (integerp (--rks-original-uppercase-position))))
 
 (ert-deftest m6r-downcase-undo/no-op-when-position-out-of-range ()
   ;; In batch when no read_key_sequence is in flight, t == 0 (or
@@ -499,7 +492,9 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (should (fboundp '--rks-fkey-start))
   (should (fboundp '--rks-keytran-start))
   (should (fboundp '--rks-indec-start))
-  (should (fboundp '--rks-first-unbound))
+  ;; first-unbound is record-resident (bucket-A, Step 2); its shim
+  ;; getter is deleted.  The short-circuit reads it through the
+  ;; live-record accessor.
   (should (fboundp '--set-rks-mock-input))
   (should (fboundp '--rks-keybuf-shift-down))
   (should (fboundp '--rks-keyremaps-shrink-by))
@@ -661,19 +656,16 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 
 (ert-deftest m6ab-helpers/exist ()
   ;; imp-3 ported follow_key to Scheme (rks-follow-key) and deleted the
-  ;; --rks-follow-key C shim; the caller wrapper and new-binding remain.
+  ;; --rks-follow-key C shim.  new-binding is record-resident (bucket-A,
+  ;; Step 2); its shim getter is deleted.  The value path is covered by
+  ;; test-m28-imp4 §6-9.
   (should (fboundp '--rks-follow-key-and-update-first-unbound!))
-  (should (fboundp '--rks-follow-key-and-update-first-unbound))
-  (should (fboundp '--rks-new-binding)))
+  (should (fboundp '--rks-follow-key-and-update-first-unbound)))
 
 (ert-deftest m6ab-follow-key/nil-at-idle ()
   ;; At idle, rks_current_binding is nil and rks_key is nil.
   ;; follow_key(nil, nil) returns nil (no binding).  Subr returns nil.
   (should (eq nil (--rks-follow-key-and-update-first-unbound))))
-
-(ert-deftest m6ab-new-binding/getter-runs ()
-  (let ((v (--rks-new-binding)))
-    (should (or (eq v nil) v))))
 
 ;;;; M6ac — mouse-click prefix expansion
 

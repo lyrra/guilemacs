@@ -157,8 +157,10 @@
 ;;;
 (define %rks-push (delay (%sym '--rks-state-stack-push)))
 (define %rks-pop  (delay (%sym '--rks-state-stack-pop)))
-(define %rks-set-shift-translated
-  (delay (%sym '--set-rks-shift-translated)))
+;; bucket-A (Step 2): the --set-rks-shift-translated C setter is deleted;
+;; flip the slot through the srfi-9 accessor on the pushed record.
+(define %rks-set-shift-translated!
+  (@@ (emacs read-key-sequence) set-rks-state-shift-translated!))
 (define %rks-done-install-shift-translated!
   (delay (%sym '--rks-done-install-shift-translated!)))
 
@@ -169,7 +171,7 @@
     (dynamic-wind
       (lambda ()
         ((force %rks-push) state)
-        ((force %rks-set-shift-translated) val))
+        (%rks-set-shift-translated! state val))
       (lambda ()
         ((force %rks-done-install-shift-translated!))
         (symbol-value 'this-command-keys-shift-translated))

@@ -986,8 +986,6 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %set-read-key-sequence-remapped
   (delay (%c '--set-read-key-sequence-remapped)))
 
-(define %rks-shift-translated-p
-  (delay (%c '--rks-shift-translated-p)))
 (define %rks-delayed-switch-frame
   (delay (%c '--rks-delayed-switch-frame)))
 (define %set-unread-switch-frame
@@ -995,11 +993,6 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 
 (define %rks-t                       (delay (%c '--rks-t)))
 (define %rks-current-binding         (delay (%c '--rks-current-binding)))
-(define %rks-original-uppercase      (delay (%c '--rks-original-uppercase)))
-(define %rks-original-uppercase-position
-  (delay (%c '--rks-original-uppercase-position)))
-(define %set-rks-shift-translated
-  (delay (%c '--set-rks-shift-translated)))
 (define %rks-keybuf-set              (delay (%c '--rks-keybuf-set)))
 
 (define %rks-mock-input  (delay (%c '--rks-mock-input)))
@@ -1008,7 +1001,6 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %add-command-key (delay (%c '--add-command-key)))
 (define %rks-keybuf-ref  (delay (%c '--rks-keybuf-ref)))
 
-(define %rks-first-unbound       (delay (%c '--rks-first-unbound)))
 (define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
 (define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
 (define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
@@ -1101,7 +1093,10 @@ current-binding, new-binding and rks-key and returns #t."
          (new-click (list new-head (rks-event-start ((force %rks-key)))))
          (new-bind  (rks-follow-key ((force %rks-current-binding))
                                     new-click)))
-    ((force %set-rks-new-binding) new-bind)
+    ;; new-binding is bucket-A / record-resident: write the slot on the
+    ;; live record (no-op when no record is pushed, like the retired
+    ;; --set-rks-new-binding DEFUN).
+    (set-rks-live-new-binding! new-bind)
     (if (%nilp new-bind)
         #f
         (begin
@@ -1161,12 +1156,13 @@ Returns `fall-through', `replay-key', or `replay-sequence'."
   "M6h-r6: unbound-event reduction with inline record sync."
   (let ((rec ((force %rks-state-current))))
     (when (not (%nilp rec))
-      (rks-sync-read rec 'key-count)
-      (rks-sync-read rec 'first-unbound))
-    (let ((t ((force %rks-t)))
-          (fu ((force %rks-first-unbound))))
-      (when (< t fu)
-        ((force %set-rks-first-unbound) t)))
+      (rks-sync-read rec 'key-count))
+    ;; first-unbound is bucket-A / record-resident: update the slot
+    ;; directly (no C file-static mirror to sync).
+    (when (not (%nilp rec))
+      (let ((t ((force %rks-t))))
+        (when (< t (rks-state-first-unbound rec))
+          (set-rks-state-first-unbound! rec t))))
     (let ((result
            (if (%nilp rec)
                'fall-through
@@ -1174,8 +1170,6 @@ Returns `fall-through', `replay-key', or `replay-sequence'."
                 (rks-state-indec rec)
                 (rks-state-fkey rec)
                 (rks-state-keytran rec)))))
-      (when (not (%nilp rec))
-        (rks-sync-write rec 'first-unbound))
       result)))
 
 (define %rks-mouse-click-prefix-body
@@ -1203,14 +1197,6 @@ remain bare file-static reads."
 (define %rks-last-real-key-start
   (delay (%c '--rks-last-real-key-start)))
 (define %rks-keybuf-depth (delay (%c '--rks-keybuf-depth)))
-(define %rks-first-unbound
-  (delay (%c '--rks-first-unbound)))
-(define %rks-new-binding
-  (delay (%c '--rks-new-binding)))
-(define %set-rks-new-binding
-  (delay (%c '--set-rks-new-binding)))
-(define %set-rks-first-unbound
-  (delay (%c '--set-rks-first-unbound)))
 
 ;;; Port of follow_key (src/keyboard.c:8603-8608).
 ;;; KEYMAP is a keymap (or keymap-designating object); KEY is the event
@@ -1241,20 +1227,20 @@ remain bare file-static reads."
   (let ((rec ((force %rks-state-current))))
     (when (not (%nilp rec))
       (rks-sync-read rec 'key-count)
-      (rks-sync-read rec 'current-binding)
-      (rks-sync-read rec 'first-unbound))
+      (rks-sync-read rec 'current-binding))
     (let* ((cb  ((force %rks-current-binding)))
            (key ((force %rks-key)))
            (new-binding (rks-follow-key cb key)))
       (if (%nilp new-binding)
           #nil
           (begin
-            ((force %set-rks-new-binding) new-binding)
-            (let ((candidate (1+ ((force %rks-t)))))
-              (when (> candidate ((force %rks-first-unbound)))
-                ((force %set-rks-first-unbound) candidate)))
+            ;; new-binding / first-unbound are bucket-A (record-resident):
+            ;; write the slots directly on the live record.
             (when (not (%nilp rec))
-              (rks-sync-write rec 'first-unbound))
+              (set-rks-state-new-binding! rec new-binding)
+              (let ((candidate (1+ ((force %rks-t)))))
+                (when (> candidate (rks-state-first-unbound rec))
+                  (set-rks-state-first-unbound! rec candidate))))
             #t)))))
 
 (define %rks-iter-install-binding
@@ -1323,6 +1309,40 @@ elements.  See docs/keyboard.org §M6y."
 (define %set-rks-indec-end     (delay (%c '--set-rks-indec-end)))
 (define %set-rks-t          (delay (%c '--set-rks-t)))
 
+;; M28 imp-4 Step 2 (brief.org) — bucket-A field access through the
+;; live <rks-state>.  The C statics for first-unbound, shift-translated,
+;; new-binding, original-uppercase and original-uppercase-position are
+;; retired (M6m/M6o); the record slot is the single source of truth and
+;; the 10 shim DEFUNs are deleted.  These helpers replace each shim:
+;; they read/write the top-of-stack record (via --rks-state-current)
+;; and are depth-0 safe — with no record pushed a read returns the
+;; retired getter's default and a write is skipped (matching the
+;; retired setter's no-op), so the pure no-record path keeps semantics.
+(define (%rks-live-rec)
+  ((force %rks-state-current)))
+(define (rks-live-first-unbound)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) 0 (rks-state-first-unbound rec))))
+(define (rks-live-shift-translated)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) #nil (rks-state-shift-translated rec))))
+(define (set-rks-live-shift-translated! v)
+  (let ((rec (%rks-live-rec)))
+    (unless (%nilp rec)
+      (set-rks-state-shift-translated! rec (if v #t #nil)))))
+(define (rks-live-new-binding)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) #nil (rks-state-new-binding rec))))
+(define (set-rks-live-new-binding! v)
+  (let ((rec (%rks-live-rec)))
+    (unless (%nilp rec) (set-rks-state-new-binding! rec v))))
+(define (rks-live-original-uppercase)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) #nil (rks-state-original-uppercase rec))))
+(define (rks-live-original-uppercase-position)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) -1 (rks-state-original-uppercase-position rec))))
+
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch
 ;; helpers.  See docs/m6-plan-revised.org.
@@ -1337,20 +1357,30 @@ elements.  See docs/keyboard.org §M6y."
 ;; `keytran-start' through the C shim (Step 3 / bucket-C ports it).
 
 (define (rks-sync-read rec field)
-  "Sync one field FROM record TO C file-static.  Returns #nil."
+  "Sync one field FROM record TO C file-static.  Returns #nil.
+Bucket-A slots (first-unbound) have no C file-static mirror (retired
+in Step 1); their branch copies the slot into the *live* <rks-state>
+(the retired setter's destination) via the accessor — a no-op when no
+record is pushed."
   (case field
     ((key-count)       ((force %set-rks-t) (rks-state-key-count rec)))
     ((mock-input)      ((force %set-rks-mock-input)
                         (rks-state-mock-input rec)))
     ((current-binding) ((force %set-rks-current-binding)
                         (rks-state-current-binding rec)))
-    ((first-unbound)   ((force %set-rks-first-unbound)
-                        (rks-state-first-unbound rec)))
+    ((first-unbound)   (let ((live (%rks-live-rec)))
+                         (unless (%nilp live)
+                           (set-rks-state-first-unbound!
+                            live (rks-state-first-unbound rec)))))
     (else (error "rks-sync-read: unknown field" field)))
   #nil)
 
 (define (rks-sync-write rec field)
-  "Sync one field FROM C file-static TO record.  Returns #nil."
+  "Sync one field FROM C file-static TO record.  Returns #nil.
+Bucket-A slots (first-unbound, shift-translated) have no C file-static
+mirror (retired in Step 1); their branches copy the slot out of the
+*live* <rks-state> into REC via the accessor (depth-0 defaults: 0 for
+first-unbound, nil for shift-translated)."
   (case field
     ((mock-input)      (set-rks-state-mock-input!
                         rec ((force %rks-mock-input))))
@@ -1359,9 +1389,9 @@ elements.  See docs/keyboard.org §M6y."
     ((current-binding) (set-rks-state-current-binding!
                         rec ((force %rks-current-binding))))
     ((first-unbound)   (set-rks-state-first-unbound!
-                        rec ((force %rks-first-unbound))))
+                        rec (rks-live-first-unbound)))
     ((shift-translated) (set-rks-state-shift-translated!
-                         rec (if ((force %rks-shift-translated-p)) #t #nil)))
+                         rec (if (rks-live-shift-translated) #t #nil)))
     (else (error "rks-sync-write: unknown field" field)))
   #nil)
 
@@ -1597,19 +1627,21 @@ deleted C --rks-walk-indec / --rks-fkey-shortcut-or-walk /
           (if (%nilp new-key)
               #nil
               (begin
-                ((force %set-rks-original-uppercase) key)
-                ((force %set-rks-original-uppercase-position)
-                 (- ((force %rks-t)) 1))
+                ;; original-uppercase / -position / shift-translated are
+                ;; bucket-A (record-resident): write the slots directly.
+                (when (not (%nilp rec))
+                  (set-rks-state-original-uppercase! rec key)
+                  (set-rks-state-original-uppercase-position!
+                   rec (- ((force %rks-t)) 1))
+                  (set-rks-state-shift-translated! rec #t))
                 ((force %rks-keybuf-set)
                  (- ((force %rks-t)) 1)
                  new-key)
                 (when (> ((force %rks-t)) ((force %rks-mock-input)))
                   ((force %set-rks-mock-input) ((force %rks-t))))
                 ((force %rks-reset-fkey-and-keytran-scans))
-                ((force %set-rks-shift-translated) #t)
                 (when (not (%nilp rec))
-                  (rks-sync-write rec 'mock-input)
-                  (rks-sync-write rec 'shift-translated))
+                  (rks-sync-write rec 'mock-input))
                 #t))))))
 
 ;; Wave B: hoisted label bodies, callable from any Scheme wrapper.
@@ -1700,7 +1732,7 @@ without taking a C goto."
       (replay-sequence-continue))
      (else 'fall-through)))
   (define (install-and-cascade)
-    (rks-iter-install-binding! ((force %rks-new-binding)))
+    (rks-iter-install-binding! (rks-live-new-binding))
     (cascade))
   (let ((mc (rks-iter-mouse-click-prefix!)))
     (cond
@@ -1907,14 +1939,7 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
 (define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
 (define %rks-t                   (delay (%c '--rks-t)))
 (define %rks-mock-input          (delay (%c '--rks-mock-input)))
-(define %rks-shift-translated-p  (delay (%c '--rks-shift-translated-p)))
-(define %set-rks-shift-translated
-  (delay (%c '--set-rks-shift-translated)))
 (define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
-(define %set-rks-original-uppercase
-  (delay (%c '--set-rks-original-uppercase)))
-(define %set-rks-original-uppercase-position
-  (delay (%c '--set-rks-original-uppercase-position)))
 (define %rks-keybuf-set          (delay (%c '--rks-keybuf-set)))
 
 (define (rks-try-shift-translation-simple! key)
@@ -1933,25 +1958,27 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
           (if (%nilp new-key)
               #nil
               (begin
-                ((force %set-rks-original-uppercase) key)
-                ((force %set-rks-original-uppercase-position)
-                 (- ((force %rks-t)) 1))
+                ;; original-uppercase / -position / shift-translated are
+                ;; bucket-A (record-resident): write the slots directly.
+                (when (not (%nilp rec))
+                  (set-rks-state-original-uppercase! rec key)
+                  (set-rks-state-original-uppercase-position!
+                   rec (- ((force %rks-t)) 1))
+                  (set-rks-state-shift-translated! rec #t))
                 ((force %rks-keybuf-set)
                  (- ((force %rks-t)) 1)
                  new-key)
                 (when (> ((force %rks-t)) ((force %rks-mock-input)))
                   ((force %set-rks-mock-input) ((force %rks-t))))
-                ((force %set-rks-shift-translated) #t)
                 (when (not (%nilp rec))
-                  (rks-sync-write rec 'mock-input)
-                  (rks-sync-write rec 'shift-translated))
+                  (rks-sync-write rec 'mock-input))
                 #t))))))
 
 (define (rks-first-unbound-short-circuit!)
   "Shrink the keybuf when a prefix has no binding.  If fired, calls
 replay-sequence-continue and returns `replay-sequence'; otherwise
 nil.  Wave B: the C goto replay_sequence is folded into this call."
-  (let* ((fu  ((force %rks-first-unbound)))
+  (let* ((fu  (rks-live-first-unbound))
          (kts ((force %rks-keytran-start))))
     (cond
      ((< fu kts)
@@ -1996,14 +2023,16 @@ the C 5-line block:
     }
 
 See docs/keyboard.org §M6r."
-  (let ((t-val   ((force %rks-t)))
-        (cb      ((force %rks-current-binding)))
-        (oup-pos ((force %rks-original-uppercase-position))))
-    (when (and (or (not (%nilp dont-downcase-last)) (%nilp cb))
-               (> t-val 0)
-               (= (- t-val 1) oup-pos))
-      ((force %rks-keybuf-set) (- t-val 1) ((force %rks-original-uppercase)))
-      ((force %set-rks-shift-translated) #nil))))
+  ;; original-uppercase / -position / shift-translated are bucket-A
+  ;; (record-resident): read/write the live record slots directly.
+  (when (and (or (not (%nilp dont-downcase-last))
+                 (%nilp ((force %rks-current-binding))))
+             (> ((force %rks-t)) 0)
+             (= (- ((force %rks-t)) 1)
+                (rks-live-original-uppercase-position)))
+    ((force %rks-keybuf-set) (- ((force %rks-t)) 1)
+     (rks-live-original-uppercase))
+    (set-rks-live-shift-translated! #nil)))
 
 (define (rks-done-install-unread-switch-frame!)
   "Copy the C-side rks_delayed_switch_frame into the global
@@ -2019,7 +2048,7 @@ defvar `this-command-keys-shift-translated' to t.  Mirrors the
 2-line C block near the end of read_key_sequence (just after the
 downcase-undo, before the fabricated-events finalize loop).  See
 docs/keyboard.org §M6o."
-  (when (not (%nilp ((force %rks-shift-translated-p))))
+  (when (not (%nilp (rks-live-shift-translated)))
     (set-symbol-value! 'this-command-keys-shift-translated #t)))
 
 (define (rks-done-compute-remapped!)

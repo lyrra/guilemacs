@@ -238,14 +238,11 @@
 
 ;;;; M6o
 
-(test-assert "m6o-helper/shift-translated-p"
-             (fboundp '--rks-shift-translated-p))
+;; shift_translated is record-resident (bucket-A, Step 2); its shim
+;; getter is deleted.  The done-block install is exercised below; the
+;; record round-trip is covered by test-m28-imp4 §6-9.
 (test-assert "m6o/install-exists"
              (fboundp '--rks-done-install-shift-translated!))
-
-(let ((v (--rks-shift-translated-p)))
-  (test-assert "m6o/shift-translated-p-boolean"
-               (or (eq v t) (eq v nil))))
 
 (--rks-done-install-shift-translated!)
 (test-assert "m6o/install-runs" t)
@@ -279,20 +276,14 @@
 
 ;;;; M6r
 
-(test-assert "m6r-helper/original-uppercase"
-             (fboundp '--rks-original-uppercase))
-(test-assert "m6r-helper/original-uppercase-position"
-             (fboundp '--rks-original-uppercase-position))
 (test-assert "m6r-helper/rks-t"             (fboundp '--rks-t))
 (test-assert "m6r-helper/rks-current-binding"
              (fboundp '--rks-current-binding))
-(test-assert "m6r-helper/set-rks-shift-translated"
-             (fboundp '--set-rks-shift-translated))
+;; original-uppercase / -position / set-shift-translated are
+;; record-resident (bucket-A, Step 2); their shims are deleted.  The
+;; downcase-undo value path is covered by test-m28-imp4 §6-9.
 (test-assert "m6r/downcase-undo-exists"
              (fboundp '--rks-done-downcase-undo!))
-
-(test-assert "m6r/original-uppercase-position-integer"
-             (integerp (--rks-original-uppercase-position)))
 
 (--rks-done-downcase-undo! nil)
 (--rks-done-downcase-undo! t)
@@ -321,7 +312,9 @@
 (test-assert "m6t-helper/fkey-start"      (fboundp '--rks-fkey-start))
 (test-assert "m6t-helper/keytran-start"   (fboundp '--rks-keytran-start))
 (test-assert "m6t-helper/indec-start"     (fboundp '--rks-indec-start))
-(test-assert "m6t-helper/first-unbound"   (fboundp '--rks-first-unbound))
+;; first-unbound is record-resident (bucket-A, Step 2); its shim
+;; getter is deleted.  The short-circuit below reads it through the
+;; live-record accessor.
 (test-assert "m6t-helper/set-mock-input"  (fboundp '--set-rks-mock-input))
 (test-assert "m6t-helper/keybuf-shift-down"
              (fboundp '--rks-keybuf-shift-down))
@@ -437,8 +430,8 @@
 
 (test-assert "m6ab-helper/follow-key-update-first-unbound"
              (fboundp '--rks-follow-key-and-update-first-unbound))
-(test-assert "m6ab-helper/new-binding"
-             (fboundp '--rks-new-binding))
+;; new-binding is record-resident (bucket-A, Step 2); its shim getter
+;; is deleted.  The value path is covered by test-m28-imp4 §6-9.
 
 (test-eq "m6ab/follow-key-nil-at-idle"
          nil (--rks-follow-key-and-update-first-unbound))
