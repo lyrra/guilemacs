@@ -9471,117 +9471,6 @@ the echo-area buffer from the current kboard state.  */)
   return Qnil;
 }
 
-/* M6t — primitives exposed to (emacs read-key-sequence) for the
-   first_unbound short-circuit branch.  See docs/keyboard.org §M6t.  */
-
-DEFUN ("--rks-fkey-start", Fc_rks_fkey_start, Sc_rks_fkey_start, 0, 0, 0,
-       doc: /* Internal: read fkey.start from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_FKEY, KM_SLOT_START));
-}
-
-DEFUN ("--rks-fkey-end", Fc_rks_fkey_end, Sc_rks_fkey_end, 0, 0, 0,
-       doc: /* Internal: read fkey.end from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_FKEY, KM_SLOT_END));
-}
-
-DEFUN ("--rks-keytran-start", Fc_rks_keytran_start, Sc_rks_keytran_start,
-       0, 0, 0,
-       doc: /* Internal: read keytran.start from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_START));
-}
-
-DEFUN ("--rks-indec-start", Fc_rks_indec_start, Sc_rks_indec_start,
-       0, 0, 0,
-       doc: /* Internal: read indec.start from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_INDEC, KM_SLOT_START));
-}
-
-DEFUN ("--rks-keytran-end", Fc_rks_keytran_end, Sc_rks_keytran_end,
-       0, 0, 0,
-       doc: /* Internal: read keytran.end from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_END));
-}
-
-DEFUN ("--rks-indec-end", Fc_rks_indec_end, Sc_rks_indec_end,
-       0, 0, 0,
-       doc: /* Internal: read indec.end from <rks-state>.  */)
-  (void)
-{
-  return make_fixnum (rks_keyremap_field_int (RKS_SLOT_INDEC, KM_SLOT_END));
-}
-
-/* Keyremap field setters — added for M6h-1 Scheme-side sync.  */
-
-DEFUN ("--set-rks-fkey-start", Fc_set_rks_fkey_start,
-       Sc_set_rks_fkey_start, 1, 1, 0,
-       doc: /* Internal: write fkey.start in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_FKEY, KM_SLOT_START, XFIXNUM (n));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-fkey-end", Fc_set_rks_fkey_end,
-       Sc_set_rks_fkey_end, 1, 1, 0,
-       doc: /* Internal: write fkey.end in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_FKEY, KM_SLOT_END, XFIXNUM (n));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-keytran-start", Fc_set_rks_keytran_start,
-       Sc_set_rks_keytran_start, 1, 1, 0,
-       doc: /* Internal: write keytran.start in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_START, XFIXNUM (n));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-keytran-end", Fc_set_rks_keytran_end,
-       Sc_set_rks_keytran_end, 1, 1, 0,
-       doc: /* Internal: write keytran.end in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_END, XFIXNUM (n));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-indec-start", Fc_set_rks_indec_start,
-       Sc_set_rks_indec_start, 1, 1, 0,
-       doc: /* Internal: write indec.start in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_INDEC, KM_SLOT_START, XFIXNUM (n));
-  return Qnil;
-}
-
-DEFUN ("--set-rks-indec-end", Fc_set_rks_indec_end,
-       Sc_set_rks_indec_end, 1, 1, 0,
-       doc: /* Internal: write indec.end in <rks-state>.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  rks_keyremap_set_field_int (RKS_SLOT_INDEC, KM_SLOT_END, XFIXNUM (n));
-  return Qnil;
-}
-
 DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,
        Sc_set_rks_mock_input, 1, 1, 0,
        doc: /* Internal: write rks_mock_input.  */)
@@ -9662,28 +9551,6 @@ call is in flight.  */)
   return Qnil;
 }
 
-DEFUN ("--rks-keyremaps-shrink-by",
-       Fc_rks_keyremaps_shrink_by, Sc_rks_keyremaps_shrink_by, 1, 1, 0,
-       doc: /* Internal: for each of indec, fkey, keytran, subtract N
-from start, set end = start, and set map = parent.  Mirrors the inner
-adjustment of the first_unbound short-circuit branch.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  EMACS_INT amount = XFIXNUM (n);
-  keyremap indec, fkey, keytran;
-  rks_keyremap_load (RKS_SLOT_INDEC,   &indec);
-  rks_keyremap_load (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_load (RKS_SLOT_KEYTRAN, &keytran);
-  indec.start   -= amount; indec.end   = indec.start;   indec.map   = indec.parent;
-  fkey.start    -= amount; fkey.end    = fkey.start;    fkey.map    = fkey.parent;
-  keytran.start -= amount; keytran.end = keytran.start; keytran.map = keytran.parent;
-  rks_keyremap_store (RKS_SLOT_INDEC,   &indec);
-  rks_keyremap_store (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_store (RKS_SLOT_KEYTRAN, &keytran);
-  return Qnil;
-}
-
 /* M6x — the three translation-map walks (input-decode-map,
    function-key-map, key-translation-map) plus the in-between
    fkey-shortcut were ported to Scheme in imp-3: rks-walk-translation-maps!
@@ -9739,21 +9606,6 @@ Returns the translated key or nil.  */)
   return (m & shift_modifier)
     ? rks_strip_shift_modifier (key, m)
     : rks_downcase_uppercase_char (key, m);
-}
-
-DEFUN ("--rks-reset-fkey-and-keytran-scans",
-       Fc_rks_reset_fkey_and_keytran_scans,
-       Sc_rks_reset_fkey_and_keytran_scans, 0, 0, 0,
-       doc: /* Internal: reset fkey and keytran start/end to 0 so
-function-key-map re-applies on the replacement key after
-shift-translation.  */)
-  (void)
-{
-  rks_keyremap_set_field_int (RKS_SLOT_FKEY,    KM_SLOT_START, 0);
-  rks_keyremap_set_field_int (RKS_SLOT_FKEY,    KM_SLOT_END,   0);
-  rks_keyremap_set_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_START, 0);
-  rks_keyremap_set_field_int (RKS_SLOT_KEYTRAN, KM_SLOT_END,   0);
-  return Qnil;
 }
 
 /* M6w — former --rks-try-shift-translation-fn-key bulk subr (40
@@ -9910,23 +9762,6 @@ Scheme caller performs).  */)
                         rks_current_binding);
       rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
     }
-  return Qnil;
-}
-
-DEFUN ("--rks-init-keyremaps", Fc_rks_init_keyremaps, Sc_rks_init_keyremaps,
-       3, 3, 0,
-       doc: /* Internal: initialize the three keyremap sub-records
-in <rks-state> with the given INDEC-MAP, FKEY-MAP, KEYTRAN-MAP.
-Each keyremap is set so parent == map == MAP and start == end == 0.
-Mirrors the C `replay_entire_sequence:' inline block.  */)
-  (Lisp_Object indec_map, Lisp_Object fkey_map, Lisp_Object keytran_map)
-{
-  keyremap indec   = { .parent = indec_map,   .map = indec_map,   .start = 0, .end = 0 };
-  keyremap fkey    = { .parent = fkey_map,    .map = fkey_map,    .start = 0, .end = 0 };
-  keyremap keytran = { .parent = keytran_map, .map = keytran_map, .start = 0, .end = 0 };
-  rks_keyremap_store (RKS_SLOT_INDEC,   &indec);
-  rks_keyremap_store (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_store (RKS_SLOT_KEYTRAN, &keytran);
   return Qnil;
 }
 

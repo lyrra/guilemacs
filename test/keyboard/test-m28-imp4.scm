@@ -251,3 +251,127 @@
     (lambda ()
       (check "imp4/s2/live/first-unbound-from-pushed" 21 (live-fu)))
     (lambda () (pop))))
+
+;;; --- 10. Step 3 (bucket-C keyremap): the 15 shims are gone -----------
+;; brief.org Step 3 deletes the 6 start/end getter+setter pairs and the
+;; 3 bulk shims (--rks-keyremaps-shrink-by / --rks-reset-fkey-and-keytran-scans /
+;; --rks-init-keyremaps).  After a rebuild each name reads back as nil
+;; (same convention as §0 / §6 above).
+(for-each
+ (lambda (name)
+   (let ((sym (intern name)))
+     (check (string-append "imp4/s3/no-defun/" name)
+            #t
+            (eq? (%sym sym) #nil))))
+ '("--rks-fkey-start"   "--rks-fkey-end"
+   "--rks-keytran-start" "--rks-keytran-end"
+   "--rks-indec-start"   "--rks-indec-end"
+   "--set-rks-fkey-start" "--set-rks-fkey-end"
+   "--set-rks-keytran-start" "--set-rks-keytran-end"
+   "--set-rks-indec-start" "--set-rks-indec-end"
+   "--rks-keyremaps-shrink-by"
+   "--rks-reset-fkey-and-keytran-scans"
+   "--rks-init-keyremaps"))
+
+;; --- 11. Step 3: bucket-C live helpers on a pushed record ------------
+;; The keyremap start/end fields are now read/written through srfi-9
+;; accessors on the *live* <rks-state>.  We reach the unexported
+;; accessors / helpers with the @@ idiom (as above).  Drive each helper
+;; on a pushed record and check the depth-0 default separately.
+(define rks-live-keytran-start      (@@rk rks-live-keytran-start))
+(define rks-keyremaps-shrink-by!    (@@rk rks-keyremaps-shrink-by!))
+(define rks-reset-fkey-and-keytran-scans!
+  (@@rk rks-reset-fkey-and-keytran-scans!))
+(define rks-state-fkey              (@@rk rks-state-fkey))
+(define rks-state-keytran           (@@rk rks-state-keytran))
+(define rks-state-indec             (@@rk rks-state-indec))
+(define keyremap-rebase!            (@@rk keyremap-rebase!))
+(define keyremap-start              (@@rk keyremap-start))
+(define keyremap-end                (@@rk keyremap-end))
+(define keyremap-map                (@@rk keyremap-map))
+(define keyremap-parent             (@@rk keyremap-parent))
+(define set-keyremap-map!           (@@rk set-keyremap-map!))
+(define set-keyremap-start!         (@@rk set-keyremap-start!))
+(define set-keyremap-end!           (@@rk set-keyremap-end!))
+
+;; depth-0 default: no record pushed → rks-live-keytran-start = 0.
+(check "imp4/s3/live/keytran-start-depth0-zero"
+       0 (rks-live-keytran-start))
+
+(define (sparse-map sym)
+  (let ((m ((%sym 'make-sparse-keymap))))
+    ((%sym 'define-key) m (vector (char->integer #\x)) sym)
+    m))
+
+;; shrink-by! decrements start, sets end = new start, map = parent, for
+;; all three keyremaps on the pushed record.
+(let* ((push   (%sym '--rks-state-stack-push))
+       (pop    (%sym '--rks-state-stack-pop))
+       (state  (make-rks-state))
+       (fkey   (rks-state-fkey state))
+       (keytran (rks-state-keytran state))
+       (indec   (rks-state-indec state)))
+  (keyremap-rebase! fkey    (sparse-map 's3-fkey))
+  (keyremap-rebase! keytran (sparse-map 's3-keytran))
+  (keyremap-rebase! indec   (sparse-map 's3-indec))
+  ;; Seed nonzero scan starts and a non-parent map so the decrement and
+  ;; the map=parent reset are each observable.
+  (set-keyremap-start! fkey 10)
+  (set-keyremap-start! keytran 20)
+  (set-keyremap-start! indec 30)
+  (set-keyremap-map! fkey (sparse-map 's3-fkey-m2))
+  (set-keyremap-map! keytran (sparse-map 's3-keytran-m2))
+  (set-keyremap-map! indec (sparse-map 's3-indec-m2))
+  (let ((fkey-parent (keyremap-parent fkey)))
+    (dynamic-wind
+      (lambda () (push state))
+      (lambda ()
+        (rks-keyremaps-shrink-by! 2)
+        (check "imp4/s3/shrink/fkey-start" 8 (keyremap-start fkey))
+        (check "imp4/s3/shrink/fkey-end-eq-start" 8 (keyremap-end fkey))
+        (check "imp4/s3/shrink/fkey-map-eq-parent" #t
+               (eq? fkey-parent (keyremap-map fkey)))
+        (check "imp4/s3/shrink/keytran-start" 18 (keyremap-start keytran))
+        (check "imp4/s3/shrink/keytran-end-eq-start" 18 (keyremap-end keytran))
+        (check "imp4/s3/shrink/keytran-map-eq-parent" #t
+               (eq? (keyremap-parent keytran) (keyremap-map keytran)))
+        (check "imp4/s3/shrink/indec-start" 28 (keyremap-start indec))
+        (check "imp4/s3/shrink/indec-end-eq-start" 28 (keyremap-end indec))
+        (check "imp4/s3/shrink/indec-map-eq-parent" #t
+               (eq? (keyremap-parent indec) (keyremap-map indec))))
+      (lambda () (pop)))))
+
+;; reset-fkey-and-keytran-scans! zeroes start/end of fkey and keytran
+;; ONLY — indec untouched, and map is NOT reset to parent.
+(let* ((push   (%sym '--rks-state-stack-push))
+       (pop    (%sym '--rks-state-stack-pop))
+       (state  (make-rks-state))
+       (fkey   (rks-state-fkey state))
+       (keytran (rks-state-keytran state))
+       (indec   (rks-state-indec state)))
+  (keyremap-rebase! fkey    (sparse-map 's3-fkey))
+  (keyremap-rebase! keytran (sparse-map 's3-keytran))
+  (keyremap-rebase! indec   (sparse-map 's3-indec))
+  ;; Pre-seed nonzero scans and a non-parent map so the reset's effect is
+  ;; distinguishable from keyremap-reset! (which also sets map = parent).
+  (set-keyremap-start! fkey 3)
+  (set-keyremap-end!   fkey 5)
+  (set-keyremap-start! keytran 7)
+  (set-keyremap-end!   keytran 9)
+  (set-keyremap-start! indec 11)      ; reset must NOT touch indec
+  (set-keyremap-map! fkey (sparse-map 's3-fkey-m2))
+  (let ((fkey-m2 (keyremap-map fkey))) ; remember the non-parent map
+    (dynamic-wind
+      (lambda () (push state))
+      (lambda ()
+        (rks-reset-fkey-and-keytran-scans!)
+        (check "imp4/s3/reset/fkey-start-zero" 0 (keyremap-start fkey))
+        (check "imp4/s3/reset/fkey-end-zero" 0 (keyremap-end fkey))
+        (check "imp4/s3/reset/keytran-start-zero" 0 (keyremap-start keytran))
+        (check "imp4/s3/reset/keytran-end-zero" 0 (keyremap-end keytran))
+        ;; indec is untouched by the reset.
+        (check "imp4/s3/reset/indec-start-unchanged" 11 (keyremap-start indec))
+        ;; map is preserved (NOT reset to parent).
+        (check "imp4/s3/reset/fkey-map-preserved" #t
+               (eq? fkey-m2 (keyremap-map fkey))))
+      (lambda () (pop)))))

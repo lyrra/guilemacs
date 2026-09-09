@@ -919,8 +919,6 @@ rks-state record.  Mirrors src/keyboard.c lines 10528-10535:
   (delay (%c 'kboard-local-function-key-map)))
 (define %active-maps           (delay (%c '--active-maps)))
 
-(define %rks-init-keyremaps    (delay (%c '--rks-init-keyremaps)))
-
 (define (rks-setup-replay-entire-sequence! state)
   "Reset the three keyremaps in STATE from current-kboard's translation
 maps and the global `key-translation-map'.  Mirrors the C block at
@@ -935,16 +933,20 @@ the `replay_entire_sequence:' label (src/keyboard.c lines
                       (symbol-value 'key-translation-map))))
 
 (define (rks-setup-replay-entire-sequence-c!)
-  "Runtime variant of `rks-setup-replay-entire-sequence!': writes the
-file-static C-side keyremap shadows (rks_indec, rks_fkey,
-rks_keytran) via `--rks-init-keyremaps'.  Called from
-read_key_sequence's `replay_entire_sequence:' label via the
-cached-SCM dispatch."
-  (let ((kb ((force %current-kboard))))
-    ((force %rks-init-keyremaps)
-     ((force %kboard-input-decode-map) kb)
-     ((force %kboard-local-function-key-map) kb)
-     (symbol-value 'key-translation-map))))
+  "Runtime variant of `rks-setup-replay-entire-sequence!': rebase the
+three keyremap sub-records of the live <rks-state> (top of stack).
+Called from read_key_sequence's `replay_entire_sequence:' label via
+the cached-SCM dispatch.  Replaces the deleted C `--rks-init-keyremaps'
+shim."
+  (let ((rec (%rks-live-rec)))
+    (unless (%nilp rec)
+      (let ((kb ((force %current-kboard))))
+        (keyremap-rebase! (rks-state-indec rec)
+                          ((force %kboard-input-decode-map) kb))
+        (keyremap-rebase! (rks-state-fkey rec)
+                          ((force %kboard-local-function-key-map) kb))
+        (keyremap-rebase! (rks-state-keytran rec)
+                          (symbol-value 'key-translation-map))))))
 
 (define READ-KEY-ELTS-PLUS-1 (+ READ-KEY-ELTS 1))
 
@@ -1001,10 +1003,8 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %add-command-key (delay (%c '--add-command-key)))
 (define %rks-keybuf-ref  (delay (%c '--rks-keybuf-ref)))
 
-(define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
 (define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
 (define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
-(define %rks-keyremaps-shrink-by (delay (%c '--rks-keyremaps-shrink-by)))
 
 (define %rks-iter-setup-capture
   (delay (%c '--rks-iter-setup-capture)))
@@ -1295,18 +1295,10 @@ elements.  See docs/keyboard.org §M6y."
 (define %set-rks-current-binding
   (delay (%c '--set-rks-current-binding)))
 
-;; M6h-1 keyremap getter/setter delays
-(define %rks-fkey-start     (delay (%c '--rks-fkey-start)))
-(define %rks-fkey-end       (delay (%c '--rks-fkey-end)))
-(define %rks-keytran-start  (delay (%c '--rks-keytran-start)))
-(define %rks-keytran-end    (delay (%c '--rks-keytran-end)))
-(define %rks-indec-start    (delay (%c '--rks-indec-start)))
-(define %rks-indec-end      (delay (%c '--rks-indec-end)))
-(define %set-rks-fkey-start    (delay (%c '--set-rks-fkey-start)))
-(define %set-rks-fkey-end      (delay (%c '--set-rks-fkey-end)))
-(define %set-rks-keytran-end   (delay (%c '--set-rks-keytran-end)))
-(define %set-rks-indec-start   (delay (%c '--set-rks-indec-start)))
-(define %set-rks-indec-end     (delay (%c '--set-rks-indec-end)))
+;; M6h-1 keyremap getter/setter delays (deleted in M28 imp-4 Step 3 —
+;; bucket-C: the fkey/keytran/indec start/end fields are now read and
+;; written through the srfi-9 <keyremap> accessors on the live record;
+;; see the helpers below).
 (define %set-rks-t          (delay (%c '--set-rks-t)))
 
 ;; M28 imp-4 Step 2 (brief.org) — bucket-A field access through the
@@ -1343,6 +1335,47 @@ elements.  See docs/keyboard.org §M6y."
   (let ((rec (%rks-live-rec)))
     (if (%nilp rec) -1 (rks-state-original-uppercase-position rec))))
 
+;; M28 imp-4 Step 3 (brief.org) — bucket-C keyremap start/end access.
+;; The 15 bucket-C shims (6 start/end getter+setter pairs + the 3 bulk
+;; shims --rks-keyremaps-shrink-by / --rks-reset-fkey-and-keytran-scans /
+;; --rks-init-keyremaps) are deleted.  The Scheme machine now reads and
+;; writes the fkey/keytran/indec start/end fields through the srfi-9
+;; <keyremap> accessors on the *live* <rks-state>.  These helpers mirror
+;; the retired C semantics and are depth-0 safe: a getter returns 0 when
+;; no record is pushed; a setter/bulk helper is a no-op there.
+(define (rks-live-keytran-start)
+  (let ((rec (%rks-live-rec)))
+    (if (%nilp rec) 0 (keyremap-start (rks-state-keytran rec)))))
+
+(define (rks-keyremaps-shrink-by! n)
+  "Mirror of the deleted C `--rks-keyremaps-shrink-by'.  For each of
+indec, fkey, keytran on the live record: start -= N, end = the *new*
+start, map = parent.  No-op when no record is pushed."
+  (let ((rec (%rks-live-rec)))
+    (unless (%nilp rec)
+      (for-each
+       (lambda (kr)
+         (set-keyremap-start! kr (- (keyremap-start kr) n))
+         (set-keyremap-end!   kr (keyremap-start kr))
+         (set-keyremap-map!   kr (keyremap-parent kr)))
+       (list (rks-state-indec rec)
+             (rks-state-fkey rec)
+             (rks-state-keytran rec))))))
+
+(define (rks-reset-fkey-and-keytran-scans!)
+  "Mirror of the deleted C `--rks-reset-fkey-and-keytran-scans'.
+Zeroes the start and end of fkey and keytran on the live record ONLY.
+Does NOT touch indec and does NOT set map = parent (unlike
+`keyremap-reset!').  No-op when no record is pushed."
+  (let ((rec (%rks-live-rec)))
+    (unless (%nilp rec)
+      (let ((fkey (rks-state-fkey rec))
+            (keytran (rks-state-keytran rec)))
+        (set-keyremap-start! fkey 0)
+        (set-keyremap-end!   fkey 0)
+        (set-keyremap-start! keytran 0)
+        (set-keyremap-end!   keytran 0)))))
+
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch
 ;; helpers.  See docs/m6-plan-revised.org.
@@ -1352,9 +1385,7 @@ elements.  See docs/keyboard.org §M6y."
 ;; (--rks-record-get-int/set-int/get/set/set-bool, deleted).  Each
 ;; `rks-sync-read' branch copies one record slot into its C file-static
 ;; mirror; each `rks-sync-write' branch copies one C file-static back
-;; into the record.  The keyremap start/end fields are NOT yet the
-;; record's source of truth — the Scheme machine still reads
-;; `keytran-start' through the C shim (Step 3 / bucket-C ports it).
+;; into the record.
 
 (define (rks-sync-read rec field)
   "Sync one field FROM record TO C file-static.  Returns #nil.
@@ -1603,8 +1634,6 @@ deleted C --rks-walk-indec / --rks-fkey-shortcut-or-walk /
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))
-(define %rks-reset-fkey-and-keytran-scans
-  (delay (%c '--rks-reset-fkey-and-keytran-scans)))
 
 (define (rks-try-shift-translation-fn-key! key)
   "M6h-r3: fn-key shift-translation with inline record sync."
@@ -1614,7 +1643,7 @@ deleted C --rks-walk-indec / --rks-fkey-shortcut-or-walk /
       (rks-sync-read rec 'mock-input)
       (rks-sync-read rec 'current-binding))
     (if (or (not (%nilp ((force %rks-current-binding))))
-            (< ((force %rks-keytran-start)) ((force %rks-t))))
+            (< (rks-live-keytran-start) ((force %rks-t))))
         #nil
         (let* ((breakdown (parse-modifiers key))
                (mods (if (pair? breakdown)
@@ -1639,7 +1668,7 @@ deleted C --rks-walk-indec / --rks-fkey-shortcut-or-walk /
                  new-key)
                 (when (> ((force %rks-t)) ((force %rks-mock-input)))
                   ((force %set-rks-mock-input) ((force %rks-t))))
-                ((force %rks-reset-fkey-and-keytran-scans))
+                (rks-reset-fkey-and-keytran-scans!)
                 (when (not (%nilp rec))
                   (rks-sync-write rec 'mock-input))
                 #t))))))
@@ -1936,7 +1965,6 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
   (delay (%c '--rks-shift-translate-key)))
 
 (define %rks-current-binding     (delay (%c '--rks-current-binding)))
-(define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
 (define %rks-t                   (delay (%c '--rks-t)))
 (define %rks-mock-input          (delay (%c '--rks-mock-input)))
 (define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
@@ -1950,7 +1978,7 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
       (rks-sync-read rec 'mock-input)
       (rks-sync-read rec 'current-binding))
     (if (or (not (%nilp ((force %rks-current-binding))))
-            (< ((force %rks-keytran-start)) ((force %rks-t)))
+            (< (rks-live-keytran-start) ((force %rks-t)))
             (not (integer? key))
             (not (symbol-value 'translate-upper-case-key-bindings)))
         #nil
@@ -1979,13 +2007,13 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
 replay-sequence-continue and returns `replay-sequence'; otherwise
 nil.  Wave B: the C goto replay_sequence is folded into this call."
   (let* ((fu  (rks-live-first-unbound))
-         (kts ((force %rks-keytran-start))))
+         (kts (rks-live-keytran-start)))
     (cond
      ((< fu kts)
       (let ((shift (+ fu 1)))
         ((force %rks-keybuf-shift-down) shift)
         ((force %set-rks-mock-input) (- ((force %rks-t)) shift))
-        ((force %rks-keyremaps-shrink-by) shift))
+        (rks-keyremaps-shrink-by! shift))
       (replay-sequence-continue)
       'replay-sequence)
      (else #nil))))

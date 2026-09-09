@@ -333,18 +333,16 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6l — runtime replay-entire-sequence wire-in
 
 (ert-deftest m6l-helpers/exist ()
-  (should (fboundp '--rks-init-keyremaps))
+  ;; --rks-init-keyremaps is deleted (bucket-C, Step 3).  The runtime
+  ;; variant rks-setup-replay-entire-sequence-c! now rebases the live
+  ;; record's three keyremaps directly (see test-m28-imp4.scm).
+  (should (not (fboundp '--rks-init-keyremaps)))
   (should (fboundp '--rks-setup-replay-entire-sequence-c!)))
 
-(ert-deftest m6l-rks-init-keyremaps/returns-nil ()
-  ;; The bulk-init subr always returns nil; just verify it accepts
-  ;; three arbitrary Lisp values.
-  (should (eq nil (--rks-init-keyremaps nil nil nil))))
-
 (ert-deftest m6l-runtime-variant/runs-without-error ()
-  ;; The runtime variant reads from current-kboard and writes the
-  ;; file-static C shadows.  No record argument — operates entirely
-  ;; on C state.
+  ;; The runtime variant reads from current-kboard and rebases the
+  ;; live <rks-state>'s keyremaps.  No record pushed here (depth 0) —
+  ;; operates as a no-op on C state.
   (--rks-setup-replay-entire-sequence-c!)
   (should t))
 
@@ -489,15 +487,20 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6t — first_unbound short-circuit
 
 (ert-deftest m6t-helpers/exist ()
-  (should (fboundp '--rks-fkey-start))
-  (should (fboundp '--rks-keytran-start))
-  (should (fboundp '--rks-indec-start))
+  ;; The 3 keytran/fkey/indec start getters + --rks-keyremaps-shrink-by
+  ;; are deleted (bucket-C, Step 3); the short-circuit now reads
+  ;; keytran.start and shrinks via the live-record Scheme helpers
+  ;; (rks-live-keytran-start / rks-keyremaps-shrink-by!, asserted in
+  ;; test-m28-imp4.scm).
+  (should (not (fboundp '--rks-fkey-start)))
+  (should (not (fboundp '--rks-keytran-start)))
+  (should (not (fboundp '--rks-indec-start)))
   ;; first-unbound is record-resident (bucket-A, Step 2); its shim
-  ;; getter is deleted.  The short-circuit reads it through the
+  ;; getter is deleted.  The short-circuit below reads it through the
   ;; live-record accessor.
   (should (fboundp '--set-rks-mock-input))
   (should (fboundp '--rks-keybuf-shift-down))
-  (should (fboundp '--rks-keyremaps-shrink-by))
+  (should (not (fboundp '--rks-keyremaps-shrink-by)))
   (should (fboundp '--rks-first-unbound-short-circuit!)))
 
 (ert-deftest m6t-short-circuit/idle-returns-nil ()
@@ -506,8 +509,10 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; return nil without touching state.
   (should (eq nil (--rks-first-unbound-short-circuit!))))
 
-(ert-deftest m6t-keyremaps-shrink-by/returns-nil ()
-  (should (eq nil (--rks-keyremaps-shrink-by 0))))
+(ert-deftest m6t-keyremaps-shrink-by/deleted ()
+  ;; The C --rks-keyremaps-shrink-by subr is deleted; the Scheme
+  ;; rks-keyremaps-shrink-by! helper is exercised in test-m28-imp4.scm.
+  (should (not (fboundp '--rks-keyremaps-shrink-by))))
 
 ;;;; M6u — simple shift-translation (upper→lower)
 

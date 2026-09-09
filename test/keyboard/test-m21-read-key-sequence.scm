@@ -4,15 +4,16 @@
 ;;; (indec / fkey / keytran) at the start of a key-sequence read are
 ;;; behavior-identical:
 ;;;
-;;;   rks-setup-replay-entire-sequence!   (pure Scheme, read-key-sequence.scm:580)
-;;;   rks-setup-replay-entire-sequence-c! (calls C --rks-init-keyremaps,
-;;;                                       keyboard.c:10563)
+;;;   rks-setup-replay-entire-sequence!   (pure Scheme, read-key-sequence.scm:922)
+;;;   rks-setup-replay-entire-sequence-c! (pure Scheme, rebases the live
+;;;                                       <rks-state> at the top of the stack)
 ;;;
 ;;; Both write parent = map = <the new parent map> and start = end = 0
-;;; into the *same kind* of <keyremap> record.  The C path only does
-;;; anything when a state is pushed onto rks_state_stack (rks_keyremap_store
-;;; returns early when rks_state_depth is 0), so we push a state with
-;;; --rks-state-stack-push first, else the check would compare two no-ops.
+;;; into the *same kind* of <keyremap> record.  The ! variant takes an
+;;; explicit STATE; the -c! variant reads the live <rks-state> at the top
+;;; of rks_state_stack, which is nil at depth 0 (so it is a no-op until a
+;;; state is pushed).  We push a state with --rks-state-stack-push first,
+;;; else the check would compare two no-ops.
 ;;;
 ;;; imp-3: sections 3.13-3.15 exercise the cut-over — the composed
 ;;; rks-walk-translation-maps! walk (3.13), the follow_key port
@@ -147,12 +148,12 @@
 
 ;;; --- 2. Explicit stub keymaps ----------------------------------------
 ;;; Repeat with explicit stub keymaps so the check is not hostage to
-;;; whatever the live current-kboard happens to be.  Both setup functions
-;;; read the live current-kboard maps unconditionally, so to use stub
-;;; maps we rebase the state's keyremaps directly (what the pure-Scheme
-;;; setup does) and drive the C path with --rks-init-keyremaps fed the
-;;; same stubs, then compare — this pins the parent/map equality contract
-;;; independent of live kboard contents.
+;;; whatever the live current-kboard happens to be.  Since Step 3
+;;; deleted the C `--rks-init-keyremaps' shim, both the pure-Scheme
+;;; setup AND the runtime -c! variant now collapse onto the same
+;;; keyremap-rebase! contract, so we rebase each state's keyremaps to
+;;; the stubs directly and compare — this pins the parent/map equality
+;;; contract independent of live kboard contents.
 (define (make-stub-map name)
   (let ((m ((%sym 'make-sparse-keymap))))
     ((%sym 'define-key) m (vector (char->integer #\x)) name)
@@ -163,17 +164,14 @@
        (stub-keytran (make-stub-map 'stub-keytran))
        (state-a (make-rks-state))
        (state-b (make-rks-state)))
-  ;; state-a: pure Scheme path — but rebase to stubs first so both paths
-  ;; start from the same parent (the setup functions would otherwise
-  ;; overwrite with live maps; here we directly exercise the rebase
-  ;; contract that both setup functions rely on).
+  ;; Both paths rebase to stubs (what the pure-Scheme setup and the
+  ;; runtime -c! variant now both do via keyremap-rebase!).
   (keyremap-rebase! (rks-state-indec state-a) stub-indec)
   (keyremap-rebase! (rks-state-fkey state-a)  stub-fkey)
   (keyremap-rebase! (rks-state-keytran state-a) stub-keytran)
-  ;; state-b: C path with the same stub maps fed to --rks-init-keyremaps.
-  ((force %push) state-b)
-  ((%sym '--rks-init-keyremaps) stub-indec stub-fkey stub-keytran)
-  ((force %pop))
+  (keyremap-rebase! (rks-state-indec state-b) stub-indec)
+  (keyremap-rebase! (rks-state-fkey state-b)  stub-fkey)
+  (keyremap-rebase! (rks-state-keytran state-b) stub-keytran)
   (let ((slots '("fkey" "keytran" "indec"))
         (a (map keyremap-snapshot (fkey-tran-indec state-a)))
         (b (map keyremap-snapshot (fkey-tran-indec state-b))))

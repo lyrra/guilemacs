@@ -199,13 +199,10 @@
 
 ;;;; M6l
 
-(test-assert "m6l-helper/rks-init-keyremaps"
-             (fboundp '--rks-init-keyremaps))
+(test-assert "m6l-helper/rks-init-keyremaps-deleted"
+             (not (fboundp '--rks-init-keyremaps)))
 (test-assert "m6l/runtime-variant-exists"
              (fboundp '--rks-setup-replay-entire-sequence-c!))
-
-(test-eq "m6l/init-keyremaps-returns-nil"
-         nil (--rks-init-keyremaps nil nil nil))
 
 (--rks-setup-replay-entire-sequence-c!)
 (test-assert "m6l/runtime-variant-runs" t)
@@ -309,24 +306,29 @@
 
 ;;;; M6t
 
-(test-assert "m6t-helper/fkey-start"      (fboundp '--rks-fkey-start))
-(test-assert "m6t-helper/keytran-start"   (fboundp '--rks-keytran-start))
-(test-assert "m6t-helper/indec-start"     (fboundp '--rks-indec-start))
+;; --rks-fkey-start / --rks-keytran-start / --rks-indec-start and
+;; --rks-keyremaps-shrink-by are deleted (bucket-C, Step 3); the
+;; short-circuit reads keytran.start / shrinks via the live-record
+;; Scheme helpers (asserted in test-m28-imp4.scm).
+(test-assert "m6t-helper/fkey-start-deleted"
+             (not (fboundp '--rks-fkey-start)))
+(test-assert "m6t-helper/keytran-start-deleted"
+             (not (fboundp '--rks-keytran-start)))
+(test-assert "m6t-helper/indec-start-deleted"
+             (not (fboundp '--rks-indec-start)))
 ;; first-unbound is record-resident (bucket-A, Step 2); its shim
 ;; getter is deleted.  The short-circuit below reads it through the
 ;; live-record accessor.
 (test-assert "m6t-helper/set-mock-input"  (fboundp '--set-rks-mock-input))
 (test-assert "m6t-helper/keybuf-shift-down"
              (fboundp '--rks-keybuf-shift-down))
-(test-assert "m6t-helper/keyremaps-shrink-by"
-             (fboundp '--rks-keyremaps-shrink-by))
+(test-assert "m6t-helper/keyremaps-shrink-by-deleted"
+             (not (fboundp '--rks-keyremaps-shrink-by)))
 (test-assert "m6t/short-circuit-exists"
              (fboundp '--rks-first-unbound-short-circuit!))
 
 (test-eq "m6t/short-circuit-idle-nil"
          nil (--rks-first-unbound-short-circuit!))
-(test-eq "m6t/keyremaps-shrink-returns-nil"
-         nil (--rks-keyremaps-shrink-by 0))
 
 ;;;; M6u
 
