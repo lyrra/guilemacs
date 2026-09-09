@@ -1318,7 +1318,6 @@ elements.  See docs/keyboard.org §M6y."
 (define %rks-indec-end      (delay (%c '--rks-indec-end)))
 (define %set-rks-fkey-start    (delay (%c '--set-rks-fkey-start)))
 (define %set-rks-fkey-end      (delay (%c '--set-rks-fkey-end)))
-(define %set-rks-keytran-start (delay (%c '--set-rks-keytran-start)))
 (define %set-rks-keytran-end   (delay (%c '--set-rks-keytran-end)))
 (define %set-rks-indec-start   (delay (%c '--set-rks-indec-start)))
 (define %set-rks-indec-end     (delay (%c '--set-rks-indec-end)))
@@ -1334,8 +1333,8 @@ elements.  See docs/keyboard.org §M6y."
 ;; `rks-sync-read' branch copies one record slot into its C file-static
 ;; mirror; each `rks-sync-write' branch copies one C file-static back
 ;; into the record.  The keyremap start/end fields are NOT yet the
-;; source of truth — `keytran-start' is still round-tripped through the
-;; C shim (see the FIX- note at Step 4 / bucket-C).
+;; record's source of truth — the Scheme machine still reads
+;; `keytran-start' through the C shim (Step 3 / bucket-C ports it).
 
 (define (rks-sync-read rec field)
   "Sync one field FROM record TO C file-static.  Returns #nil."
@@ -1347,11 +1346,6 @@ elements.  See docs/keyboard.org §M6y."
                         (rks-state-current-binding rec)))
     ((first-unbound)   ((force %set-rks-first-unbound)
                         (rks-state-first-unbound rec)))
-    ;; FIX-20260909-guilemacs: bucket-C (Step 4) must make keyremap
-    ;; start/end the record's source of truth; until then this branch
-    ;; still reads the C file-static.
-    ((keytran-start)   ((force %set-rks-keytran-start)
-                        ((force %rks-keytran-start))))
     (else (error "rks-sync-read: unknown field" field)))
   #nil)
 

@@ -149,3 +149,26 @@
   (set-rks-state-key-count! s 0)       ; clobber the slot
   (wr s 'key-count)                    ; static -> record
   (check "imp4/s1/roundtrip/key-count" 42 (rks-state-key-count s)))
+
+;;; --- 5. shift-translated sync-write branch (cr.org F3) ---------------
+;; cr.org F3: rks-sync-write's 'shift-translated branch (rewritten in
+;; Step 1 from the slot-index bool setter to the typed accessor plus the
+;; #t/#nil coercion) had no test.  The C getter it reads has no real
+;; file-static mirror — it returns the ACTIVE <rks-state>'s
+;; shift-translated (nil at depth 0).  Drive the branch by pushing a
+;; source record whose shift-translated is #t, sync-writing into an
+;; unrelated target, then popping.  dynamic-wind keeps the state stack
+;; balanced even on a non-local exit.
+(let* ((push   (%sym '--rks-state-stack-push))
+       (pop    (%sym '--rks-state-stack-pop))
+       (target (make-rks-state))
+       (src    (make-rks-state)))
+  (set-rks-state-shift-translated! src #t)
+  (dynamic-wind
+    (lambda () (push src))
+    (lambda () (rks-sync-write target 'shift-translated))
+    (lambda () (pop)))
+  ;; target starts unset (nil default); the branch must have copied the
+  ;; active record's #t through the typed accessor.
+  (check "imp4/s1/write/shift-translated-from-active" #t
+         (rks-state-shift-translated target)))
