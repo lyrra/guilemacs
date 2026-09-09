@@ -8453,7 +8453,7 @@ internally to initialize its `current_binding'.  */)
 }
 
 /* Field-level helper for reading an <rks-state> <keyremap> sub-record
-   int slot (used by --rks-loop-continue-p at depth 0; returns 0).  */
+   slot (used by --rks-loop-continue-p at depth 0; returns 0).  */
 static int
 rks_keyremap_field_int (int rks_slot, int km_slot)
 {
