@@ -2,9 +2,9 @@
 ;;;
 ;;; imp-1: the --access-keymap shim (Task 1, covered in
 ;;; test-read-key-sequence.el) plus the parity check that
-;;; rks-setup-replay-entire-sequence! (pure Scheme) and
-;;; rks-setup-replay-entire-sequence-c! (C path via --rks-init-keyremaps)
-;;; produce identical indec/fkey/keytran <keyremap> setups (Task 2).
+;;; rks-setup-replay-entire-sequence! (explicit-state) and the runtime
+;;; rks-setup-replay-entire-sequence-c! (rebases the live record) produce
+;;; identical indec/fkey/keytran <keyremap> setups (Task 2).
 ;;;
 ;;; imp-2: direct unit checks (section 3 of the Scheme corpus) on the
 ;;; Scheme port rks-keyremap-step! of C keyremap_step +

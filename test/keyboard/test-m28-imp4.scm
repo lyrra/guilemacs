@@ -1,5 +1,6 @@
-;;; test-m28-imp4.scm --- M28 imp-4, Step 1: port of the generic
-;;; <rks-state> record primitives.
+;;; test-m28-imp4.scm --- M28 imp-4, Steps 1-3: port of the generic
+;;; <rks-state> record primitives, the bucket-A DELETE set, and the
+;;; bucket-C keyremap shims.
 ;;;
 ;;; brief.org (M28 imp-4) Step 1 removes the five thin slot-index
 ;;; DEFUNs (--rks-record-get-int / --rks-record-set-int /
@@ -19,9 +20,10 @@
 ;;;     rewrite preserved the round-trip semantics);
 ;;;   - the <rks-state> record slots round-trip through the @@ idiom.
 ;;;
-;;; NOTE: this is the Step-1 sub-slice of imp-4.  Bucket-A pairs,
-;;; bucket-C (keyremap sync) and the bench remain (recorded in
-;;; docs/kb.org); a later commit extends this corpus when they land.
+;;; NOTE: section 0-5 assert the Step-1 deliverable; sections 6-9 cover
+;;; Step 2 (bucket-A DELETE set) and sections 10-11 cover Step 3
+;;; (bucket-C keyremap).  Bucket-B pairs and the bench remain (recorded
+;;; in docs/kb.org); a later commit extends this corpus when they land.
 ;;;
 ;;; Same harness as test-m28-imp3.scm: Sourced by the .el wrapper via
 ;;; eval-scheme; accumulates (NAME STATUS) pairs into test-results for

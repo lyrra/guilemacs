@@ -103,7 +103,7 @@
 ;;;;
 ;;;; Two record types that mirror the C-side state of read_key_sequence:
 ;;;;
-;;;;   `keyremap'   ←→  C struct keyremap   (src/keyboard.c:10202)
+;;;;   `keyremap'   ←→  the <keyremap> sub-records of a live <rks-state>
 ;;;;   `rks-state'  ←→  read_key_sequence locals (src/keyboard.c:10424–10500)
 ;;;;
 ;;;; These are the *substrate* for future M6h–M6j slices that will
@@ -2124,7 +2124,7 @@ cached-dispatch into here."
                ,rks-setup-replay-entire-sequence!)
               (--rks-setup-replay-sequence!
                ,rks-setup-replay-sequence!)
-              ;; M6l — runtime variant (writes C-side shadows)
+              ;; M6l — runtime variant (rebases the live record)
               (--rks-setup-replay-entire-sequence-c!
                ,rks-setup-replay-entire-sequence-c!)
               ;; M6m — runtime variant for replay_sequence

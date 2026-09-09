@@ -1,11 +1,13 @@
-;;; test-m28-imp4.el --- M28 imp-4 Step 1: record-primitive port suite.
+;;; test-m28-imp4.el --- M28 imp-4 Steps 1-3: record-primitive, bucket-A,
+;;; and bucket-C (keyremap) port suite.
 ;;;
 ;;; Verifies the M28 imp-4 Step 1 deliverable (brief.org): the five
 ;;; thin slot-index record primitives (--rks-record-get-int /
 ;;; --rks-record-set-int / --rks-record-get / --rks-record-set /
 ;;; --rks-record-set-bool) are deleted from src/keyboard.c and
 ;;; rks-sync-read / rks-sync-write now move <rks-state> fields with the
-;;; srfi-9 accessors directly.
+;;; srfi-9 accessors directly.  The corpus's later sections assert the
+;;; Step 2 bucket-A DELETE set and the Step 3 bucket-C keyremap port.
 ;;;
 ;;; Wraps test/keyboard/test-m28-imp4.scm — the Scheme test corpus.
 ;;; Loads the Scheme file via eval-scheme, then reads back `test-results`

@@ -3050,9 +3050,10 @@ static int rks_state_depth;
     }                                                                   \
   } while (0)
 
-/* C-9b: load/store helpers defined after the keyremap typedef
-   (see line ~10441).  RKS_KEYREMAP_WRITEBACK macro retired with the
-   file-static structs.  */
+/* C-9b: retired — the <keyremap> file-static struct and the
+   load/store helpers that mirrored it are gone.  C reads the keyremap
+   fields of the live <rks-state> record directly (see the field-level
+   helper below).  */
 
 enum { RC_STATE_STACK_MAX = 8 };
 static SCM rc_record_stack[RC_STATE_STACK_MAX];
@@ -8451,61 +8452,8 @@ internally to initialize its `current_binding'.  */)
   return active_maps (first_event, second_event);
 }
 
-/* Structure used to keep track of partial application of key remapping
-   such as Vfunction_key_map and Vkey_translation_map.  */
-typedef struct keyremap
-{
-  /* This is the map originally specified for this use.  */
-  Lisp_Object parent;
-  /* This is a submap reached by looking up, in PARENT,
-     the events from START to END.  */
-  Lisp_Object map;
-  /* Positions [START, END) in the key sequence buffer
-     are the key that we have scanned so far.
-     Those events are the ones that we will replace
-     if PARENT maps them into a key sequence.  */
-  int start, end;
-} keyremap;
-
-/* C-9b: load/store helpers for working with a <keyremap> sub-record
-   via a local `keyremap' struct.  Callers do:
-     keyremap km;
-     rks_keyremap_load (RKS_SLOT_FKEY, &km);
-     keyremap_step (..., &km, ...);
-     rks_keyremap_store (RKS_SLOT_FKEY, &km);
-   Avoids per-iteration record reads inside hot walks.  At idle
-   (rks_state_depth == 0) load returns a zero-initialized keyremap;
-   store is a no-op.  */
-static void
-rks_keyremap_load (int slot, keyremap *out)
-{
-  if (rks_state_depth == 0)
-    {
-      out->parent = out->map = Qnil;
-      out->start = out->end = 0;
-      return;
-    }
-  SCM km = scm_struct_ref (rks_state_stack[rks_state_depth - 1],
-                           scm_from_int (slot));
-  out->parent = scm_struct_ref (km, scm_from_int (KM_SLOT_PARENT));
-  out->map    = scm_struct_ref (km, scm_from_int (KM_SLOT_MAP));
-  out->start  = rks_get_int    (km, KM_SLOT_START);
-  out->end    = rks_get_int    (km, KM_SLOT_END);
-}
-
-static void
-rks_keyremap_store (int slot, const keyremap *in)
-{
-  if (rks_state_depth == 0) return;
-  SCM km = scm_struct_ref (rks_state_stack[rks_state_depth - 1],
-                           scm_from_int (slot));
-  scm_struct_set_x (km, scm_from_int (KM_SLOT_PARENT), in->parent);
-  scm_struct_set_x (km, scm_from_int (KM_SLOT_MAP),    in->map);
-  rks_set_int      (km, KM_SLOT_START, in->start);
-  rks_set_int      (km, KM_SLOT_END,   in->end);
-}
-
-/* Field-level convenience helpers for getter/setter DEFUNs.  */
+/* Field-level helper for reading an <rks-state> <keyremap> sub-record
+   int slot (used by --rks-loop-continue-p at depth 0; returns 0).  */
 static int
 rks_keyremap_field_int (int rks_slot, int km_slot)
 {
@@ -8515,19 +8463,10 @@ rks_keyremap_field_int (int rks_slot, int km_slot)
   return rks_get_int (km, km_slot);
 }
 
-static void
-rks_keyremap_set_field_int (int rks_slot, int km_slot, int val)
-{
-  if (rks_state_depth == 0) return;
-  SCM km = scm_struct_ref (rks_state_stack[rks_state_depth - 1],
-                           scm_from_int (rks_slot));
-  rks_set_int (km, km_slot, val);
-}
-
 /* M6l — promote read_key_sequence's `fkey', `keytran', `indec' from
    locals to file-static.  C-9b retired them in favor of <keyremap>
-   sub-records in <rks-state>; access is via rks_keyremap_load /
-   rks_keyremap_store and field-level helpers.  */
+   sub-records in <rks-state>; the Scheme side reads and rebases them
+   through the srfi-9 accessors.  */
 
 /* M6m — promote five more read_key_sequence locals (the ones written
    by the `replay_sequence:' label).  Same #define alias trick as
