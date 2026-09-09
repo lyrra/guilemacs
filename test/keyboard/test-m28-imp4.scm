@@ -1,6 +1,6 @@
-;;; test-m28-imp4.scm --- M28 imp-4, Steps 1-3: port of the generic
-;;; <rks-state> record primitives, the bucket-A DELETE set, and the
-;;; bucket-C keyremap shims.
+;;; test-m28-imp4.scm --- M28 imp-4, Steps 1-5: port of the generic
+;;; <rks-state> record primitives, the bucket-A DELETE set, the
+;;; bucket-C keyremap shims, and the bucket-B stay-C pin.
 ;;;
 ;;; brief.org (M28 imp-4) Step 1 removes the five thin slot-index
 ;;; DEFUNs (--rks-record-get-int / --rks-record-set-int /
@@ -21,9 +21,10 @@
 ;;;   - the <rks-state> record slots round-trip through the @@ idiom.
 ;;;
 ;;; NOTE: section 0-5 assert the Step-1 deliverable; sections 6-9 cover
-;;; Step 2 (bucket-A DELETE set) and sections 10-11 cover Step 3
-;;; (bucket-C keyremap).  Bucket-B pairs and the bench remain (recorded
-;;; in docs/kb.org); a later commit extends this corpus when they land.
+;;; Step 2 (bucket-A DELETE set), sections 10-11 cover Step 3
+;;; (bucket-C keyremap), and section 12 (imp4/s4) covers Step 4 — the
+;;; bucket-B stay-C pin.  The bench and its baseline live in
+;;; bench/rks-state-machine-bench.{scm,el} / docs/kb.org.
 ;;;
 ;;; Same harness as test-m28-imp3.scm: Sourced by the .el wrapper via
 ;;; eval-scheme; accumulates (NAME STATUS) pairs into test-results for
@@ -377,3 +378,17 @@
         (check "imp4/s3/reset/fkey-map-preserved" #t
                (eq? fkey-m2 (keyremap-map fkey))))
       (lambda () (pop)))))
+
+;;; --- 12. Step 4 (bucket-B stay-C pin): the six names still register --
+;;; Step 4 keeps the three bucket-B static-backed getter+setter pairs in
+;;; C (stay C — bench + reasons in docs/kb.org).  Unlike §0/§6/§10,
+;;; which assert deleted names read back as nil, §12 pins that these six
+;;; names still resolve to a non-nil function (the stay-C decision).
+(for-each
+ (lambda (name)
+   (check (string-append "imp4/s4/stay-c/" name)
+          #t
+          (not (eq? (%sym (intern name)) #nil))))
+ '("--rks-t"           "--set-rks-t"
+   "--rks-current-binding" "--set-rks-current-binding"
+   "--rks-mock-input"  "--set-rks-mock-input"))
