@@ -142,6 +142,7 @@
   "test/keyboard/test-m28-imp5.el"              ; M28 imp-5 family 2 --ie-kind-from-name reclaim (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp5-f3.el"           ; M28 imp-5 family 3 --frame- / --window- stay-C audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp5-f4.el"           ; M28 imp-5 family 4 --timer-check reclaim + --tty-/--timer-/--read-/--reset- audit (corpus prints PASS/FAIL)
+  "test/keyboard/test-m28-imp5-f5.el"           ; M28 imp-5 family 5 --button-down-location pair reclaim + --menu-/--x-/--tool-/--tab-/--button- audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

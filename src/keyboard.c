@@ -6570,26 +6570,6 @@ On platforms without a non-toolkit menu bar, always returns nil.  */)
    mirror record).  Used by imp-7.2 wheel double-click detection
    and imp-7.5 MOUSE_CLICK port.  */
 
-DEFUN ("--button-down-location", Fbutton_down_location,
-       Sbutton_down_location, 0, 0, 0,
-       doc: /* Return the value of button_down_location.
-
-A Lisp_Object vector recording the position of the most recent
-mouse-press event.  Used for drag-event position computation.  */)
-  (void)
-{
-  return button_down_location;
-}
-
-DEFUN ("--set-button-down-location", Fset_button_down_location,
-       Sset_button_down_location, 1, 1, 0,
-       doc: /* Set button_down_location to VAL.  */)
-  (Lisp_Object val)
-{
-  button_down_location = val;
-  return Qnil;
-}
-
 DEFUN ("--frame-relative-event-pos", Fframe_relative_event_pos,
        Sframe_relative_event_pos, 0, 0, 0,
        doc: /* Return the value of frame_relative_event_pos.
