@@ -8,6 +8,7 @@
 ;;; from elisp.  See docs/m16-plan.org §imp-1 and brief.org.
 
 (use-modules (emacs kbd-buffer))
+(use-modules (emacs lispy-position))
 
 (define test-results '())
 
@@ -34,9 +35,9 @@
     (lambda () (thunk) #t)
     (lambda (key . args) (list 'error key args))))
 
-;; HELP_EVENT kind constant — derived from C via --ie-kind-from-name so
-;; the test uses the exact enum value, not a copy.
-(define HELP-EVENT ((%sym '--ie-kind-from-name) 'help-echo))
+;; HELP_EVENT kind constant — derived via (emacs lispy-position)
+;; ie-kind-from-name so the test uses the exact enum value, not a copy.
+(define HELP-EVENT (ie-kind-from-name 'help-echo))
 
 ;;; --- 0. Registration: all 5 shims resolve ---------------------------
 (define shim-names

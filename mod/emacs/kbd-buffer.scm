@@ -131,7 +131,13 @@
 (defelisp %--ie-clear                   --ie-clear)
 (defelisp %--set-ie-arg                 --set-ie-arg)
 (defelisp %--set-ie-code                --set-ie-code)
-(defelisp %--ie-kind-from-name          --ie-kind-from-name)
+;; M28 imp-5 (family 2) — the C --ie-kind-from-name double-hop is gone;
+;; reach the (emacs lispy-position) port through a lazy module-ref
+;; (same rationale as family 1: no eager #:use-module, load order
+;; unchanged).
+(define %ie-kind-from-name
+  (delay (module-ref (resolve-module '(emacs lispy-position) #:ensure #t)
+                     'ie-kind-from-name)))
 (defelisp %--frame-focus-frame          --frame-focus-frame)
 ;; M13 imp-2 — store-side shims (imp-1 C DEFUNs plus the pre-existing
 ;; M2/M11/M12 set; see brief.org).  Names carry no trailing ! in C.
@@ -245,40 +251,40 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 ;;; kinds not compiled into C resolve to -1 and their case arms are
 ;;; dead, matching the C #ifdef discipline (such kinds never reach the
 ;;; buffer).  All immutable — no module-level mutable state (Risk 3).
-(define SELECTION-REQUEST-EVENT     ((force %--ie-kind-from-name) 'selection-request-event))
-(define SELECTION-CLEAR-EVENT       ((force %--ie-kind-from-name) 'selection-clear-event))
-(define MONITORS-CHANGED-EVENT      ((force %--ie-kind-from-name) 'monitors-changed))
-(define MENU-BAR-ACTIVATE-EVENT     ((force %--ie-kind-from-name) 'menu-bar-activate-event))
-(define NOTIFICATION-EVENT          ((force %--ie-kind-from-name) 'notification-event))
-(define NS-TEXT-EVENT               ((force %--ie-kind-from-name) 'ns-text-event))
-(define PREEDIT-TEXT-EVENT          ((force %--ie-kind-from-name) 'preedit-text))
-(define END-SESSION-EVENT           ((force %--ie-kind-from-name) 'end-session))
-(define LANGUAGE-CHANGE-EVENT       ((force %--ie-kind-from-name) 'language-change))
-(define DELETE-WINDOW-EVENT         ((force %--ie-kind-from-name) 'delete-frame))
-(define ICONIFY-EVENT               ((force %--ie-kind-from-name) 'iconify-frame))
-(define DEICONIFY-EVENT             ((force %--ie-kind-from-name) 'make-frame-visible))
-(define MOVE-FRAME-EVENT            ((force %--ie-kind-from-name) 'move-frame))
-(define FILE-NOTIFY-EVENT           ((force %--ie-kind-from-name) 'file-notify))
-(define DBUS-EVENT                  ((force %--ie-kind-from-name) 'dbus-event))
-(define THREAD-EVENT                ((force %--ie-kind-from-name) 'thread-event))
-(define XWIDGET-EVENT               ((force %--ie-kind-from-name) 'xwidget-event))
-(define XWIDGET-DISPLAY-EVENT       ((force %--ie-kind-from-name) 'xwidget-display-event))
-(define SAVE-SESSION-EVENT          ((force %--ie-kind-from-name) 'save-session))
-(define NO-EVENT                    ((force %--ie-kind-from-name) 'no-event))
-(define HELP-EVENT                  ((force %--ie-kind-from-name) 'help-echo))
-(define FOCUS-IN-EVENT              ((force %--ie-kind-from-name) 'focus-in))
-(define CONFIG-CHANGED-EVENT        ((force %--ie-kind-from-name) 'config-changed-event))
-(define FOCUS-OUT-EVENT             ((force %--ie-kind-from-name) 'focus-out))
-(define SELECT-WINDOW-EVENT         ((force %--ie-kind-from-name) 'select-window))
-(define ASCII-KEYSTROKE-EVENT       ((force %--ie-kind-from-name) 'ascii-keystroke))
+(define SELECTION-REQUEST-EVENT     ((force %ie-kind-from-name) 'selection-request-event))
+(define SELECTION-CLEAR-EVENT       ((force %ie-kind-from-name) 'selection-clear-event))
+(define MONITORS-CHANGED-EVENT      ((force %ie-kind-from-name) 'monitors-changed))
+(define MENU-BAR-ACTIVATE-EVENT     ((force %ie-kind-from-name) 'menu-bar-activate-event))
+(define NOTIFICATION-EVENT          ((force %ie-kind-from-name) 'notification-event))
+(define NS-TEXT-EVENT               ((force %ie-kind-from-name) 'ns-text-event))
+(define PREEDIT-TEXT-EVENT          ((force %ie-kind-from-name) 'preedit-text))
+(define END-SESSION-EVENT           ((force %ie-kind-from-name) 'end-session))
+(define LANGUAGE-CHANGE-EVENT       ((force %ie-kind-from-name) 'language-change))
+(define DELETE-WINDOW-EVENT         ((force %ie-kind-from-name) 'delete-frame))
+(define ICONIFY-EVENT               ((force %ie-kind-from-name) 'iconify-frame))
+(define DEICONIFY-EVENT             ((force %ie-kind-from-name) 'make-frame-visible))
+(define MOVE-FRAME-EVENT            ((force %ie-kind-from-name) 'move-frame))
+(define FILE-NOTIFY-EVENT           ((force %ie-kind-from-name) 'file-notify))
+(define DBUS-EVENT                  ((force %ie-kind-from-name) 'dbus-event))
+(define THREAD-EVENT                ((force %ie-kind-from-name) 'thread-event))
+(define XWIDGET-EVENT               ((force %ie-kind-from-name) 'xwidget-event))
+(define XWIDGET-DISPLAY-EVENT       ((force %ie-kind-from-name) 'xwidget-display-event))
+(define SAVE-SESSION-EVENT          ((force %ie-kind-from-name) 'save-session))
+(define NO-EVENT                    ((force %ie-kind-from-name) 'no-event))
+(define HELP-EVENT                  ((force %ie-kind-from-name) 'help-echo))
+(define FOCUS-IN-EVENT              ((force %ie-kind-from-name) 'focus-in))
+(define CONFIG-CHANGED-EVENT        ((force %ie-kind-from-name) 'config-changed-event))
+(define FOCUS-OUT-EVENT             ((force %ie-kind-from-name) 'focus-out))
+(define SELECT-WINDOW-EVENT         ((force %ie-kind-from-name) 'select-window))
+(define ASCII-KEYSTROKE-EVENT       ((force %ie-kind-from-name) 'ascii-keystroke))
 (define MULTIBYTE-CHAR-KEYSTROKE-EVENT
-  ((force %--ie-kind-from-name) 'multibyte-char-keystroke))
-(define NON-ASCII-KEYSTROKE-EVENT   ((force %--ie-kind-from-name) 'non-ascii-keystroke))
-(define PINCH-EVENT                 ((force %--ie-kind-from-name) 'pinch))
-(define MENU-BAR-EVENT              ((force %--ie-kind-from-name) 'menu-bar))
-(define TAB-BAR-EVENT               ((force %--ie-kind-from-name) 'tab-bar))
-(define TOOL-BAR-EVENT              ((force %--ie-kind-from-name) 'tool-bar))
-(define NS-NONKEY-EVENT             ((force %--ie-kind-from-name) 'ns-nonkey))
+  ((force %ie-kind-from-name) 'multibyte-char-keystroke))
+(define NON-ASCII-KEYSTROKE-EVENT   ((force %ie-kind-from-name) 'non-ascii-keystroke))
+(define PINCH-EVENT                 ((force %ie-kind-from-name) 'pinch))
+(define MENU-BAR-EVENT              ((force %ie-kind-from-name) 'menu-bar))
+(define TAB-BAR-EVENT               ((force %ie-kind-from-name) 'tab-bar))
+(define TOOL-BAR-EVENT              ((force %ie-kind-from-name) 'tool-bar))
+(define NS-NONKEY-EVENT             ((force %ie-kind-from-name) 'ns-nonkey))
 ;; M14 imp-2 — readable/special-event/drainer kinds.  Naming rule (see
 ;; the block comment above): the constant follows the *C enum* name, the
 ;; symbol arg follows the *DEFSYM lisp name*, and these two spellings do
@@ -290,15 +296,15 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 ;; pair (the C body is build-independent); kbd-buffer-readable-events
 ;; needs only the =-TOOLKIT= members (that filter only runs when
 ;; --toolkit-scroll-bars-p is true).
-(define MOUSE-CLICK-EVENT                ((force %--ie-kind-from-name) 'mouse-click-event))
-(define WHEEL-EVENT                      ((force %--ie-kind-from-name) 'wheel-event))
-(define HORIZ-WHEEL-EVENT                ((force %--ie-kind-from-name) 'horizontal-wheel-event))
-(define SCROLL-BAR-CLICK-EVENT           ((force %--ie-kind-from-name) 'scroll-bar-click-event))
-(define SCROLL-BAR-CLICK-TOOLKIT         ((force %--ie-kind-from-name) 'scroll-bar-click-toolkit))
+(define MOUSE-CLICK-EVENT                ((force %ie-kind-from-name) 'mouse-click-event))
+(define WHEEL-EVENT                      ((force %ie-kind-from-name) 'wheel-event))
+(define HORIZ-WHEEL-EVENT                ((force %ie-kind-from-name) 'horizontal-wheel-event))
+(define SCROLL-BAR-CLICK-EVENT           ((force %ie-kind-from-name) 'scroll-bar-click-event))
+(define SCROLL-BAR-CLICK-TOOLKIT         ((force %ie-kind-from-name) 'scroll-bar-click-toolkit))
 (define HORIZONTAL-SCROLL-BAR-CLICK-EVENT
-  ((force %--ie-kind-from-name) 'horizontal-scroll-bar-click-event))
+  ((force %ie-kind-from-name) 'horizontal-scroll-bar-click-event))
 (define HORIZONTAL-SCROLL-BAR-CLICK-TOOLKIT
-  ((force %--ie-kind-from-name) 'horizontal-scroll-bar-click-toolkit))
+  ((force %ie-kind-from-name) 'horizontal-scroll-bar-click-toolkit))
 ;; M14 imp-2 — readable_events flag-mask constants, hardcoded matching C
 ;; keyboard.c:375-377.  SCROLL-BAR-HANDLE-PART is the scroll_bar_handle
 ;; enum value (src/termhooks.h:38) with no DEFUN — hardcoded, same

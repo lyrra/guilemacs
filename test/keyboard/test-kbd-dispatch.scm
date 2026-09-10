@@ -25,6 +25,8 @@
 ;;; a pre-existing M9 imp-6.3 issue, not imp-3).
 
 (use-modules (emacs kbd-buffer))
+;; M28 imp-5 (family 2) — call the (emacs lispy-position) port directly.
+(use-modules (emacs lispy-position))
 
 (define test-results '())
 
@@ -56,7 +58,7 @@
 (define KBD-SIZE 4096)
 
 (define (kind name)
-  ((%sym '--ie-kind-from-name) name))
+  (ie-kind-from-name name))
 
 (define (drain-queue!)
   ;; Discard everything by moving the fetch ptr to the store ptr.

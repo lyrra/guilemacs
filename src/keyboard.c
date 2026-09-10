@@ -929,24 +929,6 @@ individual Scheme setters today.  Returns DST.  */)
   return dst;
 }
 
-DEFUN ("--ie-kind-from-name", Fie_kind_from_name, Sie_kind_from_name,
-       1, 1, 0,
-       doc: /* Return the event_kind integer for event symbol NAME, or -1.
-
-Used by (emacs lispy-event) to register per-kind dispatch entries
-without hard-coding enum values in Scheme.  Each event symbol
-(e.g. `dbus-event') maps to its enum value (e.g. DBUS_EVENT).  */)
-  (Lisp_Object name)
-{
-  /* Thin dispatcher.  The symbol→integer lookup now lives in
-     (emacs lispy-position) ie-kind-from-name, backed by a hash table
-     built once from --ie-kind-alist.  See docs/m19-plan.org §imp-3.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position", "ie-kind-from-name");
-  return SCM_CALL_1 (proc, name);
-}
-
 DEFUN ("--ie-kind-alist", Fie_kind_alist, Sie_kind_alist, 0, 0, 0,
        doc: /* Return an alist mapping each event symbol to its event_kind integer.
 
@@ -958,7 +940,7 @@ the build configuration; they are not portable across builds.
 
 Scheme must treat this as opaque build data: it consumes the list for
 lookup but must never hard-code any returned integer.  Used by
-(emacs lispy-position) to build its --ie-kind-from-name dispatch
+(emacs lispy-position) to build its ie-kind-from-name dispatch
 table.  */)
   (void)
 {
@@ -12052,7 +12034,7 @@ syms_of_keyboard (void)
   DEFSYM (Qtouchscreen_update, "touchscreen-update");
   DEFSYM (Qpinch, "pinch");
 
-  /* Event-kind keys for the imp-3 dispatch switch (--ie-kind-from-name).  */
+  /* Event-kind keys for the imp-3 dispatch switch.  */
   DEFSYM (Qselection_request_event, "selection-request-event");
   DEFSYM (Qselection_clear_event, "selection-clear-event");
   DEFSYM (Qmonitors_changed, "monitors-changed");

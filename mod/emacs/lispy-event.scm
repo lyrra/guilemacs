@@ -55,7 +55,8 @@
 ;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
 (defelisp %--time-to-position --time-to-position)
 (defelisp %--ensure-mouse-syms-size --ensure-mouse-syms-size)
-(defelisp %--ie-kind-from-name --ie-kind-from-name)
+;; M28 imp-5 (family 2) — the C --ie-kind-from-name double-hop is gone;
+;; call the (emacs lispy-position) port directly (imported in full).
 (defelisp %--user-signal-name --user-signal-name)
 
 ;;; Elisp predicates — not Scheme bindings; go through %c.
@@ -89,7 +90,7 @@
 ;;; into its event_kind integer, then stores PROC under that key.
 
 (define (register-kind! name-symbol proc)
-  (let ((k ((force %--ie-kind-from-name) name-symbol)))
+  (let ((k (ie-kind-from-name name-symbol)))
     (when (>= k 0)
       (hashv-set! make-lispy-event-dispatch k proc))))
 

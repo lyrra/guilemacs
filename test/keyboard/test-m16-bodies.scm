@@ -14,6 +14,7 @@
 ;;; mouse-fixup binding) runs inside a dynamic-wind that restores it.
 
 (use-modules (emacs help-echo))
+(use-modules (emacs lispy-position))
 
 (define test-results '())
 
@@ -40,9 +41,10 @@
     (lambda () (thunk) #t)
     (lambda (key . args) (list 'error key args))))
 
-;; HELP_EVENT kind constant — derived from C so the test uses the exact
-;; enum value, not a copy (same as test-m16-shims.scm).
-(define HELP-EVENT ((%sym '--ie-kind-from-name) 'help-echo))
+;; HELP_EVENT kind constant — derived via (emacs lispy-position)
+;; ie-kind-from-name so the test uses the exact enum value, not a copy
+;; (same as test-m16-shims.scm).
+(define HELP-EVENT (ie-kind-from-name 'help-echo))
 
 ;;; --- 0. Registration: the module's 3 procedures + shims resolve ---
 (for-each

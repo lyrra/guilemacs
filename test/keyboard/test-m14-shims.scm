@@ -9,6 +9,9 @@
 ;;; from elisp — Scheme format output does not reach emacs --batch
 ;;; stdout.
 
+;; M28 imp-5 (family 2) — ie-kind-from-name now lives in Scheme.
+(use-modules (emacs lispy-position))
+
 (define test-results '())
 
 (define (report name status)
@@ -101,7 +104,7 @@
 (let* ((saved-fetch ((%sym '--kbd-fetch-ptr-index)))
        (saved-store ((%sym '--kbd-store-ptr-index)))
        (slot (modulo (+ saved-fetch 2) KBD-BUFFER-SIZE))  ; strict middle
-       (kind ((%sym '--ie-kind-from-name) 'selection-request-event))
+       (kind (ie-kind-from-name 'selection-request-event))
        (ie ((%sym '--ie-test-event) kind 0 0 #nil)))
   (dynamic-wind
     (lambda () #f)
