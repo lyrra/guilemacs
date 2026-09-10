@@ -3,8 +3,7 @@
 ;;; Wraps test/keyboard/test-m12-umm.scm — the Scheme test corpus for
 ;;; the used-mouse-menu-flag field of <rc-state> (brief.org M12 imp-1
 ;;; + imp-2): the main-queue install path, the X-menu read block, the
-;;; two-value --rc-read-char-x-menu-prompt contract, the rc-exit!
-;;; two-value contract, and the three wrong-kboard -2 exits of
+;;; rc-exit! two-value contract, and the three wrong-kboard -2 exits of
 ;;; read-char-main (the drain path itself lives in
 ;;; ertest-read-char.el).
 ;;;

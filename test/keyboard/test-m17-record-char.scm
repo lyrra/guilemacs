@@ -10,10 +10,12 @@
 ;;; thin dispatchers into (emacs recent-keys): record-char and the new
 ;;; record-cmd-pseudo-event!, which reuses record-char-write-back's append
 ;;; logic so the recent-keys ring has one writer, not two.  This corpus
-;;; drives the REAL C entry points — --rc-record-char (which calls
-;;; record_char, now a dispatcher into Scheme record-char) and
-;;; --record-recent-keys-cmd-pseudo-event — to prove the C-to-Scheme
-;;; wiring, exactly like test-m16-help-echo.scm does for its cutover.
+;;; drives the REAL C entry point --record-recent-keys-cmd-pseudo-event
+;;; and the (emacs recent-keys) record-char port directly — M28 imp-5
+;;; (family 1, group 2) removed the --rc-record-char double-hop, as
+;;; record_char is now a thin dispatcher into the port.  This proves the
+;;; C-to-Scheme wiring, exactly like test-m16-help-echo.scm does for its
+;;; cutover.
 ;;;
 ;;; Every sub-test that mutates the ring or the guarded elisp vars
 ;;; (record-all-keys, inhibit--record-char, executing-kbd-macro,
@@ -91,27 +93,27 @@
 (check "record-char/resolves" #t (procedure? (module-ref m17-mod 'record-char)))
 (check "record-cmd-pseudo-event!/resolves" #t
        (procedure? (module-ref m17-mod 'record-cmd-pseudo-event!)))
-;; The C entry points this corpus drives must resolve as elisp functions.
-(check "rc-record-char-entry" #t (not (eq? (%sym '--rc-record-char) #nil)))
+;; The C entry point this corpus drives must resolve as an elisp function.
+(check "rc-record-char-retired" #t (eq? (%sym '--rc-record-char) #nil))
 (check "pseudo-event-entry" #t
        (not (eq? (%sym '--record-recent-keys-cmd-pseudo-event) #nil)))
 
-;;; --- 1. --rc-record-char: plain-key append ---------------------------
-;;; Drives record_char -> Scheme record-char through the real C DEFUN.
+;;; --- 1. record-char port: plain-key append ---------------------------
+;;; Drives the (emacs recent-keys) record-char port directly.
 (with-ring-state
  (lambda ()
    (set-idx! 2) (set-total! 2)
    ((%sym 'aset) (ring) 0 97)
    ((%sym 'aset) (ring) 1 98)
    (let ((c0 (symbol-value 'num-nonmacro-input-events)))
-     ((%sym '--rc-record-char) 99)
+     (record-char 99)
      (check "dispatch/plain-ring-slot" 99 (rref 2))
      (check "dispatch/plain-index-advance" 3 (ridx))
      (check "dispatch/plain-total-incr" 3 (rtotal))
      (check "dispatch/plain-counter-incr" (+ c0 1)
             (symbol-value 'num-nonmacro-input-events)))))
 
-;;; --- 2. --rc-record-char: help-echo dedup leaves the ring unchanged ---
+;;; --- 2. record-char port: help-echo dedup leaves the ring unchanged ---
 ;;; Repeated help-echo -> recorded = 1: no ring write, index/total stay put.
 (with-ring-state
  (lambda ()
@@ -119,21 +121,21 @@
    (let ((tip "dup-tip"))
      ((%sym 'aset) (ring) 0 (help-event tip))
      (let ((c0 (symbol-value 'num-nonmacro-input-events)))
-       ((%sym '--rc-record-char) (help-event tip))
+       (record-char (help-event tip))
        (check "dispatch/dup-idx" 1 (ridx))
        (check "dispatch/dup-total" 1 (rtotal))
        (check "dispatch/dup-slot-kept" #t (equal? (help-event tip) (rref 0)))
        (check "dispatch/dup-counter" (+ c0 1)
               (symbol-value 'num-nonmacro-input-events))))))
 
-;;; --- 3. --rc-record-char: ring wrap-around (cr.org Finding 4) ---------
+;;; --- 3. record-char port: ring wrap-around (cr.org Finding 4) ---------
 ;;; 3a. write-back index-advance wrap: append at index lossage_limit-1
 ;;; wraps the index back to 0 (full ring keeps total pinned at limit).
 (with-ring-state
  (lambda ()
    (let ((lim (rlimit)))
      (set-idx! (- lim 1)) (set-total! lim)
-     ((%sym '--rc-record-char) 65)
+     (record-char 65)
      (check "wrap/append-slot" 65 (rref (- lim 1)))
      (check "wrap/append-index-wraps" 0 (ridx))
      (check "wrap/append-total-pinned" lim (rtotal)))))
@@ -147,7 +149,7 @@
           (tip "wrap-tip"))
      (set-idx! 0) (set-total! 1)
      ((%sym 'aset) (ring) (- lim 1) (help-event tip))
-     ((%sym '--rc-record-char) (help-event tip))
+     (record-char (help-event tip))
      (check "wrap/dedup-idx" 0 (ridx))
      (check "wrap/dedup-total" 1 (rtotal))
      (check "wrap/dedup-slot-kept" #t

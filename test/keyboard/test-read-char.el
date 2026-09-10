@@ -170,8 +170,8 @@
              (fboundp '--rc-input-pending))
 (test-assert "helpers/rc-input-was-pending"
              (fboundp '--rc-input-was-pending))
-(test-assert "helpers/rc-swallow-events"
-             (fboundp '--rc-swallow-events))
+(test-assert "helpers/rc-swallow-events-retired"
+             (not (fboundp '--rc-swallow-events)))
 (test-assert "helpers/rc-help-echo-redisplay-preserve-p"
              (fboundp '--rc-help-echo-redisplay-preserve-p))
 (test-assert "helpers/rc-redisplay-preserve-echo-area"

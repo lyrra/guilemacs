@@ -10,14 +10,12 @@
 ;;;     %read-decoded-event-from-main-queue to return a non-nil second
 ;;;     value (the used-mouse-menu pointer), and a nil one (negative).
 ;;;   - X-menu read block (rc-prologue-xmenu-and-idle-gc!): stub
-;;;     %rc-read-char-x-menu-prompt to return (values EVENT #t) / #f
-;;;     and drive the real block with the gate satisfied.
-;;;   - the C DEFUN --rc-read-char-x-menu-prompt two-value contract:
-;;;     with a live rec and a nil prev-event (read_char_x_menu_prompt
-;;;     returns Qnil without blocking), it must return exactly two
-;;;     values with the flag read back as #f (M12 imp-3 deleted the
-;;;     used-mouse-menu pointer slot, so only the local-bool path is
-;;;     left).
+;;;     %read-char-x-menu-prompt to return (values EVENT #t) / #f
+;;;     and drive the real block with the gate satisfied.  (M28 imp-5
+;;;     family 1 group 1 deleted the C double-hop --rc-read-char-x-menu-prompt;
+;;;     read-char.scm now calls the (emacs menu-prompt) port directly, so
+;;;     the two-value contract is covered at the caller + port level, in
+;;;     test-m20-menu-prompt.scm.)
 ;;; Plus the M12 imp-2 two-value contract:
 ;;;   - rc-exit! returns (EVENT FLAG) / (#nil #f) on an empty stack.
 ;;;   - all three wrong-kboard -2 exits of read-char-main return
@@ -139,7 +137,8 @@
 ;; installed into c.
 (define (run-xmenu-block stub-prompt)
   (with-read-char-stubs
-   `((%rc-read-char-x-menu-prompt . ,(lambda () (values 'm8-xmenu-event stub-prompt)))
+   `((%read-char-x-menu-prompt . ,(lambda (map prev-event)
+                                    (values 'm8-xmenu-event stub-prompt)))
      (%interactive? . ,(lambda () #t)))
    (lambda ()
      (let* ((rec (make-test-rec))
@@ -172,26 +171,6 @@
    (let ((result (run-xmenu-block #f)))
      (check "xmenu-block/flag-false-without-menu-choice"
             '(m8-xmenu-event #f) result))))
-
-;;; --- 3. --rc-read-char-x-menu-prompt two-value contract ------------
-
-;; Live rec and nil prev-event (read_char_x_menu_prompt returns Qnil
-;; without blocking): the DEFUN must return exactly two values, the
-;; flag read back from its local bool as #f (M12 imp-3 — the rec's
-;; used-mouse-menu pointer field is gone).
-(run-section
- "xmenu-defun/two-values"
- (lambda ()
-   (let ((rec (make-test-rec)))
-     ((%c '--rc-test-state-set!) rec 'prev-event #nil)
-     ((%c '--rc-test-with-state)
-      rec
-      (lambda ()
-        (call-with-values
-            (lambda () ((%c '--rc-read-char-x-menu-prompt)))
-          (lambda args
-            (check "xmenu-defun/two-values" 2 (length args))
-            (check "xmenu-defun/flag-false" #f (cadr args)))))))))
 
 ;;; --- 4. rc-exit! two-value contract (M12 imp-2) --------------------
 

@@ -285,8 +285,14 @@ yields (#nil #f).  See docs/keyboard.org §M8final."
       ((force %rc-latch-input-was-pending))
       (values (rc-state-c rec) (rc-state-used-mouse-menu-flag rec))))))
 
-(define %rc-show-help-echo
-  (delay (%c '--rc-show-help-echo)))
+;;; M28 imp-5 (family 1, group 2) — C show_help_echo (keyboard.c:2863)
+;;; is now a thin dispatcher into (emacs help-echo) show-help-echo, so
+;;; the --rc-show-help-echo double-hop is gone.  Reach the port through
+;;; a lazy module-ref (same rationale as the group-1 menu-prompt fix):
+;;; no eager #:use-module, so the prelude load order is unchanged.
+(define %show-help-echo
+  (delay (module-ref (resolve-module '(emacs help-echo) #:ensure #t)
+                     'show-help-echo)))
 (define %rc-mouse-movement-event-p
   (delay (%c '--rc-mouse-movement-event-p)))
 (define %rc-allow-echo-at-next-pause
@@ -341,7 +347,7 @@ then repeat the read if state->c == fixnum 040 (space).  Returns
                  (object (car htem))
                  (htem (cdr htem))
                  (position (car htem)))
-            ((force %rc-show-help-echo) help window object position))
+            ((force %show-help-echo) help window object position))
           ;; We stopped being idle for this event; undo that.
           (when (%nilp (rc-state-end-time rec))
             ((force %rc-timer-resume-idle)))
@@ -389,7 +395,7 @@ events onto Vunread_post_input_method_events.  Block 2: if
          (else
           ;; Block 2: record if the event bypassed the M8l record path.
           (when (%nilp (rc-state-recorded rec))
-            ((force %rc-record-char) (rc-state-c rec))
+            ((force %record-char) (rc-state-c rec))
             (set-rc-state-recorded! rec #t))
           'fall-through)))))))
 
@@ -424,8 +430,12 @@ is returned only when non-nil)."
       (if (< c ((force %length) table))
           (or ((force %aref) table c) c)
           c)))))
-(define %rc-record-char
-  (delay (%c '--rc-record-char)))
+;;; M28 imp-5 (family 1, group 2) — C record_char (keyboard.c:4005) is
+;;; now a thin dispatcher into (emacs recent-keys) record-char, so the
+;;; --rc-record-char double-hop is gone.  Lazy module-ref as above.
+(define %record-char
+  (delay (module-ref (resolve-module '(emacs recent-keys) #:ensure #t)
+                     'record-char)))
 (define %rc-echo-area-wipe
   (delay (%c '--rc-echo-area-wipe)))
 (define %setcar (delay (%c 'setcar)))
@@ -515,11 +525,11 @@ or `fall-through'.  See docs/keyboard.org §M8l."
             (let* ((maybe-posn (rc-maybe-synthesize-menu-bar-event!))
                    (c (if (%nilp maybe-posn) c maybe-posn)))
               ;; Block 3a: record_char + also_record.
-              ((force %rc-record-char) c)
+              ((force %record-char) c)
               (set-rc-state-recorded! rec #t)
               (let ((also-record (rc-state-also-record rec)))
                 (when (not (%nilp also-record))
-                  ((force %rc-record-char) also-record)))
+                  ((force %record-char) also-record)))
               ;; Block 3b: pre-input-method echo-area save.
               (when (and (%printable-ascii? c)
                          (not (%nilp (symbol-value 'input-method-function))))
@@ -778,8 +788,18 @@ See docs/keyboard.org §M8i."
               'return-wrong-kboard)
              (else 'fall-through))))))))))
 
-(define %rc-read-char-x-menu-prompt
-  (delay (%c '--rc-read-char-x-menu-prompt)))
+;;; Lazy reference to the Scheme (emacs menu-prompt) read-char-x-menu-prompt
+;;; port (M28 imp-5, family 1, group 1).  Deliberately NOT a #:use-module:
+;;; (emacs menu-prompt) imports (emacs read-char), so an eager import here
+;;; would form a load cycle in the prelude (read-char loads first, then
+;;; menu-prompt).  Mirror the main-queue lazy module-ref pattern: the delay
+;;; defers the module resolve to the first read at runtime, after the whole
+;;; prelude has loaded.  The caller (rc-prologue-xmenu-and-idle-gc!) already
+;;; holds a non-nil REC, so the depth-0 guard the C shim used is covered by
+;;; the caller's own (%nilp rec) check.
+(define %read-char-x-menu-prompt
+  (delay (module-ref (resolve-module '(emacs menu-prompt) #:ensure #t)
+                     'read-char-x-menu-prompt)))
 (define %rc-timer-stop-idle
   (delay (%c '--rc-timer-stop-idle)))
 (define %rc-refresh-last-non-minibuf-size
@@ -872,7 +892,7 @@ docs/keyboard.org §M8h."
                (not (eq? (car prev-event) 'tool-bar))
                (not (pair? (symbol-value 'unread-command-events))))
           (call-with-values
-            (lambda () ((force %rc-read-char-x-menu-prompt)))
+            (lambda () ((force %read-char-x-menu-prompt) map prev-event))
             (lambda (event used-mouse-menu-p)
               (set-rc-state-c! rec event)
               (when used-mouse-menu-p
@@ -995,8 +1015,14 @@ to a different kboard, otherwise append a dash separator."
   (if (not (%nilp ((force %rc-echo-area-has-wrong-kboard-p))))
       ((force %rc-cancel-echoing))
       ((force %rc-echo-dash))))
-(define %rc-read-char-minibuf-menu-prompt
-  (delay (%c '--rc-read-char-minibuf-menu-prompt)))
+;;; Lazy reference to the Scheme (emacs menu-prompt) read-char-minibuf-menu-prompt
+;;; port (M28 imp-5, family 1, group 1).  Same lazy module-ref rationale as
+;;; %read-char-x-menu-prompt above: (emacs menu-prompt) imports (emacs
+;;; read-char), so no eager #:use-module here (prelude load cycle).  The
+;;; caller (rc-prologue-echo-and-menu!) guards REC non-nil before forcing.
+(define %read-char-minibuf-menu-prompt
+  (delay (module-ref (resolve-module '(emacs menu-prompt) #:ensure #t)
+                     'read-char-minibuf-menu-prompt)))
 (define %rc-detect-input-pending-run-timers
   (delay (%c '--rc-detect-input-pending-run-timers)))
 (define %keymapp
@@ -1023,7 +1049,7 @@ docs/keyboard.org §M8f."
                  (not (pair? prev-event))
                  (not (pair? (symbol-value 'unread-command-events)))
                  (%nilp ((force %rc-detect-input-pending-run-timers))))
-            (let ((c ((force %rc-read-char-minibuf-menu-prompt)
+            (let ((c ((force %read-char-minibuf-menu-prompt)
                       (rc-state-commandflag rec)
                       map)))
               (cond
@@ -1042,8 +1068,14 @@ docs/keyboard.org §M8f."
   (delay (%c '--rc-input-pending)))
 (define %rc-input-was-pending
   (delay (%c '--rc-input-was-pending)))
-(define %rc-swallow-events
-  (delay (%c '--rc-swallow-events)))
+;;; M28 imp-5 (family 1, group 2) — C swallow_events (keyboard.c:5269)
+;;; is now a thin dispatcher into (emacs kbd-buffer)
+;;; kbd-buffer-swallow-events!, so the --rc-swallow-events double-hop
+;;; is gone.  The port takes the do-display argument the C shim fixed
+;;; to false (C called swallow_events (false)); callers pass #f.
+(define %swallow-events
+  (delay (module-ref (resolve-module '(emacs kbd-buffer) #:ensure #t)
+                     'kbd-buffer-swallow-events!)))
 (define %rc-help-echo-redisplay-preserve-p
   (delay (%c '--rc-help-echo-redisplay-preserve-p)))
 (define %rc-redisplay-preserve-echo-area
@@ -1059,7 +1091,7 @@ raw input flags and redisplay actions."
   ;; user-visible, such as X selection_request events.
   (when (or (not (%nilp ((force %rc-input-pending))))
             (not (%nilp ((force %rc-detect-input-pending-run-timers)))))
-    ((force %rc-swallow-events)))
+    ((force %swallow-events) #f))
   ;; Redisplay if no pending input, mirroring the original C loop:
   ;; while (!(input_pending && input_was_pending)) { ... }.
   (let loop ()
@@ -1070,7 +1102,7 @@ raw input flags and redisplay actions."
           ((force %rc-redisplay-preserve-echo-area))
           ((force %rc-redisplay)))
       (when (not (%nilp ((force %rc-input-pending))))
-        ((force %rc-swallow-events))
+        ((force %swallow-events) #f)
         (loop))))
   #nil)
 

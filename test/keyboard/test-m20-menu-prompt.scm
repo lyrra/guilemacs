@@ -458,73 +458,55 @@
                  (check "minibuf-menu-prompt/kbd-macro-restored" #t
                         (eq? ((%c 'kboard-defining-kbd-macro) ((%c 'current-kboard))) #t))))))))))))
 
-;; 6. Repoint: after imp-4 the --rc-read-char-minibuf-menu-prompt shim
-;;    forwards to the same (emacs menu-prompt) Scheme body (the C body is
-;;    deleted), so it must agree with a direct read-char-minibuf-menu-prompt
-;;    call on the same keymap/seed.
-(with-mp-state
- (lambda ()
-   (with-msg3-stub
-    (lambda ()
-      (set-symbol-value! 'menu-prompting #t)
-      (let ((keymap (test-keymap)))
-        (set-symbol-value! 'unread-command-events (list 97))
-        (let ((scheme-res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 keymap)))
-          (set-symbol-value! 'unread-command-events (list 97))
-          (let ((c-res ((%c '--rc-read-char-minibuf-menu-prompt) 0 keymap)))
-            (check "minibuf-menu-prompt/repoints-to-scheme" scheme-res c-res))))))))
-
 ;;; =====================================================================
 ;;; M20 imp-4 — cutover checks
 ;;; =====================================================================
 ;;; The C bodies for read_menu_command, read_char_x_menu_prompt and
-;;; read_char_minibuf_menu_prompt are deleted; all four call sites now
-;;; dispatch to Scheme.  The two --rc-* shims and the (emacs menu-prompt)
-;;; bodies they forward to are exercised directly above; here we prove the
-;;; forwarding works and that the C entry points resolve the Scheme procs.
-
-;; --- 8. --rc-read-char-x-menu-prompt repoints to Scheme ------------
-;; Drive the shim through the rc_record_stack (it reads the top-of-stack
-;; rec's map / prev-event slots) with a live rec whose slots are set, and
-;; confirm it returns the same (event . used-mouse-menu) as a direct
-;; read-char-x-menu-prompt call under the same stubbed --x-popup-menu-1.
-(define (make-test-rec)
-  (let ((rec ((%c '--make-rc-state))))
-    ((%c '--rc-state-fresh!) rec)
-    rec))
-
-(define (call-xmenu-shim map prev)
-  (let ((rec (make-test-rec)))
-    ((%c '--rc-test-state-set!) rec 'map map)
-    ((%c '--rc-test-state-set!) rec 'prev-event prev)
-    ((%c '--rc-record-stack-push) rec)
-    (dynamic-wind
-      (lambda () #t)
-      (lambda ()
-        (call-with-values
-            (lambda () ((%c '--rc-read-char-x-menu-prompt)))
-          (lambda (v flag) (list v flag))))
-      (lambda () ((%c '--rc-record-stack-pop))))))
-
-(with-mp-state
- (lambda ()
-   (let ((saved-mp (symbol-value 'menu-prompting)))
-     (dynamic-wind
-       (lambda () (set-symbol-value! 'menu-prompting #t))
-       (lambda ()
-         (with-xpopup-stub (lambda (pos menu) '(sym-a 42 sym-b))
-           (lambda ()
-             (check "rc-xmenu/repoints-to-scheme"
-                    (call-rcxmp #nil '(mouse-1 (0 . 0)))
-                    (call-xmenu-shim #nil '(mouse-1 (0 . 0)))))))
-       (lambda () (set-symbol-value! 'menu-prompting saved-mp))))))
+;;; read_char_minibuf_menu_prompt are deleted; all four call sites dispatch
+;;; to Scheme.  The (emacs menu-prompt) ports are exercised directly above.
+;;; M28 imp-5 (family 1, group 1) then deleted the two remaining C
+;;; double-hops --rc-read-char-minibuf-menu-prompt and
+;;; --rc-read-char-x-menu-prompt: read-char.scm now calls the ports directly,
+;;; so the "shim repoints to Scheme" checks (old sections 6 and 8) are gone
+;;; with the shims.  The port contracts they forwarded to stay covered in
+;;; sections 5 and 7.
 
 ;; --- 9. read-menu-command C entry point resolves the Scheme proc -----
 ;; The C read_menu_command (called directly from src/term.c, no DEFUN
 ;; wrapper) dispatches via scm_c_public_ref ("emacs menu-prompt",
 ;; "read-menu-command").  Verify that public ref resolves to the exported
-;; procedure (the body itself is exercised in section 6 above).
+;; procedure (the body itself is exercised by the read-menu-command
+;; cases above).
 (check "read-menu-command/c-entry-resolves" #t
        (let ((proc (module-ref (resolve-interface '(emacs menu-prompt))
                                'read-menu-command)))
          (procedure? proc)))
+
+;;; =====================================================================
+;;; M28 imp-5 (family 1, group 1) — the two --rc-* double-hops are gone
+;;; =====================================================================
+;;; read-char.scm now reaches the (emacs menu-prompt) ports directly via
+;;; lazy module-refs (%read-char-x-menu-prompt /
+;;; %read-char-minibuf-menu-prompt), so the C DEFUNs
+;;; --rc-read-char-x-menu-prompt and --rc-read-char-minibuf-menu-prompt no
+;;; longer register, and those private read-char refs resolve to the same
+;;; ports.  Same "deleted name reads back nil" convention as
+;;; test-m28-imp4.scm §0.
+
+(for-each
+ (lambda (name)
+   (check (string-append "imp5f1g1/no-defun/" name) #t
+          (eq? (%sym (intern name)) #nil)))
+ '("--rc-read-char-x-menu-prompt"
+   "--rc-read-char-minibuf-menu-prompt"))
+
+;; The private lazy refs must force to the (emacs menu-prompt) ports, not to
+;; a now-void C DEFUN.  Reaching them needs module-variable (they are not
+;; exported) while (emacs read-char) is loaded.
+(let* ((rc (resolve-module '(emacs read-char)))
+       (xmp (force (variable-ref (module-variable rc '%read-char-x-menu-prompt))))
+       (mmp (force (variable-ref (module-variable rc '%read-char-minibuf-menu-prompt)))))
+  (check "imp5f1g1/xmenu-ref-resolves-to-port" #t
+         (eq? xmp (@@ (emacs menu-prompt) read-char-x-menu-prompt)))
+  (check "imp5f1g1/minibuf-ref-resolves-to-port" #t
+         (eq? mmp (@@ (emacs menu-prompt) read-char-minibuf-menu-prompt))))

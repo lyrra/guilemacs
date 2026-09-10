@@ -29,12 +29,19 @@
 ;;;
 ;;; M20 imp-3 — adds read_char_minibuf_menu_prompt
 ;;; (src/keyboard.c:8720-8939) as read-char-minibuf-menu-prompt.
-;;; Coexistence-only, same as imp-2: the C body stays active and
-;;; untouched; --rc-read-char-minibuf-menu-prompt still calls it.
-;;; imp-4 cuts over the call site.  This module now imports (emacs
-;;; read-char) one-way (read-char does not import menu-prompt), so no
-;;; load-order cycle yet; imp-4 must re-check when it points
-;;; rc-prologue-echo-and-menu! back at this function.
+;;; Coexistence-only, same as imp-2: the C body stayed active and
+;;; untouched until M28 imp-5 (family 1, group 1) removed the two
+;;; --rc-* double-hops that called it.  This module imports (emacs
+;;; read-char) one-way (read-char does not import menu-prompt), so
+;;; there is no load-order cycle: read-char.scm reaches these ports
+;;; through a lazy module-ref instead (see read-char.scm's
+;;; %read-char-x-menu-prompt / %read-char-minibuf-menu-prompt).
+;;;
+;;; M28 imp-5 (family 1, group 1) — the C bodies and the two --rc-*
+;;; double-hops are now gone: read-char.scm reaches these ports directly
+;;; via a lazy module-ref (see read-char.scm's %read-char-x-menu-prompt /
+;;; %read-char-minibuf-menu-prompt), which keeps the one-way import
+;;; direction and avoids the prelude cycle.
 
 (define record-char (@ (emacs recent-keys) record-char))
 

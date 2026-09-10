@@ -6,13 +6,14 @@
 ;;; the cutover: that the C thin dispatchers (=readable_events=,
 ;;; =process_special_events=, =swallow_events=, =discard_mouse_events=,
 ;;; =kbd_buffer_events_waiting=) reach those Scheme bodies.  It drives
-;;; the three C functions that expose an elisp-visible DEFUN shim and
-;;; observes the observable behavior (return value, fetch/store
-;;; cursors) that only the Scheme body produces:
+;;; the remaining elisp-visible C DEFUN shims and the (emacs kbd-buffer)
+;;; swallow-events port directly (M28 imp-5 group 2 removed the
+;;; --rc-swallow-events double-hop), and observes the behavior (return
+;;; value, fetch/store cursors) that only the Scheme body produces:
 ;;;
 ;;;   --get-input-pending FLAGS -> get_input_pending -> readable_events
 ;;;   --process-special-events  -> process_special_events
-;;;   --rc-swallow-events       -> swallow_events (false)
+;;;   kbd-buffer-swallow-events! #f -> swallow_events (false)   (port)
 ;;;
 ;;; =discard_mouse_events= and =kbd_buffer_events_waiting= have no
 ;;; elisp shim (their only callers are =term.c=/=msdos.c=, unchanged).
@@ -66,14 +67,17 @@
 
 (define FLAG-FILTER-EVENTS 2)
 
-;;; --- 0. Registration: the 3 elisp-visible cutover shims resolve ------
+;;; --- 0. Registration: the elisp-visible cutover shims resolve --------
 ;; Guards against a renamed/missing DEFUN (the
-;; C-helper-masquerading-as-elisp trap, house rule).
+;; C-helper-masquerading-as-elisp trap, house rule).  M28 imp-5 (family
+;; 1, group 2) removed the --rc-swallow-events double-hop, so it must
+;; now be absent while the two real shims stay.
 (for-each
  (lambda (n)
    (check (string-append "registered:" (symbol->string n))
           #t (not (eq? (%sym n) #nil))))
- '(--get-input-pending --process-special-events --rc-swallow-events))
+ '(--get-input-pending --process-special-events))
+(check "retired:--rc-swallow-events" #t (eq? (%sym '--rc-swallow-events) #nil))
 
 ;;; --- 1. readable_events cutover via --get-input-pending --------------
 
@@ -206,10 +210,10 @@
     (lambda () ((%sym '--kbd-set-fetch-ptr-index) saved-fetch)
                ((%sym '--kbd-set-store-ptr-index) saved-store))))
 
-;;; --- 3. swallow_events cutover via --rc-swallow-events ---------------
-;;; --rc-swallow-events calls swallow_events (false), which must run the
-;;; Scheme kbd-buffer-swallow-events! without error on an empty ring
-;;; (the do-display=false branch).
+;;; --- 3. swallow_events cutover via the (emacs kbd-buffer) port -------
+;;; M28 imp-5 (family 1, group 2) removed --rc-swallow-events; the port
+;;; takes the do-display argument the C shim fixed to false.  It must run
+;;; without error on an empty ring (the do-display=false branch).
 (let* ((saved-fetch ((%sym '--kbd-fetch-ptr-index)))
        (saved-store ((%sym '--kbd-store-ptr-index))))
   (dynamic-wind
@@ -218,6 +222,6 @@
       ((%sym '--kbd-set-fetch-ptr-index) saved-fetch)
       ((%sym '--kbd-set-store-ptr-index) saved-fetch)
       (check "cutover/rc-swallow-no-error" #t
-             (no-error? (lambda () ((%sym '--rc-swallow-events))))))
+             (no-error? (lambda () (kbd-buffer-swallow-events! #f)))))
     (lambda () ((%sym '--kbd-set-fetch-ptr-index) saved-fetch)
                ((%sym '--kbd-set-store-ptr-index) saved-store))))

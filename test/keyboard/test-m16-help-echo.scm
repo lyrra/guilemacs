@@ -8,11 +8,11 @@
 ;;; imp-3 turns the three C bodies into thin dispatchers into (emacs
 ;;; help-echo).  The C gen-help-event / store-help-event entry points are
 ;;; only reachable from C callers, so the Scheme bodies are exercised
-;;; directly (round-trip + x-field rule) exactly as at imp-2, while the
-;;; show_help_echo dispatcher is driven through the real C entry point
-;;; --rc-show-help-echo (keyboard.c), which now forwards to Scheme.  Every
-;;; sub-test that advances the store pointer or mutates shared state runs
-;;; inside a dynamic-wind that restores it.
+;;; directly (round-trip + x-field rule) exactly as at imp-2.  M28 imp-5
+;;; (family 1, group 2) removed the --rc-show-help-echo double-hop, so
+;;; show-help-echo is driven directly through the (emacs help-echo) port
+;;; too.  Every sub-test that advances the store pointer or mutates shared
+;;; state runs inside a dynamic-wind that restores it.
 
 (use-modules (emacs help-echo))
 
@@ -51,6 +51,10 @@
    (check (string-append "proc:" (symbol->string n))
           #t (procedure? (module-ref (resolve-module '(emacs help-echo)) n))))
  '(show-help-echo gen-help-event store-help-event))
+
+;; M28 imp-5 (family 1, group 2) removed the --rc-show-help-echo shim;
+;; read-char.scm now reaches the port directly, so the subr is gone.
+(check "retired:--rc-show-help-echo" #t (eq? (%sym '--rc-show-help-echo) #nil))
 
 ;;; --- 1. gen-help-event: field mapping ------------------------------
 ;;; Window case: x = WINDOW.  Frame-fallback case: x = FRAME.  (Same
@@ -99,24 +103,25 @@ pre-call store index.  Restores the store pointer afterwards."
   (check "store/y" "help-s" ((%sym '--ie-y) stored))
   (check "store/timestamp-zero" 0 ((%sym '--ie-timestamp) stored)))
 
-;;; --- 3. show-help-echo dispatch through the C entry point ----------
-;;; --rc-show-help-echo (keyboard.c) calls show_help_echo, whose imp-3
-;;; body dispatches into Scheme show-help-echo.  Batch is noninteractive,
+;;; --- 3. show-help-echo: direct (emacs help-echo) port ---------------
+;;; M28 imp-5 (family 1, group 2) removed the --rc-show-help-echo shim;
+;;; C show_help_echo is a thin dispatcher into the (emacs help-echo)
+;;; port, so the corpus calls the port directly.  Batch is noninteractive,
 ;;; so the mouse-fixup block is skipped and the shared cell write is the
 ;;; observable effect.  Drive all three HELP shapes: string, function, nil.
 
-;; 3a. string HELP through --rc-show-help-echo: shared cell set on.
+;; 3a. string HELP through the port: shared cell set on.
 (let ((saved-show (symbol-value 'show-help-function)))
   ((%sym '--rc-help-echo-showing-set!) #nil)
   (dynamic-wind
     (lambda () #f)
     (lambda ()
-      ((%sym '--rc-show-help-echo) "hello" #nil #nil 0)
+      (show-help-echo "hello" #nil #nil 0)
       (check "dispatch/string-cell-on" #t
              (truthy? ((%sym '--rc-help-echo-redisplay-preserve-p)))))
     (lambda () (set-symbol-value! 'show-help-function saved-show))))
 
-;; 3b. function HELP through --rc-show-help-echo: show-help-function is
+;; 3b. function HELP through the port: show-help-function is
 ;; called with the substituted string, and the cell reflects the write.
 (let ((saved-show (symbol-value 'show-help-function))
       (observed #nil))
@@ -126,7 +131,7 @@ pre-call store index.  Restores the store pointer afterwards."
   (dynamic-wind
     (lambda () #f)
     (lambda ()
-      ((%sym '--rc-show-help-echo) 'm16-help-fn #nil #nil 0)
+      (show-help-echo 'm16-help-fn #nil #nil 0)
       (check "dispatch/function-called" #t
              (and (string? observed)
                   (not (eq? (string-contains observed "from-fn") #f))))
@@ -134,13 +139,13 @@ pre-call store index.  Restores the store pointer afterwards."
              (truthy? ((%sym '--rc-help-echo-redisplay-preserve-p)))))
     (lambda () (set-symbol-value! 'show-help-function saved-show))))
 
-;; 3c. nil HELP through --rc-show-help-echo: clears the cell.
+;; 3c. nil HELP through the port: clears the cell.
 (let ((saved-show (symbol-value 'show-help-function)))
   ((%sym '--rc-help-echo-showing-set!) #t)
   (dynamic-wind
     (lambda () #f)
     (lambda ()
-      ((%sym '--rc-show-help-echo) #nil #nil #nil 0)
+      (show-help-echo #nil #nil #nil 0)
       (check "dispatch/nil-cell-off" #nil
              ((%sym '--rc-help-echo-redisplay-preserve-p))))
     (lambda () (set-symbol-value! 'show-help-function saved-show))))

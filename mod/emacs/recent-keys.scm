@@ -230,8 +230,10 @@ of the form (nil . COMMAND).  Mirrors C Frecent_keys."
 Append the input event C to the recent-keys ring, filtering repeated
 help-echo and mouse-movement events, and mirror the dribble-file write.
 C record_char now dispatches into this procedure (M17 imp-3);
-record_menu_key and --rc-record-char reach it through record_char
-unchanged.  Returns an unspecified value."
+record_menu_key reaches it through record_char unchanged, and M28
+imp-5 (family 1, group 2) removed the --rc-record-char double-hop so
+read-char.scm calls this procedure directly.  Returns an unspecified
+value."
   ;; Guard: subr.el/read-passwd binds inhibit--record-char to avoid
   ;; recording passwords.  When not recording all keys and recording is
   ;; inhibited, do nothing at all — no ring write, no dribble write.

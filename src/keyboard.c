@@ -3124,26 +3124,13 @@ Returns nil.  Used by Scheme rc-exit!.  */)
 
 /* M8n — tiny C shims for the Scheme-owned help-echo / command-keys
    / help-form epilogue.  Scheme owns the 3-block control flow, the
-   last-input-event update, and the block-2 add-command-key / echo
-   sequence.  C still owns show_help_echo, the mouse-movement event
-   predicate, the ok_to_echo_at_next_pause global write, the
-   num_input_events counter, and the Block 3 recursive read_char loop
-   with its dynwind / help-form-saved-window-configs machinery.  */
-
-DEFUN ("--rc-show-help-echo",
-       Fc_rc_show_help_echo,
-       Sc_rc_show_help_echo, 4, 4, 0,
-       doc: /* Internal: thin wrapper around C show_help_echo.
-HELP is the help string, WINDOW the window, OBJECT the object,
-POSITION the position within the help.  Used by Scheme
-rc-help-echo-and-help-form! after destructuring the
-(help-echo FRAME HELP WINDOW OBJECT POS) event cons.  */)
-  (Lisp_Object help, Lisp_Object window,
-   Lisp_Object object, Lisp_Object position)
-{
-  show_help_echo (help, window, object, position);
-  return Qnil;
-}
+   last-input-event update, the block-2 add-command-key / echo
+   sequence, and the help-echo dispatch (reached directly through the
+   (emacs help-echo) port since M28 imp-5 group 2).  C still owns the
+   mouse-movement event predicate, the ok_to_echo_at_next_pause global
+   write, the num_input_events counter, and the Block 3 recursive
+   read_char loop with its dynwind / help-form-saved-window-configs
+   machinery.  */
 
 DEFUN ("--safe-calln-or-eval", Fsafe_calln_or_eval, Ssafe_calln_or_eval,
        4, 4, 0,
@@ -3376,21 +3363,11 @@ return nil.  Caller has already verified the Block 1 gate.  */)
 
 /* M8l — tiny C shims for the Scheme-owned translate + menu-bar +
    record + echo-wipe block.  Scheme orchestrates the 3 blocks; C
-   owns the menu-bar event POSN_SET_POSN rewrite, the C record_char
-   path, and the echo-area / mini-window cleanup primitives.
+   owns the menu-bar event POSN_SET_POSN rewrite and the echo-area /
+   mini-window cleanup primitives.  C record_char is reached directly
+   through the (emacs recent-keys) port since M28 imp-5 group 2.
    The keyboard-translate-table lookup is now fully in Scheme
    (rc-translate-kbd-table).  */
-
-DEFUN ("--rc-record-char",
-       Fc_rc_record_char,
-       Sc_rc_record_char, 1, 1, 0,
-       doc: /* Internal: call C record_char(C).  Used by Scheme
-rc-event-translate-and-record! and rc-input-method-dispatch!.  */)
-  (Lisp_Object c)
-{
-  record_char (c);
-  return Qnil;
-}
 
 DEFUN ("--rc-echo-area-wipe",
        Fc_rc_echo_area_wipe,
@@ -3536,37 +3513,6 @@ exit is needed.  */)
    and the buffer-size-scaled auto-save / GC block which is dense
    C-internal arithmetic.  */
 
-DEFUN ("--rc-read-char-x-menu-prompt",
-       Fc_rc_read_char_x_menu_prompt,
-       Sc_rc_read_char_x_menu_prompt, 0, 0, 0,
-       doc: /* Internal: take the top-of-stack rec's MAP and PREV-EVENT
-slots, forward them to (emacs menu-prompt) read-char-x-menu-prompt,
-and read the two-value result: the event, and a boolean that is
-true exactly when the read produced a menu choice (M12 imp-3: the
-caller-owned used-mouse-menu pointer is gone; the flag travels as
-this plain boolean).  Used by Scheme rc-prologue-xmenu-and-idle-gc!
-Block 1.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
-  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
-  /* M20 imp-4 — the C read_char_x_menu_prompt body is deleted; forward
-     to (emacs menu-prompt) read-char-x-menu-prompt, which keeps the same
-     two-value contract (event, used-mouse-menu-flag).  Re-wrap into
-     scm_values so the Scheme caller (rc-prologue-xmenu-and-idle-gc! Block 1)
-     needs no change.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs menu-prompt", "read-char-x-menu-prompt");
-  SCM result = scm_call_2 (proc, map, prev_event);
-  Lisp_Object event = scm_c_value_ref (result, 0);
-  bool used_mouse_menu = scm_is_true (scm_c_value_ref (result, 1));
-  return scm_values (scm_list_2 (event, scm_from_bool (used_mouse_menu)));
-}
-
 DEFUN ("--rc-timer-stop-idle",
        Fc_rc_timer_stop_idle,
        Sc_rc_timer_stop_idle, 0, 0, 0,
@@ -3696,27 +3642,6 @@ Used by Scheme rc-echo-cancel-or-dash.  */)
   return wrong ? Qt : Qnil;
 }
 
-DEFUN ("--rc-read-char-minibuf-menu-prompt",
-       Fc_rc_read_char_minibuf_menu_prompt,
-       Sc_rc_read_char_minibuf_menu_prompt, 2, 2, 0,
-       doc: /* Internal: forward COMMANDFLAG and MAP to (emacs menu-prompt)
-read-char-minibuf-menu-prompt.  COMMANDFLAG must be a fixnum.
-MAP is the keymap candidate.
-Used by Scheme rc-prologue-echo-and-menu!.  */)
-  (Lisp_Object commandflag, Lisp_Object map)
-{
-  CHECK_FIXNUM (commandflag);
-  /* M20 imp-4 — the C read_char_minibuf_menu_prompt body is deleted;
-     forward to (emacs menu-prompt) read-char-minibuf-menu-prompt, which
-     takes COMMANDFLAG as a Lisp fixnum object (not a raw int).  Single
-     return value; 1:1 forward, no value unpacking.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs menu-prompt",
-                             "read-char-minibuf-menu-prompt");
-  return SCM_CALL_2 (proc, commandflag, map);
-}
-
 DEFUN ("--rc-detect-input-pending-run-timers",
        Fc_rc_detect_input_pending_run_timers,
        Sc_rc_detect_input_pending_run_timers, 0, 0, 0,
@@ -3785,16 +3710,6 @@ Used by Scheme rc-redisplay-and-wait-block!.  */)
   (void)
 {
   return input_was_pending ? Qt : Qnil;
-}
-
-DEFUN ("--rc-swallow-events",
-       Fc_rc_swallow_events, Sc_rc_swallow_events, 0, 0, 0,
-       doc: /* Internal: call swallow_events (false).
-Used by Scheme rc-redisplay-and-wait-block!.  */)
-  (void)
-{
-  swallow_events (false);
-  return Qnil;
 }
 
 DEFUN ("--rc-help-echo-redisplay-preserve-p",

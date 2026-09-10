@@ -228,7 +228,7 @@
   (should (fboundp '--rc-redisplay-and-wait-block))
   (should (fboundp '--rc-input-pending))
   (should (fboundp '--rc-input-was-pending))
-  (should (fboundp '--rc-swallow-events))
+  (should-not (fboundp '--rc-swallow-events))
   (should (fboundp '--rc-help-echo-redisplay-preserve-p))
   (should (fboundp '--rc-redisplay-preserve-echo-area))
   (should (fboundp '--rc-redisplay)))
