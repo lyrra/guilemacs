@@ -113,8 +113,6 @@ HAVE_BE_APP = @HAVE_BE_APP@
 HAVE_PGTK = @HAVE_PGTK@
 HAVE_GSETTINGS = @HAVE_GSETTINGS@
 
-ANDROID = @ANDROID@
-
 # ==================== Where To Install Things ====================
 
 # Location to install Emacs.app under GNUstep / macOS.
@@ -339,10 +337,6 @@ EMACS_PDMP = `./src/emacs${EXEEXT} --fingerprint`.pdmp
 # Subdirectories to make recursively.
 SUBDIR = $(NTDIR) lib lib-src src lisp
 
-ifeq ($(ANDROID),yes)
-SUBDIR := $(SUBDIR) java
-endif
-
 # The subdir makefiles created by config.status.
 SUBDIR_MAKEFILES_IN = @SUBDIR_MAKEFILES_IN@
 SUBDIR_MAKEFILES = $(patsubst ${srcdir}/%,%,${SUBDIR_MAKEFILES_IN:.in=})
@@ -534,12 +528,6 @@ lisp: src
 
 # These targets should be "${SUBDIR} without 'src'".
 lib lib-src lisp nt: Makefile
-	$(MAKE) -C $@ all
-
-java: lisp info
-	$(MAKE) -C $@ all
-
-cross: src
 	$(MAKE) -C $@ all
 
 trampolines: src lisp
@@ -1026,7 +1014,7 @@ mostlyclean: $(mostlyclean_dirs:=_mostlyclean)
 ###      with them.
 ###
 ###      Delete '.dvi' files here if they are not part of the distribution.
-clean_dirs = $(mostlyclean_dirs) java cross nextstep admin/charsets \
+clean_dirs = $(mostlyclean_dirs) nextstep admin/charsets \
   admin/unidata
 
 $(foreach dir,$(clean_dirs),$(eval $(call submake_template,$(dir),clean)))

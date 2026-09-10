@@ -3356,8 +3356,7 @@ It returns a number identifying the notification, which may be
 supplied as the @code{:replaces-id} parameter to a later call to this
 function.
 
-If Emacs is not afforded the permission to display notifications
-(@pxref{Android Environment,,, emacs, The GNU Emacs Manual}) under
+If Emacs is not afforded the permission to display notifications under
 Android 13 and later, any notifications sent will be silently
 disregarded.
 @end defun

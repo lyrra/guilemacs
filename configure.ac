@@ -26,30 +26,6 @@ dnl Note this is parsed by (at least) make-dist and lisp/cedet/ede/emacs.el.
 AC_INIT([GNU Emacs], [31.0.50], [bug-gnu-emacs@gnu.org], [],
   [https://www.gnu.org/software/emacs/])
 
-if test "$XCONFIGURE" = "android"; then
-  # configure is being called recursively to configure Emacs for
-  # Android!
-  AC_MSG_NOTICE([called to recursively configure Emacs for Android.])
-  # Set CC to ANDROID_CC and CFLAGS to ANDROID_CFLAGS.
-  CC=$ANDROID_CC
-  # Set -Wno-implicit-function-declaration.  Building Emacs for older
-  # versions of Android requires configure tests to fail if the
-  # functions are not defined, as the Android library in the NDK
-  # defines subroutines that are not available in the headers being
-  # used.
-  CFLAGS="$ANDROID_CFLAGS -Werror=implicit-function-declaration"
-  # Don't explicitly enable support for large files unless Emacs is
-  # being built for API 21 or later.  Otherwise, mmap does not work.
-  #
-  # Moreover, 64-bit variants of file IO functions in the C library are
-  # liable to fail with ENOSYS or EINVAL on earlier API versions, and as
-  # such their definitions must be explicitly disabled on NDK releases
-  # that enable them by default.
-  AS_IF([test "$ANDROID_SDK" -lt "21"], [
-    CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=32"
-    enable_largefile=no
-    enable_year2038=no])
-fi
 
 dnl Set emacs_config_options to the options of 'configure', quoted for the shell,
 dnl and then quoted again for a C string.  Separate options with spaces.
@@ -151,69 +127,9 @@ MAKE=$ac_cv_path_MAKE
 export MAKE
 
 dnl Canonicalize the configuration name.
-if test "$XCONFIGURE" = "android"; then
-  dnl Set host to whatever Android system Emacs is being configured
-  dnl for.  Determine this by looking at the output of ANDROID_CC.
-
-  AC_MSG_CHECKING([the cross-compiler's target])
-  cc_target=`${CC} -v 2>&1 | sed -n 's/Target: //p'`
-  case "$cc_target" in
-    *android*) host_alias=$cc_target
-    ;;
-    *) AC_MSG_ERROR([The cross compiler does not compile for Android.
-Please verify that you specified the correct compiler in the ANDROID_CC
-variable when you ran configure.])
-    ;;
-  esac
-  AC_MSG_RESULT([$host_alias])
-fi
 
 AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
-
-AS_IF([test "$XCONFIGURE" = "android"],[
-  # Initialize the Android NDK build system.  Make sure to use the
-  # passed through NDK path.
-  # Make sure to pass through the CFLAGS, as older versions of the
-  # NDK require them to be able to find system includes.
-  with_ndk_path="$android_ndk_path"
-  with_ndk_cxx="$android_ndk_cxx"
-  ndk_INIT([$android_abi], [$ANDROID_SDK], [cross/ndk-build],
-           [$ANDROID_CFLAGS])
-
-  # At the same time, configure libexec with the build directory
-  # set to `exec'.
-  AS_MKDIR_P([exec])
-
-  # Enter exec and configure it, using the C compiler as both the
-  # assembler and the linker.  Determine the absolute name of the
-  # source directory.
-  # N.B. that the linker is actually cc, so pass -nostdlib, lest
-  # the crt be linked in.  Likewise for as.
-
-  AS_CASE([$srcdir], [.], [emacs_srcdir=`pwd`],
-    [[[\\/]* | ?:[\\/]*]], [emacs_srcdir=$srcdir],
-    [*], [emacs_srcdir=`pwd`/$srcdir])
-
-  AC_MSG_NOTICE([configuring in `exec'])
-
-  # Derive a name for a cache file for this configure script from the
-  # current, if specified.
-  exec_cache_file=
-  AS_CASE([$cache_file], [/dev/null | ""], [],
-    [[[\\/]* | ?:[\\/]*]], [exec_cache_file="--cache-file=$cache_file.2"],
-    [*], [exec_cache_file="--cache-file=../$cache_file.2"])
-  OLDCWD=`pwd`
-  cd exec
-  $CONFIG_SHELL $emacs_srcdir/exec/configure		\
-		--host=$host "CC=$CC" "LD=$CC" "AS=$CC"	\
-		"AR=$AR" "CFLAGS=$CFLAGS" $exec_cache_file
-  emacs_val=$?
-  cd $OLDCWD
-
-  AS_IF([test "$emacs_val" != "0"],
-    [AC_MSG_ERROR([failed to configure in `exec'])])
-])
 
 case $host in
  *-mingw*)
@@ -294,12 +210,6 @@ AC_ARG_WITH([all],
   [with_features=$withval],
   [with_features=yes])
 
-dnl ARCH_INDEPENDENT_CONFIG_FILES(FILE...)
-dnl Like AC_CONFIG_FILES(FILE).  However, do not generate this
-dnl   if configure is being called recursively in preparation
-dnl   for cross-compilation.
-AC_DEFUN([ARCH_INDEPENDENT_CONFIG_FILES], [
-  AS_IF([test "$XCONFIGURE" != "android"], [AC_CONFIG_FILES([$1])])])
 
 dnl OPTION_DEFAULT_OFF(NAME, HELP-STRING)
 dnl Create a new --with option that defaults to being disabled.
@@ -357,23 +267,16 @@ AC_ARG_WITH([mailutils],
       installed])],
   [],
   [AS_IF([test "$with_features" != "no"],
-   [with_mailutils=yes-unless-android
-    AS_IF([test "x$XCONFIGURE" != "xandroid"],
-     [(movemail --version) >/dev/null 2>&1 || with_mailutils=no],
-     [dnl Don't check for movemail if cross-compiling.
-      dnl instead, default to false.
-      with_mailutils=no])])])
+   [(movemail --version) >/dev/null 2>&1 || with_mailutils=no])])
 
 AC_ARG_WITH([pop],
   [AS_HELP_STRING([--with-pop],
      [Support POP mail retrieval if Emacs movemail is used (not recommended,
       as Emacs movemail POP is insecure).  This is the default only on
-      native MS-Windows and Android.])],
+      native MS-Windows.])],
   [],
-  dnl Enable movemail POP support on Android as GNU Mailutils is
-  dnl normally unavailable on that platform.
   [AS_CASE([$host],
-     [*-mingw*|*android*], [with_pop=yes],
+     [*-mingw*], [with_pop=yes],
      [with_pop=no-by-default])])
 if test "$with_pop" = yes; then
    AC_DEFINE([MAIL_USE_POP])
@@ -516,16 +419,6 @@ OPTION_DEFAULT_ON([threads],[don't compile with elisp threading support])
 OPTION_DEFAULT_OFF([cygwin32-native-compilation],[use native compilation on 32-bit Cygwin])
 OPTION_DEFAULT_ON([xinput2],[don't use version 2 of the X Input Extension for input])
 OPTION_DEFAULT_OFF([small-ja-dic],[generate a smaller-size Japanese dictionary])
-OPTION_DEFAULT_OFF([android],[cross-compile Android application package])
-OPTION_DEFAULT_ON([android-debug],[don't build Emacs as a debug package on Android])
-
-# Find out of Android support is enabled and mailutils has defaulted
-# to `yes-unless-android'.  Disable it if so.
-
-AS_IF([test "x$with_mailutils" = "xyes-unless-android"],
-  [AS_IF([test "x$with_android" != "xno"],
-     [with_mailutils=no],
-     [with_mailutils=yes])])
 
 # Clear with_mailutils if it's set to no.
 
@@ -538,9 +431,6 @@ AS_IF([test x"$with_mailutils" = xyes],
 
 AC_SUBST([with_mailutils])
 
-AC_ARG_WITH([shared-user-id],
-  [AS_HELP_STRING([--with-shared-user-id=ID],
-    [use the given shared user ID in Android builds])])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
  [use a file notification library (LIB one of: yes, inotify, kqueue, gfile, w32, no)])],
@@ -636,24 +526,10 @@ do
 done
 IFS="$ac_save_IFS"
 
-# This environment variable is used to signal that checking should be
-# enabled on Android.  When that happens, simply enable checking for
-# the cross-compiled Android binary.
-
-AS_IF([test "x$XCONFIGURE" = "xandroid" \
-       && test "x$android_enable_checking" = "xyes"],
-  [ac_enable_checking=yes])
-
-# There is little point in enabling checking in the build machine if
-# cross-compiling for Android.
-AS_IF([test "$with_android" = no || test -n "$XCONFIGURE"],[
-  if test x$ac_enable_checking != x ; then
-    AC_DEFINE([ENABLE_CHECKING], [1],
-  [Define to 1 if expensive run-time data type and consistency checks are enabled.])
-  fi
-],[AS_IF([test "x$ac_enable_checking" != x],
-    [android_enable_checking=yes
-     export android_enable_checking])])
+if test x$ac_enable_checking != x ; then
+  AC_DEFINE([ENABLE_CHECKING], [1],
+[Define to 1 if expensive run-time data type and consistency checks are enabled.])
+fi
 
 AC_ARG_ENABLE([gc-mark-trace],
  [AS_HELP_STRING([--disable-gc-mark-trace],
@@ -702,563 +578,7 @@ AC_ARG_ENABLE([build-details],
   [test "$enableval" = no && BUILD_DETAILS=--no-build-details])
 AC_SUBST([BUILD_DETAILS])
 
-# JAVA_PUSH_LINT(OPT)
-# -------------------
-# Check if javac supports the diagnostic flag -Xlint:OPT.
-# If it does, add it to WARN_JAVAFLAGS.
 
-AC_DEFUN([JAVA_PUSH_LINT],
-[
-  AC_CACHE_CHECK([whether Java compiler accepts -Xlint:$1],
-    [emacs_cv_javac_knows_lint_$1],
-    AS_IF([rm -f conftest.class
-cat << EOF > conftest.java
-
-class conftest
-{
-
-}
-
-EOF
-("$JAVAC" -Xlint:$1 conftest.java 2>&AS_MESSAGE_LOG_FD) \
-  && rm -f conftest.class], [emacs_cv_javac_knows_lint_$1=yes],
-     [emacs_cv_javac_knows_lint_$1=no]))
-
-  AS_IF([test "$emacs_cv_javac_knows_lint_$1" = "yes"],
-    [WARN_JAVAFLAGS="$WARN_JAVAFLAGS -Xlint:$1"])
-])
-
-# Start Android configuration.  This is done in three steps:
-
-# First, the SDK tools needed to build the Android package on the host
-# are found.
-
-# Then, configure is called inside itself with the NDK C and C++
-# compilers, and the Makefiles generated, along with config.h, are
-# renamed to end with .android.
-
-# Finally, configure continues to configure the Emacs binary that will
-# run on the host.
-
-ANDROID=
-JAVAC=
-AAPT=
-JARSIGNER=
-APKSIGNER=
-ZIPALIGN=
-DX=
-ANDROID_JAR=
-ANDROID_ABI=
-WARN_JAVAFLAGS=
-ANDROID_SHARED_USER_ID=
-ANDROID_SHARED_USER_NAME=
-IS_D8_R8=
-
-# This is a list of Makefiles that have alternative versions for
-# Android.
-android_makefiles="lib/Makefile lib/gnulib.mk lib-src/Makefile src/Makefile"
-
-# This is whether or not to package mailutils into the executable.
-emacs_use_mailutils=
-
-AC_ARG_VAR([ANDROID_CC], [The Android C cross-compiler.])
-AC_ARG_VAR([SDK_BUILD_TOOLS], [Name of directory holding Android SDK build-tools.])
-AC_ARG_VAR([ANDROID_CFLAGS], [Flags given to the Android C cross-compiler.])
-AC_ARG_VAR([JAVAC], [Java compiler path.  Used for Android.])
-AC_ARG_VAR([JARSIGNER], [Java package signer path.  Used for Android.])
-AC_ARG_VAR([APKSIGNER], [Android package signer path.  Used for Android.])
-AC_ARG_VAR([SDK_BUILD_TOOLS], [Path to the Android SDK build tools.])
-AC_ARG_VAR([ZIP], [Path to the `zip' utility.])
-
-if test "$with_android" = "yes"; then
-   AC_MSG_ERROR([Please specify the path to the Android.jar file, like so:
-
-  ./configure --with-android=/path/to/android.jar
-
-along with the path to the SDK build-tools (this is the directory with
-tools such as aapt, dx, and aidl):
-
-              SDK_BUILD_TOOLS=/path/to/sdk-build-tools
-
-The cross-compiler should then be specified:
-
-              ANDROID_CC=/path/to/armv7a-linux-androideabi19-clang
-
-In addition, you may pass any special arguments to the cross-compiler
-via the ANDROID_CFLAGS environment variable.])
-elif test "$with_android" = "no" || test "$with_android" = ""; then
-  ANDROID=no
-else
-  AC_CHECK_PROGS([JAVAC], [javac])
-  if test "$JAVAC" = ""; then
-    AC_MSG_ERROR([The Java compiler required to build Emacs was not found.
-Please make sure `javac' can be found on your path, or alternatively specify
-the path to your Java compiler before configuring Emacs, like so:
-
-  JAVAC=/opt/jdk/bin/javac ./configure --with-android])
-  fi
-
-  AC_CHECK_PROGS([JARSIGNER], [jarsigner])
-  if test "$JARSIGNER" = ""; then
-    AC_MSG_ERROR([The Java package signing utility was not found.
-Please make sure `jarsigner' can be found on your path, or alternatively
-specify its location before configuring Emacs, like so:
-
-  JARSIGNER=/opt/jdk/bin/jarsigner ./configure --with-android])
-  fi
-
-  AC_CACHE_CHECK([whether the Java compiler works],
-    [emacs_cv_working_javac],
-    AS_IF([rm -f conftest.class
-cat << EOF > conftest.java
-
-import android.app.Activity;
-import android.os.Bundle;
-
-class conftest extends Activity
-{
-  @Override
-  public void
-  onCreate (Bundle savedInstanceState)
-  {
-    super.onCreate (savedInstanceState);
-  }
-}
-
-EOF
-("$JAVAC" -classpath "$with_android" -target 1.7 -source 1.7 conftest.java \
-  -d . >&AS_MESSAGE_LOG_FD 2>&1) && test -s conftest.class && rm -f conftest.class],
-          [emacs_cv_working_javac=yes],
-          [emacs_cv_working_javac=no]))
-
-  if test "$emacs_cv_working_javac" = "no"; then
-    AC_MSG_ERROR([The Java compiler does not work, or you did not specify
-a valid path to android.jar.  See config.log for more details.])
-  fi
-
-  AC_CACHE_CHECK([whether android.jar is new enough],
-    [emacs_cv_android_v_or_later],
-    AS_IF([rm -f conftest.class
-cat << EOF > conftest.java
-
-import android.os.Build;
-
-class conftest
-{
-  private static int test = Build.VERSION_CODES.VANILLA_ICE_CREAM;
-}
-
-EOF
-("$JAVAC" -classpath "$with_android" -target 1.7 -source 1.7 conftest.java \
-  -d . >&AS_MESSAGE_LOG_FD 2>&1) && test -s conftest.class && rm -f conftest.class],
-          [emacs_cv_android_v_or_later=yes],
-          [emacs_cv_android_v_or_later=no]))
-
-  if test "$emacs_cv_android_v_or_later" = "no"; then
-    AC_MSG_ERROR([Emacs must be built with an android.jar file produced for \
-Android 15 (Vanilla Ice Cream) or later.])
-  fi
-
-  dnl See if the Java compiler supports the `--release' option which
-  dnl makes it check for and prevent using features introduced after
-  dnl Java 1.7.
-
-  AC_CACHE_CHECK([whether javac accepts --release 7],
-    [emacs_cv_javac_release_7], AS_IF([rm -f conftest.class
-cat << EOF > conftest.java
-
-class conftest
-{
-
-}
-
-EOF
-("$JAVAC" --release 7 conftest.java 2>&AS_MESSAGE_LOG_FD) \
-  && rm -f conftest.class],
-      [emacs_cv_javac_release_7=yes],
-      [emacs_cv_javac_release_7=no]))
-
-  if test "$emacs_cv_javac_release_7" = "yes"; then
-    WARN_JAVAFLAGS="$WARN_JAVAFLAGS --release 7"
-  else
-    dnl If not, just make sure the generated bytecode is correct.
-    WARN_JAVAFLAGS="$WARN_JAVAFLAGS -target 1.7 -source 1.7"
-  fi
-
-  dnl Enable some useful Java linting options.
-  JAVA_PUSH_LINT([deprecation])
-  JAVA_PUSH_LINT([cast])
-  JAVA_PUSH_LINT([divzero])
-  JAVA_PUSH_LINT([nonempty])
-  JAVA_PUSH_LINT([empty])
-  JAVA_PUSH_LINT([finally])
-  JAVA_PUSH_LINT([overrides])
-  JAVA_PUSH_LINT([path])
-  JAVA_PUSH_LINT([serial])
-  JAVA_PUSH_LINT([unchecked])
-
-  # Get the name of the android.jar file.
-  ANDROID_JAR="$with_android"
-
-  # Substitute this into java/Makefile.
-  AC_SUBST([WARN_JAVAFLAGS])
-
-  AC_PATH_PROGS([AAPT], [aapt], [], "${SDK_BUILD_TOOLS}:$PATH")
-  if test "$AAPT" = ""; then
-    AC_MSG_ERROR([The Android asset packaging tool was not found.
-Please verify that the path to the SDK build tools you specified is correct])
-  fi
-
-  AC_PATH_PROGS([APKSIGNER], [apksigner], [], "${SDK_BUILD_TOOLS}:$PATH")
-  if test "$APKSIGNER" = ""; then
-    AC_MSG_ERROR([The Android package signing tool was not found.
-Please verify that the path to the SDK build tools you specified is correct])
-  fi
-
-  AC_PATH_PROGS([D8], [d8], [], "${SDK_BUILD_TOOLS}:$PATH")
-  if test "$D8" = ""; then
-    AC_MSG_ERROR([The Android dexer was not found.
-Please verify that the path to the SDK build tools you specified is correct])
-  fi
-
-  # Locate any d8.jar within the SDK build tools directory.  The R8
-  # optimizing compiler is also present in this bundle, and it generates
-  # far superior code.
-  emacs_val=`which $D8`
-  emacs_val=`AS_DIRNAME([$emacs_val])`/lib/d8.jar
-  AS_IF([test -f "$emacs_val"],
-    [AC_CACHE_CHECK([whether d8.jar coresident with d8 binary provides r8],
-       [emacs_cv_d8_provides_r8],
-       [AS_IF([java -cp "$emacs_val" com.android.tools.r8.R8 --help &>/dev/null],
-         [emacs_cv_d8_provides_r8=yes], [emacs_cv_d8_provides_r8=no])])])
-  AS_IF([test "$emacs_cv_d8_provides_r8" = "yes"],
-    # And substitute it for D8 if present.
-    [D8="java -cp $emacs_val com.android.tools.r8.R8"
-     IS_D8_R8=yes])
-
-  AC_PATH_PROGS([ZIPALIGN], [zipalign], [], "${SDK_BUILD_TOOLS}:$PATH")
-  if test "ZIPALIGN" = ""; then
-    AC_MSG_ERROR([The Android ZIP archive alignment utility was not found.
-Please verify that the path to the SDK build tools you specified is correct]);
-  fi
-
-  dnl Now configure Emacs to generate binaries for Android.  After the
-  dnl configuration completes, move the generated Makefiles.
-
-  if test "$ANDROID_CC" = ""; then
-    AC_MSG_ERROR([Please specify the path to the Android cross-compiler
-for your machine.  For example:
-
-  ANDROID_CC=/path/to/armv7a-linux-androideabi19-clang    \\
-    ./configure --with-android])
-  fi
-
-  dnl Obtain the cross compiler's target to find out where binaries go
-  dnl in the resulting package.
-
-  AC_MSG_CHECKING([for the kind of Android system Emacs is being built for])
-  cc_target=`${ANDROID_CC} -v 2>&1 | sed -n 's/Target: //p'`
-  case "$cc_target" in
-[
-    *i[3-6]86*) android_abi=x86
-      ;;
-    *x86_64*) android_abi=x86_64
-      ;;
-    *aarch64*) android_abi=arm64-v8a
-      ;;
-    *arm*v7a*) android_abi=armeabi-v7a
-      ;;
-    *mips64*) android_abi=mips64
-      ;;
-    *mips*) android_abi=mips
-      ;;
-    *arm*) android_abi=armeabi
-      ;;
-]
-    *) AC_MSG_ERROR([configure could not determine the type of Android \
-binary Emacs is being configured for.  Please port this configure script \
-to your Android system, or verify that you specified the correct compiler \
-in the ANDROID_CC variable when you ran configure.
-
-The compiler target is: $cc_target])
-      ;;
-  esac
-  AC_MSG_RESULT([$android_abi])
-
-  ANDROID_ABI=$android_abi
-
-  dnl Obtain the minimum SDK version of the resulting Emacs binary
-  dnl built with this NDK.
-
-  ANDROID_MIN_SDK=8
-  AC_MSG_CHECKING([for the lowest Android version Emacs can run on])
-  [android_sdk=`echo "$cc_target" | grep -oE 'android([0-9][0-9]?)'`]
-
-  if test -n "$android_sdk"; then
-    android_sdk=`echo "$android_sdk" | sed -n 's/android//p'`
-    AC_MSG_RESULT([$android_sdk])
-    ANDROID_MIN_SDK=$android_sdk
-  else
-    # This is probably GCC.
-    [ cat << EOF > conftest.c
-#include <android/api-level.h>
-extern const char *foo;
-
-int
-main (void)
-{
-#if __ANDROID_API__ < 7
-   foo = "emacs_api_6";
-#elif __ANDROID_API__ < 8
-   foo = "emacs_api_7";
-#elif __ANDROID_API__ < 9
-   foo = "emacs_api_8";
-#elif __ANDROID_API__ < 10
-  foo = "emacs_api_9";
-#elif __ANDROID_API__ < 11
-  foo = "emacs_api_10";
-#elif __ANDROID_API__ < 12
-  foo = "emacs_api_11";
-#elif __ANDROID_API__ < 13
-  foo = "emacs_api_12";
-#elif __ANDROID_API__ < 14
-   foo = "emacs_api_13";
-#elif __ANDROID_API__ < 15
-   foo = "emacs_api_14";
-#elif __ANDROID_API__ < 16
-   foo = "emacs_api_15";
-#elif __ANDROID_API__ < 17
-   foo = "emacs_api_16";
-#elif __ANDROID_API__ < 18
-   foo = "emacs_api_17";
-#elif __ANDROID_API__ < 19
-   foo = "emacs_api_18";
-#elif __ANDROID_API__ < 20
-   foo = "emacs_api_19";
-#elif __ANDROID_API__ < 21
-   foo = "emacs_api_20";
-#elif __ANDROID_API__ < 22
-   foo = "emacs_api_21";
-#elif __ANDROID_API__ < 23
-   foo = "emacs_api_22";
-#elif __ANDROID_API__ < 24
-   foo = "emacs_api_23";
-#elif __ANDROID_API__ < 25
-   foo = "emacs_api_24";
-#elif __ANDROID_API__ < 26
-   foo = "emacs_api_25";
-#elif __ANDROID_API__ < 27
-   foo = "emacs_api_26";
-#elif __ANDROID_API__ < 28
-   foo = "emacs_api_27";
-#elif __ANDROID_API__ < 29
-   foo = "emacs_api_28";
-#elif __ANDROID_API__ < 30
-   foo = "emacs_api_29";
-#elif __ANDROID_API__ < 31
-   foo = "emacs_api_30";
-#elif __ANDROID_API__ < 32
-   foo = "emacs_api_31";
-#elif __ANDROID_API__ < 33
-   foo = "emacs_api_32";
-#elif __ANDROID_API__ < 34
-   foo = "emacs_api_33";
-#elif __ANDROID_API__ < 35
-   foo = "emacs_api_34";
-#elif __ANDROID_API__ < 36
-   foo = "emacs_api_35";
-#else
-   foo = "emacs_api_future";
-#endif
-}
-EOF]
-
-    AC_CACHE_VAL([emacs_cv_android_api],
-		 [$ANDROID_CC $ANDROID_CFLAGS -c conftest.c -o conftest.o \
-		  && emacs_cv_android_api=`grep -ao -E	       		  \
-		     "emacs_api_([[0-9][0-9]]?|future)" conftest.o`])
-    android_sdk="$emacs_cv_android_api"
-    rm -rf conftest.c conftest.o
-
-    # If this version of the NDK requires __ANDROID_API__ to be
-    # specified, then complain to the user.
-    if test "$android_sdk" = "emacs_api_future"; then
-       AC_MSG_ERROR([The version of Android to build for was not specified.
-You must tell the Android compiler what version of Android to build for,
-by defining the __ANDROID_API__ preprocessor macro in ANDROID_CC, like so:
-
-    ANDROID_CC="/path/to/ndk/arm-linux-android-gcc -D__ANDROID_API__=8"])
-    fi
-
-    if test -n "$android_sdk"; then
-       android_sdk=`echo $android_sdk | sed -n 's/emacs_api_//p'`
-       AC_MSG_RESULT([$android_sdk])
-       ANDROID_MIN_SDK=$android_sdk
-    else
-      AC_MSG_RESULT([unknown ($cc_target); assuming 8])
-      AC_MSG_ERROR([configure could not determine the versions of Android \
-a binary built with this compiler will run on.  The generated application \
-package will likely install on older systems but crash on startup.])
-      android_sdk=8
-    fi
-  fi
-  AC_SUBST([ANDROID_MIN_SDK])
-
-  # Now tell java/Makefile if Emacs is being built for Android 4.3 or
-  # earlier.
-  ANDROID_SDK_18_OR_EARLIER=
-  if test "$android_sdk" -le "18"; then
-     ANDROID_SDK_18_OR_EARLIER=yes
-  fi
-  AC_SUBST([ANDROID_SDK_18_OR_EARLIER])
-
-  # Likewise for Android 2.2.
-  ANDROID_SDK_8_OR_EARLIER=
-  if test "$android_sdk" -le "8"; then
-     ANDROID_SDK_8_OR_EARLIER=yes
-     AC_CHECK_PROGS([ZIP], [zip])
-     AS_IF([test -z "$ZIP"],
-       [AC_MSG_ERROR([The `zip' utility is required for generating \
-packages targeting Android 2.2.])])
-  fi
-  AC_SUBST([ANDROID_SDK_8_OR_EARLIER])
-  AC_SUBST([ZIP])
-
-  # Save confdefs.h and config.log for now.
-  mv -f confdefs.h _confdefs.h
-  mv -f config.log _config.log
-
-  # Make sure these files are removed upon exit.
-  trap "rm -rf _confdefs.h _config.log" 0
-
-  # Figure out what --with-FOO options to pass through.
-  passthrough="$passthrough --with-png=$with_png"
-  passthrough="$passthrough --with-webp=$with_webp"
-  passthrough="$passthrough --with-gif=$with_gif"
-  passthrough="$passthrough --with-jpeg=$with_jpeg"
-  passthrough="$passthrough --with-xml2=$with_xml2"
-  passthrough="$passthrough --with-sqlite3=$with_sqlite3"
-  passthrough="$passthrough --with-gnutls=$with_gnutls"
-  passthrough="$passthrough --with-tiff=$with_tiff"
-  passthrough="$passthrough --with-selinux=$with_selinux"
-  passthrough="$passthrough --with-modules=$with_modules"
-  passthrough="$passthrough --with-tree-sitter=$with_tree_sitter"
-  passthrough="$passthrough --with-imagemagick=$with_imagemagick"
-  passthrough="$passthrough --with-lcms2=$with_lcms2"
-  passthrough="$passthrough --with-mailutils=$with_mailutils"
-  passthrough="$passthrough --with-pop=$with_pop"
-  passthrough="$passthrough --with-harfbuzz=$with_harfbuzz"
-  passthrough="$passthrough --with-threads=$with_threads"
-  passthrough="$passthrough --with-rsvg=$with_rsvg"
-
-  # Now pass through some checking-related options.
-  emacs_val="--enable-check-lisp-object-type=$enable_check_lisp_object_type"
-  passthrough="$passthrough $emacs_val"
-
-  # And derive a name for the recursive configure invocation's cache
-  # file if one should be specified for this.
-  AS_IF([test -n "$cache_file" && test "$cache_file" != "/dev/null"],
-    [passthrough="$passthrough --cache-file=$cache_file.1"])
-
-  AS_IF([test "x$with_mailutils" = "xyes"], [emacs_use_mailutils=yes])
-  AC_SUBST([emacs_use_mailutils])
-
-  AS_IF([XCONFIGURE=android ANDROID_CC="$ANDROID_CC"		\
-         ANDROID_SDK="$android_sdk" android_abi=$android_abi	\
-	 android_ndk_path="$with_ndk_path"		     	\
-	 android_ndk_cxx="$android_ndk_cxx"			\
-	 $CONFIG_SHELL $0 $passthrough], [],
-    [AC_MSG_ERROR([Failed to cross-configure Emacs for android.])])
-
-  # Now set ANDROID to yes.
-  ANDROID=yes
-
-  for makefile in $android_makefiles; do
-    AC_MSG_NOTICE([Generating $makefile.android])
-    mv -f "$makefile" "$makefile.android"
-  done
-
-  AC_MSG_NOTICE([Generating src/config.h.android])
-  mv -f src/config.h src/config.h.android
-
-  # Tell AndroidManifest.xml whether or not Emacs should be built
-  # debug.
-  ANDROID_DEBUGGABLE=false
-  if test "$with_android_debug" = "yes"; then
-    ANDROID_DEBUGGABLE=true
-  fi
-  AC_SUBST([ANDROID_DEBUGGABLE])
-
-  # Move confdefs.h back now that the recursive call to configure is
-  # complete.
-  mv -f _confdefs.h confdefs.h
-
-  # Move the Android config.log to config.log.android.  */
-  mv -f config.log config.log.android
-
-  # And _config.log back.
-  mv -f _config.log config.log
-fi
-
-AC_SUBST([ANDROID])
-AC_SUBST([JAVAC])
-AC_SUBST([AAPT])
-AC_SUBST([D8])
-AC_SUBST([ZIPALIGN])
-AC_SUBST([ANDROID_JAR])
-AC_SUBST([ANDROID_ABI])
-AC_SUBST([IS_D8_R8])
-
-if test "$XCONFIGURE" = "android"; then
-  ANDROID=yes
-
-  # Enable cross compiling.
-  cross_compiling=yes
-fi
-
-AC_SUBST([XCONFIGURE])
-
-if test "$ANDROID" = "yes"; then
-  # When --with-android is specified, almost all build options must be
-  # disabled, both within the recursive invocation of configure and
-  # outside.
-  with_xpm=no
-
-  # Some of these dependencies are now supported within Android, so
-  # they can be enabled.
-  if test "$XCONFIGURE" != "android"; then
-    with_png=no
-    with_webp=no
-    with_gif=no
-    with_jpeg=no
-    with_xml2=no
-    with_sqlite3=no
-    with_gnutls=no
-    with_tiff=no
-    with_selinux=no
-    with_modules=no
-    with_tree_sitter=no
-    with_imagemagick=no
-    with_lcms2=no
-    with_mailutils=no
-    with_pop=no
-    with_harfbuzz=no
-    with_native_compilation=no
-    with_threads=no
-    with_rsvg=no
-  fi
-
-  with_libsystemd=no
-  with_cairo=no
-  with_xft=no
-  with_libotf=no
-  with_gpm=no
-  with_dbus=no
-  with_gsettings=no
-  with_ns=no
-
-  # zlib is available in android.
-fi
 
 dnl This used to use changequote, but, apart from 'changequote is evil'
 dnl per the autoconf manual, we can speed up autoconf somewhat by quoting
@@ -1283,10 +603,6 @@ dnl quotation begins
 opsys='' unported=no
 case "${canonical}" in
 
-  ## Android
-  *linux-android* )
-    opsys=android
-  ;;
 
   ## GNU/Linux and similar ports
   *-*-linux* )
@@ -1497,12 +813,6 @@ AC_DEFUN([gl_TYPE_OFF64_T],
 dnl Amongst other things, this sets AR and ARFLAGS.
 gl_EARLY
 
-# ndk_LATE must be enclosed in this conditional to prevent the
-# AC_PROG_CXX it indirectly requires from being expanded at top level.
-if test "$ndk_INITIALIZED" = "yes"; then
-  ndk_LATE_EARLY
-  ndk_LATE
-fi
 
 if test "$ac_test_CFLAGS" != set; then
   # It's helpful to have C macros available to GDB, so prefer -g3 to -g
@@ -1720,12 +1030,6 @@ AS_IF([test $gl_gcc_warnings = no],
     nw="$nw -Wsuggest-attribute=format"
   fi
 
-  # If Emacs is being built for Android and many functions are
-  # currently stubbed out for operation on the build machine, disable
-  # -Wsuggest-attribute=noreturn.
-
-  AS_IF([test "$ANDROID" = "yes"],
-    [nw="$nw -Wsuggest-attribute=noreturn"])
 
   gl_MANYWARN_ALL_GCC([ws])
   gl_MANYWARN_COMPLEMENT([ws], [$ws], [$nw])
@@ -1873,7 +1177,7 @@ else
   AM_DEFAULT_VERBOSITY=0
 fi
 AC_SUBST([AM_DEFAULT_VERBOSITY])
-ARCH_INDEPENDENT_CONFIG_FILES([src/verbose.mk])
+AC_CONFIG_FILES([src/verbose.mk])
 
 dnl Some other nice autoconf tests.
 AC_PROG_INSTALL
@@ -2377,10 +1681,7 @@ AC_SUBST([SYSTEM_TYPE])
 pre_PKG_CONFIG_CFLAGS=$CFLAGS
 pre_PKG_CONFIG_LIBS=$LIBS
 
-dnl pkg-config does not work when cross-compiling for Android.
-if test "${ANDROID}" != "yes"; then
-  PKG_PROG_PKG_CONFIG([0.9.0])
-fi
+PKG_PROG_PKG_CONFIG([0.9.0])
 
 dnl EMACS_CHECK_MODULES([GSTUFF], [gtk+-2.0 >= 1.3 glib = 1.3.4])
 dnl acts like PKG_CHECK_MODULES([GSTUFF], [gtk+-2.0 >= 1.3 glib = 1.3.4],
@@ -2390,25 +1691,17 @@ dnl EMACS_CHECK_MODULES accepts optional 3rd and 4th arguments that
 dnl can take the place of the default HAVE_GSTUFF=yes and HAVE_GSTUFF=no
 dnl actions.
 AC_DEFUN([EMACS_CHECK_MODULES],
-  [AS_IF([test -n "$ndk_INITIALIZED"],
-    [ndk_CHECK_MODULES([$1], [$2], m4_default([$3], [HAVE_$1=yes]),
-      m4_default([$4],[HAVE_$1=no]))],
-    [PKG_CHECK_MODULES([$1], [$2],
-       [$1_CFLAGS=`AS_ECHO(["$$1_CFLAGS"]) | sed -e "$edit_cflags"`
-        m4_default([$3], [HAVE_$1=yes])],
-       [m4_default([$4], [HAVE_$1=no])])])])
+  [PKG_CHECK_MODULES([$1], [$2],
+     [$1_CFLAGS=`AS_ECHO(["$$1_CFLAGS"]) | sed -e "$edit_cflags"`
+      m4_default([$3], [HAVE_$1=yes])],
+     [m4_default([$4], [HAVE_$1=no])])])
 
 dnl EMACS_CHECK_LIB(NAME, FUNCTION, ACTION-IF-FOUND, ACTION-IF-NOT-FOUND,
 dnl OTHER-LIBRARIES, INCLUDES)
 dnl ---------------------------------------------------------------------
-dnl This is like AC_CHECK_LIB; however, there is no default action, and
-dnl when cross-configuring for Android, AC_CHECK_DECLS is called with NAME
-dnl and INCLUDES instead, as the library being checked against will likely
-dnl be built together with Emacs.
+dnl This is like AC_CHECK_LIB; however, there is no default action.
 AC_DEFUN([EMACS_CHECK_LIB],
-  [AS_IF([test -n "$ndk_INITIALIZED"],
-    [AC_CHECK_DECL([$2], [$3], [$4], [$6])],
-    [AC_CHECK_LIB([$1], [$2], [$3], [$4], [$5])])])
+  [AC_CHECK_LIB([$1], [$2], [$3], [$4], [$5])])
 
 PKG_CHECK_MODULES([GUILE], [guile-3.0])
 AC_SUBST(GUILE_CFLAGS)
@@ -2591,104 +1884,25 @@ AC_SUBST([AUTO_DEPEND])
 
 window_system=none
 
-ANDROID_OBJ=
-ANDROID_LIBS=
-# ANDROID_CFLAGS is a precious variable used to pass information to
-# the cross-compiler.
-ANDROID_BUILD_CFLAGS=
-REALLY_ANDROID=
 CM_OBJ="cm.o"
 
-AS_IF([test "$ANDROID" = "yes"],[
-  window_system=android
-  no_x=yes
-  ANDROID_OBJ="androidterm.o androidfns.o androidfont.o androidmenu.o"
-  ANDROID_OBJ="$ANDROID_OBJ android.o"
-  ANDROID_LIBS=
-  CM_OBJ=
 
-  AC_DEFINE([HAVE_ANDROID], [1], [Define to 1 if Emacs is being built
-with Android support])
 
-  AS_IF([test "$XCONFIGURE" != "android"], [
-    AC_DEFINE([ANDROID_STUBIFY], [1], [Define to 1 if Emacs is being built
-for Android, but all API calls need to be stubbed out])
-
-    # Now set any shared user ID that was specified.
-    AS_IF([test -n "$with_shared_user_id"],
-      [emacs_val=$with_shared_user_id
-       emacs_val=`AS_ECHO(["$with_shared_user_id"]) \
-                  | sed -e 's/"/\\"/'`
-       emacs_val="\"$emacs_val\""
-       ANDROID_SHARED_USER_ID="android:sharedUserId=$emacs_val"
-       # `android:sharedUserName' is required for sharedUserID to work
-       # on recent Android releases.  It does not otherwise affect the
-       # behavior of any code.
-       emacs_val="\"@string/shared_user_name\""
-       ANDROID_SHARED_USER_NAME="android:sharedUserLabel=$emacs_val"])],[
-    # Emacs will be built as a shared library, and a wrapper around it
-    # will also be built for the benefit of applications.  This
-    # requires Emacs be built as a position independent executable.
-    ANDROID_BUILD_CFLAGS="-fPIC -fvisibility=hidden"
-
-    # Graphics code in sfntfont-android.c benefits heavily from
-    # vectorization.
-    ANDROID_BUILD_CFLAGS="$ANDROID_BUILD_CFLAGS -ftree-vectorize"
-
-    # Link with libraries required for Android support.
-    # API 9 and later require `-landroid' for the asset manager.
-    # API 8 uses an emulation via the JNI.
-    AS_IF([test "$ANDROID_SDK" -lt "9"],
-      [ANDROID_LIBS="-llog -ljnigraphics"],
-      [ANDROID_LIBS="-landroid -llog -ljnigraphics"])
-
-    # This is required to make the system load emacs.apk's libpng
-    # (among others) instead of the system's own.  But it doesn't work
-    # on all Android versions yet, so for now just suffix shared
-    # libraries with _emacs.
-    # ANDROID_LDFLAGS="-Wl,-rpath,'\$\$ORIGIN'"
-
-    # Link with the sfnt font library and sfntfont.o, along with
-    # sfntfont-android.o.
-    ANDROID_OBJ="$ANDROID_OBJ sfnt.o sfntfont.o sfntfont-android.o"
-
-    # Build androidselect.o and androidvfs.o.
-    ANDROID_OBJ="$ANDROID_OBJ androidselect.o androidvfs.o"
-
-    # Check for some functions not always present in the NDK.
-    AC_CHECK_DECLS([android_get_device_api_level])
-
-    # Mention this build is really for Android.
-    REALLY_ANDROID=yes])])
-
-AC_SUBST([ANDROID])
-AC_SUBST([ANDROID_OBJ])
-AC_SUBST([ANDROID_LIBS])
-AC_SUBST([ANDROID_LDFLAGS])
-AC_SUBST([ANDROID_BUILD_CFLAGS])
-AC_SUBST([ANDROID_SHARED_USER_ID])
-AC_SUBST([ANDROID_SHARED_USER_NAME])
-
-# Check for pw_gecos in struct passwd; this is known to be missing on
-# Android.
+# Check for pw_gecos in struct passwd.
 
 AH_TEMPLATE([USER_FULL_NAME], [How to get a user's full name.])
 AC_CHECK_MEMBERS([struct passwd.pw_gecos], [], [], [#include <pwd.h>])
-AS_IF([test x"$REALLY_ANDROID" = "xyes"],
-  [AC_DEFINE([USER_FULL_NAME], [android_user_full_name (pw)])],
-  [AS_IF([test x"$ac_cv_member_struct_passwd_pw_gecos" = "xyes"],
-    [AC_DEFINE([USER_FULL_NAME], [pw->pw_gecos])],
-    [AC_DEFINE([USER_FULL_NAME], [NULL])])])
+AS_IF([test x"$ac_cv_member_struct_passwd_pw_gecos" = "xyes"],
+  [AC_DEFINE([USER_FULL_NAME], [pw->pw_gecos])],
+  [AC_DEFINE([USER_FULL_NAME], [NULL])])
 
 if test "${with_pgtk}" = "yes"; then
   window_system=pgtk
 fi
 
-if test "${ANDROID}" != "yes"; then
-  AC_PATH_X
-  if test "$no_x" != yes && test "${with_pgtk}" != "yes"; then
-    window_system=x11
-  fi
+AC_PATH_X
+if test "$no_x" != yes && test "${with_pgtk}" != "yes"; then
+  window_system=x11
 fi
 
 LD_SWITCH_X_SITE_RPATH=
@@ -3166,9 +2380,6 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
   haiku )
     term_header=haikuterm.h
   ;;
-  android )
-    term_header=androidterm.h
-  ;;
 esac
 
 AC_SUBST([HAVE_PGTK])
@@ -3474,13 +2685,10 @@ fi
 HAVE_RSVG=no
 if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" \
    || test "${opsys}" = "mingw32" || test "${HAVE_BE_APP}" = "yes" \
-   || test "${window_system}" = "pgtk" \
-   || test "${REALLY_ANDROID}" = "yes"; then
+   || test "${window_system}" = "pgtk"; then
   if test "${with_rsvg}" != "no"; then
     RSVG_REQUIRED=2.14.0
-    AS_IF([test "${REALLY_ANDROID}" = "yes"],
-      [RSVG_MODULE="librsvg"],
-      [RSVG_MODULE="librsvg-2.0 >= $RSVG_REQUIRED"])
+    RSVG_MODULE="librsvg-2.0 >= $RSVG_REQUIRED"
 
     EMACS_CHECK_MODULES([RSVG], [$RSVG_MODULE])
     AC_SUBST([RSVG_CFLAGS])
@@ -3502,8 +2710,7 @@ HAVE_WEBP=no
 if test "${with_webp}" != "no"; then
    if test "${HAVE_X11}" = "yes" || test "${opsys}" = "mingw32" \
    || test "${HAVE_W32}" = "yes" || test "${HAVE_NS}" = "yes" \
-   || test "${HAVE_BE_APP}" = "yes" || test "${HAVE_PGTK}" = "yes" \
-   || test "${REALLY_ANDROID}" = "yes"; then
+   || test "${HAVE_BE_APP}" = "yes" || test "${HAVE_PGTK}" = "yes"; then
       WEBP_REQUIRED=0.6.0
       WEBP_MODULE="libwebpdemux >= $WEBP_REQUIRED"
 
@@ -3517,13 +2724,12 @@ if test "${with_webp}" != "no"; then
       CFLAGS="$CFLAGS $WEBP_CFLAGS"
       LIBS="$LIBS $WEBP_LIBS"
 
-      AS_IF([test "$REALLY_ANDROID" != "yes"], [
 	AC_CHECK_FUNC([WebPGetInfo], [],
 	  [WEBP_MODULE="$WEBP_MODULE libwebpdecoder >= $WEBP_REQUIRED"
 	   HAVE_WEBP=no
 	   AS_UNSET([WEBP_LIBS])
 	   AS_UNSET([WEBP_CFLAGS])
-	   EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])])])
+	   EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])])
 
       CFLAGS=$OLD_CFLAGS
       LIBS=$OLD_LIBS
@@ -3545,17 +2751,6 @@ HAVE_SQLITE3=no
 SQLITE3_LIBS=
 SQLITE3_CFLAGS=
 if test "${with_sqlite3}" != "no"; then
-   if test "${REALLY_ANDROID}" = "yes"; then
-     ndk_SEARCH_MODULE([sqlite3], [SQLITE3], [HAVE_SQLITE3=yes])
-
-     if test "$HAVE_SQLITE3" = "yes"; then
-       SAVE_CFLAGS="$CFLAGS"
-       CFLAGS="$CFLAGS $SQLITE3_CFLAGS"
-       AC_CHECK_DECL([sqlite3_open_v2], [HAVE_SQLITE=yes],
-         [HAVE_SQLITE3=no], [#include <sqlite3.h>])
-       CFLAGS="$SAVE_CFLAGS"
-     fi
-   else
      AC_CHECK_LIB([sqlite3], [sqlite3_open_v2],
        [HAVE_SQLITE3=yes],
        [HAVE_SQLITE3=no])
@@ -3574,7 +2769,6 @@ if test "${with_sqlite3}" != "no"; then
 	   [Define to 1 if sqlite3 supports loading extensions.])
        fi
      fi
-  fi
 
   if test "$HAVE_SQLITE3" = "yes"; then
     AC_DEFINE([HAVE_SQLITE3], [1],
@@ -3587,8 +2781,7 @@ AC_SUBST([SQLITE3_CFLAGS])
 
 HAVE_IMAGEMAGICK=no
 if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}" = "yes" || \
-   test "${HAVE_BE_APP}" = "yes" || test "${window_system}" = "pgtk" || \
-   test "${REALLY_ANDROID}" = "yes"; then
+   test "${window_system}" = "pgtk"; then
   if test "${with_imagemagick}" != "no"; then
     if test -n "$BREW"; then
       # Homebrew doesn't link ImageMagick 6 by default, so make sure
@@ -3611,23 +2804,14 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}"
       OLD_LIBS=$LIBS
       CFLAGS="$CFLAGS $IMAGEMAGICK_CFLAGS"
       LIBS="$IMAGEMAGICK_LIBS $LIBS"
-      if test "$REALLY_ANDROID" != "yes"; then
 	AC_CHECK_FUNCS([MagickRelinquishMemory MagickExportImagePixels \
 			MagickMergeImageLayers MagickAutoOrientImage])
-      else
-        # AC_CHECK_FUNCS doesn't work for Android dependencies because
-	# they are built alongside Emacs.
-	AC_CHECK_DECLS([MagickRelinquishMemory,MagickExportImagePixels,
-MagickMergeImageLayers,MagickAutoOrientImage],
-		       [], [], [#include <MagickWand/MagickWand.h>])
-      fi
       CFLAGS=$OLD_CFLAGS
       LIBS=$OLD_LIBS
       # Check that ImageMagick links.  It does not link on Fedora 25
       # with './configure CC=clang', as pkg-config outputs flags like
       # -lomp that work for GCC but not Clang.
-      if test "$ac_cv_func_MagickRelinquishMemory" != yes \
-         && test "$REALLY_ANDROID" != "yes"; then
+      if test "$ac_cv_func_MagickRelinquishMemory" != yes; then
 	HAVE_IMAGEMAGICK=no
       fi
     fi
@@ -3905,24 +3089,16 @@ fi
 AC_SUBST([USE_STARTUP_NOTIFICATION])
 
 dnl SELinux is available for Linux kernel based systems only.
-dnl These include GNU/Linux and Android.
 HAVE_LIBSELINUX=no
 LIBSELINUX_LIBS=
 LIBSELINUX_CFLAGS=
 if test "${with_selinux}" = "yes"; then
-   if test "$REALLY_ANDROID" = "yes"; then
-     ndk_SEARCH_MODULE([libselinux], [LIBSELINUX],
-       [HAVE_LIBSELINUX=yes])
-   else
-     AC_CHECK_LIB([selinux], [lgetfilecon],
-       [HAVE_LIBSELINUX=yes],
-       [HAVE_LIBSELINUX=no])
-   fi
+   AC_CHECK_LIB([selinux], [lgetfilecon],
+     [HAVE_LIBSELINUX=yes],
+     [HAVE_LIBSELINUX=no])
    if test "$HAVE_LIBSELINUX" = yes; then
       AC_DEFINE([HAVE_LIBSELINUX], [1], [Define to 1 if using SELinux.])
-      if test "$REALLY_ANDROID" != "yes"; then
-        LIBSELINUX_LIBS=-lselinux
-      fi
+      LIBSELINUX_LIBS=-lselinux
    fi
 fi
 AC_SUBST([LIBSELINUX_LIBS])
@@ -4597,8 +3773,7 @@ else
 fi
 if test "${HAVE_X11}" = "yes" && test "${HAVE_FREETYPE}" = "yes" \
         || test "$window_system" = "pgtk" \
-        || test "${HAVE_W32}" = "yes" \
-	|| test "$REALLY_ANDROID" = "yes"; then
+        || test "${HAVE_W32}" = "yes"; then
   if test "${with_harfbuzz}" != "no"; then
     EMACS_CHECK_MODULES([HARFBUZZ], [harfbuzz >= $harfbuzz_required_ver])
     AS_IF([test "$HAVE_HARFBUZZ" = "yes"],[
@@ -4799,20 +3974,8 @@ LIBJPEG=
 JPEG_CFLAGS=
 if test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
    || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
-   || test "$window_system" = "pgtk" \
-   || test "${REALLY_ANDROID}" = "yes"; then
+   || test "$window_system" = "pgtk"; then
   if test "${with_jpeg}" != "no"; then
-    if test "${REALLY_ANDROID}" = "yes"; then
-      # Look for libjpeg using the NDK.
-      ndk_SEARCH_MODULE([libjpeg], [JPEG], [HAVE_JPEG=yes])
-
-      if test "$HAVE_JPEG" = "yes"; then
-        LIBJPEG="$JPEG_LIBS"
-
-	AC_DEFINE([HAVE_JPEG], [1],
-	  [Define to 1 if you have the jpeg library (typically -ljpeg).])
-      fi
-    else
       AC_CACHE_CHECK([for jpeglib 6b or later],
 	[emacs_cv_jpeglib],
 	[OLD_LIBS=$LIBS
@@ -4851,7 +4014,6 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
 	test "$emacs_cv_jpeglib" != yes && test "${opsys}" != "mingw32" \
 	&& LIBJPEG=$emacs_cv_jpeglib
       fi
-    fi
   fi
 fi
 AC_SUBST([LIBJPEG])
@@ -4964,7 +4126,7 @@ AC_SUBST([HAVE_MODULES])
 AC_SUBST([MODULES_SUFFIX])
 AC_SUBST([MODULES_SECONDARY_SUFFIX])
 
-ARCH_INDEPENDENT_CONFIG_FILES([src/emacs-module.h])
+AC_CONFIG_FILES([src/emacs-module.h])
 AC_SUBST_FILE([module_env_snippet_25])
 AC_SUBST_FILE([module_env_snippet_26])
 AC_SUBST_FILE([module_env_snippet_27])
@@ -5212,8 +4374,7 @@ if test "${with_png}" != no; then
     AC_CHECK_HEADER([png.h], [HAVE_PNG=yes])
   elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
        || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
-       || test "$window_system" = "pgtk" \
-       || test "${REALLY_ANDROID}" = "yes"; then
+       || test "$window_system" = "pgtk"; then
     EMACS_CHECK_MODULES([PNG], [libpng >= 1.0.0])
     if test $HAVE_PNG = yes; then
       LIBPNG=$PNG_LIBS
@@ -5291,33 +4452,22 @@ if test "${opsys}" = "mingw32"; then
   fi
 elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" \
      || test "${HAVE_NS}" = "yes" || test "${HAVE_BE_APP}" = "yes" \
-     || test "$window_system" = "pgtk" \
-     || test "${REALLY_ANDROID}" = "yes"; then
+     || test "$window_system" = "pgtk"; then
   if test "${with_tiff}" != "no"; then
-    if test "${REALLY_ANDROID}" != "yes"; then
       AC_CHECK_HEADER([tiffio.h],
 	[tifflibs="-lz -lm"
 	# At least one tiff package requires the jpeg library.
 	if test "${HAVE_JPEG}" = yes; then tifflibs="-ljpeg $tifflibs"; fi
 	AC_CHECK_LIB([tiff], [TIFFGetVersion], [HAVE_TIFF=yes], [],
 	  [$tifflibs])])
-    else
-      ndk_SEARCH_MODULE([libtiff], [TIFF], [HAVE_TIFF=yes])
-
-      if test "$HAVE_TIFF" = "yes"; then
-        LIBTIFF="$TIFF_LIBS"
-      fi
-    fi
   fi
 
   if test "${HAVE_TIFF}" = "yes"; then
     AC_DEFINE([HAVE_TIFF], [1],
       [Define to 1 if you have the tiff library (-ltiff).])
 
-    if test "$REALLY_ANDROID" != "yes"; then
       dnl FIXME -lz -lm, as per libpng?
       LIBTIFF=-ltiff
-    fi
   fi
 fi
 AC_SUBST([LIBTIFF])
@@ -5339,7 +4489,6 @@ if test "${opsys}" = "mingw32"; then
 elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
         || test "${HAVE_W32}" = "yes" || test "${HAVE_NS}" = "yes" \
 	|| test "${HAVE_BE_APP}" = "yes" || test "$window_system" = "pgtk" \
-	|| test "${REALLY_ANDROID}" = "yes" \
 	&& test "${with_gif}" != "no"; then
   AC_CHECK_HEADER([gif_lib.h],
 # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
@@ -5359,12 +4508,6 @@ elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
     test "$HAVE_GIF" = yes && LIBGIF=-lungif
   fi
 
-# Finally, try ndk-build on Android.
-  if test "$REALLY_ANDROID" = "yes"; then
-    ndk_SEARCH_MODULE([libgif], [GIF], [HAVE_GIF=yes],
-      [HAVE_GIF=no])
-    test "$HAVE_GIF" = yes && LIBGIF="$GIF_LIBS"
-  fi
 
   if test "${HAVE_GIF}" = "yes"; then
     AC_DEFINE([HAVE_GIF], [1],
@@ -5943,7 +5086,7 @@ if test "$with_unexec" = yes && test "$opsys" = "haiku"; then
 Please use the portable dumper instead.])
 fi
 
-# Dump loading.  Android lacks posix_madvise.
+# Dump loading.
 AC_CHECK_FUNCS([posix_madvise madvise])
 
 dnl Cannot use AC_CHECK_FUNCS
@@ -5997,7 +5140,7 @@ AC_DEFUN([tputs_link_source], [
 # than to expect to find it in ncurses.
 # Also we need tputs and friends to be able to build at all.
 AC_CACHE_CHECK([for library containing tputs], [emacs_cv_tputs_lib],
-[if test "${opsys}" = "mingw32" || test x"$REALLY_ANDROID" = "xyes"; then
+[if test "${opsys}" = "mingw32"; then
   emacs_cv_tputs_lib='none required'
 else
   # curses precedes termcap because of AIX (Bug#9736#35) and OpenIndiana.
@@ -6035,7 +5178,7 @@ TERMINFO=yes
 ## LIBS_TERMCAP="-lncurses", this overrides LIBS_TERMCAP = -ltinfo,
 ## if that was found above to have tputs.
 ## Should we use the gnu* logic everywhere?
-case "$opsys$REALLY_ANDROID" in
+case "$opsys" in
   ## darwin: Prevents crashes when running Emacs in Terminal.app under 10.2.
   ##  The ncurses library has been moved out of the System framework in
   ##  Mac OS X 10.2.  So if configure detects it, set the command-line
@@ -6064,10 +5207,8 @@ fail;
     fi
     ;;
 
-  # The case condition is a concatenation of both $opsys and
-  # $REALLY_ANDROID.  Only disable termcap if building a GUI program.
-  # (bug#65340)
-  mingw32 | androidyes)
+  # Only disable termcap if building a GUI program.  (bug#65340)
+  mingw32)
     TERMINFO=no
     LIBS_TERMCAP=
     ;;
@@ -6515,7 +5656,7 @@ case $opsys in
 esac
 
 case $opsys in
-  gnu-* | android | solaris | cygwin )
+  gnu-* | solaris | cygwin )
     dnl FIXME Can't we test if this exists (eg /proc/$$)?
     AC_DEFINE([HAVE_PROCFS], [1], [Define if you have the /proc filesystem.])
   ;;
@@ -6613,25 +5754,6 @@ case $opsys in
 
   gnu | qnxnto )
     AC_DEFINE([FIRST_PTY_LETTER], ['p'])
-    ;;
-
-  android )
-    AC_DEFINE([PTY_ITERATION], [int i; for (i = 0; i < 1; ++i)])
-    dnl grantpt may be defined in libc but not declared.  The same
-    dnl goes for posix_openpt.  When that is the case, it means that
-    dnl grantpt or posix_openpt cannot actually be used.
-    AC_CHECK_DECLS([grantpt, posix_openpt])
-    AS_IF([test "x$ac_cv_have_decl_grantpt" = xyes],
-      [AC_DEFINE([PTY_TTY_NAME_SPRINTF],
-        [{ char *ptyname = 0; sigset_t blocked; sigemptyset (&blocked); sigaddset (&blocked, SIGCHLD); pthread_sigmask (SIG_BLOCK, &blocked, 0); if (grantpt (fd) != -1 && unlockpt (fd) != -1) ptyname = ptsname(fd); pthread_sigmask (SIG_UNBLOCK, &blocked, 0); if (!ptyname) { emacs_close (fd); return -1; } snprintf (pty_name, PTY_NAME_SIZE, "%s", ptyname); }])],
-      [AC_DEFINE([PTY_TTY_NAME_SPRINTF],
-        [{ char *ptyname = 0; sigset_t blocked; sigemptyset (&blocked); sigaddset (&blocked, SIGCHLD); pthread_sigmask (SIG_BLOCK, &blocked, 0); if (unlockpt (fd) != -1) ptyname = ptsname(fd); pthread_sigmask (SIG_UNBLOCK, &blocked, 0); if (!ptyname) { emacs_close (fd); return -1; } snprintf (pty_name, PTY_NAME_SIZE, "%s", ptyname); }])])
-    AS_IF([test "x$ac_cv_have_decl_posix_openpt" = xyes],
-      [AC_DEFINE([PTY_OPEN],
-        [do { fd = posix_openpt (O_RDWR | O_CLOEXEC | O_NOCTTY); if (fd < 0 && errno == EINVAL) fd = posix_openpt (O_RDWR | O_NOCTTY); } while (false)])
-       AC_DEFINE([PTY_NAME_SPRINTF], [])],
-      [AC_DEFINE([PTY_NAME_SPRINTF], [])
-       AC_DEFINE([PTY_OPEN], [fd = getpt ()])])
     ;;
 
   gnu-linux | gnu-kfreebsd | dragonfly | freebsd | openbsd | netbsd | darwin | nacl )
@@ -7317,36 +6439,6 @@ gl_INIT
 CFLAGS=$SAVE_CFLAGS
 LIBS=$SAVE_LIBS
 
-# Set up libgmp on Android.  Make sure to override what gnulib has
-# found.
-LIBGMP_CFLAGS=
-if test "$REALLY_ANDROID" = "yes" && test "$with_libgmp" != "no"; then
-  HAVE_LIBGMP=no
-  ndk_SEARCH_MODULE([libgmp], [LIBGMP], [HAVE_LIBGMP=yes])
-
-  if test "$HAVE_LIBGMP" = "yes"; then
-    SAVE_CFLAGS="$CFLAGS"
-    CFLAGS="$CFLAGS $LIBGMP_CFLAGS"
-    unset ac_cv_header_gmp_h
-    unset ac_cv_header_gmp_gmp_h
-    AC_CHECK_HEADERS([gmp.h gmp/gmp.h], [break])
-    CFLAGS="$SAVE_CFLAGS"
-    GL_GENERATE_GMP_H=
-    GL_GENERATE_GMP_H_CONDITION=
-    GL_GENERATE_GMP_GMP_H=
-    GL_GENERATE_GMP_GMP_H_CONDITION=
-    GL_GENERATE_MINI_GMP_H=
-    GL_GENERATE_MINI_GMP_H_CONDITION=
-
-    if test "$ac_cv_header_gmp_h" != "no" \
-       || test "$ac_cv_header_gmp_gmp_h" != "no"; then
-       HAVE_LIBGMP=yes
-       GL_GENERATE_GMP_H=false
-       LIBGMP="$LIBGMP_LIBS"
-       GMP_H=
-    fi
-  fi
-fi
 AC_SUBST([LIBGMP_CFLAGS])
 
 # timer_getoverrun needs the same library as timer_settime
@@ -7477,7 +6569,7 @@ if test "$window_system" != "none"; then
     [Define if you poll periodically to detect C-g.])
   WINDOW_SYSTEM_OBJ="fontset.o fringe.o image.o"
 
-  if test "$window_system" = "x11" || test "$REALLY_ANDROID" = "yes"; then
+  if test "$window_system" = "x11"; then
     AC_DEFINE([HAVE_TEXT_CONVERSION], [1],
       [Define if the window system has text conversion support.])
     WINDOW_SYSTEM_OBJ="$WINDOW_SYSTEM_OBJ textconv.o"
@@ -7603,12 +6695,7 @@ done
 AC_DEFINE_UNQUOTED([EMACS_CONFIG_FEATURES], ["${emacs_config_features}"],
   [Summary of some of the main features enabled by configure.])
 
-# This is just a printable representation of the shared user ID.
-android_shared_user=
-AS_IF([test -n "$with_shared_user_id"],[android_shared_user="($with_shared_user_id)"])
-
 AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D}
-  Is Emacs being built for Android?                       ${ANDROID} ${android_shared_user}
   Does Emacs use the X Double Buffer Extension?           ${HAVE_XDBE}
   Does Emacs use -lXpm?                                   ${HAVE_XPM}
   Does Emacs use -ljpeg?                                  ${HAVE_JPEG}
@@ -7709,11 +6796,11 @@ fi
 AC_CONFIG_FILES([Makefile lib/gnulib.mk])
 
 dnl config.status treats $srcdir specially, so I think this is ok...
-ARCH_INDEPENDENT_CONFIG_FILES([$srcdir/doc/man/emacs.1])
+AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
 
 AC_CONFIG_FILES([lib/Makefile lib-src/Makefile oldXMenu/Makefile src/Makefile
                  lwlib/Makefile nextstep/Makefile nt/Makefile])
-ARCH_INDEPENDENT_CONFIG_FILES([doc/emacs/Makefile doc/misc/Makefile
+AC_CONFIG_FILES([doc/emacs/Makefile doc/misc/Makefile
                                doc/lispintro/Makefile doc/lispref/Makefile
 			       lisp/Makefile leim/Makefile])
 
@@ -7725,27 +6812,24 @@ if test -f "$srcdir/$opt_makefile.in"; then
   SUBDIR_MAKEFILES="$SUBDIR_MAKEFILES $opt_makefile"
   dnl Again, it's best not to use a variable.  Though you can add
   dnl ", [], [opt_makefile='$opt_makefile']" and it should work.
-  ARCH_INDEPENDENT_CONFIG_FILES([test/Makefile])
-  ARCH_INDEPENDENT_CONFIG_FILES([test/manual/noverlay/Makefile])
+  AC_CONFIG_FILES([test/Makefile])
+  AC_CONFIG_FILES([test/manual/noverlay/Makefile])
 fi
 opt_makefile=test/infra/Makefile
 if test -f "$srcdir/$opt_makefile.in"; then
   SUBDIR_MAKEFILES="$SUBDIR_MAKEFILES $opt_makefile"
   dnl Again, it's best not to use a variable.  Though you can add
   dnl ", [], [opt_makefile='$opt_makefile']" and it should work.
-  ARCH_INDEPENDENT_CONFIG_FILES([test/infra/Makefile])
+  AC_CONFIG_FILES([test/infra/Makefile])
 fi
 
-if test "$ANDROID" = "yes"; then
-  SUBDIR_MAKEFILES="$SUBDIR_MAKEFILES java/Makefile cross/Makefile"
-fi
 
 dnl The admin/ directory used to be excluded from tarfiles.
 if test -d $srcdir/admin; then
   SUBDIR_MAKEFILES="$SUBDIR_MAKEFILES admin/charsets/Makefile admin/unidata/Makefile admin/grammars/Makefile"
-  ARCH_INDEPENDENT_CONFIG_FILES([admin/charsets/Makefile])
-  ARCH_INDEPENDENT_CONFIG_FILES([admin/unidata/Makefile])
-  ARCH_INDEPENDENT_CONFIG_FILES([admin/grammars/Makefile])
+  AC_CONFIG_FILES([admin/charsets/Makefile])
+  AC_CONFIG_FILES([admin/unidata/Makefile])
+  AC_CONFIG_FILES([admin/grammars/Makefile])
 fi                              dnl -d admin
 
 
@@ -7759,109 +6843,67 @@ AC_SUBST([SMALL_JA_DIC])
 dnl The following commands are run on the build system when building
 dnl Emacs.
 
-if test "$XCONFIGURE" != "android"; then
-  dnl You might wonder (I did) why epaths.h is generated by running
-  dnl make, rather than just letting configure generate it from
-  dnl epaths.in.  One reason is that the various paths are not fully
-  dnl expanded (see above); e.g.,
-  dnl gamedir='${localstatedir}/games/emacs'.  Secondly, the GNU
-  dnl Coding standards require that one should be able to run 'make
-  dnl prefix=/some/where/else' and override the values set by
-  dnl configure.  This also explains the 'move-if-change' test and the
-  dnl use of force in the 'epaths-force' rule in Makefile.in.
-  AC_CONFIG_COMMANDS([src/epaths.h], [
-  if test "${opsys}" = "mingw32"; then
-    ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force-w32
-  elif test "$HAVE_NS" = "yes" && test "$EN_NS_SELF_CONTAINED" = "yes"; then
-    ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force-ns-self-contained
-  else
-    ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force
-  fi || AC_MSG_ERROR(['src/epaths.h' could not be made.])
-  ], [GCC="$GCC" CPPFLAGS="$CPPFLAGS" opsys="$opsys" HAVE_NS="$HAVE_NS"
-      EN_NS_SELF_CONTAINED="$EN_NS_SELF_CONTAINED"])
+dnl You might wonder (I did) why epaths.h is generated by running
+dnl make, rather than just letting configure generate it from
+dnl epaths.in.  One reason is that the various paths are not fully
+dnl expanded (see above); e.g.,
+dnl gamedir='${localstatedir}/games/emacs'.  Secondly, the GNU
+dnl Coding standards require that one should be able to run 'make
+dnl prefix=/some/where/else' and override the values set by
+dnl configure.  This also explains the 'move-if-change' test and the
+dnl use of force in the 'epaths-force' rule in Makefile.in.
+AC_CONFIG_COMMANDS([src/epaths.h], [
+if test "${opsys}" = "mingw32"; then
+  ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force-w32
+elif test "$HAVE_NS" = "yes" && test "$EN_NS_SELF_CONTAINED" = "yes"; then
+  ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force-ns-self-contained
+else
+  ${MAKE-make} MAKEFILE_NAME=do-not-make-Makefile epaths-force
+fi || AC_MSG_ERROR(['src/epaths.h' could not be made.])
+], [GCC="$GCC" CPPFLAGS="$CPPFLAGS" opsys="$opsys" HAVE_NS="$HAVE_NS"
+    EN_NS_SELF_CONTAINED="$EN_NS_SELF_CONTAINED"])
 
-  dnl NB we have to cheat and use the ac_... version because abs_top_srcdir
-  dnl is not yet set, sigh.  Or we could use ../$srcdir/src/.gdbinit,
-  dnl or a symlink?
-  AC_CONFIG_COMMANDS([src/.gdbinit], [
-  if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
-    AS_ECHO(["source $ac_abs_top_srcdir/src/.gdbinit"]) > src/.gdbinit
-  fi
-  ])
+dnl NB we have to cheat and use the ac_... version because abs_top_srcdir
+dnl is not yet set, sigh.  Or we could use ../$srcdir/src/.gdbinit,
+dnl or a symlink?
+AC_CONFIG_COMMANDS([src/.gdbinit], [
+if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+  AS_ECHO(["source $ac_abs_top_srcdir/src/.gdbinit"]) > src/.gdbinit
+fi
+])
 
-  dnl Perhaps this would be better named doc-emacs-emacsver.texi?
-  dnl See comments for etc-refcards-emacsver.tex.
-  dnl Since we get a doc/emacs directory generated anyway, for the Makefile,
-  dnl it is not quite the same.  But we are generating in $srcdir.
-  AC_CONFIG_COMMANDS([doc/emacs/emacsver.texi], [
-  ${MAKE-make} -s --no-print-directory -C doc/emacs doc-emacsver || \
-  AC_MSG_ERROR(['doc/emacs/emacsver.texi' could not be made.])
-  ])
+dnl Perhaps this would be better named doc-emacs-emacsver.texi?
+dnl See comments for etc-refcards-emacsver.tex.
+dnl Since we get a doc/emacs directory generated anyway, for the Makefile,
+dnl it is not quite the same.  But we are generating in $srcdir.
+AC_CONFIG_COMMANDS([doc/emacs/emacsver.texi], [
+${MAKE-make} -s --no-print-directory -C doc/emacs doc-emacsver || \
+AC_MSG_ERROR(['doc/emacs/emacsver.texi' could not be made.])
+])
 
-  dnl If we give this the more natural name, etc/refcards/emacsver.texi,
-  dnl then a directory etc/refcards is created in the build directory,
-  dnl which is probably harmless, but confusing (in out-of-tree builds).
-  dnl (If we were to generate etc/refcards/Makefile, this might change.)
-  dnl It is really $srcdir/etc/refcards/emacsver.tex that we generate.
-  AC_CONFIG_COMMANDS([etc-refcards-emacsver.tex], [
-  ${MAKE-make} -s MAKEFILE_NAME=do-not-make-Makefile etc-emacsver || \
-  AC_MSG_ERROR(['etc/refcards/emacsver.tex' could not be made.])
-  ])
+dnl If we give this the more natural name, etc/refcards/emacsver.texi,
+dnl then a directory etc/refcards is created in the build directory,
+dnl which is probably harmless, but confusing (in out-of-tree builds).
+dnl (If we were to generate etc/refcards/Makefile, this might change.)
+dnl It is really $srcdir/etc/refcards/emacsver.tex that we generate.
+AC_CONFIG_COMMANDS([etc-refcards-emacsver.tex], [
+${MAKE-make} -s MAKEFILE_NAME=do-not-make-Makefile etc-emacsver || \
+AC_MSG_ERROR(['etc/refcards/emacsver.tex' could not be made.])
+])
 
+if test $AUTO_DEPEND = yes; then
+   for dir in $AUTODEPEND_PARENTS; do
+     AS_MKDIR_P([$dir/deps])
+   done
+fi
+if $gl_gnulib_enabled_dynarray || $gl_gnulib_enabled_scratch_buffer; then
+  AS_MKDIR_P([lib/malloc])
   if test $AUTO_DEPEND = yes; then
-     for dir in $AUTODEPEND_PARENTS; do
-       AS_MKDIR_P([$dir/deps])
-       AS_MKDIR_P([cross/$dir/deps])
-     done
+    AS_MKDIR_P([lib/deps/malloc])
   fi
-  if $gl_gnulib_enabled_dynarray || $gl_gnulib_enabled_scratch_buffer; then
-    AS_MKDIR_P([lib/malloc])
-    AS_MKDIR_P([cross/lib/malloc])
-    if test $AUTO_DEPEND = yes; then
-      AS_MKDIR_P([lib/deps/malloc])
-      AS_MKDIR_P([cross/lib/deps/malloc])
-    fi
-  fi
-
-  dnl Make cross/lib, which various Makefiles in cross expect to
-  dnl always exist.
-  AS_MKDIR_P([cross/lib])
-  AS_MKDIR_P([cross/lib/malloc])
-  AS_MKDIR_P([cross/lib/sys])
-  AS_MKDIR_P([cross/lib-src])
-
-  dnl Make cross/etc; this directory will hold the documentation file
-  dnl holding doc strings for Android specific C files that aren't
-  dnl built during the initial compilation of Emacs for the build
-  dnl machine.
-  AS_MKDIR_P([cross/etc])
-
-  AS_IF([test "x$with_android" != "xno"], [
-    dnl Link gnulib files to cross/lib as well.  af_alg.h and
-    dnl lib/save-cwd.h are copied manually from gnulib, and as such
-    dnl aren't specified in gl_FILE_LIST.
-    emacs_files='gl_FILE_LIST lib/af_alg.h lib/save-cwd.h'
-    dnl These files are specific to Emacs.
-    emacs_files="$emacs_files lib/fingerprint.c lib/fingerprint.h \
-		   lib/save-cwd.c lib/openat-die.c lib/save-cwd.c \
-		   lib/min-max.h"
-    for file in $emacs_files; do
-      AS_IF([expr "X${file}J" : "Xlib/.*[[ch]]J" >/dev/null],
-	[AS_IF([test -f "$srcdir/$file"],
-	  [AC_CONFIG_LINKS([cross/$file:$file])])])
-    done])
 fi
 
-# Make java/Makefile
-ARCH_INDEPENDENT_CONFIG_FILES([java/Makefile])
-ARCH_INDEPENDENT_CONFIG_FILES([cross/Makefile])
 
-# Make java/AndroidManifest.xml
-ARCH_INDEPENDENT_CONFIG_FILES([java/AndroidManifest.xml])
-
-# Make ndk-build Makefiles.  This is only done inside the recursive
-# configure.
-ndk_CONFIG_FILES
 
 AC_OUTPUT
 

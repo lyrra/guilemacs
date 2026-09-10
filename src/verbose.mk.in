@@ -32,10 +32,6 @@ AM_V_GEN =
 AM_V_GLOBALS =
 AM_V_NO_PD =
 AM_V_RC =
-AM_V_JAVAC =
-AM_V_DX =
-AM_V_AAPT =
-AM_V_ZIPALIGN =
 AM_V_SILENT =
 else
 
@@ -82,10 +78,5 @@ AM_V_GEN     = @$(info $.  GEN      $@)
 AM_V_GLOBALS = @$(info $.  GEN      globals.h)
 AM_V_NO_PD = --no-print-directory
 AM_V_RC      = @$(info $.  RC       $@)
-
-# These are used for the Android port.
-AM_V_JAVAC	= @$(info $.  JAVAC    $@)
-AM_V_D8		= @$(info $.  D8       $@)
-AM_V_AAPT	= @$(info $.  AAPT     $@)
 AM_V_SILENT	= @
 endif

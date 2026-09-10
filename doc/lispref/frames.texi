@@ -2425,7 +2425,6 @@ engine), and @code{harfbuzz} (font driver for OTF and TTF fonts with
 HarfBuzz text shaping) (@pxref{Windows Fonts,,, emacs, The GNU Emacs
 Manual}).  The @code{harfbuzz} driver is similarly recommended.  On
 Haiku, there can be several font drivers (@pxref{Haiku Fonts,,, emacs,
-The GNU Emacs Manual}), as on Android (@pxref{Android Fonts,,, emacs,
 The GNU Emacs Manual}).
 
 On other systems, there is only one available font backend, so it does

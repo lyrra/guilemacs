@@ -145,6 +145,7 @@
   "test/keyboard/test-m28-imp5-f5.el"           ; M28 imp-5 family 5 --button-down-location pair reclaim + --menu-/--x-/--tool-/--tab-/--button- audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp5-f6.el"           ; M28 imp-5 family 6 (the tail) forwarder reclaim + stay-C audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m28-imp6.el"              ; M28 imp-6 close-out — pin the reclaimed end state (corpus prints PASS/FAIL)
+  "test/keyboard/test-m29-imp1.el"              ; M29 imp-1 Android build-arm removal audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
