@@ -64,15 +64,17 @@
 (define FILTER-EVENTS           (@@ (emacs kbd-buffer) FILTER-EVENTS))
 (define IGNORE-SQUEEZABLES      (@@ (emacs kbd-buffer) IGNORE-SQUEEZABLES))
 
-;;; --- 0. Registration: the 10 imp-2 C shims resolve -------------------
+;;; --- 0. Registration: the 9 imp-2 C shims resolve --------------------
 ;; Guards against a missing/renamed DEFUN (the C-helper-masquerading-as-
 ;; elisp trap, house rule).  The 3 pre-existing shims are from earlier
 ;; milestones, not new imp-1 work — they just were not imported before.
+;; M28 imp-5 family 4 reclaimed --timer-check (now (emacs timers)
+;; timer-check), so it is no longer registered here.
 (for-each
  (lambda (n)
    (check (string-append "registered:" (symbol->string n))
           #t (not (eq? (%sym n) #nil))))
- '(--timer-check --toolkit-scroll-bars-p --kbd-queue-has-data
+ '(--toolkit-scroll-bars-p --kbd-queue-has-data
    --any-kbd-queue-has-data --kbd-excise-selection-event-at!
    --redisplay-preserve-echo-area --timers-run --get-input-pending
    --rc-input-pending --ie-part))

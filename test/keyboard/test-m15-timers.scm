@@ -1,12 +1,13 @@
 ;;; test-m15-timers.scm --- M15 imp-4 round-trip identity gate test
 ;;; corpus for the timer firing core cutover.
 ;;;
-;;; Drives the two elisp-visible C entry points that now dispatch into
-;;; (emacs timers): (--timer-check) (the M14 shim, keyboard.c:4931)
-;;; and (current-idle-time) (its DEFUN, keyboard.c:5975).  This proves
-;;; the *cutover* — that both C entry points reach the Scheme bodies
-;;; through scm_c_public_ref + SCM_CALL_0 — which imp-1 (shim-level)
-;;; and imp-2 (body-level) do not.  Mirrors test-m14-predicates.scm.
+;;; Drives the two timer entry points that reach (emacs timers):
+;;; (current-idle-time) (its DEFUN, keyboard.c:5975) proves the C
+;;; *cutover* (scm_c_public_ref + SCM_CALL_0); the other entry point,
+;;; the M14 shim (--timer-check), was reclaimed in M28 imp-5 family 4,
+;;; so this corpus now calls the (emacs timers) port directly — the
+;;; same Scheme body C timer_check () re-dispatches to.  Mirrors
+;;; test-m14-predicates.scm.
 ;;;
 ;;; Sourced by test/keyboard/test-m15-timers.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback
@@ -20,6 +21,9 @@
 ;;; pending_funcalls) runs inside a dynamic-wind that restores it —
 ;;; process-global state is shared with every other test in the suite
 ;;; (brief.org; same discipline as test-m15-bodies.scm).
+
+;; M28 imp-5 family 4 — --timer-check reclaimed; drive the port.
+(use-modules (emacs timers))
 
 (define test-results '())
 
@@ -63,19 +67,19 @@
           psec        ; slot8 psecs (read as PSEC by decode_timer)
           #nil))      ; slot9 next
 
-;;; --- 0. Registration: the two elisp-visible entry points ------------
+;;; --- 0. Registration: the elisp-visible entry point --------------
 ;;; Guard against a missing/renamed DEFUN (the C-helper-masquerading-
-;;; as-elisp trap, house rule).  --timer-check is the M14 shim whose
-;;; body is `timer_check (); return Qnil;`; current-idle-time is the
-;;; M15 imp-3 thin dispatcher.
+;;; as-elisp trap, house rule).  current-idle-time is the M15 imp-3
+;;; thin dispatcher.  (--timer-check was reclaimed in M28 imp-5 family
+;;; 4; the corpus calls (emacs timers) timer-check directly below.)
 (for-each
  (lambda (n)
    (check (string-append "registered:" (symbol->string n))
           #t (not (eq? (%sym n) #nil))))
- '(--timer-check current-idle-time))
+ '(current-idle-time))
 
 ;;; --- 1. Invalid, through the cutover --------------------------------
-;;; Empty timer-list/timer-idle-list: (--timer-check) runs with no
+;;; Empty timer-list/timer-idle-list: (timer-check) runs with no
 ;;; error and returns nil (the shim's fixed contract).
 (let ((saved-timers (symbol-value 'timer-list))
       (saved-idle (symbol-value 'timer-idle-list)))
@@ -84,14 +88,14 @@
                (set-symbol-value! 'timer-idle-list #nil))
     (lambda ()
       (check "timers/invalid-no-error" #t
-             (no-error? (lambda () ((%sym '--timer-check)))))
+             (no-error? (lambda () (timer-check))))
       (check "timers/invalid-returns-nil" #nil
-             ((%sym '--timer-check))))
+             (timer-check)))
     (lambda () (set-symbol-value! 'timer-list saved-timers)
                (set-symbol-value! 'timer-idle-list saved-idle))))
 
 ;;; --- 2. Wait, through the cutover -----------------------------------
-;;; One future ordinary timer (year 2100): (--timer-check) runs with
+;;; One future ordinary timer (year 2100): (timer-check) runs with
 ;;; no error and leaves the timer unfired (slot 0 stays nil).  NOTE:
 ;;; from outside the shim this looks identical to case 1 — the shim
 ;;; always returns nil and fires nothing — intentional; see the
@@ -105,14 +109,14 @@
                (set-symbol-value! 'timer-idle-list #nil))
     (lambda ()
       (check "timers/wait-no-error" #t
-             (no-error? (lambda () ((%sym '--timer-check)))))
+             (no-error? (lambda () (timer-check))))
       (check "timers/wait-not-fired" #nil (vector-ref future 0)))
     (lambda () (set-symbol-value! 'timer-list saved-timers)
                (set-symbol-value! 'timer-idle-list saved-idle))))
 
 ;;; --- 3. Ripe fire path, single call fires all ripe timers -----------
 ;;; Two ripe ordinary timers (epoch, slot 0 = nil).  A single
-;;; (--timer-check) call fires *both*: the Scheme timer-check's
+;;; (timer-check) call fires *both*: the Scheme timer-check's
 ;;; do-while loop (fires the list head each pass) must survive the C
 ;;; round trip.  A raw t value would not prove this — firing more than
 ;;; one timer from one call is the real signal.  Assert slot 0 = t on
@@ -128,7 +132,7 @@
                (set-symbol-value! 'timer-idle-list #nil))
     (lambda ()
       (check "timers/ripe-no-error" #t
-             (no-error? (lambda () ((%sym '--timer-check)))))
+             (no-error? (lambda () (timer-check))))
       (check "timers/ripe-a-fired" #t (truthy? (vector-ref timer-a 0)))
       (check "timers/ripe-b-fired" #t (truthy? (vector-ref timer-b 0)))
       (check "timers/ripe-event-last" #t
@@ -142,7 +146,7 @@
 ;;; --- 4. Idle vs. ordinary ordering, through the cutover -------------
 ;;; Same fixture shape as test-m15-bodies.scm §4: wrap in
 ;;; --rc-timer-start-idle/--rc-timer-stop-idle, seed a ripe idle timer
-;;; and a future ordinary timer, call (--timer-check), assert the idle
+;;; and a future ordinary timer, call (timer-check), assert the idle
 ;;; timer fired and the ordinary one did not.
 (let ((saved-timers (symbol-value 'timer-list))
       (saved-idle (symbol-value 'timer-idle-list))
@@ -157,7 +161,7 @@
         (set-symbol-value! 'timer-list (elist future))
         (set-symbol-value! 'timer-idle-list (elist idle-timer))
         (check "timers/idle-vs-ordinary-no-error" #t
-               (no-error? (lambda () ((%sym '--timer-check)))))
+               (no-error? (lambda () (timer-check))))
         (check "timers/idle-vs-ordinary-fired-idle"
                #t (truthy? (vector-ref idle-timer 0)))
         (check "timers/idle-vs-ordinary-not-ordinary"
@@ -171,7 +175,7 @@
 ;;; --- 5. pending_funcalls drain, through the cutover -----------------
 ;;; Seed one (FUN . ARGS) entry via --timer-pending-funcalls-set!,
 ;;; with both list globals nil (so the drain is the only observable
-;;; effect — no timer firing to confound it).  Call (--timer-check).
+;;; effect — no timer firing to confound it).  Call (timer-check).
 ;;; Assert the seeded function ran exactly once and the queue is empty
 ;;; afterward.
 (let ((saved-queue ((%sym '--timer-pending-funcalls)))
@@ -186,7 +190,7 @@
                (set-symbol-value! 'timer-list #nil)
                (set-symbol-value! 'timer-idle-list #nil))
     (lambda ()
-      ((%sym '--timer-check))          ; drains before the invalid check
+      (timer-check)          ; drains before the invalid check
       (check "timers/drain-runs-once" 1 calls)
       (check "timers/drain-queue-empty" #nil
              ((%sym '--timer-pending-funcalls))))
@@ -196,7 +200,7 @@
 
 ;;; --- 6. Copy-window smoke, through the cutover ----------------------
 ;;; Seed timer-list with one *unripe* timer (future fixture) so
-;;; (--timer-check) does not mutate it.  Call (--timer-check).  Assert:
+;;; (timer-check) does not mutate it.  Call (timer-check).  Assert:
 ;;; no error, and the timer-list global itself is unchanged (eq? to
 ;;; what was set) — timer_check copies the list for internal use, it
 ;;; must not replace the live global.  (This is the imp-4 "smoke" level
@@ -211,7 +215,7 @@
                (set-symbol-value! 'timer-idle-list #nil))
     (lambda ()
       (check "timers/copy-window-no-error" #t
-             (no-error? (lambda () ((%sym '--timer-check)))))
+             (no-error? (lambda () (timer-check))))
       ;; eq? identity, not structural equality — timer_check must not
       ;; replace the live global with a copy (brief.org:162).
       (check "timers/copy-window-list-unchanged" #t

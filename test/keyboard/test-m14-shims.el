@@ -1,11 +1,12 @@
 ;;; test-m14-shims.el --- M14 imp-1 test suite for the C shim DEFUNs
 ;;;
 ;;; Wraps test/keyboard/test-m14-shims.scm — the Scheme test corpus
-;;; for the 7 imp-1 C shims in src/keyboard.c
+;;; for the 6 imp-1 C shims in src/keyboard.c
 ;;; (--kbd-excise-selection-event-at!, --kbd-queue-has-data,
 ;;; --any-kbd-queue-has-data, --toolkit-scroll-bars-p,
-;;; --redisplay-preserve-echo-area, --timers-run, --timer-check).
-;;; See docs/m14-plan.org §imp-1.
+;;; --redisplay-preserve-echo-area, --timers-run); --timer-check was
+;;; reclaimed in M28 imp-5 family 4, so that smoke check calls the
+;;; (emacs timers) port.  See docs/m14-plan.org §imp-1.
 ;;;
 ;;; Loads the Scheme file via eval-scheme, then reads back
 ;;; `test-results` (list of (NAME STATUS) pairs) and reports each

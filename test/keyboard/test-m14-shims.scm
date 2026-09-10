@@ -1,8 +1,9 @@
-;;; test-m14-shims.scm --- M14 imp-1 test corpus for the 7 C shim
+;;; test-m14-shims.scm --- M14 imp-1 test corpus for the 6 C shim
 ;;; DEFUNs in src/keyboard.c: --kbd-excise-selection-event-at!,
 ;;; --kbd-queue-has-data, --any-kbd-queue-has-data,
-;;; --toolkit-scroll-bars-p, --redisplay-preserve-echo-area,
-;;; --timers-run, and --timer-check.
+;;; --toolkit-scroll-bars-p, --redisplay-preserve-echo-area, and
+;;; --timers-run.  (--timer-check was reclaimed in M28 imp-5 family 4;
+;;; its smoke check now calls the (emacs timers) port.)
 ;;;
 ;;; Sourced by test/keyboard/test-m14-shims.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback
@@ -11,6 +12,8 @@
 
 ;; M28 imp-5 (family 2) — ie-kind-from-name now lives in Scheme.
 (use-modules (emacs lispy-position))
+;; M28 imp-5 (family 4) — --timer-check reclaimed; call the port.
+(use-modules (emacs timers))
 
 (define test-results '())
 
@@ -39,7 +42,7 @@
 (define shim-names
   '(--kbd-excise-selection-event-at! --kbd-queue-has-data
     --any-kbd-queue-has-data --toolkit-scroll-bars-p
-    --redisplay-preserve-echo-area --timers-run --timer-check))
+    --redisplay-preserve-echo-area --timers-run))
 (for-each
  (lambda (n)
    (check (string-append "registered:" (symbol->string n))
@@ -75,16 +78,18 @@
        (or (eq? tsb #t) (eq? tsb #nil)))
 
 ;;; --- 3. timer-check smoke -------------------------------------------
-;;; timer_check () with no ripe timers must return without signalling.
-;;; `catch' swallows a raised exception so the runner keeps going if
-;;; the shim errors; a normal return records PASS.
+;;; (emacs timers) timer-check with no ripe timers must return without
+;;; signalling.  `catch' swallows a raised exception so the runner
+;;; keeps going if the port errors; a normal return records PASS.
+;;; (--timer-check was reclaimed in M28 imp-5 family 4; the port is the
+;;; same Scheme body C timer_check () now re-dispatches to.)
 (define (no-error? thunk)
   (catch #t
     (lambda () (thunk) #t)
     (lambda (key . args) (list 'error key args))))
 
 (check "timer-check/smoke-no-signal" #t
-       (no-error? (lambda () ((%sym '--timer-check)))))
+       (no-error? (lambda () (timer-check))))
 
 ;;; --- 4. redisplay-preserve-echo-area smoke ---------------------------
 ;;; Call with swallow_events' 7 and the rc shim's 5; assert no error.

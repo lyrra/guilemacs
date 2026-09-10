@@ -4416,19 +4416,6 @@ to (emacs interrupt) handle-interrupt.  Returns nil.  */)
   return Qnil;
 }
 
-DEFUN ("--timer-check", Fc_timer_check, Sc_timer_check, 0, 0, 0,
-       doc: /* TEMPORARY: call C's timer_check ().
-
-This shim is a thin call-through to C's timer_check, which since M15
-imp-3 is itself a thin Scheme dispatcher into (emacs timers)
-timer-check.  This shim still calls it for kbd-buffer.scm's
-DO_TIMERS_NOW arm.  Returns nil.  */)
-  (void)
-{
-  timer_check ();
-  return Qnil;
-}
-
 /* M15 imp-1 — timer firing core shims.  Each shim wraps one piece of
    the C timer firing core for Scheme, leaving every C function body
    unchanged.  decode_timer is static and defined later in this file,

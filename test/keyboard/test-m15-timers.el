@@ -2,9 +2,10 @@
 ;;; core cutover
 ;;;
 ;;; Wraps test/keyboard/test-m15-timers.scm — the Scheme test corpus
-;;; that drives the two elisp-visible entry points (--timer-check and
-;;; current-idle-time) through the cutover into (emacs timers).  See
-;;; docs/m15-plan.org §imp-4 and brief.org.
+;;; that drives (current-idle-time) through the C cutover into (emacs
+;;; timers) and calls the port's timer-check directly (--timer-check was
+;;; reclaimed in M28 imp-5 family 4).  See docs/m15-plan.org §imp-4 and
+;;; brief.org.
 ;;;
 ;;; Loads the Scheme file via eval-scheme, then reads back
 ;;; `test-results` (list of (NAME STATUS) pairs) and reports each

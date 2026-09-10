@@ -46,6 +46,14 @@
   ;; import is cycle-free.
   #:use-module ((emacs read-key-sequence) #:select (some-mouse-moved))
   #:use-module ((emacs gobble) #:select (gobble-input!))
+  ;; M28 imp-5 family 4 — --timer-check reclaimed.  The C DEFUN was a
+  ;; thin call-through to C timer_check (), which already dispatches to
+  ;; (emacs timers) timer-check; import the port directly.  (emacs
+  ;; timers) imports only (emacs elisp-ref) and (emacs-elisp runtime),
+  ;; neither of which imports kbd-buffer, so this eager import is
+  ;; cycle-free (same reasoning as the read-key-sequence / gobble
+  ;; imports above).
+  #:use-module ((emacs timers) #:select (timer-check))
   #:declarative? #t
   #:export (kbd-buffer-get-event
             noninteractive-fast-path?
@@ -159,7 +167,8 @@
 ;; shims (--get-input-pending, --rc-input-pending, --ie-part) are from
 ;; earlier milestones, not new imp-1 work — imported here, not added to
 ;; src/keyboard.c.
-(defelisp %--timer-check                --timer-check)
+;; M28 imp-5 family 4 — the %--timer-check defelisp is gone; the
+;; DO_TIMERS_NOW arm now calls the (emacs timers) port directly.
 (defelisp %--toolkit-scroll-bars-p      --toolkit-scroll-bars-p)
 (defelisp %--kbd-queue-has-data         --kbd-queue-has-data)
 (defelisp %--any-kbd-queue-has-data     --any-kbd-queue-has-data)
@@ -1105,9 +1114,11 @@ immediately.  Phase 2 walks the ring by index and only reads an ie-smob
 via --kbd-event-ie when --ie-part / --ie-modifiers is actually needed
 (the dead scroll-bar toolkit members sit at -1 and can never match, so
 no build-specific branch is needed)."
-  ;; Phase 1 — READABLE_EVENTS_DO_TIMERS_NOW.
+  ;; Phase 1 — READABLE_EVENTS_DO_TIMERS_NOW.  (emacs timers)
+  ;; timer-check; the return value is ignored (the C body discarded it
+  ;; too), so its #nil / #t / (SEC . NSEC) contract is no change here.
   (when (logtest flags READABLE-EVENTS-DO-TIMERS-NOW)
-    ((force %--timer-check)))
+    (timer-check))
   ;; Feature-test result cannot change mid-call — read once (avoids a
   ;; Guile→elisp round trip per ring-slot visit).
   (let ((toolkit-scroll-bars-p ((force %--toolkit-scroll-bars-p))))
