@@ -57,7 +57,7 @@
    (check (string-append "registered:" (symbol->string n))
           #t (not (eq? (%sym n) #nil))))
  '(--ie-help-event --position-to-time --safe-calln-or-eval
-   --rc-help-echo-showing-set! --frame-set-mouse-moved! --some-mouse-moved
+   --rc-help-echo-showing-set! --frame-set-mouse-moved!
    --ie-kind --ie-frame-or-window --ie-arg --ie-x --ie-y --ie-timestamp
    --kbd-event-ie --kbd-store-ptr-index --kbd-set-store-ptr-index))
 

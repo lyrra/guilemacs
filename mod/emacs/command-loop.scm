@@ -2,6 +2,10 @@
   #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-11)          ; let*-values (adjust-point-for-property)
+  ;; M28 imp-5 family 6 — --record-recent-keys-cmd-pseudo-event reclaimed;
+  ;; call the (emacs recent-keys) port directly.  (emacs recent-keys)
+  ;; imports only elisp-ref + runtime, so this eager import is cycle-free.
+  #:use-module ((emacs recent-keys) #:select (record-cmd-pseudo-event!))
   #:declarative? #t
   #:export (command-loop-1-prologue
             command-loop-1-iter-pre-read
@@ -243,7 +247,6 @@ docs/keyboard.org §M7b1."
 (define %maybe-quit                                     (delay (%c '--maybe-quit)))
 (define %save-state-for-redisplay-get-pt                (delay (%c '--save-state-for-redisplay-get-pt)))
 (define %restore-last-point-position                    (delay (%c '--restore-last-point-position)))
-(define %record-recent-keys-cmd-pseudo-event            (delay (%c '--record-recent-keys-cmd-pseudo-event)))
 (define %with-hourglass-protection                      (delay (%c '--with-hourglass-protection)))
 (define %save-point-before-last-command-or-undo         (delay (%c '--save-point-before-last-command-or-undo)))
 (define %reset-redisplay-tick-state                     (delay (%c '--reset-redisplay-tick-state)))
@@ -287,7 +290,7 @@ docs/keyboard.org §M7b2."
              (cmd (if (%nilp remapped) cmd remapped)))
 
         ;; Push (nil . cmd) pseudo-event into recent-keys ring.
-        ((force %record-recent-keys-cmd-pseudo-event) cmd)
+        (record-cmd-pseudo-event! cmd)
 
         (set-symbol-value! 'this-command      cmd)
         (set-symbol-value! 'real-this-command cmd)

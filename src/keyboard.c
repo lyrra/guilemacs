@@ -1092,28 +1092,13 @@ two separate --kbd-fetch-ptr-index / --kbd-store-ptr-index reads.  */)
   return (kbd_fetch_ptr == kbd_store_ptr) ? Qt : Qnil;
 }
 
-DEFUN ("--some-mouse-moved", Fsome_mouse_moved, Ssome_mouse_moved, 0, 0, 0,
-       doc: /* Return the frame that has pending mouse movement, or nil.
-
-M22 imp-3: dispatches to (emacs read-key-sequence) some-mouse-moved,
-which ports the old C some_mouse_moved().  Returns a frame Lisp_Object
-or nil.  Scheme uses this in the wait loop to detect mouse-motion
-fallback.  */)
-  (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs read-key-sequence", "some-mouse-moved");
-  return SCM_CALL_0 (proc);
-}
-
 DEFUN ("--frame-set-mouse-moved!", Fframe_set_mouse_moved,
        Sframe_set_mouse_moved, 1, 1, 0,
        doc: /* Internal: set FRAME's mouse_moved flag to true.
 
 Restore side of show_help_echo's save/restore around the
 mouse-fixup-help-message call: the Lisp call can reset mouse_moved as
-a side effect, so the flag saved by --some-mouse-moved is restored
+a side effect, so the flag saved by some-mouse-moved is restored
 here afterward.  Always sets true — there is no false-setting call
 site.  */)
   (Lisp_Object frame)
@@ -2341,23 +2326,6 @@ clobbered by a recursive-edit inside the command).  */)
 {
   CHECK_FIXNAT (n);
   last_point_position = XFIXNAT (n);
-  return Qnil;
-}
-
-DEFUN ("--record-recent-keys-cmd-pseudo-event",
-       Fc_record_recent_keys_cmd_pseudo_event,
-       Sc_record_recent_keys_cmd_pseudo_event, 1, 1, 0,
-       doc: /* Internal: push the (nil . CMD) pseudo-event into the
-recent_keys ring, with lossage rotation.  Dispatches into
-record-cmd-pseudo-event!.  */)
-  (Lisp_Object cmd)
-{
-  /* M17 imp-3 — repoint the pseudo-event writer at the same Scheme
-     helper record_char uses, so the ring has one writer.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs recent-keys", "record-cmd-pseudo-event!");
-  SCM_CALL_1 (proc, cmd);
   return Qnil;
 }
 
@@ -6517,28 +6485,6 @@ DEFUN ("--set-menu-bar-touch-id", Fset_menu_bar_touch_id,
   return Qnil;
 }
 
-DEFUN ("--coords-in-menu-bar-window", Fcoords_in_menu_bar_window,
-       Scoords_in_menu_bar_window, 3, 3, 0,
-       doc: /* Return t if frame-relative (X, Y) lies inside FRAME's
-menu-bar window.
-
-FRAME must be a live frame.  X and Y are fixnums (pixel coords).
-Returns nil on platforms without a non-toolkit menu bar
-(e.g. toolkit builds, no-X builds).  */)
-  (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
-{
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  static SCM proc = SCM_UNDEFINED;
-  CHECK_LIVE_FRAME (frame);
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position",
-			     "coords-in-menu-bar-window?");
-  return scm_is_true (SCM_CALL_3 (proc, frame, x, y)) ? Qt : Qnil;
-#else
-  return Qnil;
-#endif
-}
-
 DEFUN ("--menu-bar-touch-consume-p", Fmenu_bar_touch_consume_p,
        Smenu_bar_touch_consume_p, 1, 1, 0,
        doc: /* Return t if TOUCH-ID matches menu_bar_touch_id,
@@ -6789,23 +6735,6 @@ and stores it in down_mouse_line_number_width.  */)
   int pixel_width;
   line_number_display_width (w, &down_mouse_line_number_width, &pixel_width);
   return Qnil;
-}
-
-DEFUN ("--line-number-mode-hscroll", Fline_number_mode_hscroll,
-       Sline_number_mode_hscroll, 2, 2, 0,
-       doc: /* Return t if the position change from START-POS to END-POS
-is likely due to line-number-mode hscroll redisplay.
-
-Calls into (emacs lispy-position) line-number-mode-hscroll?.  Used by
-the mouse-click drag/click resolution to avoid spurious drag events
-when line-number display width changes between down and up.  */)
-  (Lisp_Object start_pos, Lisp_Object end_pos)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position",
-			     "line-number-mode-hscroll?");
-  return scm_is_true (SCM_CALL_2 (proc, start_pos, end_pos)) ? Qt : Qnil;
 }
 
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
@@ -10275,13 +10204,6 @@ this-single-command-key-start-set!.  */)
                              "this-single-command-key-start-set!");
   return SCM_CALL_1 (proc, n);
 }
-
-
-
-
-
-
-
 
 DEFUN ("--dribble-open-p", Fdribble_open_p, Sdribble_open_p, 0, 0, 0,
        doc: /* Internal: return non-nil when a dribble file is currently open.

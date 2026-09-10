@@ -152,7 +152,7 @@
 (test-assert "m7b2-helper/restore-last-point-position"
              (fboundp '--restore-last-point-position))
 (test-assert "m7b2-helper/record-recent-keys-cmd"
-             (fboundp '--record-recent-keys-cmd-pseudo-event))
+             (fboundp 'record-cmd-pseudo-event!))
 (test-assert "m7b2-helper/with-hourglass" (fboundp '--with-hourglass-protection))
 (test-assert "m7b2-helper/save-point-before-last-command"
              (fboundp '--save-point-before-last-command-or-undo))
@@ -171,7 +171,7 @@
   (test-eq "with-hourglass-protection/runs-thunk" 'ran sentinel))
 
 (clear-this-command-keys)
-(--record-recent-keys-cmd-pseudo-event 'srfi-sentinel-cmd)
+(record-cmd-pseudo-event! 'srfi-sentinel-cmd)
 (let ((rk (recent-keys t))
       (found nil))
   (dotimes (i (length rk))

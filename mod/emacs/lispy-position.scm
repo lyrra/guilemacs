@@ -471,9 +471,9 @@ no tab-bar window."
 (define (coords-in-menu-bar-window? frame x y)
   "True if frame-relative (X, Y) lies inside FRAME's menu-bar window.
 See coords_in_menu_bar_window (src/keyboard.c).  Returns #f when FRAME
-has no non-toolkit menu-bar window.  Exported; the C DEFUN
---coords-in-menu-bar-window dispatches here (only on builds where the
-non-toolkit menu-bar window exists)."
+has no non-toolkit menu-bar window.  Exported; (emacs lispy-event)
+calls it directly (M28 imp-5 family 6 reclaimed the C DEFUN
+--coords-in-menu-bar-window, which used to dispatch here)."
   (let ((w ((force %--frame-menu-bar-window) frame)))
     (if (eq? w #nil) #f (window-box-hits? frame w x y))))
 

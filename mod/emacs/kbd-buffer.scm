@@ -100,7 +100,8 @@
 ;; An imp-3 attempt also added --kbd-peek-event; it was removed after
 ;; it regressed the bench (cr.org F3).  See dispatch-event! below.
 (defelisp %--kbd-empty-p                --kbd-empty-p)
-(defelisp %--some-mouse-moved           --some-mouse-moved)
+;; M28 imp-5 family 6 — --some-mouse-moved reclaimed; call the
+;; (emacs read-key-sequence) port directly (imported above).
 (defelisp %--quit-throw-to-read-char    --quit-throw-to-read-char)
 (defelisp %--gobble-input               --gobble-input)
 (defelisp %--x-detect-pending-selection-requests
@@ -699,7 +700,7 @@ is pending, so a nil movement-frame here means neither condition held —
 the impossible state C dumps core on.
 Does NOT advance the fetch pointer or update
 input_pending (the shared C epilogue, imp-2/imp-5 tail)."
-  (let ((movement-frame ((force %--some-mouse-moved))))
+  (let ((movement-frame (some-mouse-moved)))
     ;; C 5515 / 5568-5571: post-wait calls us when the queue is empty
     ;; and (some_mouse_moved OR not had-sel); a nil movement-frame here
     ;; means both are false, the impossible invariant C dumps core on
@@ -1131,7 +1132,7 @@ no build-specific branch is needed)."
             ((truthy? ((force %--x-detect-pending-selection-requests))) #t)
             ((truthy? ((force %--detect-conversion-events))) #t)
             ((and (not (logtest flags IGNORE-SQUEEZABLES))
-                  (truthy? ((force %--some-mouse-moved))))
+                  (truthy? (some-mouse-moved)))
              #t)
             ((truthy? ((force %--kbd-single-kboard-p)))
              ;; --kbd-queue-has-data returns Qt/Qnil directly.

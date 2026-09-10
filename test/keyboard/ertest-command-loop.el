@@ -202,7 +202,7 @@
   (should (fboundp '--maybe-quit))
   (should (fboundp '--save-state-for-redisplay-get-pt))
   (should (fboundp '--restore-last-point-position))
-  (should (fboundp '--record-recent-keys-cmd-pseudo-event))
+  (should (fboundp 'record-cmd-pseudo-event!))
   (should (fboundp '--with-hourglass-protection))
   (should (fboundp '--save-point-before-last-command-or-undo))
   (should (fboundp '--reset-redisplay-tick-state))
@@ -226,7 +226,7 @@
   ;; Push a (nil . CMD) pseudo-event into the ring; verify recent-keys
   ;; with INCLUDE-CMDS=t surfaces it.  Clear after to avoid contamination.
   (clear-this-command-keys)
-  (--record-recent-keys-cmd-pseudo-event 'm7b2-sentinel-cmd)
+  (record-cmd-pseudo-event! 'm7b2-sentinel-cmd)
   (let ((rk (recent-keys t)))
     (should (or (vectorp rk) (stringp rk)))
     ;; recent-keys returns the chronological view; our event should be

@@ -95,8 +95,9 @@
        (procedure? (module-ref m17-mod 'record-cmd-pseudo-event!)))
 ;; The C entry point this corpus drives must resolve as an elisp function.
 (check "rc-record-char-retired" #t (eq? (%sym '--rc-record-char) #nil))
-(check "pseudo-event-entry" #t
-       (not (eq? (%sym '--record-recent-keys-cmd-pseudo-event) #nil)))
+;; M28 imp-5 family 6 reclaimed the pseudo-event double-hop; drive the port.
+(check "pseudo-event-retired" #t
+       (eq? (%sym '--record-recent-keys-cmd-pseudo-event) #nil))
 
 ;;; --- 1. record-char port: plain-key append ---------------------------
 ;;; Drives the (emacs recent-keys) record-char port directly.
@@ -156,15 +157,15 @@
             (equal? (help-event tip) (rref (- lim 1)))))))
 
 ;;; --- 4. --record-recent-keys-cmd-pseudo-event: (nil . CMD) append -----
-;;; Drives the C DEFUN directly.  It now dispatches into
-;;; record-cmd-pseudo-event!, which reuses record-char-write-back — so
+;;; Drives the (emacs recent-keys) port directly (M28 imp-5 family 6
+;;; reclaimed the C DEFUN).  It reuses record-char-write-back — so
 ;;; both writers produce the same plain-key append shape.  Note it does
 ;;; NOT bump num-nonmacro-input-events (matching the C pseudo-event body).
 (with-ring-state
  (lambda ()
    (set-idx! 0) (set-total! 0)
    (let ((c0 (symbol-value 'num-nonmacro-input-events)))
-     ((%sym '--record-recent-keys-cmd-pseudo-event) 'm17-cmd)
+     (record-cmd-pseudo-event! 'm17-cmd)
      (check "pseudo/ring-slot" (cons #nil 'm17-cmd) (rref 0))
      (check "pseudo/index-advance" 1 (ridx))
      (check "pseudo/total-incr" 1 (rtotal))
@@ -179,7 +180,7 @@
  (lambda ()
    (let ((lim (rlimit)))
      (set-idx! (- lim 1)) (set-total! lim)
-     ((%sym '--record-recent-keys-cmd-pseudo-event) 'm17-cmd2)
+     (record-cmd-pseudo-event! 'm17-cmd2)
      (check "pseudo-wrap/slot" (cons #nil 'm17-cmd2) (rref (- lim 1)))
      (check "pseudo-wrap/index-wraps" 0 (ridx))
      (check "pseudo-wrap/total-pinned" lim (rtotal)))))

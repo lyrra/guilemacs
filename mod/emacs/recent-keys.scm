@@ -288,9 +288,10 @@ value."
 
 (define (record-cmd-pseudo-event! cmd)
   "Push the (nil . CMD) pseudo-event into the recent-keys ring,
-rotating the ring when it is full.  C --record-recent-keys-cmd-pseudo-event
-(M17 imp-3) dispatches into this procedure.  Reuses
-record-char-write-back's append logic (recorded fixed at 0) so the ring
+rotating the ring when it is full.  M28 imp-5 family 6 reclaimed the
+C --record-recent-keys-cmd-pseudo-event shim; callers use this
+procedure directly.  Reuses record-char-write-back's append logic
+(recorded fixed at 0) so the ring
 has one writer, not two — mirroring the C pseudo-event append exactly,
 including that it does NOT bump num-nonmacro-input-events."
   (let* ((ring      ((%c '--recent-keys-ring)))
@@ -311,7 +312,10 @@ including that it does NOT bump num-nonmacro-input-events."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((recent-keys  ,recent-keys)
-              (lossage-size ,lossage-size)))
+              (lossage-size ,lossage-size)
+              ;; M28 imp-5 family 6 — --record-recent-keys-cmd-pseudo-event
+              ;; reclaimed; expose the port so elisp tests can drive it.
+              (record-cmd-pseudo-event! ,record-cmd-pseudo-event!)))
   ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
   (for-each
    (lambda (spec)

@@ -27,6 +27,9 @@
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs menu-item-parse) ; help-echo-substitute-command-keys
   #:use-module (emacs kbd-buffer)     ; kbd-buffer-store-event! (M13)
+  ;; M28 imp-5 family 6 — --some-mouse-moved reclaimed; call the port
+  ;; directly.  (emacs kbd-buffer) already imports it, so no new cycle.
+  #:use-module ((emacs read-key-sequence) #:select (some-mouse-moved))
   #:declarative? #t
   #:export (show-help-echo
             gen-help-event
@@ -39,7 +42,8 @@
 (defelisp %--safe-calln-or-eval       --safe-calln-or-eval)
 (defelisp %--rc-help-echo-showing-set! --rc-help-echo-showing-set!)
 (defelisp %--frame-set-mouse-moved!   --frame-set-mouse-moved!)
-(defelisp %--some-mouse-moved         --some-mouse-moved)
+;; M28 imp-5 family 6 — --some-mouse-moved reclaimed; call the
+;; (emacs read-key-sequence) port directly (imported above).
 (defelisp %windowp                    windowp)
 (defelisp %funcall                    funcall)
 
@@ -95,7 +99,7 @@
       (when (and (not (truthy? (symbol-value 'noninteractive)))
                  (string? help))
         ;; Save BEFORE the call, restore AFTER it (never before).
-        (let ((f ((force %--some-mouse-moved))))
+        (let ((f (some-mouse-moved)))
           (set! help ((force %funcall) 'mouse-fixup-help-message help))
           (when (not (eq? f #nil))
             ((force %--frame-set-mouse-moved!) f))))

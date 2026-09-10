@@ -678,7 +678,6 @@ unrecognized kind aborts."
 
 (defelisp %--menu-bar-touch-id --menu-bar-touch-id)
 (defelisp %--set-menu-bar-touch-id --set-menu-bar-touch-id)
-(defelisp %--coords-in-menu-bar-window --coords-in-menu-bar-window)
 (defelisp %--menu-bar-touch-consume-p --menu-bar-touch-consume-p)
 
 (define (mle-touchscreen-begin-event ie)
@@ -693,7 +692,7 @@ unrecognized kind aborts."
                (y ((force %--ie-y) ie)))
           ;; Menu-bar early-return: if tap on menu bar,
           ;; store touch ID and return nil.
-          (if ((force %--coords-in-menu-bar-window) fow x y)
+          (if (coords-in-menu-bar-window? fow x y)
               (begin
                 ((force %--set-menu-bar-touch-id) id)
                 #nil)
@@ -904,8 +903,6 @@ unrecognized kind aborts."
 ;;; is a click or a drag by comparing up-event coordinates against
 ;;; the saved down-event position.
 
-(define %--line-number-mode-hscroll
-  (delay (%c '--line-number-mode-hscroll)))
 (define %--frame-relative-event-pos
   (delay (%c '--frame-relative-event-pos)))
 (define %--set-down-mouse-line-number-width
@@ -940,7 +937,7 @@ unrecognized kind aborts."
          (< (- fuzz) xdiff) (< xdiff fuzz)
          (< (- fuzz) ydiff) (< ydiff fuzz)
          (or (eq? (cadr start-pos) (cadr position))
-             ((force %--line-number-mode-hscroll) start-pos position)
+             (line-number-mode-hscroll? start-pos position)
              (not (eq? (car start-pos) (car position)))))))
 
 (define (mur-window-change-detected? start-pos position)

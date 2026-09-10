@@ -38,8 +38,7 @@
 (for-each (lambda (n)
             (check (string-append "registered:" (symbol->string n)) #t
                    (not (eq? (%sym n) #nil))))
-          '(--some-mouse-moved
-            --mouse-position-hook
+          '(--mouse-position-hook
             --frame-last-mouse-device
             --kbd-abort
             --make-lispy-position
