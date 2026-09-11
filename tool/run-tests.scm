@@ -151,6 +151,7 @@
   "test/keyboard/test-m29-imp4.el"              ; M29 imp-4 MS-DOS build-arm removal audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m29-imp5.el"              ; M29 imp-5 dropped-platform sweep audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m29-imp6.el"              ; M29 imp-6 close-out audit (corpus prints PASS/FAIL)
+  "test/keyboard/test-m30-imp1.el"              ; M30 imp-1 table + --cell-ref / --cell-set! proof (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

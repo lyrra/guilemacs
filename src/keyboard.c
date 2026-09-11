@@ -5525,6 +5525,121 @@ static Time button_down_time;
 
 static int double_click_count;
 
+/* M30 imp-1: table-driven cell accessors.  The C cell stays C, so the
+   signal-context reads and writes stay safe.  Scheme reaches a cell
+   through --cell-ref and --cell-set!; the kind picks the convert step.
+   imp-1 proves the table and keeps every per-cell DEFUN.  imp-2 to
+   imp-4 delete the wrappers.  */
+
+enum cell_kind
+{
+  CELL_BOOL,
+  CELL_FIXNUM,
+  CELL_LISP_OBJECT
+};
+
+struct cell_entry
+{
+  const char *name;
+  void *cell;
+  enum cell_kind kind;
+};
+
+static const struct cell_entry cell_table[] =
+  {
+    { "--set-echoing!", &echoing, CELL_BOOL },
+    { "--set-raw-keybuf-count", &raw_keybuf_count, CELL_FIXNUM },
+    { "--set-frame-relative-event-pos", &frame_relative_event_pos,
+      CELL_LISP_OBJECT },
+  };
+
+/* Return the table entry for the accessor name NAME, or NULL.  A linear
+   scan is enough for 74 entries.  */
+
+static const struct cell_entry *
+lookup_cell (Lisp_Object name)
+{
+  CHECK_SYMBOL (name);
+  const char *s = SSDATA (SYMBOL_NAME (name));
+
+  for (int i = 0; i < ARRAYELTS (cell_table); i++)
+    if (strcmp (s, cell_table[i].name) == 0)
+      return &cell_table[i];
+
+  return NULL;
+}
+
+DEFUN ("--cell-ref", Fcell_ref, Scell_ref, 1, 1, 0,
+       doc: /* Internal: return the value of the C cell named NAME.
+
+The NAME is the accessor name of the cell, for example
+`--set-echoing!`.  A missing name signals an error.  */)
+  (Lisp_Object name)
+{
+  const struct cell_entry *e = lookup_cell (name);
+
+  if (e == NULL)
+    xsignal2 (Qerror, build_string ("unknown cell"), name);
+
+  switch (e->kind)
+    {
+    case CELL_BOOL:
+      return *(bool *) e->cell ? Qt : Qnil;
+
+    case CELL_FIXNUM:
+      return make_fixnum (*(int *) e->cell);
+
+    case CELL_LISP_OBJECT:
+      return *(Lisp_Object *) e->cell;
+    }
+
+  emacs_abort ();
+}
+
+DEFUN ("--cell-set!", Fcell_set, Scell_set, 2, 2, 0,
+       doc: /* Internal: set the C cell named NAME to VAL.
+
+The NAME is the accessor name of the cell, for example
+`--set-echoing!`.  The kind of the cell selects the convert step.  A
+missing name signals an error.  Return nil.  */)
+  (Lisp_Object name, Lisp_Object val)
+{
+  const struct cell_entry *e = lookup_cell (name);
+
+  if (e == NULL)
+    xsignal2 (Qerror, build_string ("unknown cell"), name);
+
+  switch (e->kind)
+    {
+    case CELL_BOOL:
+      *(bool *) e->cell = !NILP (val);
+      break;
+
+    case CELL_FIXNUM:
+      /* A `static int' cell accepts a negative value.  Six of the seven
+	 per-cell fixnum setters use XFIXNUM (for example
+	 --set-last-mouse-x, --set-last-mouse-y); only
+	 --set-raw-keybuf-count uses XFIXNAT because it is a count.  The
+	 generic table cannot enforce a per-cell range, so CHECK_FIXNUM is
+	 the correct kind-wide check.  A count cell keeps its non-negative
+	 duty; imp-3 records it when the wrapper is deleted.  */
+      CHECK_FIXNUM (val);
+      *(int *) e->cell = XFIXNUM (val);
+      break;
+
+    case CELL_LISP_OBJECT:
+      *(Lisp_Object *) e->cell = val;
+      break;
+
+    default:
+      /* Symmetry with --cell-ref: a kind outside the enum must not write
+	 nothing and report success.  */
+      emacs_abort ();
+    }
+
+  return Qnil;
+}
+
 
 /* X and Y are frame-relative coordinates for a click or wheel event.
    Return a Lisp-style event list.  */
@@ -11371,6 +11486,9 @@ syms_of_keyboard (void)
 
   button_down_location = make_nil_elisp_vector (5);
   staticpro (&button_down_location);
+  /* M30 imp-1: frame_relative_event_pos is read through --cell-ref; a
+     staticpro of a zeroed Lisp_Object roots NULL.  Initialize to Qnil.  */
+  frame_relative_event_pos = Qnil;
   staticpro (&frame_relative_event_pos);
   mouse_syms = make_nil_elisp_vector (5);
   staticpro (&mouse_syms);
