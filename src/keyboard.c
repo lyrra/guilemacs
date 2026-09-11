@@ -2031,14 +2031,6 @@ DEFUN ("--clear-waiting-for-input", Fc_clear_waiting_for_input,
   return Qnil;
 }
 
-DEFUN ("--set-echoing!", Fc_set_echoing, Sc_set_echoing, 1, 1, 0,
-       doc: /* Internal: set the C echoing flag to VAL.  */)
-  (Lisp_Object val)
-{
-  echoing = !NILP (val);
-  return Qnil;
-}
-
 DEFUN ("--waiting-for-input-p", Fc_waiting_for_input_p,
        Sc_waiting_for_input_p, 0, 0, 0,
        doc: /* Internal: t if the C waiting_for_input flag is set.  */)
@@ -2098,15 +2090,6 @@ display_malloc_warning until clear.  */)
 {
   while (pending_malloc_warning)
     display_malloc_warning ();
-  return Qnil;
-}
-
-DEFUN ("--clear-ignore-mouse-drag", Fc_clear_ignore_mouse_drag,
-       Sc_clear_ignore_mouse_drag, 0, 0, 0,
-       doc: /* Internal: clear the C ignore_mouse_drag_p flag.  */)
-  (void)
-{
-  ignore_mouse_drag_p = false;
   return Qnil;
 }
 
@@ -2319,17 +2302,6 @@ new command isn't charged for the previous command's redisplay cost.  */)
   (void)
 {
   update_redisplay_ticks (0, NULL);
-  display_working_on_window_p = false;
-  return Qnil;
-}
-
-DEFUN ("--clear-display-working-on-window-p",
-       Fc_clear_display_working_on_window_p,
-       Sc_clear_display_working_on_window_p, 0, 0, 0,
-       doc: /* Internal: display_working_on_window_p = false.  Called
-again after command-execute returns.  */)
-  (void)
-{
   display_working_on_window_p = false;
   return Qnil;
 }
@@ -5529,7 +5501,14 @@ static int double_click_count;
    signal-context reads and writes stay safe.  Scheme reaches a cell
    through --cell-ref and --cell-set!; the kind picks the convert step.
    imp-1 proves the table and keeps every per-cell DEFUN.  imp-2 to
-   imp-4 delete the wrappers.  */
+   imp-4 delete the wrappers.
+
+   M30 imp-2 converts the plain bool cells.  `waiting_for_input' is a
+   per-thread field (`current_thread->m_waiting_for_input', see
+   src/thread.h), so its address is not a constant expression and it
+   cannot appear in the static initializer below.  It stays C for now
+   (`--clear-waiting-for-input', `--waiting-for-input-p'); the table is
+   not the only writer of the cell.  Recorded in docs/m30-plan.org.  */
 
 enum cell_kind
 {
@@ -5547,8 +5526,14 @@ struct cell_entry
 
 static const struct cell_entry cell_table[] =
   {
+    /* plain bool cells (M30 imp-2) */
     { "--set-echoing!", &echoing, CELL_BOOL },
+    { "--set-ignore-mouse-drag-p", &ignore_mouse_drag_p, CELL_BOOL },
+    { "--clear-display-working-on-window-p", &display_working_on_window_p,
+      CELL_BOOL },
+    /* fixnum cell (M30 imp-1) */
     { "--set-raw-keybuf-count", &raw_keybuf_count, CELL_FIXNUM },
+    /* Lisp_Object cell (M30 imp-1) */
     { "--set-frame-relative-event-pos", &frame_relative_event_pos,
       CELL_LISP_OBJECT },
   };
@@ -6389,15 +6374,6 @@ during drag tracking (keyboard.c:1761).  */)
   (void)
 {
   return ignore_mouse_drag_p ? Qt : Qnil;
-}
-
-DEFUN ("--set-ignore-mouse-drag-p", Fset_ignore_mouse_drag_p,
-       Sset_ignore_mouse_drag_p, 1, 1, 0,
-       doc: /* Set ignore_mouse_drag_p to (VAL != nil).  */)
-  (Lisp_Object val)
-{
-  ignore_mouse_drag_p = !NILP (val);
-  return Qnil;
 }
 
 DEFUN ("--button-down-location-aref", Fbutton_down_location_aref,
@@ -10289,16 +10265,6 @@ read_stdin (void)
    of the number of times C-g has been requested.  If C-g is pressed
    enough times, then quit anyway.  See bug#6585.  */
 static int volatile force_quit_count;
-
-DEFUN ("--echoing-p", Fc_echoing_p, Sc_echoing_p, 0, 0, 0,
-       doc: /* FIX-20260907-guilemacs: Internal: t if the C echoing flag is set.
-Getter for the echoing flag that --set-echoing! (src/keyboard.c) writes.  M26
-imp-3 (emacs interrupt) handle-interrupt needs it for the tail condition
-waiting_for_input && !echoing.  */)
-  (void)
-{
-  return echoing ? Qt : Qnil;
-}
 
 DEFUN ("--force-quit-count", Fc_force_quit_count, Sc_force_quit_count, 0, 0, 0,
        doc: /* FIX-20260907-guilemacs: Internal: return the C force_quit_count

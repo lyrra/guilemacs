@@ -143,6 +143,8 @@
 (use-modules (emacs event-modifiers))
 (use-modules (emacs kboard))
 (use-modules (emacs recent-keys))
+;; M30 imp-2 — plain bool cell accessors through the cell table.
+(use-modules (emacs cell-accessors))
 (use-modules (emacs recursive-edit))
 (use-modules (emacs this-command-keys))
 (use-modules (emacs command-loop))
@@ -183,6 +185,8 @@
 (init-event-modifiers-registrations)
 (init-kboard-registrations)
 (init-recent-keys-registrations)
+;; M30 imp-2 — bind the converted bool accessor names to (emacs cell-accessors).
+(init-cell-accessors-registrations)
 (init-recursive-edit-registrations)
 (init-this-command-keys-registrations)
 (init-command-loop-registrations)
