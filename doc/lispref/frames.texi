@@ -2423,9 +2423,7 @@ MS-Windows, there are currently three available font backends:
 driver for OTF and TTF fonts with text shaping by the Uniscribe
 engine), and @code{harfbuzz} (font driver for OTF and TTF fonts with
 HarfBuzz text shaping) (@pxref{Windows Fonts,,, emacs, The GNU Emacs
-Manual}).  The @code{harfbuzz} driver is similarly recommended.  On
-Haiku, there can be several font drivers (@pxref{Haiku Fonts,,, emacs,
-The GNU Emacs Manual}).
+Manual}).  The @code{harfbuzz} driver is similarly recommended.
 
 On other systems, there is only one available font backend, so it does
 not make sense to modify this frame parameter.

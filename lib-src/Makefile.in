@@ -137,8 +137,6 @@ MKDIR_P = @MKDIR_P@
 
 ## Haiku build-time support
 HAVE_BE_APP=@HAVE_BE_APP@
-HAIKU_LIBS=@HAIKU_LIBS@
-HAIKU_CFLAGS=@HAIKU_CFLAGS@
 
 # emacsclientw.exe for MinGW, empty otherwise
 CLIENTW = @CLIENTW@
@@ -262,7 +260,7 @@ ALL_CFLAGS = ${BASE_CFLAGS} ${PROFILING_CFLAGS} ${LDFLAGS} ${CPPFLAGS} ${CFLAGS}
 CPP_CFLAGS = ${BASE_CFLAGS} ${PROFILING_CFLAGS} ${CPPFLAGS} ${CFLAGS}
 
 ALL_CXXFLAGS = $(filter-out ${NON_CXX_CFLAGS},${BASE_CFLAGS}) \
-  ${PROFILING_CFLAGS} ${LDFLAGS} ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS} ${HAIKU_CFLAGS}
+  ${PROFILING_CFLAGS} ${LDFLAGS} ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
 
 # Configuration files for .o files to depend on.
 config_h = ../src/config.h $(srcdir)/../src/conf_post.h
@@ -433,7 +431,7 @@ emacsclientw${EXEEXT}: ${srcdir}/emacsclient.c $(NTLIB) $(CLIENTRES) $(config_h)
 	   $(LIB_WSOCK32) $(EUIDACCESS_LIBGEN) $(LIBS_ECLIENT) -o $@
 
 be-resources: ${srcdir}/be_resources.cc ${config_h}
-	$(AM_V_CXXLD)$(CXX) ${ALL_CXXFLAGS} ${HAIKU_LIBS} $< -o $@
+	$(AM_V_CXXLD)$(CXX) ${ALL_CXXFLAGS} $< -o $@
 
 NTINC = ${srcdir}/../nt/inc
 NTDEPS = $(NTINC)/ms-w32.h $(NTINC)/sys/stat.h $(NTINC)/inttypes.h \

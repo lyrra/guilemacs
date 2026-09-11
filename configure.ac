@@ -2296,40 +2296,6 @@ if test "${HAVE_W32}" = "yes"; then
   with_xft=no
 fi
 
-HAIKU_OBJ=
-HAIKU_CXX_OBJ=
-HAIKU_LIBS=
-HAIKU_CFLAGS=
-
-if test "$opsys" = "haiku"; then
-  HAIKU_OBJ="$HAIKU_OBJ haiku.o"
-fi
-
-if test "${HAVE_BE_APP}" = "yes"; then
-  AC_DEFINE([HAVE_HAIKU], [1],
-      [Define if Emacs will be built with Haiku windowing support])
-fi
-
-if test "${HAVE_BE_APP}" = "yes"; then
-  window_system=haiku
-  with_xft=no
-  HAIKU_OBJ="$HAIKU_OBJ haikufns.o haikuterm.o haikumenu.o haikufont.o haikuselect.o haiku_io.o"
-  HAIKU_CXX_OBJ="haiku_support.o haiku_font_support.o haiku_draw_support.o haiku_select.o"
-  HAIKU_LIBS="-lbe -lgame -ltranslation -ltracker" # -lgame is needed for set_mouse_position.
-
-  if test "${with_native_image_api}" = yes; then
-     AC_DEFINE([HAVE_NATIVE_IMAGE_API], [1],
-       [Define to use native OS APIs for images.])
-     NATIVE_IMAGE_API="yes (haiku)"
-     HAIKU_OBJ="$HAIKU_OBJ haikuimage.o"
-  fi
-fi
-
-AC_SUBST([HAIKU_LIBS])
-AC_SUBST([HAIKU_OBJ])
-AC_SUBST([HAIKU_CXX_OBJ])
-AC_SUBST([HAIKU_CFLAGS])
-
 ## $window_system is now set to the window system we will
 ## ultimately use.
 
@@ -2376,9 +2342,6 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
     USE_X_TOOLKIT=none
     HAVE_PGTK=yes
     AC_DEFINE([HAVE_PGTK], [1], [Define to 1 if you have pure Gtk+-3.])
-  ;;
-  haiku )
-    term_header=haikuterm.h
   ;;
 esac
 
