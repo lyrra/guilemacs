@@ -139,13 +139,6 @@ tooltips.  Emacs on Windows can be compiled as either a 64-bit or a
 
 @xref{Cygwin}.
 
-@cindex DOS port
-@cindex Windows 3.11 port
-Emacs can also be compiled for MSDOS@.  When run on recent MS Windows,
-it supports long file names, and uses the Windows clipboard.
-See the @file{msdos} directory in the Emacs sources for building
-instructions (requires DJGPP).
-
 @c ------------------------------------------------------------
 @node Getting Emacs
 @chapter Getting Emacs

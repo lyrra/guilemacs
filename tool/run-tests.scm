@@ -148,6 +148,7 @@
   "test/keyboard/test-m29-imp1.el"              ; M29 imp-1 Android build-arm removal audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m29-imp2.el"              ; M29 imp-2 Haiku build-arm removal audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m29-imp3.el"              ; M29 imp-3 W32 / Cygwin build-arm removal audit (corpus prints PASS/FAIL)
+  "test/keyboard/test-m29-imp4.el"              ; M29 imp-4 MS-DOS build-arm removal audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

@@ -1,34 +1,35 @@
-;;; test-m29-imp3.el --- M29 imp-3 (W32 / Cygwin build-arm removal) suite.
+;;; test-m29-imp4.el --- M29 imp-4 (MS-DOS build-arm removal) suite.
 ;;;
-;;; Pins the M29 imp-3 removal (brief.org M29 imp-3): no W32 / Cygwin
-;;; build-arm token survives in configure.ac or the Makefiles, no build
-;;; file names a deleted W32 file or nt/ path, and every W32 source,
-;;; src/cygw32.c, src/cygw32.h, lib-src/ntlib.{c,h}, and nt/ listed in
-;;; the brief is gone.  The opsys cygwin
-;;; / mingw32 host cases and HAVE_W32=no stay; the dead HAVE_NTGUI /
-;;; DOS_NT arms in src/keyboard.c stay (imp-4 removes msdos.texi).
+;;; Pins the M29 imp-4 removal (brief.org M29 imp-4): no MS-DOS
+;;; build-arm token survives in src/Makefile.in or the doc/emacs files,
+;;; no build file names a deleted MS-DOS file, and every MS-DOS source,
+;;; the msdos/ directory, and doc/emacs/msdos.texi / msdos-xtra.texi
+;;; listed in the brief is gone.  AH_TEMPLATE([MSDOS]) stays in
+;;; configure.ac; the dead DOS_NT / HAVE_X_WINDOWS arms in
+;;; src/keyboard.c stay; doc/misc/efaq-w32.texi keeps its node and the
+;;; @xref{Cygwin}; nextstep/ stays.
 ;;;
-;;; Wraps test/keyboard/test-m29-imp3.scm -- the Scheme audit corpus.
+;;; Wraps test/keyboard/test-m29-imp4.scm -- the Scheme audit corpus.
 ;;; Binds the repo root as %m29-root, loads the Scheme file via
 ;;; eval-scheme, then reads back `test-results` (list of (NAME STATUS)
 ;;; pairs) and reports each via princ.  Same harness as
-;;; test-m29-imp2.el.
+;;; test-m29-imp3.el.
 
-(princ "=== m29-imp3 (W32 / Cygwin build-arm removal) test suite ===\n")
+(princ "=== m29-imp4 (MS-DOS build-arm removal) test suite ===\n")
 
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
-       (corpus (expand-file-name "test-m29-imp3.scm" dir)))
+       (corpus (expand-file-name "test-m29-imp4.scm" dir)))
   ;; The corpus reads the build tree, so tell it where the root is.
   (eval-scheme (format "(define %%m29-root %S)" root))
   (condition-case err
       (eval-scheme
        (format "(primitive-load %S)" corpus))
-    (error (princ (format "M29I3-CORPUS-LOAD-ERROR: %S\n" err)))))
+    (error (princ (format "M29I4-CORPUS-LOAD-ERROR: %S\n" err)))))
 
 (let ((results (condition-case e
                    (eval-scheme "(reverse test-results)")
-                 (error (princ (format "M29I3-READBACK-ERROR: %S\n" e)) '())))
+                 (error (princ (format "M29I4-READBACK-ERROR: %S\n" e)) '())))
       (pass 0)
       (fail 0))
   (dolist (result results)

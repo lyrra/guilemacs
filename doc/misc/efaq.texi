@@ -3855,17 +3855,6 @@ There is a separate FAQ for Emacs on MS-Windows,
 Emacs supports GNUstep natively.  See the file @file{nextstep/INSTALL}
 in the distribution.
 
-@cindex MS-DOS, Emacs for
-@cindex DOS, Emacs for
-@cindex Compiling Emacs for DOS
-@cindex Emacs for MS-DOS
-To build Emacs from source for MS-DOS, see the instructions in the file
-@file{msdos/INSTALL} in the distribution.  The DOS port builds and runs
-on plain DOS, and also on all versions of MS-Windows from version 3.X
-onwards, including Windows XP and Vista.  Pre-built binaries may be
-available at
-@uref{https://www.delorie.com/pub/djgpp/current/v2gnu/emacs.README}
-
 For a list of other implementations of Emacs (and Emacs
 look-alikes), consult the list of ``Emacs implementations and literature,''
 available at

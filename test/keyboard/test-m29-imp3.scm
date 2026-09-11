@@ -15,7 +15,8 @@
 ;;;   3. every path deleted in brief.org Step 2 is gone;
 ;;;   4. no over-deletion: the opsys cygwin / mingw32 host cases stay,
 ;;;      HAVE_W32=no stays, and the dead HAVE_NTGUI / DOS_NT arms in
-;;;      src/keyboard.c and doc/emacs/msdos.texi stay.
+;;;      src/keyboard.c stay.  (imp-4 removes doc/emacs/msdos.texi; the
+;;;      imp-4 corpus owns that check.)
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m29-root (the harness
 ;;; loads the corpus with CWD=test/).
@@ -123,8 +124,7 @@
 ;;; --- 4. No over-deletion -------------------------------------------
 ;;; brief.org "What stays": the opsys cygwin / mingw32 host cases and
 ;;; HAVE_W32=no stay in configure.ac.  src/keyboard.c is unchanged; its
-;;; HAVE_NTGUI / DOS_NT arms stay (imp-5 sweeps them).  doc/emacs/msdos.texi
-;;; stays (imp-4 removes it).
+;;; HAVE_NTGUI / DOS_NT arms stay (imp-5 sweeps them).
 (let ((cfg (slurp (repo "configure.ac"))))
   (if (has? cfg "*-*-cygwin )")
       (report "kept:host-case-cygwin" 'PASS)
@@ -145,9 +145,5 @@
       (report "kept:keyboard.c-DOS_NT-arm" 'PASS)
       (report "kept:keyboard.c-DOS_NT-arm"
               (cons 'FAIL "keyboard.c DOS_NT arm gone (over-deleted)"))))
-
-(if (file-exists? (repo "doc/emacs/msdos.texi"))
-    (report "kept:doc/emacs/msdos.texi" 'PASS)
-    (report "kept:doc/emacs/msdos.texi" (cons 'FAIL "msdos.texi gone (over-deleted)")))
 
 (reverse test-results)

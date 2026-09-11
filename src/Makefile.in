@@ -19,10 +19,6 @@
 # along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 
-# Note that this file is edited by msdos/sed1v2.inp for MSDOS.  That
-# script may need modifying in sync with changes made here.  Try to
-# avoid shell-ism because the DOS build has to use the DOS shell.
-
 SHELL = @SHELL@
 
 # Here are the things that we expect ../configure to edit.
@@ -288,11 +284,6 @@ HYBRID_MALLOC = @HYBRID_MALLOC@
 ## fontset.o fringe.o image.o if we have any window system
 WINDOW_SYSTEM_OBJ=@WINDOW_SYSTEM_OBJ@
 
-## dosfns.o msdos.o w16select.o if MSDOS.
-MSDOS_OBJ =
-## w16select.o termcap.o if MSDOS && HAVE_X_WINDOWS.
-MSDOS_X_OBJ =
-
 NS_OBJ=@NS_OBJ@
 ## nsterm.o nsfns.o nsmenu.o nsselect.o nsimage.o ns_fontfile if HAVE_NS.
 NS_OBJC_OBJ=@NS_OBJC_OBJ@
@@ -422,7 +413,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o     \
 	guile.o 							       \
 	itree.o json.o 							       \
 	$(if $(HYBRID_MALLOC),sheap.o) 					       \
-	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(FONT_OBJ)        \
+	$(NS_OBJ) $(FONT_OBJ)        \
 	$(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)			       \
 	$(PGTK_OBJ)
 doc_obj = $(base_obj) $(NS_OBJC_OBJ)
@@ -432,12 +423,12 @@ obj = $(doc_obj)
 ## These go in the DOC file on all machines in case they are needed.
 ## Some of them have no DOC entries, but it does no harm to have them
 ## in the list, in case they ever add any such entries.
-SOME_MACHINE_OBJECTS = dosfns.o msdos.o \
+SOME_MACHINE_OBJECTS = \
   xterm.o xfns.o xmenu.o xselect.o xrdb.o xsmfns.o fringe.o image.o \
   fontset.o dbusbind.o \
   nsterm.o nsfns.o nsmenu.o nsselect.o nsimage.o nsfont.o macfont.o \
   nsxwidget.o \
-  w16select.o widget.o xfont.o ftfont.o xftfont.o gtkutil.o \
+  widget.o xfont.o ftfont.o xftfont.o gtkutil.o \
   xsettings.o xgselect.o termcap.o hbfont.o \
   sfntfont.c
 
@@ -750,7 +741,6 @@ decompress.o: decompress.x
 dired.o: dired.x
 dispnew.o: dispnew.x
 doc.o: doc.x
-dosfns.o: dosfns.x
 editfns.o: editfns.x
 emacs.o: emacs.x
 eval.o: eval.x
@@ -777,7 +767,6 @@ macros.o: macros.x
 marker.o: marker.x
 menu.o: menu.x
 minibuf.o: minibuf.x
-msdos.o: msdos.x
 nsfns.o: nsfns.x
 nsmenu.o: nsmenu.x
 nsselect.o: nsselect.x
@@ -797,7 +786,6 @@ timefns.o: timefns.x
 textprop.o: textprop.x
 treesit.o: treesit.x
 undo.o: undo.x
-w16select.o: w16select.x
 window.o: window.x
 xdisp.o: xdisp.x
 xfaces.o: xfaces.x
