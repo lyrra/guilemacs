@@ -153,6 +153,7 @@
   "test/keyboard/test-m29-imp6.el"              ; M29 imp-6 close-out audit (corpus prints PASS/FAIL)
   "test/keyboard/test-m30-imp1.el"              ; M30 imp-1 table + --cell-ref / --cell-set! proof (corpus prints PASS/FAIL)
   "test/keyboard/test-m30-imp2.el"              ; M30 imp-2 plain bool cell conversion proof (corpus prints PASS/FAIL)
+  "test/keyboard/test-m30-imp3.el"              ; M30 imp-3 plain fixnum cell conversion proof (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

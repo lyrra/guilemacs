@@ -2129,17 +2129,6 @@ branch when re-queueing a C-g into unread-command-events.  */)
   return make_fixnum (quit_char);
 }
 
-DEFUN ("--set-raw-keybuf-count", Fc_set_raw_keybuf_count, Sc_set_raw_keybuf_count, 1, 1, 0,
-       doc: /* Internal: set raw_keybuf_count to N.  Callers run
-before the read_key_sequence record-stack push (rks_state_depth==0),
-so no <rks-state> mirror is needed here.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNAT (n);
-  raw_keybuf_count = XFIXNAT (n);
-  return Qnil;
-}
-
 DEFUN ("--read-key-sequence", Fc_read_key_sequence_, Sc_read_key_sequence_, 0, 0, 0,
        doc: /* Internal: read the next key sequence from the active input source.
 Wraps the C read_key_sequence(keybuf, Qnil, false, true, true, false, false)
@@ -2517,19 +2506,6 @@ property.  Wraps display_prop_intangible_p.  */)
   return (display_prop_intangible_p (val, overlay, XFIXNUM (pos),
 				     XFIXNUM (pos_byte))
 	  ? Qt : Qnil);
-}
-
-DEFUN ("--set-windows-or-buffers-changed",
-       Fc_set_windows_or_buffers_changed,
-       Sc_set_windows_or_buffers_changed, 1, 1, 0,
-       doc: /* Internal: set the C global windows_or_buffers_changed to N
-(a small integer; only 21 and 39 are used from the finalize
-block).  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  windows_or_buffers_changed = XFIXNUM (n);
-  return Qnil;
 }
 
 DEFUN ("--finalize-kbd-macro-chars", Fc_finalize_kbd_macro_chars,
@@ -5510,10 +5486,19 @@ static int double_click_count;
    (`--clear-waiting-for-input', `--waiting-for-input-p'); the table is
    not the only writer of the cell.  Recorded in docs/m30-plan.org.  */
 
+/* M30 imp-3: the menu-bar / tab-bar / tool-bar index cells are the real
+   definitions, placed here so the cell table initializer below can take
+   their addresses.  Their infrastructure code uses them further down
+   this file.  */
+static int menu_bar_items_index;
+static int ntab_bar_items;
+static int ntool_bar_items;
+
 enum cell_kind
 {
   CELL_BOOL,
   CELL_FIXNUM,
+  CELL_FIXNAT,
   CELL_LISP_OBJECT
 };
 
@@ -5531,8 +5516,25 @@ static const struct cell_entry cell_table[] =
     { "--set-ignore-mouse-drag-p", &ignore_mouse_drag_p, CELL_BOOL },
     { "--clear-display-working-on-window-p", &display_working_on_window_p,
       CELL_BOOL },
-    /* fixnum cell (M30 imp-1) */
-    { "--set-raw-keybuf-count", &raw_keybuf_count, CELL_FIXNUM },
+    /* plain fixnum cells (M30 imp-3).  Each cell is a `static int'
+       (or the extern int windows_or_buffers_changed).  The setter name
+       is the canonical table key; the bare C getters stay C.  */
+    { "--set-down-mouse-line-number-width", &down_mouse_line_number_width,
+      CELL_FIXNUM },
+    { "--set-last-mouse-button", &last_mouse_button, CELL_FIXNUM },
+    { "--set-last-mouse-x", &last_mouse_x, CELL_FIXNUM },
+    { "--set-last-mouse-y", &last_mouse_y, CELL_FIXNUM },
+    { "--set-double-click-count", &double_click_count, CELL_FIXNUM },
+    { "--set-menu-bar-items-index", &menu_bar_items_index, CELL_FIXNUM },
+    { "--set-tab-bar-items-count", &ntab_bar_items, CELL_FIXNUM },
+    { "--set-tool-bar-items-count", &ntool_bar_items, CELL_FIXNUM },
+    { "--set-windows-or-buffers-changed", &windows_or_buffers_changed,
+      CELL_FIXNUM },
+    /* fixnum count cell (M30 imp-3).  raw_keybuf_count indexes
+       raw_keybuf, so a negative value corrupts the key buffer.  The
+       deleted per-cell setter ran CHECK_FIXNAT; CELL_FIXNAT keeps that
+       duty as the table becomes the only writer.  */
+    { "--set-raw-keybuf-count", &raw_keybuf_count, CELL_FIXNAT },
     /* Lisp_Object cell (M30 imp-1) */
     { "--set-frame-relative-event-pos", &frame_relative_event_pos,
       CELL_LISP_OBJECT },
@@ -5572,6 +5574,7 @@ The NAME is the accessor name of the cell, for example
       return *(bool *) e->cell ? Qt : Qnil;
 
     case CELL_FIXNUM:
+    case CELL_FIXNAT:
       return make_fixnum (*(int *) e->cell);
 
     case CELL_LISP_OBJECT:
@@ -5601,15 +5604,20 @@ missing name signals an error.  Return nil.  */)
       break;
 
     case CELL_FIXNUM:
-      /* A `static int' cell accepts a negative value.  Six of the seven
-	 per-cell fixnum setters use XFIXNUM (for example
-	 --set-last-mouse-x, --set-last-mouse-y); only
-	 --set-raw-keybuf-count uses XFIXNAT because it is a count.  The
-	 generic table cannot enforce a per-cell range, so CHECK_FIXNUM is
-	 the correct kind-wide check.  A count cell keeps its non-negative
-	 duty; imp-3 records it when the wrapper is deleted.  */
+      /* A plain `static int' cell.  The deleted per-cell setter ran
+	 CHECK_FIXNUM, which accepts a negative value; the table keeps
+	 the same range.  (cr.org F7: no confirmed writer stores a
+	 negative value; the range is kept to match the old setter.)  */
       CHECK_FIXNUM (val);
       *(int *) e->cell = XFIXNUM (val);
+      break;
+
+    case CELL_FIXNAT:
+      /* A fixnum count cell (raw_keybuf_count, M30 imp-3).  The cell
+	 indexes raw_keybuf, so the value must not be negative.  The
+	 deleted per-cell setter ran CHECK_FIXNAT; keep that duty.  */
+      CHECK_FIXNAT (val);
+      *(int *) e->cell = XFIXNAT (val);
       break;
 
     case CELL_LISP_OBJECT:
@@ -6235,17 +6243,6 @@ DEFUN ("--down-mouse-line-number-width", Fdown_mouse_line_number_width,
   return make_fixnum (down_mouse_line_number_width);
 }
 
-DEFUN ("--set-down-mouse-line-number-width",
-       Fset_down_mouse_line_number_width,
-       Sset_down_mouse_line_number_width, 1, 1, 0,
-       doc: /* Set down_mouse_line_number_width to VAL (a fixnum).  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  down_mouse_line_number_width = XFIXNUM (val);
-  return Qnil;
-}
-
 DEFUN ("--last-mouse-button", Flast_mouse_button,
        Slast_mouse_button, 0, 0, 0,
        doc: /* Return last_mouse_button as a fixnum.
@@ -6257,16 +6254,6 @@ Distinguishes wheel from mouse button by negative values
   return make_fixnum (last_mouse_button);
 }
 
-DEFUN ("--set-last-mouse-button", Fset_last_mouse_button,
-       Sset_last_mouse_button, 1, 1, 0,
-       doc: /* Set last_mouse_button to VAL (a fixnum).  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  last_mouse_button = XFIXNUM (val);
-  return Qnil;
-}
-
 DEFUN ("--last-mouse-x", Flast_mouse_x,
        Slast_mouse_x, 0, 0, 0,
        doc: /* Return last_mouse_x as a fixnum.  */)
@@ -6275,32 +6262,12 @@ DEFUN ("--last-mouse-x", Flast_mouse_x,
   return make_fixnum (last_mouse_x);
 }
 
-DEFUN ("--set-last-mouse-x", Fset_last_mouse_x,
-       Sset_last_mouse_x, 1, 1, 0,
-       doc: /* Set last_mouse_x to VAL (a fixnum).  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  last_mouse_x = XFIXNUM (val);
-  return Qnil;
-}
-
 DEFUN ("--last-mouse-y", Flast_mouse_y,
        Slast_mouse_y, 0, 0, 0,
        doc: /* Return last_mouse_y as a fixnum.  */)
   (void)
 {
   return make_fixnum (last_mouse_y);
-}
-
-DEFUN ("--set-last-mouse-y", Fset_last_mouse_y,
-       Sset_last_mouse_y, 1, 1, 0,
-       doc: /* Set last_mouse_y to VAL (a fixnum).  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  last_mouse_y = XFIXNUM (val);
-  return Qnil;
 }
 
 DEFUN ("--button-down-time", Fbutton_down_time,
@@ -6331,16 +6298,6 @@ DEFUN ("--double-click-count", Fdouble_click_count,
   (void)
 {
   return make_fixnum (double_click_count);
-}
-
-DEFUN ("--set-double-click-count", Fset_double_click_count,
-       Sset_double_click_count, 1, 1, 0,
-       doc: /* Set double_click_count to VAL (a fixnum).  */)
-  (Lisp_Object val)
-{
-  CHECK_FIXNUM (val);
-  double_click_count = XFIXNUM (val);
-  return Qnil;
 }
 
 DEFUN ("--ensure-button-down-location-size",
@@ -7324,11 +7281,11 @@ the same step, per the M9 ie-smob lifetime rule.  */)
 
 static Lisp_Object menu_bar_one_keymap_changed_items;
 
-/* These variables hold the vector under construction within
-   menu_bar_items and its subroutines, and the current index
-   for storing into that vector.  */
+/* The vector under construction within menu_bar_items and its
+   subroutines.  The current index for storing into that vector
+   (menu_bar_items_index) is defined above, near the M30 cell table,
+   so the table initializer can take its address.  */
 static Lisp_Object menu_bar_items_vector;
-static int menu_bar_items_index;
 
 /* Infrastructure DEFUNs exposing menu-bar internals to Scheme.
    These let the Scheme side own menu_bar_items() while C still
@@ -7361,16 +7318,6 @@ This is the slot count, not item count (÷4 for item count).  */)
   (void)
 {
   return make_fixnum (menu_bar_items_index);
-}
-
-DEFUN ("--set-menu-bar-items-index", Fset_menu_bar_items_index,
-       Sset_menu_bar_items_index, 1, 1, 0,
-       doc: /* Set the menu-bar items index to N.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  menu_bar_items_index = XFIXNUM (n);
-  return Qnil;
 }
 
 DEFUN ("--menu-bar-one-keymap-changed-items",
@@ -7584,9 +7531,9 @@ static Lisp_Object tab_bar_items_vector;
 
 static Lisp_Object tab_bar_item_properties;
 
-/* Next free index in tab_bar_items_vector.  */
-
-static int ntab_bar_items;
+/* ntab_bar_items (the next free index in tab_bar_items_vector) is
+   defined above, near the M30 cell table, so the table initializer can
+   take its address.  */
 
 /* Infrastructure DEFUNs exposing tab-bar internals to Scheme.
    These let the Scheme side own tab_bar_items() while C still
@@ -7628,16 +7575,6 @@ DEFUN ("--tab-bar-items-count", Ftab_bar_items_count,
   (void)
 {
   return make_fixnum (ntab_bar_items);
-}
-
-DEFUN ("--set-tab-bar-items-count", Fset_tab_bar_items_count,
-       Sset_tab_bar_items_count, 1, 1, 0,
-       doc: /* Set the tab-bar items count to N.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  ntab_bar_items = XFIXNUM (n);
-  return Qnil;
 }
 
 DEFUN ("--larger-vector", Flarger_vector,
@@ -7687,9 +7624,9 @@ static Lisp_Object tool_bar_items_vector;
 
 static Lisp_Object tool_bar_item_properties;
 
-/* Next free index in tool_bar_items_vector.  */
-
-static int ntool_bar_items;
+/* ntool_bar_items (the next free index in tool_bar_items_vector) is
+   defined above, near the M30 cell table, so the table initializer can
+   take its address.  */
 
 /* Infrastructure DEFUNs exposing tool-bar internals to Scheme.
    These let the Scheme side own tool_bar_items() while C still
@@ -7732,16 +7669,6 @@ DEFUN ("--tool-bar-items-count", Ftool_bar_items_count,
   (void)
 {
   return make_fixnum (ntool_bar_items);
-}
-
-DEFUN ("--set-tool-bar-items-count", Fset_tool_bar_items_count,
-       Sset_tool_bar_items_count, 1, 1, 0,
-       doc: /* Set the tool-bar items count to N.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-  ntool_bar_items = XFIXNUM (n);
-  return Qnil;
 }
 
 /* Return a vector of tool bar items for keymaps currently in effect.
