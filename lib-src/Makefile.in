@@ -138,11 +138,8 @@ MKDIR_P = @MKDIR_P@
 ## Haiku build-time support
 HAVE_BE_APP=@HAVE_BE_APP@
 
-# emacsclientw.exe for MinGW, empty otherwise
-CLIENTW = @CLIENTW@
-
 # Things that a user might actually run, which should be installed in bindir.
-INSTALLABLES = etags${EXEEXT} ctags${EXEEXT} emacsclient${EXEEXT} $(CLIENTW) \
+INSTALLABLES = etags${EXEEXT} ctags${EXEEXT} emacsclient${EXEEXT} \
                ebrowse${EXEEXT}
 
 # Things that Emacs runs internally, or during the build process,
@@ -198,9 +195,6 @@ GETRANDOM_LIB = @GETRANDOM_LIB@
 EUIDACCESS_LIBGEN=@EUIDACCESS_LIBGEN@
 ## Libraries needed for file_has_acl
 FILE_HAS_ACL_LIB=@FILE_HAS_ACL_LIB@
-## empty or -lwsock2 for MinGW
-LIB_WSOCK32=@LIB_WSOCK32@
-
 ## Extra libraries for etags
 LIBS_ETAGS = $(CLOCK_TIME_LIB) $(GETRANDOM_LIB)
 
@@ -233,16 +227,8 @@ endif
 
 ## Extra libraries to use when linking movemail.
 LIBS_MOVE = $(LIBS_MAIL) $(KRB4LIB) $(DESLIB) $(KRB5LIB) $(CRYPTOLIB) \
-  $(COM_ERRLIB) $(LIBHESIOD) $(LIBRESOLV) $(LIB_WSOCK32) $(LIBS_ETAGS)
+  $(COM_ERRLIB) $(LIBHESIOD) $(LIBRESOLV) $(LIBS_ETAGS)
 
-## Extra libraries when linking emacsclient
-## (empty or -lcomctl32 for MinGW)
-LIBS_ECLIENT = @LIBS_ECLIENT@
-
-## Extra object files for linking for MinGW
-NTLIB = @NTLIB@
-CLIENTRES = @CLIENTRES@
-WINDRES = @WINDRES@
 
 ## Some systems define this to request special libraries.
 LIBS_SYSTEM = @LIBS_SYSTEM@
@@ -391,8 +377,8 @@ TAGS: etags${EXEEXT} ${tagsfiles}
 ../lib/libgnu.a: $(config_h)
 	$(MAKE) -C ../lib all
 
-etags_deps = ${srcdir}/etags.c $(NTLIB) $(config_h)
-etags_libs = $(NTLIB) $(LOADLIBES) $(LIBS_ETAGS)
+etags_deps = ${srcdir}/etags.c $(config_h)
+etags_libs = $(LOADLIBES) $(LIBS_ETAGS)
 
 etags${EXEEXT}: ${etags_deps}
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} -o $@ $< $(etags_libs)
@@ -404,55 +390,37 @@ etags${EXEEXT}: ${etags_deps}
 ctags${EXEEXT}: ${srcdir}/ctags.c ${etags_deps}
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} -o $@ $< $(etags_libs)
 
-ebrowse${EXEEXT}: ${srcdir}/ebrowse.c ${srcdir}/../lib/min-max.h $(NTLIB) \
+ebrowse${EXEEXT}: ${srcdir}/ebrowse.c ${srcdir}/../lib/min-max.h \
                    $(config_h)
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} -o $@ $< $(NTLIB) $(LOADLIBES)
+	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} -o $@ $< $(LOADLIBES)
 
-make-fingerprint${EXEEXT}: ${srcdir}/make-fingerprint.c $(NTLIB) $(config_h)
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(NTLIB) $(LOADLIBES) -o $@
+make-fingerprint${EXEEXT}: ${srcdir}/make-fingerprint.c $(config_h)
+	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(LOADLIBES) -o $@
 
-movemail${EXEEXT}: ${srcdir}/movemail.c pop.o $(NTLIB) $(config_h)
+movemail${EXEEXT}: ${srcdir}/movemail.c pop.o $(config_h)
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} ${MOVE_FLAGS} $< pop.o \
-	  $(NTLIB) $(LOADLIBES) $(LIBS_MOVE) -o $@
+	  $(LOADLIBES) $(LIBS_MOVE) -o $@
 
 pop.o: ${srcdir}/pop.c ${srcdir}/pop.h ${srcdir}/../lib/min-max.h $(config_h)
 	$(AM_V_CC)$(CC) -c ${CPP_CFLAGS} ${MOVE_FLAGS} $<
 
-emacsclient${EXEEXT}: ${srcdir}/emacsclient.c $(NTLIB) $(config_h)
+emacsclient${EXEEXT}: ${srcdir}/emacsclient.c $(config_h)
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< \
-	   $(NTLIB) $(LOADLIBES) \
-	   $(LIB_WSOCK32) $(EUIDACCESS_LIBGEN) \
-	   $(FILE_HAS_ACL_LIB) $(LIBS_ECLIENT) \
-	   -o $@
-
-emacsclientw${EXEEXT}: ${srcdir}/emacsclient.c $(NTLIB) $(CLIENTRES) $(config_h)
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $(CLIENTRES) -mwindows $< \
 	   $(LOADLIBES) \
-	   $(LIB_WSOCK32) $(EUIDACCESS_LIBGEN) $(LIBS_ECLIENT) -o $@
+	   $(EUIDACCESS_LIBGEN) \
+	   $(FILE_HAS_ACL_LIB) \
+	   -o $@
 
 be-resources: ${srcdir}/be_resources.cc ${config_h}
 	$(AM_V_CXXLD)$(CXX) ${ALL_CXXFLAGS} $< -o $@
 
-NTINC = ${srcdir}/../nt/inc
-NTDEPS = $(NTINC)/ms-w32.h $(NTINC)/sys/stat.h $(NTINC)/inttypes.h \
- $(NTINC)/stdint.h $(NTINC)/pwd.h $(NTINC)/sys/time.h $(NTINC)/stdbool.h \
- $(NTINC)/sys/wait.h $(NTINC)/unistd.h $(NTINC)/sys/file.h $(NTINC)/netdb.h
-
-# The dependency on $(NTDEPS) is a trick intended to cause recompile of
-# programs on MinGW whenever some private header in nt/inc is modified.
-ntlib.o: ${srcdir}/ntlib.c ${srcdir}/ntlib.h $(NTDEPS)
-	$(AM_V_CC)$(CC) -c ${CPP_CFLAGS} $<
-
-hexl${EXEEXT}: ${srcdir}/hexl.c $(NTLIB) $(config_h)
+hexl${EXEEXT}: ${srcdir}/hexl.c $(config_h)
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(LOADLIBES) -o $@
 
-update-game-score${EXEEXT}: ${srcdir}/update-game-score.c $(NTLIB) $(config_h)
+update-game-score${EXEEXT}: ${srcdir}/update-game-score.c $(config_h)
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} \
 	  -DHAVE_SHARED_GAME_DIR="\"$(gamedir)\"" \
-	  $< $(NTLIB) $(LOADLIBES) -o $@
-
-emacsclient.res: ../nt/emacsclient.rc $(NTINC)/../icons/emacs.ico
-	$(AM_V_RC)$(WINDRES) -O coff --include-dir=$(NTINC)/.. -o $@ $<
+	  $< $(LOADLIBES) -o $@
 
 ifeq ($(SECCOMP_FILTER),1)
 seccomp-filter$(EXEEXT): $(srcdir)/seccomp-filter.c $(config_h)

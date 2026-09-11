@@ -63,9 +63,6 @@ INSTALL_DATA = @INSTALL_DATA@
 MAKEINFO = @MAKEINFO@
 MAKEINFO_OPTS = --force -I$(emacsdir)
 
-## On MS Windows, efaq-w32; otherwise blank.
-DOCMISC_W32 = @DOCMISC_W32@
-
 ## Info files to build and install on all platforms.
 INFO_COMMON = auth autotype bovine calc ccmode cl dbus dired-x		\
 	ebrowse ede ediff edt efaq eglot eieio emacs-gnutls		\
@@ -77,7 +74,7 @@ INFO_COMMON = auth autotype bovine calc ccmode cl dbus dired-x		\
 	vhdl-mode viper vtable widget wisent woman
 
 ## Info files to install on current platform.
-INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
+INFO_INSTALL = $(INFO_COMMON)
 
 ## Info files to build on current platform.
 ## This is all of them, even though they might not all get installed,

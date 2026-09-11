@@ -26,10 +26,6 @@ lisp = $(srcdir)
 VPATH = $(srcdir)
 EXEEXT = @EXEEXT@
 
-# Empty for all systems except MinGW, where xargs needs an explicit
-# limitation.
-XARGS_LIMIT = @XARGS_LIMIT@
-
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
 ifeq ($(HAVE_NATIVE_COMP),yes)
@@ -264,7 +260,7 @@ ${ETAGS}: FORCE
 TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_GEN)rm -f $@
 	$(AM_V_at)touch $@
-	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
+	$(AM_V_at)ls ${tagsfiles} | xargs "${ETAGS}" -a -o $@
 
 
 # The src/Makefile.in has its own set of dependencies and when they decide
@@ -370,7 +366,7 @@ compile-main: gen-lisp compile-clean main-first | autoloads
 	      GREP_OPTIONS= grep '^;.*[^a-zA-Z]no-byte-compile: *t' $$el > /dev/null && \
 	      continue; 			     \
 	  echo "$${el}c";                            \
-	done | xargs $(XARGS_LIMIT) echo) |	     \
+	done | xargs echo) |	     \
 	while read chunk; do			     \
 	  $(MAKE) compile-targets		     \
 		  NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
@@ -382,7 +378,7 @@ main-first:
 	@(cd $(lisp) && 			     \
 	for el in ${MAIN_FIRST}; do                  \
 	  echo "$${el}c";                            \
-	done | xargs $(XARGS_LIMIT) echo) |	     \
+	done | xargs echo) |	     \
 	while read chunk; do			     \
 	  $(MAKE) compile-targets		     \
 		  NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
@@ -462,7 +458,7 @@ compile-eln-aot:
 	  GREP_OPTIONS= grep '^;.*[^a-zA-Z]no-native-compile: *t' $$el > /dev/null && \
 	      continue; 			     \
 	  echo "$${el}n";                            \
-	done | xargs $(XARGS_LIMIT) echo) |	     \
+	done | xargs echo) |	     \
 	while read chunk; do			     \
 	  $(MAKE) compile-eln-targets		     \
 	      TARGETS="$$chunk" ELNDONE="$(ELNDONE)"; \

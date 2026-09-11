@@ -171,7 +171,6 @@ GTK_OBJ=@GTK_OBJ@
 ## inotify.o if HAVE_INOTIFY.
 ## kqueue.o if HAVE_KQUEUE.
 ## gfilenotify.o if HAVE_GFILENOTIFY.
-## w32notify.o if HAVE_W32NOTIFY.
 NOTIFY_OBJ = @NOTIFY_OBJ@
 NOTIFY_CFLAGS = @NOTIFY_CFLAGS@
 NOTIFY_LIBS = @NOTIFY_LIBS@
@@ -286,9 +285,6 @@ WIDGET_OBJ=@WIDGET_OBJ@
 
 HYBRID_MALLOC = @HYBRID_MALLOC@
 
-## cygw32.o if CYGWIN, otherwise empty.
-CYGWIN_OBJ=@CYGWIN_OBJ@
-
 ## fontset.o fringe.o image.o if we have any window system
 WINDOW_SYSTEM_OBJ=@WINDOW_SYSTEM_OBJ@
 
@@ -302,25 +298,10 @@ NS_OBJ=@NS_OBJ@
 NS_OBJC_OBJ=@NS_OBJC_OBJ@
 ## Used only for GNUstep.
 GNU_OBJC_CFLAGS=$(patsubst -specs=%-hardened-cc1,,@GNU_OBJC_CFLAGS@)
-## w32fns.o w32menu.c w32reg.o fringe.o fontset.o w32font.o w32term.o
-## w32xfns.o w32select.o image.o w32uniscribe.o w32cygwinx.o if HAVE_W32,
-## w32cygwinx.o if CYGWIN but not HAVE_W32, else empty.
-W32_OBJ=@W32_OBJ@
-## -lkernel32 -luser32 -lusp10 -lgdi32 -lole32 -lcomdlg32 -lcomctl32
-## -lwinspool if HAVE_W32,
-## -lkernel32 if CYGWIN but not HAVE_W32, else empty.
-W32_LIBS=@W32_LIBS@
 
 PGTK_OBJ=@PGTK_OBJ@
 PGTK_LIBS=@PGTK_LIBS@
 
-## emacs.res if HAVE_W32
-EMACSRES = @EMACSRES@
-## If HAVE_W32, compiler arguments for including
-## the resource file in the binary.
-## Cygwin: -Wl,emacs.res
-## MinGW: emacs.res
-W32_RES_LINK=@W32_RES_LINK@
 
 ## Empty if !HAVE_X_WINDOWS
 ## xfont.o ftfont.o xftfont.o if HAVE_XFT
@@ -330,8 +311,6 @@ W32_RES_LINK=@W32_RES_LINK@
 ## if HAVE_HARFBUZZ, hbfont.o is added regardless of the rest
 FONT_OBJ=@FONT_OBJ@
 
-## Empty for MinGW and Android, cm.o for the rest.
-CM_OBJ=@CM_OBJ@
 
 LIBGPM = @LIBGPM@
 
@@ -426,7 +405,7 @@ ALL_CXX_CFLAGS = $(EMACS_CFLAGS) \
 ## be dumped as pure by dump-emacs.
 base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o     \
 	charset.o coding.o category.o ccl.o character.o chartab.o bidi.o       \
-	$(CM_OBJ) term.o terminal.o xfaces.o $(XOBJ) $(GTK_OBJ) $(DBUS_OBJ)    \
+	cm.o term.o terminal.o xfaces.o $(XOBJ) $(GTK_OBJ) $(DBUS_OBJ)    \
 	emacs.o keyboard.o keyboard-globals.o macros.o keymap.o sysdep.o     \
 	bignum.o buffer.o filelock.o insdel.o marker.o 			       \
 	minibuf.o fileio.o dired.o 					       \
@@ -443,8 +422,8 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o     \
 	guile.o 							       \
 	itree.o json.o 							       \
 	$(if $(HYBRID_MALLOC),sheap.o) 					       \
-	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ)        \
-	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)			       \
+	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(FONT_OBJ)        \
+	$(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)			       \
 	$(PGTK_OBJ)
 doc_obj = $(base_obj) $(NS_OBJC_OBJ)
 obj = $(doc_obj)
@@ -455,11 +434,9 @@ obj = $(doc_obj)
 ## in the list, in case they ever add any such entries.
 SOME_MACHINE_OBJECTS = dosfns.o msdos.o \
   xterm.o xfns.o xmenu.o xselect.o xrdb.o xsmfns.o fringe.o image.o \
-  fontset.o dbusbind.o cygw32.o \
+  fontset.o dbusbind.o \
   nsterm.o nsfns.o nsmenu.o nsselect.o nsimage.o nsfont.o macfont.o \
   nsxwidget.o \
-  w32.o w32console.o w32cygwinx.o w32fns.o w32heap.o w32inevt.o w32notify.o \
-  w32menu.o w32proc.o w32reg.o w32select.o w32term.o w32xfns.o \
   w16select.o widget.o xfont.o ftfont.o xftfont.o gtkutil.o \
   xsettings.o xgselect.o termcap.o hbfont.o \
   sfntfont.c
@@ -473,9 +450,7 @@ VMLIMIT_OBJ=@VMLIMIT_OBJ@
 ## ralloc.o if !SYSTEM_MALLOC && REL_ALLOC, else empty.
 RALLOC_OBJ=@RALLOC_OBJ@
 
-## Empty on Cygwin and MinGW, lastfile.o elsewhere.
 PRE_ALLOC_OBJ=@PRE_ALLOC_OBJ@
-## lastfile.o on Cygwin and MinGW, empty elsewhere.
 POST_ALLOC_OBJ=@POST_ALLOC_OBJ@
 
 ## List of object files that make-docfile should not be told about.
@@ -483,9 +458,7 @@ otherobj= $(TERMCAP_OBJ) $(PRE_ALLOC_OBJ) $(GMALLOC_OBJ) $(RALLOC_OBJ) \
   $(POST_ALLOC_OBJ) $(WIDGET_OBJ) $(LIBOBJS)
 
 ## All object files linked into temacs.  $(VMLIMIT_OBJ) should be first.
-## (On MinGW, firstfile.o should be before vm-limit.o.)
-FIRSTFILE_OBJ=@FIRSTFILE_OBJ@
-ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
+ALLOBJS = $(VMLIMIT_OBJ) $(obj) $(otherobj)
 
 # Must be first, before dep inclusion!
 ifneq ($(HAVE_BE_APP),yes)
@@ -542,7 +515,7 @@ export LISP_PRELOADED = ${shortlisp}
 lisp = $(addprefix ${lispsource}/,${shortlisp})
 
 ## Construct full set of libraries to be linked.
-LIBES = $(LIBS) $(GUILE_LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BASE) $(LIBIMAGE) \
+LIBES = $(LIBS) $(GUILE_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BASE) $(LIBIMAGE) \
    $(LIBX_OTHER) $(LIBSOUND) \
    $(RSVG_LIBS) $(IMAGEMAGICK_LIBS) $(LIB_ACL) $(CLOCK_TIME_LIB) \
    $(NANOSLEEP_LIB) $(QCOPY_ACL_LIB) $(WEBKIT_LIBS) \
@@ -653,16 +626,16 @@ $(LIBEGNU_ARCHIVE): $(config_h)
 ## existence when setting Vinstallation_directory (FIXME?).
 ## This goes on to affect various things, and the emacs binary fails
 ## to start if Vinstallation_directory has the wrong value.
-temacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
+temacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) \
   $(charsets) $(charscript) ${emoji-zwj}
 ifeq ($(HAVE_BE_APP),yes)
 	$(AM_V_CXXLD)$(CXX) -o $@.tmp \
 	  $(ALL_CFLAGS) $(TEMACS_LDFLAGS) $(LDFLAGS) \
-	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(LIBES) -lstdc++
+	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(LIBES) -lstdc++
 else
 	$(AM_V_CCLD)$(CC) -o $@.tmp \
 	  $(ALL_CFLAGS) $(CXXFLAGS) $(TEMACS_LDFLAGS) $(LDFLAGS) \
-	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(LIBES)
+	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(LIBES)
 endif
 	$(AM_V_at)mv $@.tmp $@
 	cp $@ emacs${EXEEXT}
@@ -684,9 +657,6 @@ Makefile: ../config.status $(srcdir)/Makefile.in
 	$(MAKE) -C .. src/$@
 
 doc.o: buildobj.h
-
-emacs.res: FORCE
-	$(MAKE) -C ../nt ../src/emacs.res
 
 .PHONY: ns-app
 ns-app: emacs$(EXEEXT)
@@ -774,7 +744,6 @@ chartab.o: chartab.x
 cmds.o: cmds.x
 coding.o: coding.x
 composite.o: composite.x
-cygw32.o: cygw32.x
 data.o: data.x
 dbusbind.o: dbusbind.x
 decompress.o: decompress.x
@@ -829,13 +798,6 @@ textprop.o: textprop.x
 treesit.o: treesit.x
 undo.o: undo.x
 w16select.o: w16select.x
-w32console.o: w32console.x
-w32fns.o: w32fns.x
-w32font.o: w32font.x
-w32menu.o: w32menu.x
-w32notify.o: w32notify.x
-w32proc.o: w32proc.x
-w32select.o: w32select.x
 window.o: window.x
 xdisp.o: xdisp.x
 xfaces.o: xfaces.x
