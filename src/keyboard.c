@@ -2199,18 +2199,6 @@ DEFUN ("--read-key-sequence-remapped", Fc_read_key_sequence_remapped,
   return read_key_sequence_remapped;
 }
 
-DEFUN ("--set-read-key-sequence-remapped",
-       Fc_set_read_key_sequence_remapped,
-       Sc_set_read_key_sequence_remapped, 1, 1, 0,
-       doc: /* Internal: set the C-side `read_key_sequence_remapped'
-to X.  Called by the Scheme done:-block port to install the result
-of `command-remapping' on read_key_sequence_cmd.  */)
-  (Lisp_Object x)
-{
-  read_key_sequence_remapped = x;
-  return Qnil;
-}
-
 DEFUN ("--maybe-quit", Fc_maybe_quit, Sc_maybe_quit, 0, 0, 0,
        doc: /* Internal: call C maybe_quit().  Signals quit if Vquit_flag is set
 and inhibit-quit is nil.  */)
@@ -5494,6 +5482,17 @@ static int menu_bar_items_index;
 static int ntab_bar_items;
 static int ntool_bar_items;
 
+/* M30 imp-4: the menu-bar / tab-bar / tool-bar object cells follow the
+   same rule as the index cells above.  Their real `static Lisp_Object'
+   definitions are placed here, above the table, so the cell table
+   initializer can take their addresses.  The menu-bar / tab-bar /
+   tool-bar infrastructure code further down this file uses them.  Each
+   cell is a GC root: syms_of_keyboard sets it and staticpros it.  */
+static Lisp_Object menu_bar_one_keymap_changed_items;
+static Lisp_Object menu_bar_items_vector;
+static Lisp_Object tab_bar_items_vector;
+static Lisp_Object tool_bar_items_vector;
+
 enum cell_kind
 {
   CELL_BOOL,
@@ -5538,20 +5537,63 @@ static const struct cell_entry cell_table[] =
     /* Lisp_Object cell (M30 imp-1) */
     { "--set-frame-relative-event-pos", &frame_relative_event_pos,
       CELL_LISP_OBJECT },
+    /* Lisp_Object cells (M30 imp-4).  Each cell is a GC root: a
+       staticpro in syms_of_keyboard roots it, and the cell is set to
+       Qnil (or a fresh vector) before that staticpro.  A write uses
+       the canonical --set- name; a get/set pair shares one row, so a
+       read uses the same key.  */
+    { "--set-menu-bar-items-vector", &menu_bar_items_vector,
+      CELL_LISP_OBJECT },
+    { "--set-tab-bar-items-vector", &tab_bar_items_vector,
+      CELL_LISP_OBJECT },
+    { "--set-tool-bar-items-vector", &tool_bar_items_vector,
+      CELL_LISP_OBJECT },
+    { "--set-menu-bar-one-keymap-changed-items",
+      &menu_bar_one_keymap_changed_items, CELL_LISP_OBJECT },
+    { "--set-menu-bar-touch-id", &menu_bar_touch_id, CELL_LISP_OBJECT },
+    { "--set-internal-last-event-frame", &internal_last_event_frame,
+      CELL_LISP_OBJECT },
+    { "--set-unread-switch-frame", &unread_switch_frame,
+      CELL_LISP_OBJECT },
+    { "--set-read-key-sequence-remapped", &read_key_sequence_remapped,
+      CELL_LISP_OBJECT },
   };
 
 /* Return the table entry for the accessor name NAME, or NULL.  A linear
    scan is enough for 74 entries.  */
 
+/* A one-entry memo for the linear scan.  The hot callers use one name
+   repeatedly: for example `kbd-buffer-get-event' reads
+   --get-internal-last-event-frame once per event.  An EQ test reuses
+   the last result and keeps the lookup from adding a visible cost.
+   M30 imp-4.
+
+   The memo caches NAME on the strcmp hit path, for any symbol, not just
+   an interned one (cr.org F2).  An EQ false hit needs the same address,
+   so the cached symbol must stay alive.  last_cell_name is a GC root:
+   syms_of_keyboard staticpros it.  Without that root an uninterned
+   symbol could be collected, a later object could reuse its address,
+   and EQ would return the wrong cell entry.  */
+static Lisp_Object last_cell_name;
+static const struct cell_entry *last_cell_entry;
+
 static const struct cell_entry *
 lookup_cell (Lisp_Object name)
 {
   CHECK_SYMBOL (name);
+
+  if (EQ (name, last_cell_name))
+    return last_cell_entry;
+
   const char *s = SSDATA (SYMBOL_NAME (name));
 
   for (int i = 0; i < ARRAYELTS (cell_table); i++)
     if (strcmp (s, cell_table[i].name) == 0)
-      return &cell_table[i];
+      {
+	last_cell_name = name;
+	last_cell_entry = &cell_table[i];
+	return &cell_table[i];
+      }
 
   return NULL;
 }
@@ -6175,15 +6217,6 @@ TOUCHSCREEN_UPDATE (to filter those touches) and TOUCHSCREEN_END
   return menu_bar_touch_id;
 }
 
-DEFUN ("--set-menu-bar-touch-id", Fset_menu_bar_touch_id,
-       Sset_menu_bar_touch_id, 1, 1, 0,
-       doc: /* Set menu_bar_touch_id to VAL.  See --menu-bar-touch-id.  */)
-  (Lisp_Object val)
-{
-  menu_bar_touch_id = val;
-  return Qnil;
-}
-
 DEFUN ("--menu-bar-touch-consume-p", Fmenu_bar_touch_consume_p,
        Smenu_bar_touch_consume_p, 1, 1, 0,
        doc: /* Return t if TOUCH-ID matches menu_bar_touch_id,
@@ -6224,15 +6257,6 @@ of the most recent mouse-down event.  */)
   (void)
 {
   return frame_relative_event_pos;
-}
-
-DEFUN ("--set-frame-relative-event-pos", Fset_frame_relative_event_pos,
-       Sset_frame_relative_event_pos, 1, 1, 0,
-       doc: /* Set frame_relative_event_pos to VAL.  */)
-  (Lisp_Object val)
-{
-  frame_relative_event_pos = val;
-  return Qnil;
 }
 
 DEFUN ("--down-mouse-line-number-width", Fdown_mouse_line_number_width,
@@ -6618,44 +6642,11 @@ character, are not returned verbatim.)  */)
   return SCM_CALL_1 (proc, event_desc);
 }
 
-/* Tiny shims that let the Scheme (emacs read-char) port of
-   internal-handle-focus-in read/write the C-side state it relies
-   on.  The Scheme implementation reads --get-internal-last-event-frame,
-   compares it to FRAME, then writes back via --set-internal-last-event-frame.
-   For unread_switch_frame, the existing --set-unread-switch-frame
-   handles writes; --get-unread-switch-frame reads it without clearing
-   (unlike the read-and-clear --rc-take-unread-switch-frame).  */
-
-DEFUN ("--get-internal-last-event-frame",
-       Fc_get_internal_last_event_frame,
-       Sc_get_internal_last_event_frame, 0, 0, 0,
-       doc: /* Internal: return the C global `internal_last_event_frame'.  */)
-  (void)
-{
-  return internal_last_event_frame;
-}
-
-DEFUN ("--set-internal-last-event-frame",
-       Fc_set_internal_last_event_frame,
-       Sc_set_internal_last_event_frame, 1, 1, 0,
-       doc: /* Internal: write the C global `internal_last_event_frame'.
-Returns nil.  */)
-  (Lisp_Object f)
-{
-  internal_last_event_frame = f;
-  return Qnil;
-}
-
-DEFUN ("--get-unread-switch-frame",
-       Fc_get_unread_switch_frame,
-       Sc_get_unread_switch_frame, 0, 0, 0,
-       doc: /* Internal: return the C global `unread_switch_frame'
-without clearing it.  See --rc-take-unread-switch-frame for the
-read-and-clear variant.  */)
-  (void)
-{
-  return unread_switch_frame;
-}
+/* M30 imp-4: the four tiny shims that let the Scheme (emacs read-char)
+   and (emacs kbd-buffer) ports of internal-handle-focus-in read and
+   write internal_last_event_frame and unread_switch_frame moved to
+   (emacs cell-accessors), through the cell table.  The read-and-clear
+   variant --rc-take-unread-switch-frame stays C.  */
 
 /* Try to recognize SYMBOL as a modifier name.
    Return the modifier flag bit, or 0 if not recognized.  */
@@ -7279,13 +7270,9 @@ the same step, per the M9 ie-smob lifetime rule.  */)
 }
 
 
-static Lisp_Object menu_bar_one_keymap_changed_items;
-
-/* The vector under construction within menu_bar_items and its
-   subroutines.  The current index for storing into that vector
-   (menu_bar_items_index) is defined above, near the M30 cell table,
-   so the table initializer can take its address.  */
-static Lisp_Object menu_bar_items_vector;
+/* M30 imp-4: menu_bar_one_keymap_changed_items and
+   menu_bar_items_vector are defined above, near the cell table, so the
+   table initializer can take their addresses. */
 
 /* Infrastructure DEFUNs exposing menu-bar internals to Scheme.
    These let the Scheme side own menu_bar_items() while C still
@@ -7299,16 +7286,6 @@ DEFUN ("--menu-bar-items-vector", Fmenu_bar_items_vector,
   if (NILP (menu_bar_items_vector))
     menu_bar_items_vector = make_nil_elisp_vector (24);
   return menu_bar_items_vector;
-}
-
-DEFUN ("--set-menu-bar-items-vector", Fset_menu_bar_items_vector,
-       Sset_menu_bar_items_vector, 1, 1, 0,
-       doc: /* Set the menu-bar items vector to VEC.
-Used by Scheme to write back a resized vector after larger-vector.  */)
-  (Lisp_Object vec)
-{
-  menu_bar_items_vector = vec;
-  return Qnil;
 }
 
 DEFUN ("--menu-bar-items-index", Fmenu_bar_items_index,
@@ -7330,18 +7307,6 @@ duplicate contributions from the same keymap.  */)
 {
   return menu_bar_one_keymap_changed_items;
 }
-
-DEFUN ("--set-menu-bar-one-keymap-changed-items",
-       Fset_menu_bar_one_keymap_changed_items,
-       Sset_menu_bar_one_keymap_changed_items, 1, 1, 0,
-       doc: /* Set the per-keymap dedup list to LST.
-Reset to nil before each per-map --map-keymap-canonical call.  */)
-  (Lisp_Object lst)
-{
-  menu_bar_one_keymap_changed_items = lst;
-  return Qnil;
-}
-
 
 static const char *separator_names[] = {
   "space",
@@ -7522,9 +7487,8 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 
 /* A vector holding tab bar items while they are parsed in function
    tab_bar_items. Each item occupies TAB_BAR_ITEM_NSCLOTS elements
-   in the vector.  */
-
-static Lisp_Object tab_bar_items_vector;
+   in the vector.  M30 imp-4: defined above, near the cell table, so
+   the table initializer can take its address.  */
 
 /* A vector holding the result of parse_tab_bar_item.  Layout is like
    the one for a single item in tab_bar_items_vector.  */
@@ -7547,16 +7511,6 @@ DEFUN ("--tab-bar-items-vector", Ftab_bar_items_vector,
   if (NILP (tab_bar_items_vector))
     tab_bar_items_vector = make_nil_elisp_vector (64);
   return tab_bar_items_vector;
-}
-
-DEFUN ("--set-tab-bar-items-vector", Fset_tab_bar_items_vector,
-       Sset_tab_bar_items_vector, 1, 1, 0,
-       doc: /* Set the tab-bar items vector to VEC.
-Used by Scheme to write back a resized vector after larger-vector.  */)
-  (Lisp_Object vec)
-{
-  tab_bar_items_vector = vec;
-  return Qnil;
 }
 
 DEFUN ("--tab-bar-item-properties-vector", Ftab_bar_item_properties_vector,
@@ -7615,9 +7569,8 @@ tab_bar_items (Lisp_Object reuse, int *nitems)
 
 /* A vector holding tool bar items while they are parsed in function
    tool_bar_items. Each item occupies TOOL_BAR_ITEM_NSCLOTS elements
-   in the vector.  */
-
-static Lisp_Object tool_bar_items_vector;
+   in the vector.  M30 imp-4: defined above, near the cell table, so
+   the table initializer can take its address.  */
 
 /* A vector holding the result of parse_tool_bar_item.  Layout is like
    the one for a single item in tool_bar_items_vector.  */
@@ -7640,16 +7593,6 @@ DEFUN ("--tool-bar-items-vector", Ftool_bar_items_vector,
   if (NILP (tool_bar_items_vector))
     tool_bar_items_vector = make_nil_elisp_vector (64);
   return tool_bar_items_vector;
-}
-
-DEFUN ("--set-tool-bar-items-vector", Fset_tool_bar_items_vector,
-       Sset_tool_bar_items_vector, 1, 1, 0,
-       doc: /* Set the tool-bar items vector to VEC.
-Used by Scheme to write back a resized vector after larger-vector.  */)
-  (Lisp_Object vec)
-{
-  tool_bar_items_vector = vec;
-  return Qnil;
 }
 
 DEFUN ("--tool-bar-item-properties-vector", Ftool_bar_item_properties_vector,
@@ -9037,18 +8980,6 @@ record slot.  */)
   if (rks_state_depth > 0)
     scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
                       scm_from_int (RKS_SLOT_FAKE_PREFIXED_KEYS), val);
-  return Qnil;
-}
-
-DEFUN ("--set-unread-switch-frame", Fc_set_unread_switch_frame,
-       Sc_set_unread_switch_frame, 1, 1, 0,
-       doc: /* Internal: write the C global `unread_switch_frame'.
-Called by the Scheme done:-block port to install
-rks_delayed_switch_frame into the post-read-key-sequence pending
-queue.  */)
-  (Lisp_Object x)
-{
-  unread_switch_frame = x;
   return Qnil;
 }
 
@@ -11442,8 +11373,10 @@ syms_of_keyboard (void)
   menu_bar_touch_id = Qnil;
   staticpro (&menu_bar_touch_id);
 
-
-
+  /* M30 imp-4: root the lookup_cell one-entry memo name (cr.org F2).
+     See the comment at the definition of last_cell_name.  */
+  last_cell_name = Qnil;
+  staticpro (&last_cell_name);
 
 
   DEFSYM (Qecho_area_clear_hook, "echo-area-clear-hook");

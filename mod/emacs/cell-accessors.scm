@@ -17,6 +17,17 @@
             --set-tool-bar-items-count
             --set-windows-or-buffers-changed
             --set-raw-keybuf-count
+            --set-frame-relative-event-pos
+            --set-menu-bar-items-vector
+            --set-tab-bar-items-vector
+            --set-tool-bar-items-vector
+            --set-menu-bar-one-keymap-changed-items
+            --set-menu-bar-touch-id
+            --set-internal-last-event-frame
+            --set-unread-switch-frame
+            --set-read-key-sequence-remapped
+            --get-internal-last-event-frame
+            --get-unread-switch-frame
             init-cell-accessors-registrations))
 
 ;;; M30 imp-2 / imp-3 — plain cell accessors, moved from per-cell DEFUNs
@@ -62,11 +73,18 @@
 
 ;;; --- the table subrs ------------------------------------------------
 
+;; Resolve the two table subrs once.  %c (symbol-function) is not free,
+;; and --get-internal-last-event-frame runs on the kbd-buffer-get-event
+;; hot path (once per event), so cache the subr instead of re-resolving
+;; it on every call.
+(defelisp %--cell-ref --cell-ref)
+(defelisp %--cell-set! --cell-set!)
+
 (define (%cell-ref name)
-  ((%c '--cell-ref) name))
+  ((force %--cell-ref) name))
 
 (define (%cell-set! name value)
-  ((%c '--cell-set!) name value))
+  ((force %--cell-set!) name value))
 
 ;;;;
 ;;;; echoing
@@ -160,6 +178,68 @@ cell table."
   "Write N to `raw_keybuf_count' through the cell table (N >= 0)."
   (%cell-set! '--set-raw-keybuf-count n))
 
+;;;;
+;;;; plain Lisp_Object cells (M30 imp-4)
+;;;;
+;;; Each wrapper writes or reads one `Lisp_Object' cell through the cell
+;;; table (kind CELL_LISP_OBJECT).  The deleted DEFUN was a plain
+;;; assignment or return of one cell.  The table key is the `--set-'
+;;; name; a get/set pair shares one row.  The bare C getters that
+;;; lazy-init a vector (--menu-bar-items-vector, --tab-bar-items-vector,
+;;; --tool-bar-items-vector, --menu-bar-one-keymap-changed-items,
+;;; --menu-bar-touch-id, --frame-relative-event-pos) and the plain C
+;;; getter --read-key-sequence-remapped stay C: they are operations or
+;;; an independent read, not a plain cell.
+
+(define (--set-frame-relative-event-pos value)
+  "Write VALUE to `frame_relative_event_pos' through the cell table."
+  (%cell-set! '--set-frame-relative-event-pos value))
+
+(define (--set-menu-bar-items-vector value)
+  "Write VALUE to `menu_bar_items_vector' through the cell table."
+  (%cell-set! '--set-menu-bar-items-vector value))
+
+(define (--set-tab-bar-items-vector value)
+  "Write VALUE to `tab_bar_items_vector' through the cell table."
+  (%cell-set! '--set-tab-bar-items-vector value))
+
+(define (--set-tool-bar-items-vector value)
+  "Write VALUE to `tool_bar_items_vector' through the cell table."
+  (%cell-set! '--set-tool-bar-items-vector value))
+
+(define (--set-menu-bar-one-keymap-changed-items value)
+  "Write VALUE to `menu_bar_one_keymap_changed_items' through the cell
+table."
+  (%cell-set! '--set-menu-bar-one-keymap-changed-items value))
+
+(define (--set-menu-bar-touch-id value)
+  "Write VALUE to `menu_bar_touch_id' through the cell table."
+  (%cell-set! '--set-menu-bar-touch-id value))
+
+(define (--set-internal-last-event-frame value)
+  "Write VALUE to the C global `internal_last_event_frame' through the
+cell table."
+  (%cell-set! '--set-internal-last-event-frame value))
+
+(define (--set-unread-switch-frame value)
+  "Write VALUE to the C global `unread_switch_frame' through the cell
+table."
+  (%cell-set! '--set-unread-switch-frame value))
+
+(define (--set-read-key-sequence-remapped value)
+  "Write VALUE to `read_key_sequence_remapped' through the cell table."
+  (%cell-set! '--set-read-key-sequence-remapped value))
+
+(define (--get-internal-last-event-frame)
+  "Return the C global `internal_last_event_frame' read through the cell
+table."
+  (%cell-ref '--set-internal-last-event-frame))
+
+(define (--get-unread-switch-frame)
+  "Return the C global `unread_switch_frame' read through the cell table
+without clearing it."
+  (%cell-ref '--set-unread-switch-frame))
+
 ;;; --- registration ---------------------------------------------------
 
 (define (init-cell-accessors-registrations)
@@ -183,4 +263,25 @@ cell table."
               (--set-tool-bar-items-count         ,--set-tool-bar-items-count)
               (--set-windows-or-buffers-changed
                ,--set-windows-or-buffers-changed)
-              (--set-raw-keybuf-count             ,--set-raw-keybuf-count))))
+              (--set-raw-keybuf-count             ,--set-raw-keybuf-count)
+              (--set-frame-relative-event-pos
+               ,--set-frame-relative-event-pos)
+              (--set-menu-bar-items-vector
+               ,--set-menu-bar-items-vector)
+              (--set-tab-bar-items-vector
+               ,--set-tab-bar-items-vector)
+              (--set-tool-bar-items-vector
+               ,--set-tool-bar-items-vector)
+              (--set-menu-bar-one-keymap-changed-items
+               ,--set-menu-bar-one-keymap-changed-items)
+              (--set-menu-bar-touch-id             ,--set-menu-bar-touch-id)
+              (--set-internal-last-event-frame
+               ,--set-internal-last-event-frame)
+              (--set-unread-switch-frame
+               ,--set-unread-switch-frame)
+              (--set-read-key-sequence-remapped
+               ,--set-read-key-sequence-remapped)
+              (--get-internal-last-event-frame
+               ,--get-internal-last-event-frame)
+              (--get-unread-switch-frame
+               ,--get-unread-switch-frame))))
