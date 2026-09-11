@@ -59,18 +59,52 @@
 
 ;;;; recent-keys
 
+;;; The recent-keys ring is a process-global.  All test/keyboard
+;;; corpora share one Emacs process (tool/run-tests.scm keyboard group),
+;;; and the harness randomizes the load order (tool/utils.scm
+;;; randomize-list, tool/run-tests.scm *random-state*).  Earlier
+;;; corpora record keys, so the ring is not guaranteed empty here.
+;;; Reset it to the "nothing recorded yet" state for the check, then put
+;;; the index and count back.  Without this the test fails by load
+;;; order (cr.org §5.1, shared-harness cross-corpus state leak).
+(defmacro m3-recent-keys--with-empty-ring (&rest body)
+  `(let ((idx (--recent-keys-index))
+         (total (--total-keys)))
+     (unwind-protect
+         (progn
+           (--recent-keys-index-set! 0)
+           (--total-keys-set! 0)
+           ,@body)
+       ;; Restore count before index so the ring stays readable.
+       (--total-keys-set! total)
+       (--recent-keys-index-set! idx))))
+
 (ert-deftest m3-recent-keys/empty-returns-empty ()
-  ;; Batch startup hasn't recorded any keys — result should be a
-  ;; string or vector of length 0.
-  (let ((r (recent-keys)))
-    (should (or (stringp r) (vectorp r)))
-    (should (= (length r) 0))))
+  ;; With no keys recorded, the result should be a string or vector of
+  ;; length 0.
+  (m3-recent-keys--with-empty-ring
+   (let ((r (recent-keys)))
+     (should (or (stringp r) (vectorp r)))
+     (should (= (length r) 0)))))
 
 (ert-deftest m3-recent-keys/include-cmds-empty ()
   ;; With include-cmds, same shape.
-  (let ((r (recent-keys t)))
-    (should (or (stringp r) (vectorp r)))
-    (should (= (length r) 0))))
+  (m3-recent-keys--with-empty-ring
+   (let ((r (recent-keys t)))
+     (should (or (stringp r) (vectorp r)))
+     (should (= (length r) 0)))))
+
+(ert-deftest m3-recent-keys/reset-restores-state ()
+  ;; The m3-recent-keys--with-empty-ring helper must not leak its reset:
+  ;; after it runs, the ring index and recorded-key count are unchanged,
+  ;; so later tests in the shared process see the state they expect.
+  (let ((idx (--recent-keys-index))
+        (total (--total-keys)))
+    (m3-recent-keys--with-empty-ring
+     (should (= (--recent-keys-index) 0))
+     (should (= (--total-keys) 0)))
+    (should (= idx (--recent-keys-index)))
+    (should (= total (--total-keys)))))
 
 (ert-deftest m3-recent-keys/returns-correct-type ()
   ;; The result is either a unibyte string (all events are simple
