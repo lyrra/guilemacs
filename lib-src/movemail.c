@@ -83,7 +83,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif /* MSDOS */
 
 #ifdef WINDOWSNT
-#include "ntlib.h"
 #undef access
 #undef unlink
 #define fork() 0

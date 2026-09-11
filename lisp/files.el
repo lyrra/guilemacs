@@ -845,7 +845,6 @@ Runs the usual ange-ftp hook, but only for completion operations."
       (apply op args))))
 
 (declare-function dos-convert-standard-filename "dos-fns.el" (filename))
-(declare-function w32-convert-standard-filename "w32-fns.el" (filename))
 
 (defun convert-standard-filename (filename)
   "Convert a standard file's name to something suitable for the OS.

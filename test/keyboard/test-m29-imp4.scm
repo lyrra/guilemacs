@@ -142,9 +142,10 @@
 
 ;;; --- 4. No over-deletion -------------------------------------------
 ;;; brief.org "What stays": AH_TEMPLATE([MSDOS]) stays in configure.ac;
-;;; src/keyboard.c keeps its DOS_NT arm and its HAVE_X_WINDOWS arm
-;;; (imp-5 sweeps src/keyboard.c); doc/misc/efaq-w32.texi keeps the node
-;;; "Other versions of Emacs" and its @xref{Cygwin}; nextstep/ stays.
+;;; src/keyboard.c keeps its config-variance HAVE_X_WINDOWS arm (imp-5
+;;; sweeps the dropped-platform DOS_NT arms; see test-m29-imp5);
+;;; doc/misc/efaq-w32.texi keeps the node "Other versions of Emacs" and
+;;; its @xref{Cygwin}; nextstep/ stays.
 (let ((cfg (slurp (repo "configure.ac"))))
   (if (has? cfg "AH_TEMPLATE([MSDOS]")
       (report "kept:AH_TEMPLATE-MSDOS" 'PASS)
@@ -152,10 +153,6 @@
               (cons 'FAIL "AH_TEMPLATE([MSDOS]) gone (over-deleted)"))))
 
 (let ((kbd (slurp (repo "src/keyboard.c"))))
-  (if (has? kbd "DOS_NT")
-      (report "kept:keyboard.c-DOS_NT-arm" 'PASS)
-      (report "kept:keyboard.c-DOS_NT-arm"
-              (cons 'FAIL "keyboard.c DOS_NT arm gone (over-deleted)")))
   (if (has? kbd "HAVE_X_WINDOWS")
       (report "kept:keyboard.c-HAVE_X_WINDOWS-arm" 'PASS)
       (report "kept:keyboard.c-HAVE_X_WINDOWS-arm"

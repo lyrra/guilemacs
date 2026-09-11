@@ -429,8 +429,8 @@ unrecognized kind aborts."
 ;;;   3. Function key range check (FUNCTION_KEY_OFFSET) → ditto.
 ;;;   4. Fall through to system-key lookup.
 ;;;
-;;; MULTIMEDIA_KEY_EVENT is a separate handler (HAVE_NTGUI only); its
-;;; registration silently skips on non-NTGUI builds.
+;;; MULTIMEDIA_KEY_EVENT is a separate handler that belonged to a dropped
+;;; platform; its registration silently skips.
 ;;;
 ;;; button_down_time = 0 is intentionally skipped — the double-click
 ;;; file-statics get proper Scheme mirroring under imp-7.1.
@@ -508,10 +508,9 @@ unrecognized kind aborts."
 
 (define mle-ns-nonkey mle-non-ascii-keystroke)
 
-;;; MULTIMEDIA_KEY_EVENT.  Single-table lookup via lispy_multimedia_keys
-;;; and the func_key_syms cache (tag 2).  Returns nil on unrecognized code
-;;; or empty mm-keys vector (matching the C).  Registration silently
-;;; skipped on non-NTGUI builds.
+;;; MULTIMEDIA_KEY_EVENT (dropped platform).  Single-table lookup via the
+;;; func_key_syms cache (tag 2).  Returns nil on unrecognized code or
+;;; empty mm-keys vector (matching the C).  Registration silently skipped.
 
 (define (mle-multimedia-key ie)
   (let ((code ((force %--ie-code) ie))

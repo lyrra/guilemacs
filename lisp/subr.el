@@ -4445,8 +4445,6 @@ Note: :data and :device are currently not supported on Windows."
       (play-sound-internal sound)
     (error "This Emacs binary lacks sound support")))
 
-(declare-function w32-shell-dos-semantics "w32-fns" nil)
-
 (defun shell-quote-argument (argument &optional posix)
   "Quote ARGUMENT for passing as argument to an inferior shell.
 

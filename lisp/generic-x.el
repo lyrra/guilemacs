@@ -429,8 +429,6 @@ like an INI file.  You can add this hook to `find-file-hook'."
            '((nil "^\\s-*\\(.*\\)\\s-*=" 1)))))
   "Generic mode for MS-Windows Registry files."))
 
-(declare-function w32-shell-name "w32-fns" ())
-
 ;;; DOS/Windows BAT files
 (when (memq 'bat-generic-mode generic-extras-enable-list)
   (define-obsolete-function-alias 'bat-generic-mode 'bat-mode "24.4"))

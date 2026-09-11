@@ -37,14 +37,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "guile.h"
 #include "sysstdio.h"
 
-#ifdef HAVE_ANDROID
-#include "androidterm.h"
-#endif
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#include "sfntfont.h"
-#endif
-
 #ifdef WINDOWSNT
 #include <fcntl.h>
 #include <sys/socket.h>
@@ -52,21 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <filename.h>	/* for IS_ABSOLUTE_FILE_NAME */
 #include "w32.h"
 #include "w32heap.h"
-#endif
-
-#if defined WINDOWSNT || defined HAVE_NTGUI
-#include "w32select.h"
-#include "w32font.h"
-#include "w32common.h"
-#endif
-
-#if defined CYGWIN
-#include "cygw32.h"
-#endif
-
-#ifdef MSDOS
-#include <binary-io.h>
-#include "dosfns.h"
 #endif
 
 #ifdef HAVE_LIBSYSTEMD

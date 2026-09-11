@@ -48,10 +48,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 #include <unlocked-io.h>
 
-#ifdef WINDOWSNT
-#include "ntlib.h"
-#endif
-
 #ifndef min
 # define min(a,b) ((a) < (b) ? (a) : (b))
 #endif

@@ -385,29 +385,6 @@ that the search has reached."
       (load "term/common-win")
       (load "term/android-win")))
 
-(if (or (eq system-type 'windows-nt)
-        (featurep 'w32))
-    (progn
-      (load "term/common-win")
-      (load "w32-vars")
-      (load "term/w32-win")
-      (load "disp-table")
-      (when (eq system-type 'windows-nt)
-        (load "w32-fns")
-        (load "ls-lisp")
-        (load "dos-w32"))
-      (load "touch-screen")))
-(if (eq system-type 'ms-dos)
-    (progn
-      (load "dos-w32")
-      (load "dos-fns")
-      (load "dos-vars")
-      ;; Don't load term/common-win: it isn't appropriate for the `pc'
-      ;; ``window system'', which generally behaves like a terminal.
-      (load "term/internal")
-      (load "term/pc-win")
-      (load "ls-lisp")
-      (load "disp-table"))) ; needed to setup ibm-pc char set, see internal.el
 (if (featurep 'ns)
     (progn
       (load "term/common-win")
@@ -429,10 +406,9 @@ that the search has reached."
     ;; mouse-wheel-*-event vars depends on those files being loaded or not.
     (load "mwheel"))
 
-;; progmodes/elisp-mode.el must be after w32-fns.el, to avoid this:
-;;"Eager macro-expansion failure: (void-function w32-convert-standard-filename)"
-;; which happens while processing 'elisp-flymake-byte-compile', when
-;; elisp-mode.elc is outdated.
+;; progmodes/elisp-mode.el must be loaded after the standard-filename
+;; conversion helpers, to avoid an eager macro-expansion failure while
+;; processing 'elisp-flymake-byte-compile' when elisp-mode.elc is outdated.
 (load "progmodes/elisp-mode")
 
 ;; Preload some constants and floating point functions.

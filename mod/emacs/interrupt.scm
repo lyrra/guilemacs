@@ -165,10 +165,9 @@ normal path.  See brief.org M26 imp-3."
   ;; C: in_signal_handler == false: no maybe_reacquire_global_lock (that
   ;;    branch is guarded by if (in_signal_handler)).
   ;; C: if (waiting_for_input && !echoing) quit_throw_to_read_char (false);
-  ;;    NOTE (cr.org Finding 2, portability): in C this tail is wrapped in
-  ;;    #ifndef HAVE_NS; the brief's Scheme spec omits the guard, and NS is out
-  ;;    of scope, so this port follows the brief verbatim.  A future NS port
-  ;;    must decide whether the normal-path quit-throw stays here.
+  ;;    NOTE (cr.org Finding 2, portability): in C this tail was wrapped in
+  ;;    an NS guard; NS is a dropped platform, so the guard is gone and this
+  ;;    port follows the brief verbatim.
   (when (and (not (%nilp ((%c '--waiting-for-input-p))))
              (%nilp ((%c '--echoing-p))))
     (quit-throw-to-read-char))   ; imp-2, same module, ends in abort-to-prompt.

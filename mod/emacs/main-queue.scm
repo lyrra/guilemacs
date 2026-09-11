@@ -228,9 +228,8 @@ events short-circuit to emit-and-unread.  Returns
         (let ((umm (if (or (truthy? used-mouse-menu)
                            (truthy? fresh-umm))
                        #t #nil)))
-          ;; 1. WINDOWSNT fast path — N/A on guilemacs (POSIX); the tty
-          ;;    shims are #ifdef-gated and return nil on WINDOWSNT, so
-          ;;    nothing special is needed.
+          ;; 1. Windows fast path — N/A on guilemacs (POSIX); it belonged
+          ;;    to a dropped platform, so nothing special is needed here.
           ;; 2. decode-needed gate (C :3241-3250).
           (if (not (and (truthy? ((force %--selected-frame-tty-p)))
                         (not (eq? prev-event #t))   ; prev_event != Qt

@@ -59,8 +59,9 @@
 ;;;       shadow-etched-in-dash, shadow-etched-out-dash)
 ;;;   2. Any string consisting solely of dashes ("--", "---", etc.)
 ;;;
-;;; C copy at keyboard.c:8575 stays for native GUI callers
-;;; (androidmenu.c, w32menu.c, haikumenu.c, gtkutil.c, xdisp.c).
+;;; C copy at keyboard.c:8575 stays for native GUI callers.
+;;; (androidmenu.c, w32menu.c and haikumenu.c belonged to dropped
+;;; platforms; gtkutil.c and xdisp.c remain.)
 (define menu-separator-names
   '("space" "no-line" "single-line" "double-line"
     "single-dashed-line" "double-dashed-line"

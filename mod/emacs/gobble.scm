@@ -161,8 +161,8 @@ USER_SIGNAL_EVENT per pending count and reset it to zero.  Returns nil."
 (define (handle-async-input!)
   "Port of handle_async_input (pre-imp-2 C body): call gobble-input
 until it reports no more input (0) or a blocked read (negative).  The
-dropped-platform HAVE_ANDROID urgent-query check was deleted, not
-ported.  Returns nil."
+dropped-platform urgent-query check was deleted, not ported.  Returns
+nil."
   (let loop ()
     (when (> ((force %--gobble-input)) 0)
       (loop)))

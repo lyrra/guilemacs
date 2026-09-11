@@ -123,8 +123,8 @@
 
 ;;; --- 4. No over-deletion -------------------------------------------
 ;;; brief.org "What stays": the opsys cygwin / mingw32 host cases and
-;;; HAVE_W32=no stay in configure.ac.  src/keyboard.c is unchanged; its
-;;; HAVE_NTGUI / DOS_NT arms stay (imp-5 sweeps them).
+;;; HAVE_W32=no stay in configure.ac.  The src/keyboard.c HAVE_NTGUI /
+;;; DOS_NT arms are swept by M29 imp-5.
 (let ((cfg (slurp (repo "configure.ac"))))
   (if (has? cfg "*-*-cygwin )")
       (report "kept:host-case-cygwin" 'PASS)
@@ -136,14 +136,7 @@
       (report "kept:HAVE_W32=no" 'PASS)
       (report "kept:HAVE_W32=no" (cons 'FAIL "missing HAVE_W32=no"))))
 
-(let ((kbd (slurp (repo "src/keyboard.c"))))
-  (if (has? kbd "HAVE_NTGUI")
-      (report "kept:keyboard.c-HAVE_NTGUI-arm" 'PASS)
-      (report "kept:keyboard.c-HAVE_NTGUI-arm"
-              (cons 'FAIL "keyboard.c HAVE_NTGUI arm gone (over-deleted)")))
-  (if (has? kbd "DOS_NT")
-      (report "kept:keyboard.c-DOS_NT-arm" 'PASS)
-      (report "kept:keyboard.c-DOS_NT-arm"
-              (cons 'FAIL "keyboard.c DOS_NT arm gone (over-deleted)"))))
+;;; The src/keyboard.c HAVE_NTGUI / DOS_NT arms are swept by M29
+;;; imp-5 (see test-m29-imp5.scm).  Do not assert them here.
 
 (reverse test-results)

@@ -584,7 +584,8 @@ special command matched.  See docs/keyboard.org §M8k."
                            (%nilp (rc-state-end-time rec)))
                   ;; We stopped being idle for this event; undo that.
                   ((force %rc-timer-resume-idle)))
-                ;; HAVE_NS: latch input_was_pending for ns-unput-working-text.
+                ;; dropped-platform NS: latch input_was_pending for
+                ;; ns-unput-working-text.
                 (when (and (pair? c) (eq? (car c) 'ns-unput-working-text))
                   ((force %rc-latch-input-was-pending)))
                 (cond

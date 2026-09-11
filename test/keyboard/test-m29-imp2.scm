@@ -104,8 +104,8 @@
 
 ;;; --- 4. No over-deletion -------------------------------------------
 ;;; brief.org "What stays": the opsys=haiku host arms and the
-;;; HAVE_BE_APP apparatus stay in configure.ac.  src/keyboard.c is
-;;; unchanged; its HAVE_HAIKU arm stays (imp-5 sweeps it).
+;;; HAVE_BE_APP apparatus stay in configure.ac.  The src/keyboard.c
+;;; HAVE_HAIKU arm is swept by M29 imp-5 (see test-m29-imp5.scm).
 (let ((cfg (slurp (repo "configure.ac"))))
   (if (has? cfg "*-haiku )")
       (report "kept:host-case" 'PASS)
@@ -113,11 +113,5 @@
   (if (has? cfg "HAVE_BE_APP")
       (report "kept:HAVE_BE_APP" 'PASS)
       (report "kept:HAVE_BE_APP" (cons 'FAIL "missing HAVE_BE_APP apparatus"))))
-
-(let ((kbd (slurp (repo "src/keyboard.c"))))
-  (if (has? kbd "HAVE_HAIKU")
-      (report "kept:keyboard.c-HAVE_HAIKU-arm" 'PASS)
-      (report "kept:keyboard.c-HAVE_HAIKU-arm"
-              (cons 'FAIL "keyboard.c HAVE_HAIKU arm gone (over-deleted)"))))
 
 (reverse test-results)

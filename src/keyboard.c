@@ -50,22 +50,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "textconv.h"
 #endif /* HAVE_TEXT_CONVERSION */
 
-#ifdef HAVE_ANDROID
-#include "android.h"
-#endif /* HAVE_ANDROID */
-
 #include "guile.h"
 #include <errno.h>
 
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
 #endif
-#ifdef MSDOS
-#include "msdos.h"
-#include <time.h>
-#else /* not MSDOS */
 #include <sys/ioctl.h>
-#endif /* not MSDOS */
 
 #if defined USABLE_FIONREAD && defined USG5_4
 # include <sys/filio.h>
@@ -86,11 +77,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#ifdef WINDOWSNT
-char const DEV_TTY[] = "CONOUT$";
-#else
 char const DEV_TTY[] = "/dev/tty";
-#endif
 char *dev_tty;	/* set by init_keyboard */
 
 /* Variables for blockinput.h:  */
@@ -973,10 +960,6 @@ table.  */)
   result = Fcons (Fcons (Qsave_session, make_fixnum (SAVE_SESSION_EVENT)), result);
   result = Fcons (Fcons (Qconfig_changed_event, make_fixnum (CONFIG_CHANGED_EVENT)), result);
   result = Fcons (Fcons (Qpreedit_text, make_fixnum (PREEDIT_TEXT_EVENT)), result);
-#ifdef HAVE_NTGUI
-  result = Fcons (Fcons (Qend_session, make_fixnum (END_SESSION_EVENT)), result);
-  result = Fcons (Fcons (Qlanguage_change, make_fixnum (LANGUAGE_CHANGE_EVENT)), result);
-#endif
   result = Fcons (Fcons (Quser_signal_event, make_fixnum (USER_SIGNAL_EVENT)), result);
 
   /* Simple-helper group (imp-4).  */
@@ -998,9 +981,6 @@ table.  */)
   result = Fcons (Fcons (Qascii_keystroke, make_fixnum (ASCII_KEYSTROKE_EVENT)), result);
   result = Fcons (Fcons (Qmultibyte_char_keystroke, make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT)), result);
   result = Fcons (Fcons (Qnon_ascii_keystroke, make_fixnum (NON_ASCII_KEYSTROKE_EVENT)), result);
-#ifdef HAVE_NTGUI
-  result = Fcons (Fcons (Qmultimedia_key, make_fixnum (MULTIMEDIA_KEY_EVENT)), result);
-#endif
 
   /* imp-7.2 — wheel events (always compiled in).  */
   result = Fcons (Fcons (Qwheel_event, make_fixnum (WHEEL_EVENT)), result);
@@ -1028,9 +1008,6 @@ table.  */)
   result = Fcons (Fcons (Qselection_clear_event, make_fixnum (SELECTION_CLEAR_EVENT)), result);
   result = Fcons (Fcons (Qmonitors_changed, make_fixnum (MONITORS_CHANGED_EVENT)), result);
   result = Fcons (Fcons (Qmenu_bar_activate_event, make_fixnum (MENU_BAR_ACTIVATE_EVENT)), result);
-#ifdef HAVE_ANDROID
-  result = Fcons (Fcons (Qnotification_event, make_fixnum (NOTIFICATION_EVENT)), result);
-#endif
 
   /* More entries added as additional kind groups are ported.  */
   return result;
@@ -1265,8 +1242,6 @@ event dispatch; on t, it loops back to wait for the next event.
 Platform routing is internal:
   X11:   x_handle_selection_event   (struct selection_input_event *)
   PGTK:  pgtk_handle_selection_event (same)
-  Haiku: haiku_handle_selection_clear (struct input_event *)
-         — REQUEST case aborts (matches C:5103)
   Otherwise: emacs_abort ().  */)
   (void)
 {
@@ -1275,7 +1250,6 @@ Platform routing is internal:
 
   switch (kbd_fetch_ptr->kind)
     {
-#ifndef HAVE_HAIKU
     case SELECTION_REQUEST_EVENT:
     case SELECTION_CLEAR_EVENT:
       {
@@ -1296,19 +1270,6 @@ Platform routing is internal:
         emacs_abort ();
 # endif
       }
-#else  /* HAVE_HAIKU */
-    case SELECTION_REQUEST_EVENT:
-      emacs_abort ();
-
-    case SELECTION_CLEAR_EVENT:
-      {
-        struct input_event copy = kbd_fetch_ptr->ie;
-        kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-        input_pending = readable_events (0);
-        haiku_handle_selection_clear (&copy);
-        return Qt;
-      }
-#endif
     default:
       return Qnil;
     }
@@ -1329,7 +1290,7 @@ kbd-buffer-process-special-events! finds N by scanning kind fields
 between the fetch and store cursors, then re-reads both cursors
 after each excise (this shim moves them).  Aborts on builds without
 HAVE_X11 or HAVE_PGTK, matching process_special_events' no-window
-arm.  HAVE_HAIKU is not ported (dropped platform).  */)
+arm.  */)
   (Lisp_Object n)
 {
   EMACS_INT idx = XFIXNUM (n);
@@ -1385,22 +1346,6 @@ make_lispy_event's USER_SIGNAL_EVENT case.  */)
     emacs_abort ();
   return intern (name);
 }
-
-#ifdef HAVE_NS
-DEFUN ("--ns-text-event-symbol", Fns_text_event_symbol,
-       Sns_text_event_symbol, 1, 1, 0,
-       doc: /* Return the interned symbol for NS text event code C.
-
-Wraps KEY_NS_PUT_WORKING_TEXT / KEY_NS_UNPUT_WORKING_TEXT so the
-Scheme handler doesn't need the magic-number constants.  Returns
-`ns-put-working-text' or `ns-unput-working-text'.  */)
-  (Lisp_Object code)
-{
-  return intern (XFIXNUM (code) == KEY_NS_PUT_WORKING_TEXT
-		 ? "ns-put-working-text"
-		 : "ns-unput-working-text");
-}
-#endif
 
 DEFUN ("--uppercasep", Fuppercasep, Suppercasep, 1, 1, 0,
        doc: /* Return t if character C is upper case.
@@ -4207,7 +4152,7 @@ kbd_buffer_get_event_2 (Lisp_Object val)
    check, and the tty keyboard-coding decode core.  Each is thin; the
    tty decode shim is the only non-trivial one.  Scheme gates every
    tty call behind --selected-frame-tty-p at runtime; the tty shims
-   are #ifdef-gated internally (nil on WINDOWSNT) to match the C
+   are #ifdef-gated internally to match the C
    decode loop.  See docs/m12-plan.org §imp-1.  */
 
 /* imp-1.1 — getctag save/set + single-kboard reflection.  */
@@ -4546,29 +4491,23 @@ so they stay testable without an rc-record on the stack.  */)
   return (timespec_cmp (*end_time, current_timespec ()) <= 0) ? Qt : Qnil;
 }
 
-/* imp-1.4 — tty keyboard-coding decode shims.  #ifdef-gated internally
-   to match the C decode loop's #ifndef WINDOWSNT boundary; Scheme gates
-   every call behind --selected-frame-tty-p at runtime (see Risk 4:
-   these shims deref FRAME_TTY unguarded on non-WINDOWSNT builds).
-   MAX_ENCODED_BYTES (16) is a file-scope #define above the decode
-   loop.  */
+/* imp-1.4 — tty keyboard-coding decode shims.  Scheme gates every call
+   behind --selected-frame-tty-p at runtime (see Risk 4: these shims
+   deref FRAME_TTY unguarded).  MAX_ENCODED_BYTES (16) is a file-scope
+   #define above the decode loop.  */
 
 DEFUN ("--tty-keyboard-coding-requires-decoding-p",
        Fc_tty_keyboard_coding_requires_decoding_p,
        Sc_tty_keyboard_coding_requires_decoding_p, 0, 0, 0,
        doc: /* Internal: t when the selected frame's terminal keyboard
 coding has CODING_REQUIRE_DECODING_MASK set.  Caller must verify
---selected-frame-tty-p first; nil on WINDOWSNT.  */)
+--selected-frame-tty-p first.  */)
   (void)
 {
-#ifndef WINDOWSNT
   struct frame *frame = XFRAME (selected_frame);
   struct terminal *terminal = frame->terminal;
   return (TERMINAL_KEYBOARD_CODING (terminal)->common_flags
 	  & CODING_REQUIRE_DECODING_MASK) ? Qt : Qnil;
-#else
-  return Qnil;
-#endif
 }
 
 DEFUN ("--tty-keyboard-coding-raw-text-p",
@@ -4576,17 +4515,13 @@ DEFUN ("--tty-keyboard-coding-raw-text-p",
        Sc_tty_keyboard_coding_raw_text_p, 0, 0, 0,
        doc: /* Internal: t when the selected frame's terminal keyboard
 coding is a raw-text coding system.  Caller must verify
---selected-frame-tty-p first; nil on WINDOWSNT.  */)
+--selected-frame-tty-p first.  */)
   (void)
 {
-#ifndef WINDOWSNT
   struct frame *frame = XFRAME (selected_frame);
   struct terminal *terminal = frame->terminal;
   return raw_text_coding_system_p (TERMINAL_KEYBOARD_CODING (terminal))
     ? Qt : Qnil;
-#else
-  return Qnil;
-#endif
 }
 
 DEFUN ("--tty-decode-keyboard-bytes", Fc_tty_decode_keyboard_bytes,
@@ -4597,10 +4532,9 @@ a list of fixnums, or nil when the sequence is incomplete
 (produced_char == 0).  The raw-text high-bit strip stays in Scheme;
 Scheme tracks n and treats nil as continue (n < MAX_ENCODED_BYTES) or
 flush (n == MAX_ENCODED_BYTES).  Caller must verify
---selected-frame-tty-p first; nil on WINDOWSNT.  */)
+--selected-frame-tty-p first.  */)
   (Lisp_Object bytevector)
 {
-#ifndef WINDOWSNT
   if (!scm_is_bytevector (bytevector))
     return Qnil;
   ptrdiff_t n = scm_c_bytevector_length (bytevector);
@@ -4644,9 +4578,6 @@ flush (n == MAX_ENCODED_BYTES).  Caller must verify
       result = Fcons (make_fixnum (c), result);
     }
   return Fnreverse (result);
-#else
-  return Qnil;
-#endif
 }
 
 /* Process any non-user-visible events (currently X selection events),
@@ -5423,349 +5354,11 @@ static const char *const lispy_accent_keys[] =
   "dead-horn",
 };
 
-#ifdef HAVE_ANDROID
-#define FUNCTION_KEY_OFFSET 0
-
-/* Mind that Android designates 23 KEYCODE_DPAD_CENTER, but it is
-   merely abstruse terminology for the ``select'' key frequently
-   located in certain physical keyboards.  */
-
-static const char *const lispy_function_keys[] =
-  {
-    /* All elements in this array default to 0, except for the few
-       function keys that Emacs recognizes.  */
-    [111] = "escape",
-    [112] = "delete",
-    [116] = "scroll",
-    [120] = "sysrq",
-    [121] = "break",
-    [122] = "home",
-    [123] = "end",
-    [124] = "insert",
-    [126] = "media-play",
-    [127] = "media-pause",
-    [130] = "media-record",
-    [131] = "f1",
-    [132] = "f2",
-    [133] = "f3",
-    [134] = "f4",
-    [135] = "f5",
-    [136] = "f6",
-    [137] = "f7",
-    [138] = "f8",
-    [139] = "f9",
-    [140] = "f10",
-    [141] = "f11",
-    [142] = "f12",
-    [143] = "kp-numlock",
-    [160] = "kp-ret",
-    [164] = "volume-mute",
-    [165] = "info",
-    [19]  = "up",
-    [20]  = "down",
-    [211] = "zenkaku-hankaku",
-    [213] = "muhenkan",
-    [214] = "henkan",
-    [215] = "hiragana-katakana",
-    [218] = "kana",
-    [21]  = "left",
-    [223] = "sleep",
-    [22]  = "right",
-    [23]  = "select",
-    [24]  = "volume-up",
-    [259] = "help",
-    [25]  = "volume-down",
-    [268] = "kp-up-left",
-    [269] = "kp-down-left",
-    [26]  = "power",
-    [270] = "kp-up-right",
-    [271] = "kp-down-right",
-    [272] = "media-skip-forward",
-    [273] = "media-skip-backward",
-    [277] = "cut",
-    [278] = "copy",
-    [279] = "paste",
-    [285] = "browser-refresh",
-    [28]  = "clear",
-    [300] = "XF86Forward",
-    [4]	  = "XF86Back",
-    [61]  = "tab",
-    [66]  = "return",
-    [67]  = "backspace",
-    [82]  = "menu",
-    [84]  = "find",
-    [85]  = "media-play-pause",
-    [86]  = "media-stop",
-    [87]  = "media-next",
-    [88]  = "media-previous",
-    [89]  = "media-rewind",
-    [92]  = "prior",
-    [93]  = "next",
-    [95]  = "mode-change",
-  };
-
-#elif defined HAVE_NTGUI
-#define FUNCTION_KEY_OFFSET 0x0
-
-const char *const lispy_function_keys[] =
-  {
-    0,                /* 0                      */
-
-    0,                /* VK_LBUTTON        0x01 */
-    0,                /* VK_RBUTTON        0x02 */
-    "cancel",         /* VK_CANCEL         0x03 */
-    0,                /* VK_MBUTTON        0x04 */
-
-    0, 0, 0,          /*    0x05 .. 0x07        */
-
-    "backspace",      /* VK_BACK           0x08 */
-    "tab",            /* VK_TAB            0x09 */
-
-    0, 0,             /*    0x0A .. 0x0B        */
-
-    "clear",          /* VK_CLEAR          0x0C */
-    "return",         /* VK_RETURN         0x0D */
-
-    0, 0,             /*    0x0E .. 0x0F        */
-
-    0,                /* VK_SHIFT          0x10 */
-    0,                /* VK_CONTROL        0x11 */
-    0,                /* VK_MENU           0x12 */
-    "pause",          /* VK_PAUSE          0x13 */
-    "capslock",       /* VK_CAPITAL        0x14 */
-    "kana",           /* VK_KANA/VK_HANGUL 0x15 */
-    0,                /*    0x16                */
-    "junja",          /* VK_JUNJA          0x17 */
-    "final",          /* VK_FINAL          0x18 */
-    "kanji",          /* VK_KANJI/VK_HANJA 0x19 */
-    0,                /*    0x1A                */
-    "escape",         /* VK_ESCAPE         0x1B */
-    "convert",        /* VK_CONVERT        0x1C */
-    "non-convert",    /* VK_NONCONVERT     0x1D */
-    "accept",         /* VK_ACCEPT         0x1E */
-    "mode-change",    /* VK_MODECHANGE     0x1F */
-    0,                /* VK_SPACE          0x20 */
-    "prior",          /* VK_PRIOR          0x21 */
-    "next",           /* VK_NEXT           0x22 */
-    "end",            /* VK_END            0x23 */
-    "home",           /* VK_HOME           0x24 */
-    "left",           /* VK_LEFT           0x25 */
-    "up",             /* VK_UP             0x26 */
-    "right",          /* VK_RIGHT          0x27 */
-    "down",           /* VK_DOWN           0x28 */
-    "select",         /* VK_SELECT         0x29 */
-    "print",          /* VK_PRINT          0x2A */
-    "execute",        /* VK_EXECUTE        0x2B */
-    "snapshot",       /* VK_SNAPSHOT       0x2C */
-    "insert",         /* VK_INSERT         0x2D */
-    "delete",         /* VK_DELETE         0x2E */
-    "help",           /* VK_HELP           0x2F */
-
-    /* VK_0 thru VK_9 are the same as ASCII '0' thru '9' (0x30 - 0x39) */
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0, 0, 0, 0, 0, 0, 0, /* 0x3A .. 0x40       */
-
-    /* VK_A thru VK_Z are the same as ASCII 'A' thru 'Z' (0x41 - 0x5A) */
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-
-    "lwindow",       /* VK_LWIN           0x5B */
-    "rwindow",       /* VK_RWIN           0x5C */
-    "apps",          /* VK_APPS           0x5D */
-    0,               /*    0x5E                */
-    "sleep",
-    "kp-0",          /* VK_NUMPAD0        0x60 */
-    "kp-1",          /* VK_NUMPAD1        0x61 */
-    "kp-2",          /* VK_NUMPAD2        0x62 */
-    "kp-3",          /* VK_NUMPAD3        0x63 */
-    "kp-4",          /* VK_NUMPAD4        0x64 */
-    "kp-5",          /* VK_NUMPAD5        0x65 */
-    "kp-6",          /* VK_NUMPAD6        0x66 */
-    "kp-7",          /* VK_NUMPAD7        0x67 */
-    "kp-8",          /* VK_NUMPAD8        0x68 */
-    "kp-9",          /* VK_NUMPAD9        0x69 */
-    "kp-multiply",   /* VK_MULTIPLY       0x6A */
-    "kp-add",        /* VK_ADD            0x6B */
-    "kp-separator",  /* VK_SEPARATOR      0x6C */
-    "kp-subtract",   /* VK_SUBTRACT       0x6D */
-    "kp-decimal",    /* VK_DECIMAL        0x6E */
-    "kp-divide",     /* VK_DIVIDE         0x6F */
-    "f1",            /* VK_F1             0x70 */
-    "f2",            /* VK_F2             0x71 */
-    "f3",            /* VK_F3             0x72 */
-    "f4",            /* VK_F4             0x73 */
-    "f5",            /* VK_F5             0x74 */
-    "f6",            /* VK_F6             0x75 */
-    "f7",            /* VK_F7             0x76 */
-    "f8",            /* VK_F8             0x77 */
-    "f9",            /* VK_F9             0x78 */
-    "f10",           /* VK_F10            0x79 */
-    "f11",           /* VK_F11            0x7A */
-    "f12",           /* VK_F12            0x7B */
-    "f13",           /* VK_F13            0x7C */
-    "f14",           /* VK_F14            0x7D */
-    "f15",           /* VK_F15            0x7E */
-    "f16",           /* VK_F16            0x7F */
-    "f17",           /* VK_F17            0x80 */
-    "f18",           /* VK_F18            0x81 */
-    "f19",           /* VK_F19            0x82 */
-    "f20",           /* VK_F20            0x83 */
-    "f21",           /* VK_F21            0x84 */
-    "f22",           /* VK_F22            0x85 */
-    "f23",           /* VK_F23            0x86 */
-    "f24",           /* VK_F24            0x87 */
-
-    0, 0, 0, 0,      /*    0x88 .. 0x8B        */
-    0, 0, 0, 0,      /*    0x8C .. 0x8F        */
-
-    "kp-numlock",    /* VK_NUMLOCK        0x90 */
-    "scroll",        /* VK_SCROLL         0x91 */
-    /* Not sure where the following block comes from.
-       Windows headers have NEC and Fujitsu specific keys in
-       this block, but nothing generic.  */
-    "kp-space",	     /* VK_NUMPAD_CLEAR   0x92 */
-    "kp-enter",	     /* VK_NUMPAD_ENTER   0x93 */
-    "kp-prior",	     /* VK_NUMPAD_PRIOR   0x94 */
-    "kp-next",	     /* VK_NUMPAD_NEXT    0x95 */
-    "kp-end",	     /* VK_NUMPAD_END     0x96 */
-    "kp-home",	     /* VK_NUMPAD_HOME    0x97 */
-    "kp-left",	     /* VK_NUMPAD_LEFT    0x98 */
-    "kp-up",	     /* VK_NUMPAD_UP      0x99 */
-    "kp-right",	     /* VK_NUMPAD_RIGHT   0x9A */
-    "kp-down",	     /* VK_NUMPAD_DOWN    0x9B */
-    "kp-insert",     /* VK_NUMPAD_INSERT  0x9C */
-    "kp-delete",     /* VK_NUMPAD_DELETE  0x9D */
-
-    0, 0,	     /*    0x9E .. 0x9F        */
-
-    /*
-     * VK_L* & VK_R* - left and right Alt, Ctrl and Shift virtual keys.
-     * Used only as parameters to GetAsyncKeyState and GetKeyState.
-     * No other API or message will distinguish left and right keys this way.
-     * 0xA0 .. 0xA5
-     */
-    0, 0, 0, 0, 0, 0,
-
-    /* Multimedia keys. These are handled as WM_APPCOMMAND, which allows us
-       to enable them selectively, and gives access to a few more functions.
-       See lispy_multimedia_keys below.  */
-    0, 0, 0, 0, 0, 0, 0, /* 0xA6 .. 0xAC        Browser */
-    0, 0, 0,             /* 0xAD .. 0xAF         Volume */
-    0, 0, 0, 0,          /* 0xB0 .. 0xB3          Media */
-    0, 0, 0, 0,          /* 0xB4 .. 0xB7           Apps */
-
-    /* 0xB8 .. 0xC0 "OEM" keys - all seem to be punctuation.  */
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    /* 0xC1 - 0xDA unallocated, 0xDB-0xDF more OEM keys */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0,               /* 0xE0                   */
-    "ax",            /* VK_OEM_AX         0xE1 */
-    0,               /* VK_OEM_102        0xE2 */
-    "ico-help",      /* VK_ICO_HELP       0xE3 */
-    "ico-00",        /* VK_ICO_00         0xE4 */
-    0,               /* VK_PROCESSKEY     0xE5 - used by IME */
-    "ico-clear",     /* VK_ICO_CLEAR      0xE6 */
-    0,               /* VK_PACKET         0xE7  - used to pass Unicode chars */
-    0,               /*                   0xE8 */
-    "reset",         /* VK_OEM_RESET      0xE9 */
-    "jump",          /* VK_OEM_JUMP       0xEA */
-    "oem-pa1",       /* VK_OEM_PA1        0xEB */
-    "oem-pa2",       /* VK_OEM_PA2        0xEC */
-    "oem-pa3",       /* VK_OEM_PA3        0xED */
-    "wsctrl",        /* VK_OEM_WSCTRL     0xEE */
-    "cusel",         /* VK_OEM_CUSEL      0xEF */
-    "oem-attn",      /* VK_OEM_ATTN       0xF0 */
-    "finish",        /* VK_OEM_FINISH     0xF1 */
-    "copy",          /* VK_OEM_COPY       0xF2 */
-    "auto",          /* VK_OEM_AUTO       0xF3 */
-    "enlw",          /* VK_OEM_ENLW       0xF4 */
-    "backtab",       /* VK_OEM_BACKTAB    0xF5 */
-    "attn",          /* VK_ATTN           0xF6 */
-    "crsel",         /* VK_CRSEL          0xF7 */
-    "exsel",         /* VK_EXSEL          0xF8 */
-    "ereof",         /* VK_EREOF          0xF9 */
-    "play",          /* VK_PLAY           0xFA */
-    "zoom",          /* VK_ZOOM           0xFB */
-    "noname",        /* VK_NONAME         0xFC */
-    "pa1",           /* VK_PA1            0xFD */
-    "oem_clear",     /* VK_OEM_CLEAR      0xFE */
-    0 /* 0xFF */
-  };
-
-/* Some of these duplicate the "Media keys" on newer keyboards,
-   but they are delivered to the application in a different way.  */
-static const char *const lispy_multimedia_keys[] =
-  {
-    0,
-    "browser-back",
-    "browser-forward",
-    "browser-refresh",
-    "browser-stop",
-    "browser-search",
-    "browser-favorites",
-    "browser-home",
-    "volume-mute",
-    "volume-down",
-    "volume-up",
-    "media-next",
-    "media-previous",
-    "media-stop",
-    "media-play-pause",
-    "mail",
-    "media-select",
-    "app-1",
-    "app-2",
-    "bass-down",
-    "bass-boost",
-    "bass-up",
-    "treble-down",
-    "treble-up",
-    "mic-volume-mute",
-    "mic-volume-down",
-    "mic-volume-up",
-    "help",
-    "find",
-    "new",
-    "open",
-    "close",
-    "save",
-    "print",
-    "undo",
-    "redo",
-    "copy",
-    "cut",
-    "paste",
-    "mail-reply",
-    "mail-forward",
-    "mail-send",
-    "spell-check",
-    "toggle-dictate-command",
-    "mic-toggle",
-    "correction-list",
-    "media-play",
-    "media-pause",
-    "media-record",
-    "media-fast-forward",
-    "media-rewind",
-    "media-channel-up",
-    "media-channel-down"
-  };
-
-#else /* not HAVE_NTGUI */
-
 #define FUNCTION_KEY_OFFSET 0xff00
 
 /* You'll notice that this table is arranged to be conveniently
    indexed by X Windows keysym values.  */
-#if defined HAVE_NS || !defined HAVE_WINDOW_SYSTEM
-/* FIXME: Why are we using X11 keysym values for NS?  */
+#if !defined HAVE_WINDOW_SYSTEM
 static
 #endif
 const char *const lispy_function_keys[] =
@@ -5872,8 +5465,6 @@ static const char *const iso_lispy_function_keys[] =
     "iso-continuous-underline", "iso-discontinuous-underline", /* 0xfe30, 31 */
     "iso-emphasize", "iso-center-object", "iso-enter", /* ... 0xfe34 */
   };
-
-#endif /* not HAVE_NTGUI */
 
 /* An array of symbol indexes of scroll bar parts, indexed by an enum
    scroll_bar_part value.  Note that Qnil corresponds to
@@ -6842,24 +6433,11 @@ DEFUN ("--lispy-multimedia-keys", Flispy_multimedia_keys,
        doc: /* Return a vector of multimedia key name strings (or #f).
 
 Callers should memoize the returned vector.
-Returns an empty vector on non-NTGUI builds where
-MULTIMEDIA_KEY_EVENT can't fire.  */)
+Always returns an empty vector: MULTIMEDIA_KEY_EVENT came from a
+dropped platform and can't fire here.  */)
   (void)
 {
-#ifdef HAVE_NTGUI
-  int n = ARRAYELTS (lispy_multimedia_keys);
-  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
-  int i;
-  for (i = 0; i < n; i++)
-    {
-      const char *s = lispy_multimedia_keys[i];
-      if (s)
-	scm_c_vector_set_x (vec, i, scm_from_utf8_string (s));
-    }
-  return vec;
-#else
   return scm_c_make_vector (0, SCM_BOOL_F);
-#endif
 }
 
 /* thin SCM_CALL_1 wrapper that replaces the old
@@ -7406,16 +6984,6 @@ totally_unblock_input (void)
 void
 handle_input_available_signal (int sig)
 {
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Make all writes from the Android UI thread visible.  If
-     `android_urgent_query' has been set, preceding writes to query
-     related variables should become observable here on as well.  */
-#if defined __aarch64__
-  asm ("dmb ishst");
-#else /* !defined __aarch64__ */
-  __atomic_thread_fence (__ATOMIC_SEQ_CST);
-#endif /* defined __aarch64__ */
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
   pending_signals = true;
 
   if (input_available_clear_time)
@@ -10650,9 +10218,9 @@ handle-interrupt on the normal path.  */)
 
 /* M26 imp-3 — arm 1 of handle_interrupt: the emergency-escape prompt.  The body
    below was extracted verbatim from C handle_interrupt (was lines 11241-11309),
-   preserving the #ifdef SIGTSTP / #ifdef MSDOS / #ifndef HAVE_NS arms byte for
-   byte.  It stays C on BOTH the signal and the normal path.  See brief.org M26
-   imp-3.  */
+   preserving the #ifdef SIGTSTP arm byte for byte; the dropped-platform arms
+   are gone.  It stays C on BOTH the signal and the normal path.  See brief.org
+   M26 imp-3.  */
 static void
 handle_interrupt_emergency_escape (bool in_signal_handler)
 {
@@ -10689,11 +10257,6 @@ handle_interrupt_emergency_escape (bool in_signal_handler)
 		    " on this operating system;\n"
 		    "you can continue or abort.\n");
 #endif /* not SIGTSTP */
-#ifdef MSDOS
-  /* We must remain inside the screen area when the internal terminal
-	 is used.  Note that [Enter] is not echoed by dos.  */
-  cursor_to (SELECTED_FRAME (), 0, 0);
-#endif
 
   write_stdout ("Emacs is resuming after an emergency escape.\n");
 
@@ -10702,30 +10265,18 @@ handle_interrupt_emergency_escape (bool in_signal_handler)
   if (c == 'y' || c == 'Y')
     {
       Fdo_auto_save (Qt, Qnil);
-#ifdef MSDOS
-      write_stdout ("\r\nAuto-save done");
-#else
       write_stdout ("Auto-save done\n");
-#endif
     }
   while (c != '\n')
     c = read_stdin ();
 
-#ifdef MSDOS
-  write_stdout ("\r\nAbort?  (y or n) ");
-#else
   write_stdout ("Abort (and dump core)? (y or n) ");
-#endif
   c = read_stdin ();
   if (c == 'y' || c == 'Y')
 	emacs_abort ();
   while (c != '\n')
 	c = read_stdin ();
-#ifdef MSDOS
-  write_stdout ("\r\nContinuing...\r\n");
-#else /* not MSDOS */
   write_stdout ("Continuing...\n");
-#endif /* not MSDOS */
   init_all_sys_modes ();
 }
 
@@ -10772,14 +10323,6 @@ handle_interrupt (bool in_signal_handler)
   /* tail — arm 1 (both paths) and arm 2 signal path.  */
   pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
 
-/* TODO: The longjmp in this call throws the NS event loop integration off,
-         and it seems to do fine without this.  Probably some attention
-	 needs to be paid to the setting of waiting_for_input in
-         wait_reading_process_output() under HAVE_NS because of the call
-         to ns_select there (needed because otherwise events aren't picked up
-         outside of polling since we don't get SIGIO like X and we don't have a
-         separate event loop thread like W32.  */
-#ifndef HAVE_NS
 #ifdef THREADS_ENABLED
   /* If we were called from a signal handler, we must be in the main
      thread, see deliver_process_signal.  So we must make sure the
@@ -10789,7 +10332,6 @@ handle_interrupt (bool in_signal_handler)
 #endif
   if (waiting_for_input && !echoing)
     quit_throw_to_read_char (in_signal_handler);
-#endif
 }
 
 /* M26 imp-2 — quit_throw_to_read_char (from_signal == false) cutover
@@ -10869,9 +10411,9 @@ otherwise Emacs uses CBREAK mode.
 See also `current-input-mode'.  */)
   (Lisp_Object interrupt)
 {
-  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The X-override,
-     USABLE_SIGIO/SIGPOLL branch and the DOS_NT / POLL_FOR_INPUT guards
-     are reproduced by the Scheme body through the M22 imp-3 shims.  */
+  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The X-override
+     and USABLE_SIGIO/SIGPOLL branches are reproduced by the Scheme
+     body through the M22 imp-3 shims.  */
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs read-key-sequence", "set-input-interrupt-mode");
@@ -10890,7 +10432,7 @@ See also `current-input-mode'.  */)
   (Lisp_Object flow, Lisp_Object terminal)
 {
   /* M22 imp-3: dispatch to (emacs read-key-sequence).  The terminal-arg
-     decode, DOS_NT guard and reset/init dance are in the Scheme body.  */
+     decode and reset/init dance are in the Scheme body.  */
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs read-key-sequence", "set-output-flow-control");
@@ -10921,8 +10463,8 @@ See also `current-input-mode'.  */)
   (Lisp_Object meta, Lisp_Object terminal)
 {
   /* M22 imp-3: dispatch to (emacs read-key-sequence).  The META value
-     mapping (nil/t/encoded/else -> 0/1/3/2), terminal-arg decode,
-     DOS_NT guard and reset/init dance are in the Scheme body.  */
+     mapping (nil/t/encoded/else -> 0/1/3/2), terminal-arg decode and
+     reset/init dance are in the Scheme body.  */
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs read-key-sequence", "set-input-meta-mode");
@@ -11183,57 +10725,45 @@ nil if TERMINAL does not decode to a tty.  */)
 
 DEFUN ("--reset-sys-modes", Fc_reset_sys_modes, Sc_reset_sys_modes, 1, 1, 0,
        doc: /* FIX-20260901-guilemacs: Internal: reset the terminal modes of
-TERMINAL's tty (wraps reset_sys_modes (tty)).  Absorbs the #ifndef
-DOS_NT guard; no-op on DOS_NT or when TERMINAL does not decode to a
-tty.  */)
+TERMINAL's tty (wraps reset_sys_modes (tty)).  No-op when TERMINAL does
+not decode to a tty.  */)
   (Lisp_Object terminal)
 {
-#ifndef DOS_NT
   struct tty_display_info *tty = m22_tty_of_terminal (terminal);
   if (tty)
     reset_sys_modes (tty);
-#endif
   return Qnil;
 }
 
 DEFUN ("--init-sys-modes", Fc_init_sys_modes, Sc_init_sys_modes, 1, 1, 0,
        doc: /* FIX-20260901-guilemacs: Internal: initialize the terminal
-modes of TERMINAL's tty (wraps init_sys_modes (tty)).  Absorbs the
-#ifndef DOS_NT guard; no-op on DOS_NT or when TERMINAL does not decode
-to a tty.  */)
+modes of TERMINAL's tty (wraps init_sys_modes (tty)).  No-op when
+TERMINAL does not decode to a tty.  */)
   (Lisp_Object terminal)
 {
-#ifndef DOS_NT
   struct tty_display_info *tty = m22_tty_of_terminal (terminal);
   if (tty)
     init_sys_modes (tty);
-#endif
   return Qnil;
 }
 
 DEFUN ("--reset-all-sys-modes", Fc_reset_all_sys_modes, Sc_reset_all_sys_modes,
        0, 0, 0,
        doc: /* FIX-20260901-guilemacs: Internal: reset all terminal modes
-(wraps reset_all_sys_modes).  Absorbs the #ifndef DOS_NT guard; no-op
-on DOS_NT.  */)
+(wraps reset_all_sys_modes).  */)
   (void)
 {
-#ifndef DOS_NT
   reset_all_sys_modes ();
-#endif
   return Qnil;
 }
 
 DEFUN ("--init-all-sys-modes", Fc_init_all_sys_modes, Sc_init_all_sys_modes,
        0, 0, 0,
        doc: /* FIX-20260901-guilemacs: Internal: initialize all terminal
-modes (wraps init_all_sys_modes).  Absorbs the #ifndef DOS_NT guard;
-no-op on DOS_NT.  */)
+modes (wraps init_all_sys_modes).  */)
   (void)
 {
-#ifndef DOS_NT
   init_all_sys_modes ();
-#endif
   return Qnil;
 }
 
@@ -11299,30 +10829,26 @@ argument.  */)
 DEFUN ("--reset-controlling-tty-sys-modes", Fc_reset_controlling_tty_sys_modes,
        Sc_reset_controlling_tty_sys_modes, 0, 0, 0,
        doc: /* FIX-20260901-guilemacs: Internal: reset the controlling
-tty's terminal modes (wraps reset_sys_modes).  Absorbs the #ifndef
-DOS_NT guard; no-op on DOS_NT or when there is no controlling tty.  */)
+tty's terminal modes (wraps reset_sys_modes).  No-op when there is no
+controlling tty.  */)
   (void)
 {
-#ifndef DOS_NT
   struct tty_display_info *tty = m22_controlling_tty ();
   if (tty)
     reset_sys_modes (tty);
-#endif
   return Qnil;
 }
 
 DEFUN ("--init-controlling-tty-sys-modes", Fc_init_controlling_tty_sys_modes,
        Sc_init_controlling_tty_sys_modes, 0, 0, 0,
        doc: /* FIX-20260901-guilemacs: Internal: initialize the controlling
-tty's terminal modes (wraps init_sys_modes).  Absorbs the #ifndef
-DOS_NT guard; no-op on DOS_NT or when there is no controlling tty.  */)
+tty's terminal modes (wraps init_sys_modes).  No-op when there is no
+controlling tty.  */)
   (void)
 {
-#ifndef DOS_NT
   struct tty_display_info *tty = m22_controlling_tty ();
   if (tty)
     init_sys_modes (tty);
-#endif
   return Qnil;
 }
 
@@ -11591,11 +11117,9 @@ init_keyboard (void)
       struct sigaction action;
       emacs_sigaction_init (&action, deliver_interrupt_signal);
       sigaction (SIGINT, &action, 0);
-#ifndef DOS_NT
       /* For systems with SysV TERMIO, C-g is set up for both SIGINT and
 	 SIGQUIT and we can't tell which one it will give us.  */
       sigaction (SIGQUIT, &action, 0);
-#endif /* not DOS_NT */
     }
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
   if (!noninteractive)
@@ -11743,17 +11267,9 @@ syms_of_keyboard (void)
   DEFSYM (Qascii_keystroke, "ascii-keystroke");
   DEFSYM (Qmultibyte_char_keystroke, "multibyte-char-keystroke");
   DEFSYM (Qnon_ascii_keystroke, "non-ascii-keystroke");
-#ifdef HAVE_NTGUI
-  DEFSYM (Qmultimedia_key, "multimedia-key");
-#endif
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
   DEFSYM (Quser_signal_event, "user-signal-event");
-
-#ifdef HAVE_NTGUI
-  DEFSYM (Qlanguage_change, "language-change");
-  DEFSYM (Qend_session, "end-session");
-#endif
 
 #ifdef HAVE_DBUS
   DEFSYM (Qdbus_event, "dbus-event");
@@ -11928,9 +11444,6 @@ syms_of_keyboard (void)
   DEFSYM (Qselection_clear_event, "selection-clear-event");
   DEFSYM (Qmonitors_changed, "monitors-changed");
   DEFSYM (Qmenu_bar_activate_event, "menu-bar-activate-event");
-#ifdef HAVE_ANDROID
-  DEFSYM (Qnotification_event, "notification-event");
-#endif
 
   DEFSYM (Qtouchscreen, "touchscreen");
 

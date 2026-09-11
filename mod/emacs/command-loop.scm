@@ -1241,8 +1241,8 @@ self-evaluating, matching the elisp reader idiom."
 ;;;
 ;;; Dropped-platform entries (Windows-only, out of scope per docs/
 ;;; milestone-overview.org "Platform scope") are deliberately not ported:
-;;;   end-session → kill-emacs   (#ifdef HAVE_NTGUI)
-;;;   language-change → ignore   (#if defined (WINDOWSNT))
+;;;   end-session → kill-emacs   (dropped-platform W32)
+;;;   language-change → ignore   (dropped-platform W32)
 ;;; thread-event → thread-handle-event (#ifdef THREADS_ENABLED) is also
 ;;; not ported: this build has THREADS_ENABLED undefined and exposes no
 ;;; Scheme featurep predicate for threads, so the binding is dead here.
