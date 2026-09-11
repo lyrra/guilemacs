@@ -4091,26 +4091,9 @@ kbd_buffer_get_event_2 (Lisp_Object val)
    are #ifdef-gated internally to match the C
    decode loop.  See docs/m12-plan.org §imp-1.  */
 
-/* imp-1.1 — getctag save/set + single-kboard reflection.  */
-
-DEFUN ("--get-ctag", Fc_get_ctag, Sc_get_ctag, 0, 0, 0,
-       doc: /* Internal: return the current getctag prompt tag (nil
-when unset).  getctag is the static Lisp_Object that
-quit_throw_to_read_char unwinds to via abort_to_prompt; the Scheme
-read loop saves/restores it around the blocking read.  */)
-  (void)
-{
-  return getctag;
-}
-
-DEFUN ("--set-ctag", Fc_set_ctag, Sc_set_ctag, 1, 1, 0,
-       doc: /* Internal: set getctag to TAG and return TAG.  Mirrors
-set-current-kboard returning its argument.  */)
-  (Lisp_Object tag)
-{
-  getctag = tag;
-  return tag;
-}
+/* imp-1.1 — single-kboard reflection.  The getctag save/set pair
+   (--get-ctag, --set-ctag) moved to the cell table at M30 imp-5; see
+   cell_table and mod/emacs/cell-accessors.scm.  */
 
 DEFUN ("--kbd-single-kboard-p", Fc_kbd_single_kboard_p,
        Sc_kbd_single_kboard_p, 0, 0, 0,
@@ -5557,10 +5540,17 @@ static const struct cell_entry cell_table[] =
       CELL_LISP_OBJECT },
     { "--set-read-key-sequence-remapped", &read_key_sequence_remapped,
       CELL_LISP_OBJECT },
+    /* Lisp_Object cell (M30 imp-5).  getctag is the prompt tag that
+       quit_throw_to_read_char unwinds to via abort_to_prompt.  imp-5
+       roots it in syms_of_keyboard (getctag = Qnil then staticpro), so
+       the object-cell rule holds.  A write uses the canonical
+       --set- name; --set-ctag must return TAG, so the Scheme wrapper
+       returns it.  */
+    { "--set-ctag", &getctag, CELL_LISP_OBJECT },
   };
 
 /* Return the table entry for the accessor name NAME, or NULL.  A linear
-   scan is enough for 74 entries.  */
+   scan is enough for the 23 entries.  */
 
 /* A one-entry memo for the linear scan.  The hot callers use one name
    repeatedly: for example `kbd-buffer-get-event' reads
@@ -11350,6 +11340,13 @@ syms_of_keyboard (void)
 
   internal_last_event_frame = Qnil;
   staticpro (&internal_last_event_frame);
+
+  /* M30 imp-5: root the getctag prompt tag so the cell table can hold
+     it.  An object cell must be a GC root; the table holds a raw
+     void *.  A zeroed Lisp_Object is not Qnil (DEFINE_NON_NIL_Q_SYMBOL_MACROS
+     is false), so set it before the staticpro.  */
+  getctag = Qnil;
+  staticpro (&getctag);
 
   read_key_sequence_cmd = Qnil;
   staticpro (&read_key_sequence_cmd);

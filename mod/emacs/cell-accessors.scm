@@ -28,6 +28,8 @@
             --set-read-key-sequence-remapped
             --get-internal-last-event-frame
             --get-unread-switch-frame
+            --get-ctag
+            --set-ctag
             init-cell-accessors-registrations))
 
 ;;; M30 imp-2 / imp-3 — plain cell accessors, moved from per-cell DEFUNs
@@ -240,6 +242,25 @@ table."
 without clearing it."
   (%cell-ref '--set-unread-switch-frame))
 
+;;;;
+;;;; getctag (M30 imp-5)
+;;;;
+;;; getctag is the prompt tag that quit_throw_to_read_char unwinds to
+;;; via abort_to_prompt.  imp-5 roots it in syms_of_keyboard (getctag =
+;;; Qnil then staticpro), so it may enter the object-cell table.  The
+;;; old --set-ctag returned TAG (it mirrors set-current-kboard returning
+;;; its argument); main-queue.scm and test-m12-shims.scm depend on that
+;;; contract, so the wrapper returns TAG after the table write.
+
+(define (--set-ctag tag)
+  "Set `getctag' to TAG through the cell table and return TAG."
+  (%cell-set! '--set-ctag tag)
+  tag)
+
+(define (--get-ctag)
+  "Return the current `getctag' prompt tag through the cell table."
+  (%cell-ref '--set-ctag))
+
 ;;; --- registration ---------------------------------------------------
 
 (define (init-cell-accessors-registrations)
@@ -284,4 +305,6 @@ without clearing it."
               (--get-internal-last-event-frame
                ,--get-internal-last-event-frame)
               (--get-unread-switch-frame
-               ,--get-unread-switch-frame))))
+               ,--get-unread-switch-frame)
+              (--get-ctag                         ,--get-ctag)
+              (--set-ctag                         ,--set-ctag))))

@@ -148,7 +148,9 @@ root, so a stored object must survive this."
 
 ;;; --- stay-C names remain --------------------------------------------
 ;;; The bare C getters that lazy-init a vector or give an independent
-;;; read stay C.  getctag stays C: no staticpro roots it.
+;;; read stay C.  (The getctag pair --get-ctag / --set-ctag left this
+;;; set at M30 imp-5, which roots getctag and moves the pair to the
+;;; table; see test-m30-imp5.scm.)
 
 (for-each
  (lambda (name)
@@ -160,9 +162,7 @@ root, so a stored object must survive this."
     --tool-bar-items-vector
     --menu-bar-one-keymap-changed-items
     --menu-bar-touch-id
-    --read-key-sequence-remapped
-    --get-ctag
-    --set-ctag))
+    --read-key-sequence-remapped))
 
 ;;; --- a stay-C name is not a table key -------------------------------
 
@@ -176,9 +176,7 @@ root, so a stored object must survive this."
     --tool-bar-items-vector
     --menu-bar-one-keymap-changed-items
     --menu-bar-touch-id
-    --read-key-sequence-remapped
-    --get-ctag
-    --set-ctag))
+    --read-key-sequence-remapped))
 
 ;;; --- the lookup memo accepts an uninterned symbol -------------------
 ;;; cr.org F2: lookup_cell caches the last name on the strcmp hit path,
