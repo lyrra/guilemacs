@@ -169,6 +169,8 @@
 (use-modules (emacs process-error))
 ;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
 (use-modules (emacs eval-main))
+;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).
+(use-modules (emacs sysdep-main))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

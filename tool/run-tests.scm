@@ -164,6 +164,7 @@
   "test/keyboard/test-m32-imp2.el"              ; M32 imp-2: process.c error paths + send_process drain moved to (emacs process-error); cmd_error_internal retired (corpus prints PASS/FAIL)
   "test/keyboard/test-m32-imp3.el"              ; M32 imp-3: emacs.c stuff_buffered_input caller ported; top-level + attempt-orderly-shutdown-on-fatal-signal moved to Scheme (corpus prints PASS/FAIL)
   "test/keyboard/test-m32-imp4.el"              ; M32 imp-4: eval.c probably_quit caller ported to (emacs eval-main); num-nonmacro-input-events + throw-on-input moved to Scheme (corpus prints PASS/FAIL)
+  "test/keyboard/test-m32-imp5.el"              ; M32 imp-5: sysdep.c emacs_full_write drain ported to (emacs sysdep-main); tty-erase-char + attempt-stack-overflow-recovery moved to Scheme (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

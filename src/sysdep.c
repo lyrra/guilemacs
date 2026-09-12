@@ -1074,7 +1074,11 @@ init_sys_modes (struct tty_display_info *tty_out)
   Lisp_Object terminal;
 #endif
 
-  Vtty_erase_char = Qnil;
+  /* M32 imp-5: tty-erase-char left C for a Scheme declaration (see
+     (emacs command-loop) init-command-loop-registrations).  Write it
+     through the elisp runtime; Qtty_erase_char is DEFSYM'd in
+     keyboard-globals.c.  */
+  Fset (Qtty_erase_char, Qnil);
 
   if (noninteractive)
     return;
@@ -1092,7 +1096,8 @@ init_sys_modes (struct tty_display_info *tty_out)
   tty = *tty_out->old_tty;
 
 #if !defined (DOS_NT)
-  XSETINT (Vtty_erase_char, tty.main.c_cc[VERASE]);
+  /* M32 imp-5: write tty-erase-char through the elisp runtime.  */
+  Fset (Qtty_erase_char, make_fixnum (tty.main.c_cc[VERASE]));
 
   tty.main.c_iflag |= (IGNBRK);	/* Ignore break condition */
   tty.main.c_iflag &= ~ICRNL;	/* Disable map of CR to NL on input */
@@ -1809,12 +1814,32 @@ init_sigbus (void)
 
 #if defined HAVE_STACK_OVERFLOW_HANDLING && !defined WINDOWSNT
 
+/* M32 imp-5: attempt-stack-overflow-recovery left C for a Scheme
+   declaration ((emacs command-loop) init-command-loop-registrations).
+   stack_overflow runs from the SIGSEGV and SIGBUS handlers (the
+   fatal-signal path), so it must NOT call find_symbol_value,
+   Fsymbol_value, or intern_c_string: a Guile frame there can allocate.
+   Resolve the symbol's desc vector once in syms_of_sysdep and read slot
+   4 with a plain C vector read, mirroring src/emacs.c
+   orderly_shutdown_value.  SCM_UNDEFINED means "not resolved yet"; the C
+   default (true) then applies.  See docs/kb.org ** M32.  */
+static Lisp_Object attempt_stack_overflow_recovery_cell = SCM_UNDEFINED;
+
+static bool
+attempt_stack_overflow_recovery_value (void)
+{
+  if (SCM_UNBNDP (attempt_stack_overflow_recovery_cell))
+    return true;		/* not resolved yet: keep the C default */
+  /* A Scheme vector read; no Guile frame, no allocation. */
+  return !NILP (GAREF (attempt_stack_overflow_recovery_cell, 4));
+}
+
 /* Return true if SIGINFO indicates a stack overflow.  */
 
 static bool
 stack_overflow (siginfo_t *siginfo)
 {
-  if (!attempt_stack_overflow_recovery)
+  if (!attempt_stack_overflow_recovery_value ())
     return false;
 
   /* In theory, a more-accurate heuristic can be obtained by using
@@ -2697,6 +2722,23 @@ emacs_read_quit (int fd, void *buf, ptrdiff_t nbyte)
   return emacs_intr_read (fd, buf, nbyte, true);
 }
 
+/* M32 imp-5: the EINTR drain decision of emacs_full_write moved to
+   Scheme as (emacs sysdep-main) full-write-drain!.  This thin static
+   dispatcher memoises the resolved procedure (the recursive_edit_1
+   idiom, as imp-4 did in eval.c) and passes the C interruptible level.
+   The write () system call, the byte counters, the errno == EINTR test,
+   and the loop control stay C.  The caller keeps the `if (interruptible)'
+   guard, so the dispatcher runs only for a nonzero INTERRUPTIBLE
+   (decision D2).  See docs/kb.org ** M32.  */
+static void
+sysdep_full_write_drain (int interruptible)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs sysdep-main", "full-write-drain!");
+  SCM_CALL_1 (proc, scm_from_int (interruptible));
+}
+
 /* Write to FILEDES from a buffer BUF with size NBYTE, retrying if
    interrupted or if a partial write occurs.  Process any quits
    immediately if INTERRUPTIBLE is positive, and process any pending
@@ -2719,12 +2761,7 @@ emacs_full_write (int fd, char const *buf, ptrdiff_t nbyte,
 	    break;
 
 	  if (interruptible)
-	    {
-	      if (0 < interruptible)
-		maybe_quit ();
-	      if (pending_signals)
-		process_pending_signals ();
-	    }
+	    sysdep_full_write_drain (interruptible);
 	}
       else
 	{
@@ -4658,4 +4695,17 @@ syms_of_sysdep (void)
 
   plus_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-+");
   times_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-*");
+
+#if defined HAVE_STACK_OVERFLOW_HANDLING && !defined WINDOWSNT
+  /* M32 imp-5: resolve the value cell of the Scheme-declared
+     attempt-stack-overflow-recovery once, here, while Guile is running.
+     stack_overflow (the fatal-signal path) then reads slot 4 of this
+     cell with a plain C vector read and never enters the Guile runtime.
+     XSYMBOL (symbol-desc) creates the cell with the Scheme `unbound'
+     default if (emacs command-loop) has not declared the name yet; that
+     default is non-nil, so the C default (true) holds.  See docs/kb.org
+     ** M32.  */
+  attempt_stack_overflow_recovery_cell
+    = XSYMBOL (intern_c_string ("attempt-stack-overflow-recovery"));
+#endif
 }

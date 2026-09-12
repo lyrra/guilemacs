@@ -130,7 +130,9 @@
 ;; so they no longer have a DEFVAR site in keyboard-globals.c; their
 ;; names are declared in Scheme (mod/emacs/command-loop.scm).  M31 imp-2
 ;; moved auto-save-interval the same way (its last C reader was the dead
-;; #ifdef SIGDANGER arm).
+;; #ifdef SIGDANGER arm).  M32 imp-5 moved attempt-stack-overflow-recovery
+;; the same way (its only reader, sysdep.c stack_overflow, now reads a
+;; resolved Scheme value cell), so it leaves this list too.
 (dolist (name '("unread-post-input-method-events"
                 "unread-input-method-events"
                 "echo-keystrokes" "polling-period" "num-input-keys"
@@ -139,7 +141,7 @@
                 "special-event-map" "timer-list" "timer-idle-list"
                 "input-method-function" "minibuffer-message-timeout"
                 "debug-on-event" "select-active-regions"
-                "saved-region-selection" "attempt-stack-overflow-recovery"
+                "saved-region-selection"
                 "disable-inhibit-text-conversion"))
   (gm5-report (format "m23/imp5/src/in-globals/%s" name)
               (gm5-has-defvar? gm5-globals-c name) t nil)

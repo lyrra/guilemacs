@@ -106,10 +106,6 @@ In Lisp, you might want to use `mouse-double-click-time' instead of
 reading the value of this variable directly.  */);
   Vdouble_click_time = make_fixnum (500);
 
-  /* This variable is set up in sysdep.c.  */
-  DEFVAR_LISP ("tty-erase-char", Vtty_erase_char,
-	       doc: /* The ERASE character as set by the user with stty.  */);
-
   DEFVAR_LISP ("help-form", Vhelp_form,
 	       doc: /* Form to execute when character `help-char' is read.
 If the form returns a string, that string is displayed.
@@ -448,15 +444,6 @@ Currently, the only supported values for this
 variable are `sigusr1' and `sigusr2'.  */);
   Vdebug_on_event = Qsigusr2;
 
-  DEFVAR_BOOL ("attempt-stack-overflow-recovery",
-               attempt_stack_overflow_recovery,
-               doc: /* If non-nil, attempt to recover from C stack overflows.
-This recovery is potentially unsafe and may lead to deadlocks or data
-corruption, but it usually works and may preserve modified buffers
-that would otherwise be lost.  If nil, treat stack overflow like any
-other kind of crash or fatal error.  */);
-  attempt_stack_overflow_recovery = true;
-
   DEFVAR_BOOL ("disable-inhibit-text-conversion",
                disable_inhibit_text_conversion,
     doc: /* Don't disable text conversion inside `read-key-sequence'.
@@ -512,4 +499,12 @@ key has been read inside `read-key-sequence'.  */);
      elisp runtime (Fsymbol_value).  See docs/kb.org ** M32.  */
   DEFSYM (Qnum_nonmacro_input_events, "num-nonmacro-input-events");
   DEFSYM (Qthrow_on_input, "throw-on-input");
+
+  /* M32 imp-5 — the DEFSYM handle for tty-erase-char, which left C for a
+     Scheme declaration.  Its DEFVAR_* site is gone, so this keeps the
+     generated Qsym #define and the defsym_name[] entry that make-docfile
+     emits.  sysdep.c writes the name through the elisp runtime (Fset).
+     attempt-stack-overflow-recovery needs no DEFSYM: sysdep.c resolves
+     it by string name.  See docs/kb.org ** M32.  */
+  DEFSYM (Qtty_erase_char, "tty-erase-char");
 }

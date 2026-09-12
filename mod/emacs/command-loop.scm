@@ -1213,7 +1213,18 @@ command_loop_1_iter_pre_read."
      ;; C reader (eval.c process_quit_flag) reads the name through the
      ;; elisp runtime (Fsymbol_value (Qthrow_on_input)).  The C default
      ;; was nil.
-     (throw-on-input                ,#nil))))
+     (throw-on-input                ,#nil)
+     ;; M32 imp-5 — DEFVAR_LISP moved here from keyboard-globals.c.  The
+     ;; C writers (sysdep.c init_sys_modes) now write the name through
+     ;; the elisp runtime (Fset (Qtty_erase_char, ...)).  The C default
+     ;; was nil.
+     (tty-erase-char                ,#nil)
+     ;; M32 imp-5 — DEFVAR_BOOL moved here from keyboard-globals.c.  The
+     ;; C reader (sysdep.c stack_overflow) now reads the name through a
+     ;; resolved value cell (attempt_stack_overflow_recovery_value), so
+     ;; it never enters the Guile runtime on the fatal-signal path.  The
+     ;; C default was true.
+     (attempt-stack-overflow-recovery ,#t))))
 
 ;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
 ;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard
