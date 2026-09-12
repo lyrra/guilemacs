@@ -351,11 +351,6 @@ If there's an active input method, the events are given to
 `input-method-function'.  */);
   Vunread_input_method_events = Qnil;
 
-  DEFVAR_INT ("auto-save-interval", auto_save_interval,
-              doc: /* Number of input events between auto-saves.
-Zero means disable autosaving due to number of characters typed.  */);
-  auto_save_interval = 300;
-
   DEFVAR_LISP ("echo-keystrokes", Vecho_keystrokes,
     doc: /* Nonzero means echo unfinished commands after this many seconds of pause.
 The value may be integer or floating point.

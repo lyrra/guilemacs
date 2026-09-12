@@ -1172,6 +1172,11 @@ command_loop_1_iter_pre_read."
      ;; No C file reads cannot_suspend any more; (emacs interrupt) reads
      ;; the name with symbol-value.  The C default was false, i.e. #nil.
      (cannot-suspend                ,#nil)
+     ;; M31 imp-2 — DEFVAR_INT moved here from keyboard-globals.c.
+     ;; No C file reads auto_save_interval any more (the dead #ifdef
+     ;; SIGDANGER arm was its last reader); (emacs read-char) reads the
+     ;; name with symbol-value.  The C default was 300.
+     (auto-save-interval           300)
      ;; The rows below live in modules that are lazily loaded only
      ;; (lispy-event / kbd-buffer / help-echo) — their load-time
      ;; top-level forms need C DEFUNs registered after prelude, so they

@@ -22,7 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <signal.h>		/* For SIGABRT, SIGDANGER.  */
+#include <signal.h>		/* For SIGABRT.  */
 
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
@@ -212,7 +212,7 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 				Malloc
  ************************************************************************/
 
-#if defined SIGDANGER || (!defined SYSTEM_MALLOC && !defined HYBRID_MALLOC)
+#if !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
 
 /* Function malloc calls this if it finds we are near exhausting storage.  */
 

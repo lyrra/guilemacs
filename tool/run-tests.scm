@@ -157,6 +157,8 @@
   "test/keyboard/test-m30-imp4.el"              ; M30 imp-4 Lisp_Object cell conversion proof (corpus prints PASS/FAIL)
   "test/keyboard/test-m30-imp5.el"              ; M30 imp-5 close-out audit: ctag conversion + 47 stay-C names (corpus prints PASS/FAIL)
   "test/keyboard/test-m31-imp1.el"              ; M31 imp-1: last-event-device + cannot-suspend moved to Scheme (corpus prints PASS/FAIL)
+  "test/keyboard/test-m31-imp2.el"              ; M31 imp-2: dead SIGDANGER arm deleted + auto-save-interval moved to Scheme (corpus prints PASS/FAIL)
+  "test/keyboard/test-m31-imp2-reporting.el"    ; M31 imp-2: reporting guards — imp-2 registration + m23-imp5 scan split (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

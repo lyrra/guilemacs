@@ -129,9 +129,11 @@
 ;; True relocated DEFVAR site prefix (LISP/INT/BOOL).  M31 imp-1 moved
 ;; last-event-device and cannot-suspend out of C entirely (no C reader),
 ;; so they no longer have a DEFVAR site in keyboard-globals.c; their
-;; names are declared in Scheme (mod/emacs/command-loop.scm).
+;; names are declared in Scheme (mod/emacs/command-loop.scm).  M31 imp-2
+;; moved auto-save-interval the same way (its last C reader was the dead
+;; #ifdef SIGDANGER arm).
 (dolist (name '("unread-post-input-method-events"
-                "unread-input-method-events" "auto-save-interval"
+                "unread-input-method-events"
                 "echo-keystrokes" "polling-period" "num-input-keys"
                 "last-event-frame" "help-char"
                 "help-event-list" "prefix-help-command"

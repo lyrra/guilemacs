@@ -571,15 +571,6 @@ record_auto_save (void)
   last_auto_save = num_nonmacro_input_events;
 }
 
-/* Make an auto save happen as soon as possible at command level.  */
-
-#ifdef SIGDANGER
-void
-force_auto_save_soon (void)
-{
-  last_auto_save = - auto_save_interval - 1;
-}
-#endif
 /* M22 imp-2: thin dispatcher.  The recursive_edit_1 body (prologue +
    command-loop-main + throw-value tail) lives in Scheme as
    (emacs recursive-edit)/recursive-edit-1.  Called directly by
