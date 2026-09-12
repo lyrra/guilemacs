@@ -161,6 +161,7 @@
   "test/keyboard/test-m31-imp2-reporting.el"    ; M31 imp-2: reporting guards — imp-2 registration + m23-imp5 scan split (corpus prints PASS/FAIL)
   "test/keyboard/test-m31-imp3.el"              ; M31 imp-3: close-out audit (converted names + budget/unlock-map guards; corpus prints PASS/FAIL)
   "test/keyboard/test-m32-imp1.el"              ; M32 imp-1: process.c wait decision path moved to (emacs process-wait) (corpus prints PASS/FAIL)
+  "test/keyboard/test-m32-imp2.el"              ; M32 imp-2: process.c error paths + send_process drain moved to (emacs process-error); cmd_error_internal retired (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

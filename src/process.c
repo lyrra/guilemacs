@@ -5296,6 +5296,20 @@ wait_run_timers (bool do_display)
   return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
 }
 
+/* M32 imp-2: dispatcher into (emacs process-error) for the send_process
+   EINTR-loop drain.  Static and local to process.c: the C entry point
+   stays C.  See send-process-drain-signals! in the module.  */
+
+static void
+send_process_drain_signals (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-error",
+                             "send-process-drain-signals!");
+  SCM_CALL_0 (proc);
+}
+
 #if defined HAVE_ANDROID && !defined ANDROID_STUBIFY	\
   && defined THREADS_ENABLED
 
@@ -6208,12 +6222,14 @@ read_process_output_call (Lisp_Object fun_and_args)
 static Lisp_Object
 read_process_output_error_handler (Lisp_Object error_val)
 {
-  cmd_error_internal (error_val, "error in process filter: ");
-  Vinhibit_quit = Qt;
-  update_echo_area ();
-  if (process_error_pause_time > 0)
-    Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
-  return Qt;
+  /* M32 imp-2: thin dispatcher.  The body lives in Scheme as
+     (emacs process-error)/process-filter-error-handler.  Keep this C
+     signature because internal_condition_case_1 takes a C pointer.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-error",
+                             "process-filter-error-handler");
+  return SCM_CALL_1 (proc, error_val);
 }
 
 static void read_and_dispose_of_process_output (struct Lisp_Process *, char *,
@@ -6858,8 +6874,9 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 			       datagram_address[outfd].len);
 		  if (! (rv < 0 && errno == EINTR))
 		    break;
-		  if (pending_signals)
-		    process_pending_signals ();
+		  /* M32 imp-2: the drain choice moved to (emacs
+		     process-error)/send-process-drain-signals!.  */
+		  send_process_drain_signals ();
 		}
 
 	      if (rv >= 0)
@@ -7783,16 +7800,16 @@ deliver_child_signal (int sig)
 static Lisp_Object
 exec_sentinel_error_handler (Lisp_Object error_val)
 {
-  /* Make sure error_val is a cons cell, as all the rest of error
-     handling expects that, and will barf otherwise.  */
-  if (!CONSP (error_val))
-    error_val = Fcons (Qerror, error_val);
-  cmd_error_internal (error_val, "error in process sentinel: ");
-  Vinhibit_quit = Qt;
-  update_echo_area ();
-  if (process_error_pause_time > 0)
-    Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
-  return Qt;
+  /* M32 imp-2: thin dispatcher.  The body lives in Scheme as
+     (emacs process-error)/process-sentinel-error-handler -- it makes
+     error_val a cons cell first, as the rest of error handling
+     expects.  Keep this C signature because internal_condition_case_1
+     takes a C pointer.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-error",
+                             "process-sentinel-error-handler");
+  return SCM_CALL_1 (proc, error_val);
 }
 
 static void

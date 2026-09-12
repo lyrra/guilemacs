@@ -164,6 +164,9 @@
 (use-modules (emacs tab-bar-items))
 ;; M32 imp-1 — process.c wait/input decision path in (emacs process-wait).
 (use-modules (emacs process-wait))
+;; M32 imp-2 — process.c error paths + send_process drain in
+;; (emacs process-error).
+(use-modules (emacs process-error))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

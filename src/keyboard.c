@@ -1548,30 +1548,6 @@ restore_kboard_configuration (int was_locked)
 }
 
 
-/* M7f — cmd_error ported to (emacs command-loop) cmd-error.  See
-   docs/keyboard.org §M7f.  */
-
-/* Take actions on handling an error.  DATA is the data that describes
-   the error.
-
-   CONTEXT is a C-string containing ASCII characters only which
-   describes the context in which the error happened.  If we need to
-   generalize CONTEXT to allow multibyte characters, make it a Lisp
-   string.  */
-
-void
-cmd_error_internal (Lisp_Object data, const char *context)
-{
-  /* M22 imp-2: thin dispatcher.  The body lives in Scheme as
-     (emacs command-loop)/cmd-error-internal!.  Keep this C signature so
-     the two process.c call sites need no change.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "cmd-error-internal!");
-  SCM_CALL_2 (proc, data,
-              context ? build_string (context) : empty_unibyte_string);
-}
-
 /* `command-error-default-function' (the default value of
    `command-error-function') is provided entirely by Scheme — see
    (emacs command-loop) command-error-default-function.  It is
@@ -3581,6 +3557,16 @@ nil.  */)
 {
   CHECK_FIXNUM (n);
   redisplay_preserve_echo_area (XFIXNUM (n));
+  return Qnil;
+}
+
+DEFUN ("--update-echo-area", Fc_update_echo_area, Sc_update_echo_area,
+       0, 0, 0,
+       doc: /* Internal: call update_echo_area () — display the current
+echo-area message.  Used by (emacs process-error).  */)
+  (void)
+{
+  update_echo_area ();
   return Qnil;
 }
 
