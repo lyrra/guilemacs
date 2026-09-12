@@ -126,12 +126,15 @@
   (let ((re (concat "DEFVAR_[A-Z_]+\\s-*(\"" (regexp-quote name) "\"")))
     (string-match-p re src)))
 
-;; True relocated DEFVAR site prefix (LISP/INT/BOOL).
+;; True relocated DEFVAR site prefix (LISP/INT/BOOL).  M31 imp-1 moved
+;; last-event-device and cannot-suspend out of C entirely (no C reader),
+;; so they no longer have a DEFVAR site in keyboard-globals.c; their
+;; names are declared in Scheme (mod/emacs/command-loop.scm).
 (dolist (name '("unread-post-input-method-events"
                 "unread-input-method-events" "auto-save-interval"
                 "echo-keystrokes" "polling-period" "num-input-keys"
-                "last-event-frame" "last-event-device" "help-char"
-                "help-event-list" "prefix-help-command" "cannot-suspend"
+                "last-event-frame" "help-char"
+                "help-event-list" "prefix-help-command"
                 "special-event-map" "timer-list" "timer-idle-list"
                 "input-method-function" "minibuffer-message-timeout"
                 "debug-on-event" "select-active-regions"

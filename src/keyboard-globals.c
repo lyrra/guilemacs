@@ -380,17 +380,6 @@ The number is effectively the number of interactive command invocations.  */);
 If the last event came from a keyboard macro, this is set to `macro'.  */);
   Vlast_event_frame = Qnil;
 
-  DEFVAR_LISP ("last-event-device", Vlast_event_device,
-               doc: /* The name of the input device of the most recently read event.
-When the input extension is being used on X, this is the name of the X
-Input Extension device from which the last event was generated as a
-string.  Otherwise, this is "Virtual core keyboard" for keyboard input
-events, and "Virtual core pointer" for other events.
-
-It is nil if the last event did not come from an input device (i.e. it
-came from `unread-command-events' instead).  */);
-  Vlast_event_device = Qnil;
-
   DEFVAR_LISP ("help-char", Vhelp_char,
                doc: /* Character to recognize as meaning Help.
 When it is read, do `(eval help-form)', and display result if it's a string.
@@ -407,11 +396,6 @@ These work just like the value of `help-char' (see that).  */);
 This command is used only when there is no actual binding
 for that character after that prefix key.  */);
   Vprefix_help_command = Qnil;
-
-  DEFVAR_BOOL ("cannot-suspend", cannot_suspend,
-               doc: /* Non-nil means to always spawn a subshell instead of suspending.
-\(Even if the operating system has support for stopping a process.)  */);
-  cannot_suspend = false;
 
   DEFVAR_LISP ("special-event-map", Vspecial_event_map,
                doc: /* Keymap defining bindings for special events to execute at low level.  */);

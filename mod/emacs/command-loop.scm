@@ -1168,8 +1168,12 @@ command_loop_1_iter_pre_read."
      (selection-inhibit-update-commands
       ,(list 'handle-switch-frame 'handle-select-window))
      (post-select-region-hook       ,#nil)
-     ;; The four DEFVAR_* below live in modules that are lazily loaded
-     ;; only (lispy-event / kbd-buffer / help-echo) — their load-time
+     ;; M31 imp-1 — DEFVAR_BOOL moved here from keyboard-globals.c.
+     ;; No C file reads cannot_suspend any more; (emacs interrupt) reads
+     ;; the name with symbol-value.  The C default was false, i.e. #nil.
+     (cannot-suspend                ,#nil)
+     ;; The rows below live in modules that are lazily loaded only
+     ;; (lispy-event / kbd-buffer / help-echo) — their load-time
      ;; top-level forms need C DEFUNs registered after prelude, so they
      ;; cannot be use-modules'd at boot.  Declare them here (an
      ;; eagerly-loaded module) so they are special + bound from the
@@ -1178,7 +1182,13 @@ command_loop_1_iter_pre_read."
      (double-click-fuzz             3)
      (input-pending-p-filter-events ,#t)
      (display-monitors-changed-functions ,#nil)
-     (show-help-function            ,#nil))))
+     (show-help-function            ,#nil)
+     ;; M31 imp-1 — DEFVAR_LISP moved here from keyboard-globals.c.
+     ;; No C file reads Vlast_event_device any more; the lazy
+     ;; (emacs kbd-buffer) module writes the name with
+     ;; set-symbol-value!, so the special must be bound before it loads
+     ;; (same FIX-20260902-guilemacs reason).  The C default was nil.
+     (last-event-device             ,#nil))))
 
 ;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
 ;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard
