@@ -167,6 +167,8 @@
 ;; M32 imp-2 — process.c error paths + send_process drain in
 ;; (emacs process-error).
 (use-modules (emacs process-error))
+;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
+(use-modules (emacs eval-main))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

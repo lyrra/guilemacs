@@ -155,7 +155,10 @@ call_debugger (Lisp_Object arg)
 #endif
 
   debug_on_next_call = 0;
-  when_entered_debugger = num_nonmacro_input_events;
+  /* M32 imp-4: `num-nonmacro-input-events' left C for a Scheme
+     declaration, so read it through the elisp runtime as a fixnum.
+     Qnum_nonmacro_input_events is DEFSYM'd in keyboard-globals.c.  */
+  when_entered_debugger = XFIXNUM (Fsymbol_value (Qnum_nonmacro_input_events));
 
   /* Resetting redisplaying_p to 0 makes sure that debug output is
      displayed if the debugger is invoked during redisplay.  */
@@ -880,18 +883,54 @@ process_quit_flag (void)
   Vquit_flag = Qnil;
   if (EQ (flag, Qkill_emacs))
     Fkill_emacs (Qnil, Qnil);
-  if (EQ (Vthrow_on_input, flag))
-    Fthrow (Vthrow_on_input, Qt);
+  /* M32 imp-4: `throw-on-input' left C for a Scheme declaration (see
+     (emacs eval-main) probably-quit! and (emacs command-loop)
+     init-command-loop-registrations), so read it through the elisp
+     runtime.  Qthrow_on_input is DEFSYM'd in keyboard-globals.c.  */
+  {
+    Lisp_Object throw_on_input = Fsymbol_value (Qthrow_on_input);
+    if (EQ (throw_on_input, flag))
+      Fthrow (throw_on_input, Qt);
+  }
   quit ();
+}
+
+/* M32 imp-4: the branch-1 callback for (emacs eval-main) probably-quit!.
+   Runs the static process_quit_flag.  It may not return: quit () does
+   not return, and Fthrow makes a non-local exit.  Same contract as the
+   --recursive-edit-quit! DEFUN.  */
+DEFUN ("--process-quit-flag!", Fprocess_quit_flag, Sprocess_quit_flag,
+       0, 0, 0,
+       doc: /* Internal: run process_quit_flag (see probably_quit).
+Makes the quit non-local exit; may not return.  Returns nil.  */)
+  (void)
+{
+  process_quit_flag ();
+  return Qnil;
 }
 
 void
 probably_quit (void)
 {
-  if (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
-    process_quit_flag ();
-  else if (pending_signals)
-    process_pending_signals ();
+  /* M32 imp-4: the decision (quit vs pending-signals) moved to Scheme as
+     (emacs eval-main) probably-quit!.  The mechanism stays C (see
+     process_quit_flag above).  Memo the resolved procedure, the
+     recursive_edit_1 idiom.
+
+     The two branch tests are computed here in C and passed in.  Do NOT
+     read `quit-flag' / `inhibit-quit' with Fsymbol_value from inside the
+     Scheme procedure: probably_quit runs from the maybe_quit inline, and
+     a symbol-value call there re-enters the Guile VM (C -> Scheme -> C
+     gsubr Fsymbol_value -> XSYMBOL -> Scheme) which is not re-entrant in
+     that context -- it segfaults during bootstrap.  Scheme still owns
+     the if / else decision.  See docs/kb.org ** M32.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs eval-main", "probably-quit!");
+  SCM_CALL_2 (proc,
+              (!NILP (Vquit_flag) && NILP (Vinhibit_quit)) ? SCM_BOOL_T
+                                                           : SCM_BOOL_F,
+              pending_signals ? SCM_BOOL_T : SCM_BOOL_F);
 }
 
 DEFUN ("signal", Fsignal, Ssignal, 2, 2, 0,
@@ -1140,7 +1179,8 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object error)
       && ! skip_debugger (conditions, error)
       /* See commentary on definition of
          `internal-when-entered-debugger'.  */
-      && when_entered_debugger < num_nonmacro_input_events)
+      && when_entered_debugger
+	 < XFIXNUM (Fsymbol_value (Qnum_nonmacro_input_events)))
     {
       call_debugger (list2 (Qerror, error));
       return 1;

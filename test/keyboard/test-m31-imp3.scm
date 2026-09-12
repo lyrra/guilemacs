@@ -204,11 +204,14 @@ variable reference or a comment mention does not count."
       (check "m31/imp3/keep/kboard-sites" 8
              (count-calls kg "DEFVAR_KBOARD"))))
 
-;;; --- 7. Over-deletion guard: the 31 DEFSYM sites stay ---------------
+;;; --- 7. Over-deletion guard: the DEFSYM sites stay ------------------
+;;; 31 at M31 imp-3.  M32 imp-4 added 2 more (Qthrow_on_input,
+;;; Qnum_nonmacro_input_events, the symbol handles for the two migrated
+;;; names), so the guard moves to 33.
 (let ((kg (slurp (repo "src/keyboard-globals.c"))))
   (if (not kg)
       (report "m31/imp3/scan/keyboard-globals.c" (cons 'FAIL "file missing"))
-      (check "m31/imp3/keep/defsym-sites" 31
+      (check "m31/imp3/keep/defsym-sites" 33
              (count-calls kg "DEFSYM"))))
 
 ;;; --- 8. Counts (INFO; printed, not asserted) ------------------------

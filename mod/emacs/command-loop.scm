@@ -1202,7 +1202,18 @@ command_loop_1_iter_pre_read."
      ;; M32 imp-3 — DEFVAR_BOOL moved here from keyboard-globals.c.  The
      ;; C reader (emacs.c terminate_due_to_signal) reads the name through
      ;; find_symbol_value.  The C default was true.
-     (attempt-orderly-shutdown-on-fatal-signal ,#t))))
+     (attempt-orderly-shutdown-on-fatal-signal ,#t)
+     ;; M32 imp-4 — DEFVAR_INT moved here from keyboard-globals.c.  The
+     ;; C readers (keyboard.c record_auto_save, eval.c call_debugger and
+     ;; maybe_call_debugger) now read the name through the elisp runtime
+     ;; (XFIXNUM (Fsymbol_value (Qnum_nonmacro_input_events))).  The C
+     ;; default was 0.
+     (num-nonmacro-input-events     0)
+     ;; M32 imp-4 — DEFVAR_LISP moved here from keyboard-globals.c.  The
+     ;; C reader (eval.c process_quit_flag) reads the name through the
+     ;; elisp runtime (Fsymbol_value (Qthrow_on_input)).  The C default
+     ;; was nil.
+     (throw-on-input                ,#nil))))
 
 ;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
 ;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard

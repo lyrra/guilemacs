@@ -570,7 +570,10 @@ add_command_key (Lisp_Object key)
 void
 record_auto_save (void)
 {
-  last_auto_save = num_nonmacro_input_events;
+  /* M32 imp-4: `num-nonmacro-input-events' left C for a Scheme
+     declaration, so read it through the elisp runtime as a fixnum.
+     Qnum_nonmacro_input_events is DEFSYM'd in keyboard-globals.c.  */
+  last_auto_save = XFIXNUM (Fsymbol_value (Qnum_nonmacro_input_events));
 }
 
 /* M22 imp-2: thin dispatcher.  The recursive_edit_1 body (prologue +
