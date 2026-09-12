@@ -84,7 +84,9 @@ line; see brief.org M26 imp-1."
     (dynamic-wind
       (lambda () #t)
       (lambda ()
-        ;; C: stuff_buffered_input (stuffstring);  (M22 imp-3, reused)
+        ;; (emacs kbd-buffer) stuff-buffered-input (M22 imp-3).  The old
+        ;; C caller stuff_buffered_input retired at M32 imp-3; the body
+        ;; lives in Scheme, as here.
         ((force %stuff-buffered-input) stuffstring)
         ;; C: if (cannot_suspend) sys_subshell (); else sys_suspend ();
         (if (not (%nilp (symbol-value 'cannot-suspend)))

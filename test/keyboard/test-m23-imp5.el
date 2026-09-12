@@ -75,7 +75,6 @@
     (select-active-regions t)
     (saved-region-selection nil)
     (attempt-stack-overflow-recovery t)
-    (attempt-orderly-shutdown-on-fatal-signal t)
     (disable-inhibit-text-conversion nil)))
 
 (dolist (case gm5-cases)
@@ -141,7 +140,6 @@
                 "input-method-function" "minibuffer-message-timeout"
                 "debug-on-event" "select-active-regions"
                 "saved-region-selection" "attempt-stack-overflow-recovery"
-                "attempt-orderly-shutdown-on-fatal-signal"
                 "disable-inhibit-text-conversion"))
   (gm5-report (format "m23/imp5/src/in-globals/%s" name)
               (gm5-has-defvar? gm5-globals-c name) t nil)

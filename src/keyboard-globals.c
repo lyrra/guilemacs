@@ -121,11 +121,6 @@ If the form returns a string, that string is displayed.
 If `help-form' is nil, the help char is not recognized.  */);
   Vhelp_form = Qnil;
 
-  DEFVAR_LISP ("top-level", Vtop_level,
-	       doc: /* Form to evaluate when Emacs starts up.
-Useful to set before you dump a modified Emacs.  */);
-  Vtop_level = Qnil;
-
   DEFVAR_INT ("extra-keyboard-modifiers", extra_keyboard_modifiers,
 	      doc: /* A mask of additional modifier keys to use with every keyboard character.
 Emacs applies the modifiers of the character stored here to each keyboard
@@ -472,18 +467,6 @@ corruption, but it usually works and may preserve modified buffers
 that would otherwise be lost.  If nil, treat stack overflow like any
 other kind of crash or fatal error.  */);
   attempt_stack_overflow_recovery = true;
-
-  DEFVAR_BOOL ("attempt-orderly-shutdown-on-fatal-signal",
-               attempt_orderly_shutdown_on_fatal_signal,
-               doc: /* If non-nil, attempt orderly shutdown on fatal signals.
-By default this variable is non-nil, and Emacs attempts to perform
-an orderly shutdown when it catches a fatal signal (e.g., a crash).
-The orderly shutdown includes an attempt to auto-save your unsaved edits
-and other useful cleanups.  These cleanups are potentially unsafe and may
-lead to deadlocks or data corruption, but it usually works and may
-preserve data in modified buffers that would otherwise be lost.
-If nil, Emacs crashes immediately in response to fatal signals.  */);
-  attempt_orderly_shutdown_on_fatal_signal = true;
 
   DEFVAR_BOOL ("disable-inhibit-text-conversion",
                disable_inhibit_text_conversion,

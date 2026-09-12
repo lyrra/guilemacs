@@ -374,7 +374,9 @@ static char *find_user_signal_name (int);
 
 /* Advance or retreat a buffered input event pointer.  */
 
-static union buffered_input_event *
+/* M32 imp-3: external linkage (declared in keyboard.h) so the
+   fatal-safe buffer drain in src/emacs.c can step kbd_fetch_ptr.  */
+union buffered_input_event *
 next_kbd_event (union buffered_input_event *ptr)
 {
   return ptr == kbd_buffer + KBD_BUFFER_SIZE - 1 ? kbd_buffer : ptr + 1;
@@ -1559,11 +1561,15 @@ restore_kboard_configuration (int was_locked)
    docs/keyboard.org §M7e.  */
 
 DEFUN ("--eval-top-level", Fc_eval_top_level, Sc_eval_top_level, 0, 0, 0,
-       doc: /* Internal: call Feval (Vtop_level, Qt).  Runs the startup
-expression installed at top level — see top_level_2_body in C.  */)
+       doc: /* Internal: call Feval with the value of `top-level', in the
+current dynamic context.  Runs the startup expression installed at top
+level — see top_level_2_body in C.  */)
   (void)
 {
-  return Feval (Vtop_level, Qt);
+  /* M32 imp-3: `top-level' left C for a Scheme declaration (see (emacs
+     command-loop) init-command-loop-registrations), so read it through
+     the elisp runtime.  Qtop_level is DEFSYM'd in data.c.  */
+  return Feval (Fsymbol_value (Qtop_level), Qt);
 }
 
 /* M7g — primitives exposed to (emacs command-loop) for the default
@@ -4016,7 +4022,9 @@ kbd_buffer_events_waiting (void)
 
 /* Clear input event EVENT.  */
 
-static void
+/* M32 imp-3: external linkage (declared in keyboard.h) so the
+   fatal-safe buffer drain in src/emacs.c can clear each event.  */
+void
 clear_event (struct input_event *event)
 {
   event->kind = NO_EVENT;
@@ -9874,73 +9882,10 @@ either signal an error or silently fail to stuff the characters.  */)
   return SCM_CALL_1 (proc, stuffstring);
 }
 
-/* If STUFFSTRING is a string, stuff its contents as pending terminal input.
-   Then in any case stuff anything Emacs has read ahead and not used.  */
-
-/* M22 imp-3 — the body moved to (emacs kbd-buffer) stuff-buffered-input.
-   This copy stays as the C fallback for the fatal-signal path only:
-   terminate_due_to_signal (src/emacs.c:421) sets fatal_error_in_progress
-   before calling shut_down_emacs, which calls stuff_buffered_input.  From
-   a signal handler the Guile VM may be interrupted mid-eval, so calling
-   into Scheme there is unsafe.  See docs/m22-plan.org §imp-3 (Finding D).  */
-static void
-stuff_buffered_input_c (Lisp_Object stuffstring)
-{
-#ifdef SIGTSTP  /* stuff_char is defined if SIGTSTP.  */
-  register unsigned char *p;
-
-  if (STRINGP (stuffstring))
-    {
-      register ptrdiff_t count;
-
-      p = SDATA (stuffstring);
-      count = SBYTES (stuffstring);
-      while (count-- > 0)
-	stuff_char (*p++);
-      stuff_char ('\n');
-    }
-
-  /* Anything we have read ahead, put back for the shell to read.  */
-  /* ?? What should this do when we have multiple keyboards??
-     Should we ignore anything that was typed in at the "wrong" kboard?
-
-     rms: we should stuff everything back into the kboard
-     it came from.  */
-  for (; kbd_fetch_ptr != kbd_store_ptr;
-       kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr))
-    {
-
-      if (kbd_fetch_ptr->kind == ASCII_KEYSTROKE_EVENT)
-	stuff_char (kbd_fetch_ptr->ie.code);
-
-      clear_event (&kbd_fetch_ptr->ie);
-    }
-
-  input_pending = false;
-#endif /* SIGTSTP */
-}
-
-void
-stuff_buffered_input (Lisp_Object stuffstring)
-{
-  /* Fatal-signal path: fall back to the C body (see above).  */
-  if (fatal_error_in_progress)
-    {
-      stuff_buffered_input_c (stuffstring);
-      return;
-    }
-#ifdef SIGTSTP
-  /* M22 imp-3: dispatch to (emacs kbd-buffer).  Keeps external linkage
-     and signature — src/emacs.c:2825 and Fsuspend_emacs call this.  The
-     #ifdef SIGTSTP guard absorbs the C body's own guard: on a build
-     without SIGTSTP the whole function is a no-op, exactly like the old
-     body (its entire contents sat inside #ifdef SIGTSTP).  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs kbd-buffer", "stuff-buffered-input");
-  SCM_CALL_1 (proc, stuffstring);
-#endif /* SIGTSTP */
-}
+/* M32 imp-3: the stuff_buffered_input stub and its fatal-safe C body
+   moved to src/emacs.c, next to their only caller shut_down_emacs.  The
+   external declaration is gone from keyboard.h.  See docs/kb.org
+   ** M32.  */
 
 DEFUN ("--stuff-char", Fc_stuff_char, Sc_stuff_char, 1, 1, 0,
        doc: /* FIX-20260901-guilemacs: Internal: stuff one char N into the

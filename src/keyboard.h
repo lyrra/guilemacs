@@ -453,6 +453,14 @@ extern union buffered_input_event kbd_buffer[KBD_BUFFER_SIZE];
 extern union buffered_input_event *kbd_fetch_ptr;
 extern union buffered_input_event *kbd_store_ptr;
 
+/* M32 imp-3: next_kbd_event and clear_event lost their file-local
+   linkage.  The fatal-safe buffer drain moved from keyboard.c to a
+   static body in src/emacs.c (it must stay C: a fatal signal must not
+   run a Guile frame), and that body steps kbd_fetch_ptr and clears each
+   event.  See docs/kb.org ** M32.  */
+extern union buffered_input_event *next_kbd_event (union buffered_input_event *);
+extern void clear_event (struct input_event *);
+
 extern bool ignore_mouse_drag_p;
 
 extern Lisp_Object parse_modifiers (Lisp_Object);
@@ -488,7 +496,6 @@ extern bool requeued_command_events_pending_p (void);
 extern bool requeued_events_pending_p (void);
 extern void bind_polling_period (int);
 extern int make_ctrl_char (int) ATTRIBUTE_CONST;
-extern void stuff_buffered_input (Lisp_Object);
 extern void clear_waiting_for_input (void);
 extern void swallow_events (bool);
 extern bool lucid_event_type_list_p (Lisp_Object);

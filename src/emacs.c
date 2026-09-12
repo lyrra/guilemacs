@@ -345,6 +345,32 @@ static char const *const usage_message[] =
 /* True if handling a fatal error already.  */
 bool fatal_error_in_progress;
 
+/* M32 imp-3 fix (review F1): attempt-orderly-shutdown-on-fatal-signal
+   left C for a Scheme declaration (see (emacs command-loop)
+   init-command-loop-registrations), but its only C reader,
+   terminate_due_to_signal, runs on the fatal-signal path.  A Guile frame
+   must not run there: find_symbol_value calls XSYMBOL, which is
+   scm_call_1 (xsymbol_fn = symbol-desc), and that can allocate a vector
+   and run module-add!; intern_c_string can also touch the obarray hash
+   table.  So keep the value cell of the Scheme symbol and read its value
+   slot with a plain C vector read instead.
+
+   ORDERLY_SHUTDOWN_VALUE_CELL holds the symbol's Scheme desc vector (the
+   same slot-4 storage that symbol-value / set-symbol-value! use), so the
+   C read stays in sync with every Scheme or Lisp write.  It is resolved
+   once at boot in syms_of_emacs.  SCM_UNDEFINED means "not resolved yet";
+   the C default (true) then applies.  See docs/kb.org ** M32.  */
+static Lisp_Object orderly_shutdown_value_cell = SCM_UNDEFINED;
+
+static Lisp_Object
+orderly_shutdown_value (void)
+{
+  if (SCM_UNBNDP (orderly_shutdown_value_cell))
+    return Qt;			/* not resolved yet: keep the C default */
+  /* A Scheme vector read; no Guile frame, no allocation. */
+  return GAREF (orderly_shutdown_value_cell, 4);
+}
+
 /* True if the current system locale uses UTF-8 encoding.  */
 static bool
 using_utf8 (void)
@@ -377,7 +403,13 @@ terminate_due_to_signal (int sig, int backtrace_limit)
 {
   signal (sig, SIG_DFL);
 
-  if (attempt_orderly_shutdown_on_fatal_signal)
+  /* M32 imp-3 fix (review F1): read the C copy of the value cell.  A
+     fatal signal must not run a Guile frame, so do not call
+     find_symbol_value or intern_c_string here (see
+     orderly_shutdown_value).  The cell holds the Scheme `unbound' marker
+     before the (emacs command-loop) declaration runs; that marker is
+     non-nil, so the C default (true) holds.  */
+  if (!NILP (orderly_shutdown_value ()))
     {
       /* If fatal error occurs in code below, avoid infinite recursion.  */
       if (! fatal_error_in_progress)
@@ -2245,12 +2277,12 @@ main2 (void *ignore, int argc, char **argv)
 	  if (filename_from_ansi (file, file_utf8) == 0)
 	    file = file_utf8;
 #endif
-	  Vtop_level = list2 (Qload, build_unibyte_string (file));
+	  Fset (Qtop_level, list2 (Qload, build_unibyte_string (file)));
 	}
       /* Unless next switch is -nl, load "loadup.el" first thing.  */
       if (! no_loadup)
         {
-	  Vtop_level = list2 (Qload, build_string ("loadup.el"));
+	  Fset (Qtop_level, list2 (Qload, build_string ("loadup.el")));
         } else {
           Lisp_Object loads = Qnil;
           for (int i = 0; i < argc - 1; i++)
@@ -2262,7 +2294,7 @@ main2 (void *ignore, int argc, char **argv)
             }
           if (!NILP (loads))
             {
-              Vtop_level = Fcons (Qprogn, loads);
+              Fset (Qtop_level, Fcons (Qprogn, loads));
             }
         }
 
@@ -2270,7 +2302,7 @@ main2 (void *ignore, int argc, char **argv)
       /* If we are going to load stuff in a non-initialized Emacs,
 	 update the value of native-comp-eln-load-path, so that the
 	 *.eln files will be found if they are there.  */
-      if (!NILP (Vtop_level) && !temacs)
+      if (!NILP (Fsymbol_value (Qtop_level)) && !temacs)
 	Vnative_comp_eln_load_path =
 	  Fcons (Fexpand_file_name (XCAR (Vnative_comp_eln_load_path),
 				    Vinvocation_directory),
@@ -2305,8 +2337,8 @@ main2 (void *ignore, int argc, char **argv)
      work because normal-top-level runs and creates the initial frame
      before fonts are initialized.  So this is done in
      normal-top-level instead.  */
-  Vtop_level = list3 (Qprogn, Vtop_level,
-		      list1 (Qandroid_enumerate_fonts));
+  Fset (Qtop_level, list3 (Qprogn, Fsymbol_value (Qtop_level),
+			   list1 (Qandroid_enumerate_fonts)));
 #endif
 
   /* Enter editor command loop.  This never returns.  */
@@ -2750,6 +2782,71 @@ killed.  */
    This is called by fatal signal handlers, X protocol error handlers,
    and Fkill_emacs.  */
 
+/* M32 imp-3: the caller of stuff_buffered_input moved here from
+   keyboard.c, with the stub it called.  The normal path runs the Scheme
+   body in (emacs kbd-buffer) stuff-buffered-input; the fatal-signal
+   path keeps a C drain, because a fatal signal must not run a Guile
+   frame.  See docs/kb.org ** M32.  */
+
+/* Fatal-safe C drain.  Stuff STUFFSTRING, then put anything Emacs has
+   read ahead back for the shell to read.  This body stays C.  The
+   #ifdef SIGTSTP guard is the original one: stuff_char exists only when
+   SIGTSTP is defined, so without it the whole drain is a no-op.  */
+static void
+stuff_buffered_input_c (Lisp_Object stuffstring)
+{
+#ifdef SIGTSTP
+  register unsigned char *p;
+
+  if (STRINGP (stuffstring))
+    {
+      register ptrdiff_t count;
+
+      p = SDATA (stuffstring);
+      count = SBYTES (stuffstring);
+      while (count-- > 0)
+	stuff_char (*p++);
+      stuff_char ('\n');
+    }
+
+  /* Anything we have read ahead, put back for the shell to read.  */
+  /* ?? What should this do when we have multiple keyboards??
+     Should we ignore anything that was typed in at the "wrong" kboard?
+
+     rms: we should stuff everything back into the kboard
+     it came from.  */
+  for (; kbd_fetch_ptr != kbd_store_ptr;
+       kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr))
+    {
+      if (kbd_fetch_ptr->kind == ASCII_KEYSTROKE_EVENT)
+	stuff_char (kbd_fetch_ptr->ie.code);
+
+      clear_event (&kbd_fetch_ptr->ie);
+    }
+
+  input_pending = false;
+#endif /* SIGTSTP */
+}
+
+/* Dispatch STUFFSTRING.  Called only by shut_down_emacs.  When a fatal
+   signal is in progress, run the C drain; otherwise run the Scheme body.
+   The Scheme procedure is memoed in a static.  */
+static void
+stuff_buffered_input_dispatch (Lisp_Object stuffstring)
+{
+  if (fatal_error_in_progress)
+    {
+      stuff_buffered_input_c (stuffstring);
+      return;
+    }
+#ifdef SIGTSTP
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "stuff-buffered-input");
+  SCM_CALL_1 (proc, stuffstring);
+#endif /* SIGTSTP */
+}
+
 void
 shut_down_emacs (int sig, Lisp_Object stuff)
 {
@@ -2800,7 +2897,7 @@ shut_down_emacs (int sig, Lisp_Object stuff)
   reset_all_sys_modes ();
 #endif
 
-  stuff_buffered_input (stuff);
+  stuff_buffered_input_dispatch (stuff);
 
   inhibit_sentinels = 1;
   kill_buffer_processes (Qnil);
@@ -3292,4 +3389,15 @@ libraries; only those already known by Emacs will be loaded.  */);
   Vlibrary_cache = Qnil;
   staticpro (&Vlibrary_cache);
 #endif
+
+  /* M32 imp-3 fix (review F1): resolve the value cell of the
+     Scheme-declared attempt-orderly-shutdown-on-fatal-signal once, here,
+     while Guile is running.  terminate_due_to_signal then reads slot 4 of
+     this cell with a plain C vector read, so the fatal-signal path never
+     enters the Guile runtime.  XSYMBOL (symbol-desc) creates the cell
+     with the Scheme `unbound' default if (emacs command-loop) has not
+     declared the name yet; that default is non-nil, so the C default
+     (true) holds.  See docs/kb.org ** M32.  */
+  orderly_shutdown_value_cell
+    = XSYMBOL (intern_c_string ("attempt-orderly-shutdown-on-fatal-signal"));
 }

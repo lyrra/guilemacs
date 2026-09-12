@@ -1193,7 +1193,16 @@ command_loop_1_iter_pre_read."
      ;; (emacs kbd-buffer) module writes the name with
      ;; set-symbol-value!, so the special must be bound before it loads
      ;; (same FIX-20260902-guilemacs reason).  The C default was nil.
-     (last-event-device             ,#nil))))
+     (last-event-device             ,#nil)
+     ;; M32 imp-3 — DEFVAR_LISP moved here from keyboard-globals.c.  The
+     ;; C reader (keyboard.c --eval-top-level) and the C writers
+     ;; (emacs.c main) now read/write the name through the elisp runtime
+     ;; (Fsymbol_value / Fset).  The C default was nil.
+     (top-level                     ,#nil)
+     ;; M32 imp-3 — DEFVAR_BOOL moved here from keyboard-globals.c.  The
+     ;; C reader (emacs.c terminate_due_to_signal) reads the name through
+     ;; find_symbol_value.  The C default was true.
+     (attempt-orderly-shutdown-on-fatal-signal ,#t))))
 
 ;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
 ;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard
