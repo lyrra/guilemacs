@@ -32,6 +32,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "guile_fns.h"
+/* M32 imp-1: SCM dispatch macros for the wait_reading_process_output
+   decision path (wait_signal_drain / wait_run_timers).  */
+#include "guile.h"
 
 /* Only MS-DOS does not define `subprocesses'.  */
 #ifdef subprocesses
@@ -5267,6 +5270,32 @@ wait_reading_process_output_1 (void)
 {
 }
 
+/* M32 imp-1: thin dispatchers into (emacs process-wait), the Scheme
+   module that now owns the wait decision logic (docs/m32-plan.org A3).
+   They are static and local to process.c: the C entry points stay C.
+   See wait_signal_drain / wait_run_timers in the module.  */
+
+static void
+wait_signal_drain (int read_kbd)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait", "wait-signal-drain");
+  SCM_CALL_1 (proc, INT_TO_INTEGER (read_kbd));
+}
+
+static struct timespec
+wait_run_timers (bool do_display)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait", "wait-run-timers");
+  SCM result = SCM_CALL_1 (proc, scm_from_bool (do_display));
+  if (NILP (result))
+    return invalid_timespec ();
+  return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
+}
+
 #if defined HAVE_ANDROID && !defined ANDROID_STUBIFY	\
   && defined THREADS_ENABLED
 
@@ -5389,13 +5418,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       bool wrapped;
       int channel_start;
 
-      /* If calling from keyboard input, do not quit
-	 since we want to return C-g as an input character.
-	 Otherwise, do pending quit if requested.  */
-      if (read_kbd >= 0)
-	maybe_quit ();
-      else if (pending_signals)
-	process_pending_signals ();
+      /* M32 imp-1: the signal-drain choice lives in (emacs process-wait).
+	 Port of the former read_kbd >= 0 -> maybe_quit () / else
+	 pending_signals -> process_pending_signals () choice.  See
+	 docs/m32-plan.org A3 and wait_signal_drain in keyboard.c.  */
+      wait_signal_drain (read_kbd);
 
       /* Exit now if the cell we're waiting for became non-nil.  */
       if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
@@ -5480,20 +5507,10 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       if (NILP (wait_for_cell)
 	  && just_wait_proc >= 0)
 	{
-	  do
-	    {
-	      unsigned old_timers_run = timers_run;
-
-	      timer_delay = timer_check ();
-
-	      if (timers_run != old_timers_run && do_display)
-		/* We must retry, since a timer may have requeued itself
-		   and that could alter the time_delay.  */
-		redisplay_preserve_echo_area (9);
-	      else
-		break;
-	    }
-	  while (!detect_input_pending ());
+	  /* M32 imp-1: the timer decision and its do/while loop live in
+	     (emacs process-wait).  See docs/m32-plan.org A3 and
+	     wait_run_timers in keyboard.c.  */
+	  timer_delay = wait_run_timers (do_display);
 
 	  /* If there is unread keyboard input, also return.  */
 	  if (read_kbd != 0

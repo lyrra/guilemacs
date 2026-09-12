@@ -162,6 +162,8 @@
 (use-modules (emacs tool-bar-items))
 (use-modules (emacs menu-item-parse))
 (use-modules (emacs tab-bar-items))
+;; M32 imp-1 — process.c wait/input decision path in (emacs process-wait).
+(use-modules (emacs process-wait))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

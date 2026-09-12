@@ -6795,6 +6795,18 @@ from a signal handler.  Returns nil.  */)
   return Qnil;
 }
 
+/* M32 imp-1: read the pending-signals flag for (emacs process-wait).  */
+DEFUN ("--pending-signals-p", Fpending_signals_p,
+       Spending_signals_p, 0, 0, 0,
+       doc: /* Internal: return t when the pending-signals flag is set.
+Reads the C cell that deliver_input_available_signal also writes from a
+signal handler.  (emacs process-wait) uses it for the wait-loop signal
+drain.  Returns t or nil.  */)
+  (void)
+{
+  return pending_signals ? Qt : Qnil;
+}
+
 DEFUN ("--frame-make-pointer-visible!", Fframe_make_pointer_visible,
        Sframe_make_pointer_visible, 1, 1, 0,
        doc: /* Internal: make the mouse pointer visible on FRAME.
@@ -9359,6 +9371,18 @@ detect_input_pending_run_timers (bool do_display)
     redisplay_preserve_echo_area (8);
 
   return input_pending;
+}
+
+/* M32 imp-1: Scheme-callable entry to the C input-pending test for
+   (emacs process-wait).  detect_input_pending stays C.  */
+DEFUN ("--detect-input-pending", Fc_detect_input_pending,
+       Sc_detect_input_pending, 0, 0, 0,
+       doc: /* Internal: return t when input events are pending; calls
+the C detect_input_pending ().  (emacs process-wait) uses it as the
+wait-loop termination test.  Returns t or nil.  */)
+  (void)
+{
+  return detect_input_pending () ? Qt : Qnil;
 }
 
 /* This is called in some cases before a possible quit.
