@@ -172,6 +172,7 @@
   "test/keyboard/test-m33-imp4.el"              ; M33 imp-4: xterm.c input test + 2 name readers moved to (emacs xterm) (corpus prints PASS/FAIL)
   "test/keyboard/test-m33-imp5.el"              ; M33 imp-5: pgtkterm.c read path moved to (emacs pgtk) — help guards, extra-keyboard-modifiers, mwheel-coalesce (corpus prints PASS/FAIL)
   "test/keyboard/test-m33-imp6.el"              ; M33 imp-6: 2 DEFVAR_* names moved to Scheme — extra-keyboard-modifiers + mwheel-coalesce-scroll-events deleted from keyboard-globals.c (corpus prints PASS/FAIL)
+  "test/keyboard/test-m33-imp7.el"              ; M33 imp-7 close-out audit: the two retirements (show_help_echo, discard_mouse_events), the four stay-C stubs, and the anchored Job 1 counts (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
