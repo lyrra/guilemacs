@@ -717,6 +717,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 #include "xsettings.h"
 #include "sysselect.h"
+/* M33 imp-3: SCM dispatch macros for the help-event decision in
+   (emacs xterm) (x-help-event-action).  */
+#include "guile.h"
 #include "menu.h"
 
 #ifdef USE_X_TOOLKIT
@@ -18889,6 +18892,20 @@ x_find_selection_owner (struct x_display_info *dpyinfo, Atom selection)
 
 #endif
 
+/* M33 imp-3 — the help-event decision moved to (emacs xterm)
+   x-help-event-action.  This C function keeps the mechanism: the
+   frame conversion, the input-pending flag, the XInput2 interaction
+   call, the gen_help_event calls, and the event count.  brief.org 4.2.  */
+static int
+x_help_event_action (int do_help, bool hold_quit_p)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xterm", "x-help-event-action");
+  return scm_to_int (SCM_CALL_2 (proc, scm_from_int (do_help),
+                                 scm_from_bool (hold_quit_p)));
+}
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -25626,35 +25643,39 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       count++;
     }
 
-  if (do_help
-      && !(hold_quit && hold_quit->kind != NO_EVENT))
-    {
-      Lisp_Object frame;
+  {
+    int action = x_help_event_action (do_help,
+                                      hold_quit && hold_quit->kind != NO_EVENT);
 
-      if (f)
-	XSETFRAME (frame, f);
-      else
-	frame = Qnil;
+    if (action)
+      {
+        Lisp_Object frame;
 
-      if (do_help > 0)
-	{
-	  any_help_event_p = true;
+        if (f)
+          XSETFRAME (frame, f);
+        else
+          frame = Qnil;
+
+        if (action == 1)
+          {
+            any_help_event_p = true;
 #ifdef HAVE_XINPUT2
-	  if (gen_help_device)
-	    xi_handle_interaction (dpyinfo, f,
-				   gen_help_device,
-				   gen_help_time);
+            if (gen_help_device)
+              xi_handle_interaction (dpyinfo, f,
+                                     gen_help_device,
+                                     gen_help_time);
 #endif
-	  gen_help_event (help_echo_string, frame, help_echo_window,
-			  help_echo_object, help_echo_pos);
-	}
-      else
-	{
-	  help_echo_string = Qnil;
-	  gen_help_event (Qnil, frame, Qnil, Qnil, 0);
-	}
-      count++;
-    }
+            gen_help_event (help_echo_string, frame, help_echo_window,
+                            help_echo_object, help_echo_pos);
+          }
+        else
+          {
+            help_echo_string = Qnil;
+            gen_help_event (Qnil, frame, Qnil, Qnil, 0);
+          }
+        count++;
+      }
+  }
 
 #if defined HAVE_XINPUT2 || defined HAVE_XKB || defined HAVE_X_I18N
   SAFE_FREE ();

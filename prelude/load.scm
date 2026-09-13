@@ -175,6 +175,8 @@
 (use-modules (emacs terminal))
 ;; M33 imp-2 — xmenu.c/gtkutil.c menu helpers in (emacs menu).
 (use-modules (emacs menu))
+;; M33 imp-3 — xterm.c help decision in (emacs xterm).
+(use-modules (emacs xterm))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
