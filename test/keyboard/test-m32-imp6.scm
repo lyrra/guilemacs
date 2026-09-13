@@ -171,13 +171,14 @@ count -- a loose substring match would also count a comment line."
 ;;; The brief warns twice about loose patterns.  Use the anchored forms
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
 ;;; the site counts.  M33 imp-1 added two keyboard.c primitives
-;;; (--menu-items, --clear-input-pending!), so the count is 448.
+;;; (--menu-items, --clear-input-pending!), and M34 imp-1 added one more
+;;; (--detect-input-pending-run-timers), so the count is 449.
 ;;; M33 imp-6 moved extra-keyboard-modifiers (INT) and
 ;;; mwheel-coalesce-scroll-events (BOOL) to Scheme, so the DEFVAR_INT
 ;;; and DEFVAR_BOOL site counts drop by one each (2 -> 1).
 (if (not kbd)
     (report "m32/imp6/scan/keyboard.c-count" (cons 'FAIL "missing"))
-    (check "m32/imp6/count/keyboard.c-defuns" 448
+    (check "m32/imp6/count/keyboard.c-defuns" 449
            (count-prefix kbd "DEFUN (\"")))
 
 (if (not kg)

@@ -9353,6 +9353,23 @@ wait-loop termination test.  Returns t or nil.  */)
   return detect_input_pending () ? Qt : Qnil;
 }
 
+/* M34 imp-1: Scheme-callable entry to the C input-pending + timers
+   test for (emacs display) sit-for-pre-wait!.  It takes the live
+   DO_DISPLAY argument (the no-arg --rc-detect-input-pending-run-timers
+   hardcodes 0 and must not be widened).  detect_input_pending_run_timers
+   stays C; process.c keeps 4 callers.  brief.org 5.2.  */
+DEFUN ("--detect-input-pending-run-timers",
+       Fc_detect_input_pending_run_timers,
+       Sc_detect_input_pending_run_timers, 1, 1, 0,
+       doc: /* Internal: return t when input events are pending after
+running pending timers; calls the C detect_input_pending_run_timers
+(DO_DISPLAY).  (emacs display) uses it as the sit_for early-exit test.
+Returns t or nil.  */)
+  (Lisp_Object do_display)
+{
+  return detect_input_pending_run_timers (!NILP (do_display)) ? Qt : Qnil;
+}
+
 /* This is called in some cases before a possible quit.
    It cases the next call to detect_input_pending to recompute input_pending.
    So calling this function unnecessarily can't do any harm.  */

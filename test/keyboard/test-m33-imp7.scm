@@ -216,14 +216,17 @@ milestone, or from a plan, from satisfying it."
 
 ;;; --- 4. Static: the four stay-C stubs keep their caller ------------
 ;;; brief.org Job 2 "Confirm the four non-retirements".  Each must still
-;;; have its stated caller.
+;;; have its stated caller.  M34 imp-1 moved the dispnew.c callers of
+;;; gen_help_event and detect_input_pending into (emacs display); the
+;;; stubs stay C because their non-M34 callers remain (process.c for
+;;; detect_input_pending; xterm.c/pgtkterm.c for gen_help_event).
 (define dispnew-c (slurp (repo "src/dispnew.c")))
 (if (not dispnew-c)
     (report "m33/imp7/scan/dispnew.c" (cons 'FAIL "src/dispnew.c missing"))
     (begin
-      (check "m33/imp7/stays-c/gen-help-event" #t
-             (contains? dispnew-c "gen_help_event ("))
-      (check "m33/imp7/stays-c/detect-input-pending-dispnew" #t
+      (check "m33/imp7/moved/gen-help-event-dispnew" #f
+             (contains? dispnew-c "gen_help_event (help_echo_string"))
+      (check "m33/imp7/moved/detect-input-pending-dispnew" #f
              (contains? dispnew-c "detect_input_pending ()"))))
 
 (define process-c (slurp (repo "src/process.c")))
@@ -262,13 +265,14 @@ milestone, or from a plan, from satisfying it."
 ;;; --- 7. Static: the anchored Job 1 counts --------------------------
 ;;; The brief warns twice about loose patterns.  Use the anchored forms
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
-;;; the site counts.  M33 added no new keyboard.c primitive, so the
-;;; count stays 448; and imp-6 moved extra-keyboard-modifiers (INT) and
+;;; the site counts.  M33 added no new keyboard.c primitive.  M34 imp-1
+;;; added one (--detect-input-pending-run-timers), so the count is 449;
+;;; and imp-6 moved extra-keyboard-modifiers (INT) and
 ;;; mwheel-coalesce-scroll-events (BOOL) to Scheme, so the DEFVAR_INT and
 ;;; DEFVAR_BOOL site counts are 1 each.
 (if (not kbd)
     (report "m33/imp7/scan/keyboard.c-count" (cons 'FAIL "missing"))
-    (check "m33/imp7/count/keyboard.c-defuns" 448
+    (check "m33/imp7/count/keyboard.c-defuns" 449
            (count-prefix kbd "DEFUN (\"")))
 
 ;;; --- 8. Static: keyboard-globals.c keeps the anchored split --------

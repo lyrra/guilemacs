@@ -31,6 +31,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "cm.h"
 #include "buffer.h"
 #include "guile_fns.h"
+#include "guile.h"
 #include "keyboard.h"
 #include "frame.h"
 #include "termhooks.h"
@@ -4066,6 +4067,12 @@ update_frame_with_menu (struct frame *f, int row, int col)
   set_window_update_flags (root_window, false);
 }
 
+/* M34 imp-1 — dispatcher prototype; defined with the others above
+   sit_for.  update_mouse_position calls it before that definition.  */
+static bool display_maybe_gen_help_event (struct frame *, Lisp_Object,
+                                          Lisp_Object, Lisp_Object,
+                                          Lisp_Object, Lisp_Object);
+
 /* Update the mouse position for a frame F.  This handles both
    updating the display for mouse-face properties and updating the
    help echo text.
@@ -4081,16 +4088,11 @@ update_mouse_position (struct frame *f, int x, int y)
 
   /* If the contents of the global variable help_echo_string
      has changed, generate a HELP_EVENT.  */
-  if (!NILP (help_echo_string)
-      || !NILP (previous_help_echo_string))
-    {
-      Lisp_Object frame;
-      XSETFRAME (frame, f);
-
-      gen_help_event (help_echo_string, frame, help_echo_window,
-                      help_echo_object, help_echo_pos);
-      return 1;
-    }
+  if (display_maybe_gen_help_event (f, help_echo_string,
+                                    previous_help_echo_string,
+                                    help_echo_window, help_echo_object,
+                                    INT_TO_INTEGER (help_echo_pos)))
+    return 1;
 
   return 0;
 }
@@ -6818,64 +6820,100 @@ it specifies an additional wait period, in milliseconds.  */)
    more (i.e. until either there's pending input events or the timeout
    expired).  */
 
+/* M34 imp-1 - static dispatchers into (emacs display).  They are local
+   to dispnew.c, so the budgeted keyboard.c surface does not grow.  Each
+   caches its SCM proc in a static SCM with the SCM_UNBNDP guard, as
+   term.c and xterm.c do.  The C mechanism stays here: the struct
+   timespec, the wait_reading_process_output call, the
+   set_buffer_internal switch, the wrong_type_argument signal,
+   redisplay_preserve_echo_area, and the raw Qt / Qnil returns.
+   brief.org 4.  */
+
+static bool
+display_sit_for_pre_wait (bool do_display)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs display", "sit-for-pre-wait!");
+  return scm_is_true (SCM_CALL_1 (proc, scm_from_bool (do_display)));
+}
+
+/* Parse TIMEOUT via (emacs display) sit-for-timeout.  Return 1 when the
+   caller must return Qt, 0 when SEC / NSEC are set, and -1 when TIMEOUT
+   is not a number (the caller signals wrong_type_argument).  */
+static int
+display_sit_for_timeout (Lisp_Object timeout, intmax_t *sec, int *nsec)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs display", "sit-for-timeout");
+  SCM r = SCM_CALL_1 (proc, timeout);
+  if (scm_is_eq (r, SCM_BOOL_T))
+    return 1;
+  if (!scm_is_pair (r))
+    return -1;
+  *sec = scm_to_intmax (scm_car (r));
+  *nsec = scm_to_int (scm_cdr (r));
+  return 0;
+}
+
+static bool
+display_sit_for_done_p (int nbytes)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs display", "sit-for-done?");
+  return scm_is_true (SCM_CALL_1 (proc, scm_from_int (nbytes)));
+}
+
+static bool
+display_redisplay_swallow (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs display", "redisplay-swallow!");
+  return scm_is_true (SCM_CALL_0 (proc));
+}
+
+/* Decide and raise the help event for update_mouse_position via (emacs
+   display) maybe-gen-help-event!.  The C keeps the XSETFRAME conversion
+   and the event count.  Return true when the caller must return 1.  */
+static bool
+display_maybe_gen_help_event (struct frame *f, Lisp_Object help,
+                              Lisp_Object previous, Lisp_Object window,
+                              Lisp_Object object, Lisp_Object pos)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs display", "maybe-gen-help-event!");
+  Lisp_Object frame;
+  XSETFRAME (frame, f);
+  SCM args[6] = { help, previous, frame, window, object, pos };
+  return scm_is_true (SCM_CALL_N (proc, args, 6));
+}
+
 Lisp_Object
 sit_for (Lisp_Object timeout, bool reading, int display_option)
 {
-  intmax_t sec;
-  int nsec;
+  intmax_t sec = 0;
+  int nsec = 0;
   bool do_display = display_option > 0;
   bool curbuf_eq_winbuf
     = (current_buffer == XBUFFER (XWINDOW (selected_window)->contents));
 
-  swallow_events (do_display);
-
-  if ((detect_input_pending_run_timers (do_display))
-      || !NILP (Vexecuting_kbd_macro))
+  if (display_sit_for_pre_wait (do_display))
     return Qnil;
 
   if (display_option > 1)
     redisplay_preserve_echo_area (2);
 
-  if (INTEGERP (timeout))
+  switch (display_sit_for_timeout (timeout, &sec, &nsec))
     {
-      if (integer_to_intmax (timeout, &sec))
-	{
-	  if (sec <= 0)
-	    return Qt;
-	  sec = min (sec, WAIT_READING_MAX);
-	}
-      else
-	{
-	  if (NILP (Fnatnump (timeout)))
-	    return Qt;
-	  sec = WAIT_READING_MAX;
-	}
-      nsec = 0;
+    case 1:
+      return Qt;
+    case -1:
+      wrong_type_argument (Qnumberp, timeout);
     }
-  else if (FLOATP (timeout))
-    {
-      double seconds = XFLOAT_DATA (timeout);
-      if (! (0 < seconds))
-	return Qt;
-      else
-	{
-	  struct timespec t = dtotimespec (seconds);
-	  sec = min (t.tv_sec, WAIT_READING_MAX);
-	  nsec = t.tv_nsec;
-	}
-    }
-  else if (EQ (timeout, Qt))
-    {
-      sec = 0;
-      nsec = 0;
-    }
-  else
-    wrong_type_argument (Qnumberp, timeout);
-
-
-#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-  gobble_input ();
-#endif
 
   int nbytes
     = wait_reading_process_output (sec, nsec, reading ? -1 : 1, do_display,
@@ -6888,7 +6926,7 @@ sit_for (Lisp_Object timeout, bool reading, int display_option)
        buffer to start with).  */
     set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
 
-  return (nbytes > 0 || detect_input_pending ()) ? Qnil : Qt;
+  return display_sit_for_done_p (nbytes) ? Qnil : Qt;
 }
 
 
@@ -6899,8 +6937,7 @@ Value is t if redisplay has been performed, nil if executing a
 keyboard macro.  */)
   (Lisp_Object force)
 {
-  swallow_events (true);
-  if (!NILP (Vexecuting_kbd_macro))
+  if (display_redisplay_swallow ())
     return Qnil;
 
   redisplay_preserve_echo_area (2);
