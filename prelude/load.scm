@@ -173,6 +173,8 @@
 (use-modules (emacs sysdep-main))
 ;; M33 imp-1 — term.c TTY help/mouse consumers in (emacs terminal).
 (use-modules (emacs terminal))
+;; M33 imp-2 — xmenu.c/gtkutil.c menu helpers in (emacs menu).
+(use-modules (emacs menu))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

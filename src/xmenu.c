@@ -45,6 +45,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 #include "sysselect.h"
+/* M33 imp-2: SCM dispatch macros for the menu/help consumers in
+   (emacs menu) (menu-show-help-event, menu-help-callback,
+   x-menu-timer-wait).  */
+#include "guile.h"
 
 #ifdef MSDOS
 #include "msdos.h"
@@ -172,6 +176,22 @@ x_menu_set_in_use (bool in_use)
 }
 #endif
 
+/* M33 imp-2 - static dispatcher into (emacs menu).  It converts the
+   Scheme (SEC . NSEC) result into a struct timespec, exactly as
+   timer_check (keyboard.c) does.  The C keeps the timespec_valid_p /
+   ntp choice and the select call.  */
+static struct timespec
+x_menu_timer_wait (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu", "x-menu-timer-wait");
+  SCM result = SCM_CALL_0 (proc);
+  if (NILP (result))
+    return invalid_timespec ();
+  return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
+}
+
 /* Wait for an X event to arrive or for a timer to expire.  */
 
 void
@@ -192,7 +212,7 @@ x_menu_wait_for_event (void *data)
 #endif
          )
     {
-      struct timespec next_time = timer_check (), *ntp;
+      struct timespec next_time = x_menu_timer_wait (), *ntp;
       fd_set read_fds;
       struct x_display_info *dpyinfo;
       int n = 0;
@@ -726,15 +746,22 @@ popup_deactivate_callback (
 static void
 show_help_event (struct frame *f, xt_or_gtk_widget widget, Lisp_Object help)
 {
+  /* M33 imp-2 - the decision body moved to (emacs menu)
+     menu-show-help-event.  This C function keeps the name and the
+     signature.  Convert the frame pointer with XSETFRAME here; pass
+     Qnil when f is NULL (brief.org 4.2).  */
+  static SCM proc = SCM_UNDEFINED;
   Lisp_Object frame;
 
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu", "menu-show-help-event");
   if (f)
     {
       XSETFRAME (frame, f);
-      kbd_buffer_store_help_event (frame, help);
+      SCM_CALL_2 (proc, frame, help);
     }
   else
-    show_help_echo (help, Qnil, Qnil, Qnil);
+    SCM_CALL_2 (proc, Qnil, help);
 }
 
 /* Callback called when menu items are highlighted/unhighlighted
@@ -2491,24 +2518,19 @@ static struct frame *menu_help_frame;
 static void
 menu_help_callback (char const *help_string, int pane, int item)
 {
-  Lisp_Object pane_name;
-  Lisp_Object menu_object;
-  Lisp_Object menu_vec = menu_items;
-
-  CHECK_TYPE (PLAIN_VECTORP (menu_vec), Qvectorp, menu_vec);
-
-  if (EQ (AREF (menu_vec, 0), Qt))
-    pane_name = AREF (menu_vec, MENU_ITEMS_PANE_NAME);
-  else if (EQ (AREF (menu_vec, 0), Qquote))
-    /* This shouldn't happen, see x_menu_show.  */
-    pane_name = empty_unibyte_string;
-  else
-    pane_name = AREF (menu_vec, MENU_ITEMS_ITEM_NAME);
-
-  /* (menu-item MENU-NAME PANE-NUMBER)  */
-  menu_object = list3 (Qmenu_item, pane_name, make_fixnum (pane));
-  show_help_echo (help_string ? build_string (help_string) : Qnil,
- 		  Qnil, menu_object, make_fixnum (item));
+  /* M33 imp-2 - the help body moved to (emacs menu) menu-help-callback.
+     This C function keeps the name and the fn-pointer signature at
+     xmenu.c:2817.  It passes the built string or Qnil, and the two
+     fixnums, exactly as the term.c dispatcher does at term.c:3627.
+     Note: under USE_GTK this function is not compiled (it lives in the
+     not-USE_X_TOOLKIT && not-USE_GTK branch); the edit keeps the source
+     consistent for the Xlib build.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu", "menu-help-callback");
+  SCM_CALL_3 (proc,
+	      help_string ? build_string (help_string) : Qnil,
+	      make_fixnum (pane), make_fixnum (item));
 }
 
 struct pop_down_menu

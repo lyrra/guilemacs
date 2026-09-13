@@ -44,6 +44,9 @@ typedef struct pgtk_output xp_output;
 #include "termhooks.h"
 #include "keyboard.h"
 #include "coding.h"
+/* M33 imp-2: SCM dispatch macros for (emacs menu)
+   xg-maybe-add-timer-delay.  */
+#include "guile.h"
 
 #include <gdk/gdkkeysyms.h>
 
@@ -2432,19 +2435,31 @@ pop_down_dialog (void *arg)
 static gboolean
 xg_maybe_add_timer (gpointer data)
 {
+  /* M33 imp-2 - the re-arm decision moved to (emacs menu)
+     xg-maybe-add-timer-delay.  The C keeps dd->timerid, the range
+     check, and g_timeout_add.  The Scheme result is #nil (no active
+     timer) or a millisecond count.
+
+     The test "ms <= (long long) (guint) -1" equals the old test
+     "s <= ((guint) -1 - ms) / 1000": the old code arms the source with
+     s * 1000 + ms, so s * 1000 + ms must fit a guint.  */
+  static SCM proc = SCM_UNDEFINED;
   struct xg_dialog_data *dd = data;
-  struct timespec next_time = timer_check ();
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu", "xg-maybe-add-timer-delay");
 
   dd->timerid = 0;
 
-  if (timespec_valid_p (next_time))
-    {
-      time_t s = next_time.tv_sec;
-      int per_ms = TIMESPEC_HZ / 1000;
-      int ms = (next_time.tv_nsec + per_ms - 1) / per_ms;
-      if (s <= ((guint) -1 - ms) / 1000)
-	dd->timerid = g_timeout_add (s * 1000 + ms, xg_maybe_add_timer, dd);
-    }
+  {
+    SCM delay = SCM_CALL_0 (proc);
+    if (!NILP (delay))
+      {
+	long long ms = XFIXNUM (delay);
+	if (0 <= ms && ms <= (long long) (guint) -1)
+	  dd->timerid = g_timeout_add ((guint) ms, xg_maybe_add_timer, dd);
+      }
+  }
   return FALSE;
 }
 

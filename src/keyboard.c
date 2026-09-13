@@ -2640,45 +2640,6 @@ make_ctrl_char (int c)
   return scm_to_int (SCM_CALL_1 (proc, scm_from_int (c)));
 }
 
-/* Display the help-echo property of the character after the mouse pointer.
-   Either show it in the echo area, or call show-help-function to display
-   it by other means (maybe in a tooltip).
-
-   If HELP is nil, that means clear the previous help echo.
-
-   If HELP is a string, display that string.  If HELP is a function,
-   call it with OBJECT and POS as arguments; the function should
-   return a help string or nil for none.  For all other types of HELP,
-   evaluate it to obtain a string.
-
-   WINDOW is the window in which the help was generated, if any.
-   It is nil if not in a window.
-
-   If OBJECT is a buffer, POS is the position in the buffer where the
-   `help-echo' text property was found.
-
-   If OBJECT is an overlay, that overlay has a `help-echo' property,
-   and POS is the position in the overlay's buffer under the mouse.
-
-   If OBJECT is a string (an overlay string or a string displayed with
-   the `display' property).  POS is the position in that string under
-   the mouse.
-
-   Note: this function may only be called with HELP nil or a string
-   from X code running asynchronously.  */
-
-void
-show_help_echo (Lisp_Object help, Lisp_Object window, Lisp_Object object,
-		Lisp_Object pos)
-{
-  /* M16 imp-3 — C body replaced by a SCM_CALL_4 into the Scheme
-     procedure in (emacs help-echo) show-help-echo.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs help-echo", "show-help-echo");
-  SCM_CALL_4 (proc, help, window, object, pos);
-}
-
 
 
 /* Input of single characters from keyboard.  */
