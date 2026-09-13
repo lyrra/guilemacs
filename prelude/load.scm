@@ -181,6 +181,8 @@
 (use-modules (emacs pgtk))
 ;; M34 imp-1 — dispnew.c display/poll callers in (emacs display).
 (use-modules (emacs display))
+;; M34 imp-2 — frame.c swallow and single-kboard callers in (emacs frame).
+(use-modules (emacs frame))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

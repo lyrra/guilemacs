@@ -642,7 +642,7 @@ This function is called by the editor initialization to begin editing.  */)
 
    See mod/emacs/kboard.scm and docs/keyboard.org §M2.  */
 
-static SCM
+SCM
 make_kboard_smob (KBOARD *kb)
 {
   SCM smob;

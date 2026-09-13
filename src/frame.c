@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "guile_fns.h"
+#include "guile.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -53,6 +54,39 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef USE_X_TOOLKIT
 #include "widget.h"
 #endif
+
+/* M34 imp-2 — the two frame.c keyboard-caller dispatchers.  Each caches
+   its SCM proc in a static SCM with the SCM_UNBNDP guard, as
+   src/dispnew.c and src/terminal.c do.  The C mechanism stays here: the
+   if (kb != NULL) test, the FOR_EACH_FRAME walk, the
+   kb == FRAME_KBOARD (XFRAME (frame1)) comparison, and the
+   make_kboard_smob wrap.  brief.org 5.2.  */
+
+#ifdef HAVE_PGTK
+/* Site 1 — the swallow_events (false) call in Fdelete_frame under
+   HAVE_PGTK.  The call passes false, which is elisp nil (#nil), not #f.  */
+static void
+frame_swallow_events (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs frame", "frame-swallow-events!");
+  SCM_CALL_0 (proc);
+}
+#endif
+
+/* Site 2 — the single-kboard leave decision in Fdelete_frame.  Pass the
+   kboard and the FRAME-ON-SAME-KBOARD Lisp object to (emacs frame),
+   which tests nil and calls not-single-kboard-state.  */
+static void
+frame_maybe_not_single_kboard_state (KBOARD *kb, Lisp_Object frame_on_same_kboard)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs frame",
+			     "frame-maybe-not-single-kboard-state!");
+  SCM_CALL_2 (proc, make_kboard_smob (kb), frame_on_same_kboard);
+}
 
 /* The currently selected frame.  */
 Lisp_Object selected_frame;
@@ -2554,7 +2588,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     {
       /* Do special selection events now, in case the window gets
 	 destroyed by this deletion.  Does this run Lisp code?  */
-      swallow_events (false);
+      frame_swallow_events ();
 
       pgtk_clear_frame_selections (f);
     }
@@ -2687,8 +2721,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	if (kb == FRAME_KBOARD (XFRAME (frame1)))
 	  frame_on_same_kboard = frame1;
 
-      if (NILP (frame_on_same_kboard))
-	not_single_kboard_state (kb);
+      frame_maybe_not_single_kboard_state (kb, frame_on_same_kboard);
     }
 
 

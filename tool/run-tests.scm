@@ -174,6 +174,7 @@
   "test/keyboard/test-m33-imp6.el"              ; M33 imp-6: 2 DEFVAR_* names moved to Scheme — extra-keyboard-modifiers + mwheel-coalesce-scroll-events deleted from keyboard-globals.c (corpus prints PASS/FAIL)
   "test/keyboard/test-m33-imp7.el"              ; M33 imp-7 close-out audit: the two retirements (show_help_echo, discard_mouse_events), the four stay-C stubs, and the anchored Job 1 counts (corpus prints PASS/FAIL)
   "test/keyboard/test-m34-imp1.el"              ; M34 imp-1: dispnew.c display/poll callers moved to (emacs display) (corpus prints PASS/FAIL)
+  "test/keyboard/test-m34-imp2.el"              ; M34 imp-2: frame.c swallow + single-kboard callers moved to (emacs frame) (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

@@ -5,6 +5,11 @@ void init_guile (void);
    Defined in guile.c, initialized in init_guile. */
 extern scm_t_bits kboard_tag;
 
+/* M34 imp-2: the KBOARD smob maker, defined in keyboard.c.  Exposed so
+   src/frame.c's frame_maybe_not_single_kboard_state dispatcher can pass
+   the struct kboard * to (emacs frame) as a smob.  brief.org 5.2.  */
+extern SCM make_kboard_smob (KBOARD *kb);
+
 /* M9: smob type tag for struct input_event * foreign-object wrapping.
    Defined in guile.c, initialized in init_guile.
    See docs/m9-plan.org §imp-1.1.  */
