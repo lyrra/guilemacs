@@ -177,6 +177,8 @@
 (use-modules (emacs menu))
 ;; M33 imp-3 — xterm.c help decision in (emacs xterm).
 (use-modules (emacs xterm))
+;; M33 imp-5 — pgtkterm.c read path in (emacs pgtk).
+(use-modules (emacs pgtk))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

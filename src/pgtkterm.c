@@ -56,6 +56,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "menu.h"
 #include "window.h"
 #include "keyboard.h"
+/* M33 imp-5: SCM dispatch macros for the read path in (emacs pgtk)
+   (pgtk-clear-help-echo?, pgtk-help-event-action,
+   pgtk-extra-keyboard-modifiers, pgtk-mwheel-coalesce-scroll-events?).  */
+#include "guile.h"
 #include "atimer.h"
 #include "buffer.h"
 #include "font.h"
@@ -5206,6 +5210,18 @@ pgtk_enqueue_preedit (struct frame *f, Lisp_Object preedit)
   evq_enqueue (&inev);
 }
 
+/* M33 imp-5 — the extra-keyboard-modifiers read moved to (emacs pgtk)
+   pgtk-extra-keyboard-modifiers.  The C keeps pgtk_emacs_to_gtk_modifiers.
+   Return an intmax_t.  brief.org 5.1.  */
+static intmax_t
+pgtk_extra_keyboard_modifiers (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs pgtk", "pgtk-extra-keyboard-modifiers");
+  return scm_to_intmax (SCM_CALL_0 (proc));
+}
+
 static gboolean
 key_press_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
@@ -5267,7 +5283,7 @@ key_press_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 	}
 
       state |= pgtk_emacs_to_gtk_modifiers (FRAME_DISPLAY_INFO (f),
-					    extra_keyboard_modifiers);
+					    pgtk_extra_keyboard_modifiers ());
       modifiers = state;
 
       /* This will have to go some day...  */
@@ -5471,6 +5487,19 @@ key_release_event (GtkWidget *widget,
   return TRUE;
 }
 
+/* M33 imp-5 — the help-echo clear guards moved to (emacs pgtk)
+   pgtk-clear-help-echo?.  The C keeps the frame conversion, the
+   help_echo_string = Qnil assignment, and the gen_help_event call.
+   brief.org 5.2.  */
+static bool
+pgtk_clear_help_echo_p (bool any_help_p)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs pgtk", "pgtk-clear-help-echo?");
+  return scm_is_true (SCM_CALL_1 (proc, scm_from_bool (any_help_p)));
+}
+
 static gboolean
 configure_event (GtkWidget *widget,
 		 GdkEvent *event,
@@ -5480,7 +5509,7 @@ configure_event (GtkWidget *widget,
 
   if (f && widget == FRAME_GTK_OUTER_WIDGET (f))
     {
-      if (any_help_event_p)
+      if (pgtk_clear_help_echo_p (any_help_event_p))
 	{
 	  Lisp_Object frame;
 	  if (f)
@@ -5764,7 +5793,7 @@ leave_notify_event (GtkWidget *widget, GdkEvent *event,
 
   if (frame)
     {
-      if (any_help_event_p)
+      if (pgtk_clear_help_echo_p (any_help_event_p))
 	{
 	  Lisp_Object frame_obj;
 	  XSETFRAME (frame_obj, frame);
@@ -5884,6 +5913,18 @@ note_mouse_movement (struct frame *frame,
   return false;
 }
 
+/* M33 imp-5 — the help-event decision moved to (emacs pgtk)
+   pgtk-help-event-action.  The C computes do_help and keeps the
+   any_help_event_p flag and the gen_help_event call.  brief.org 5.3.  */
+static int
+pgtk_help_event_action (int do_help)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs pgtk", "pgtk-help-event-action");
+  return scm_to_int (SCM_CALL_1 (proc, scm_from_int (do_help)));
+}
+
 static gboolean
 motion_notify_event (GtkWidget *widget, GdkEvent *event,
 		     gpointer *user_data)
@@ -5983,7 +6024,7 @@ motion_notify_event (GtkWidget *widget, GdkEvent *event,
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue (&inev);
 
-  if (do_help > 0)
+  if (pgtk_help_event_action (do_help))
     {
       Lisp_Object frame;
 
@@ -6161,6 +6202,19 @@ button_event (GtkWidget *widget, GdkEvent *event,
   return TRUE;
 }
 
+/* M33 imp-5 — the mwheel-coalesce-scroll-events read moved to
+   (emacs pgtk) pgtk-mwheel-coalesce-scroll-events?.  The C keeps the
+   accumulator and the two fabs tests.  brief.org 5.4.  */
+static bool
+pgtk_mwheel_coalesce_scroll_events_p (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs pgtk",
+                             "pgtk-mwheel-coalesce-scroll-events?");
+  return scm_is_true (SCM_CALL_0 (proc));
+}
+
 static gboolean
 scroll_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
@@ -6226,7 +6280,7 @@ scroll_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
     }
   else if (gdk_event_get_scroll_deltas (event, &delta_x, &delta_y))
     {
-      if (!mwheel_coalesce_scroll_events)
+      if (!pgtk_mwheel_coalesce_scroll_events_p ())
 	{
 	  inev.ie.kind = ((fabs (delta_x) > fabs (delta_y))
 			  ? HORIZ_WHEEL_EVENT
@@ -6263,7 +6317,7 @@ scroll_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 	      dpyinfo->scroll.acc_y -= -dpyinfo->scroll.y_per_line * nlines;
 	    }
 	  else if (dpyinfo->scroll.acc_x >= dpyinfo->scroll.x_per_char
-		   || !mwheel_coalesce_scroll_events)
+		   || !pgtk_mwheel_coalesce_scroll_events_p ())
 	    {
 	      int nchars = dpyinfo->scroll.acc_x / dpyinfo->scroll.x_per_char;
 	      inev.ie.kind = HORIZ_WHEEL_EVENT;
