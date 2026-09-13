@@ -11546,6 +11546,18 @@ x_hide_hourglass (struct frame *f)
     }
 }
 
+/* M33 imp-4 — the XTflash input test moved to (emacs xterm)
+   x-input-pending?.  The C keeps the pselect, the fd-set build, and
+   the timeout arithmetic.  brief.org 3.  */
+static bool
+x_input_pending (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xterm", "x-input-pending?");
+  return scm_is_true (SCM_CALL_0 (proc));
+}
+
 /* Invert the middle quarter of the frame for .15 sec.  */
 
 static void
@@ -11600,7 +11612,7 @@ XTflash (struct frame *f)
 
   /* Keep waiting until past the time wakeup or any input gets
      available.  */
-  while (! detect_input_pending ())
+  while (! x_input_pending ())
     {
       struct timespec current = current_timespec ();
       struct timespec timeout;
@@ -18906,6 +18918,31 @@ x_help_event_action (int do_help, bool hold_quit_p)
                                  scm_from_bool (hold_quit_p)));
 }
 
+/* M33 imp-4 — the extra-keyboard-modifiers read moved to (emacs xterm)
+   x-extra-keyboard-modifiers.  The C keeps the x_emacs_to_x_modifiers
+   conversion.  Return an intmax_t.  brief.org 4.1.  */
+static intmax_t
+x_extra_keyboard_modifiers (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xterm", "x-extra-keyboard-modifiers");
+  return scm_to_intmax (SCM_CALL_0 (proc));
+}
+
+/* M33 imp-4 — the mwheel-coalesce-scroll-events read moved to
+   (emacs xterm) x-mwheel-coalesce-scroll-events?.  The C keeps the 2
+   fabs tests.  brief.org 4.2.  */
+static bool
+x_mwheel_coalesce_scroll_events_p (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xterm",
+                             "x-mwheel-coalesce-scroll-events?");
+  return scm_is_true (SCM_CALL_0 (proc));
+}
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -20360,7 +20397,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
           xkey.state |= x_emacs_to_x_modifiers (dpyinfo,
-						extra_keyboard_modifiers);
+						x_extra_keyboard_modifiers ());
           modifiers = xkey.state;
 
           /* This will have to go some day...  */
@@ -22826,7 +22863,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 			  val->emacs_value += delta;
 
-			  if (mwheel_coalesce_scroll_events
+			  if (x_mwheel_coalesce_scroll_events_p ()
 			      && (fabs (val->emacs_value) < 1)
 			      && (fabs (delta) > 0))
 			    continue;
@@ -24258,7 +24295,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 #endif /* HAVE_X_I18N || USE_GTK */
 
-	      state |= x_emacs_to_x_modifiers (dpyinfo, extra_keyboard_modifiers);
+	      state |= x_emacs_to_x_modifiers (dpyinfo, x_extra_keyboard_modifiers ());
 
 	      /* If mouse-highlight is an integer, input clears out
 		 mouse highlighting.  */

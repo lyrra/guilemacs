@@ -1,4 +1,5 @@
-;;; xterm.scm --- M33 imp-3: the xterm.c help-event decision
+;;; xterm.scm --- M33 imp-3/imp-4: the xterm.c help decision, the
+;;;                  input test, and 2 name readers
 ;;;                  ((emacs xterm))
 ;;;
 ;;; Moves the *decision* logic of the handle_one_xevent help path out
@@ -8,11 +9,17 @@
 ;;; (xi_handle_interaction), the gen_help_event calls, and the event
 ;;; count.  See docs/m33-plan.org A2 ... A3 and brief.org 3.
 ;;;
-;;; One exported procedure:
+;;; Four exported procedures:
 ;;;
 ;;;   x-help-event-action -- src/xterm.c:25629-25657, the three-way
 ;;;                          choice of the help block in
 ;;;                          handle_one_xevent.
+;;;   x-input-pending?     -- src/xterm.c:11603, the input test of
+;;;                          XTflash.  brief.org 3.
+;;;   x-extra-keyboard-modifiers -- src/xterm.c:20363 and :24261, the
+;;;                          fixnum mask read.  brief.org 4.1.
+;;;   x-mwheel-coalesce-scroll-events? -- src/xterm.c:22829, the
+;;;                          boolean read.  brief.org 4.2.
 ;;;
 ;;; Port principle (brief.org 3): the module decides the *outcome*.  The
 ;;; C forms the arguments of its own gen_help_event call, because
@@ -32,11 +39,51 @@
 ;;;
 ;;; Conventions (identical to M9-M33): a guilemacs Scheme integer is an
 ;;; elisp fixnum; #nil is elisp nil; no module-level mutable state.
-;;; The module has no C primitive and no cross-module reference.
+;;; The module adds no C primitive.  It reads the 2 name cells with the
+;;; delayed (emacs-elisp runtime) symbol-value and the input state with
+;;; the delayed C primitive --detect-input-pending.
 
 (define-module (emacs xterm)
+  #:use-module (emacs elisp-ref)      ; defelisp
+  #:use-module (emacs-elisp runtime)  ; symbol-value, --detect-input-pending
   #:declarative? #t
-  #:export (x-help-event-action))
+  #:export (x-help-event-action
+            x-input-pending?
+            x-extra-keyboard-modifiers
+            x-mwheel-coalesce-scroll-events?))
+
+;;; --- delayed C references ------------------------------------------
+;;; The 2 names are cell readers.  The C keeps the mechanism.  The
+;;; primitive --detect-input-pending stays C (src/keyboard.c:9346).
+(defelisp %--detect-input-pending --detect-input-pending)
+(defelisp %symbol-value           symbol-value)
+
+;;; --- Helpers -------------------------------------------------------
+;;; Each module carries its own copy.  See mod/emacs/recent-keys.scm:38.
+(define (truthy? x)
+  "Elisp truthiness: everything except #nil is true."
+  (not (eq? x #nil)))
+
+;;; --- x-input-pending? ----------------------------------------------
+;;; Port of the input test at src/xterm.c:11603 in XTflash.  Return #t
+;;; when input events are pending.  The primitive returns elisp t or
+;;; elisp nil, so normalize with truthy?.  The C keeps the loop: the
+;;; current_timespec read, the timespec_cmp test, the FD_ZERO / FD_SET
+;;; build, the timeout, and the pselect call.  brief.org 3.
+(define (x-input-pending?)
+  (truthy? ((force %--detect-input-pending))))
+
+;;; --- x-extra-keyboard-modifiers ------------------------------------
+;;; Port of the reads at src/xterm.c:20363 and :24261.  Return the
+;;; fixnum mask.  The C keeps x_emacs_to_x_modifiers.  brief.org 4.1.
+(define (x-extra-keyboard-modifiers)
+  ((force %symbol-value) 'extra-keyboard-modifiers))
+
+;;; --- x-mwheel-coalesce-scroll-events? ------------------------------
+;;; Port of the read at src/xterm.c:22829.  Return a plain Scheme
+;;; boolean.  The C keeps the 2 fabs tests.  brief.org 4.2.
+(define (x-mwheel-coalesce-scroll-events?)
+  (truthy? ((force %symbol-value) 'mwheel-coalesce-scroll-events)))
 
 ;;; --- x-help-event-action -------------------------------------------
 ;;; Port of the help decision at src/xterm.c:25629-25630 and
