@@ -45,6 +45,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "syssignal.h"
 #include "sysstdio.h"
+#include "guile.h"
 #ifdef MSDOS
 #include "msdos.h"
 static int been_here = -1;
@@ -3310,6 +3311,31 @@ read_menu_input (struct frame *sf, int *x, int *y, int min_y, int max_y,
   return MI_CONTINUE;
 }
 
+/* M33 imp-1 - static dispatchers into (emacs terminal).  They are local
+   to term.c, so the budgeted keyboard.c surface does not grow.  Each
+   caches its SCM proc in a static SCM with the SCM_UNBNDP guard.  The C
+   mechanism stays here: the menu select loop and the terminal walk.  */
+
+static void
+tty_menu_clear_help (void)
+{
+  /* Port of the MI_QUIT_MENU arm (term.c:3432-3434).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "tty-menu-clear-help!");
+  SCM_CALL_0 (proc);
+}
+
+static void
+tty_menu_discard_mouse_events (void)
+{
+  /* Port of term.c:3566-3568.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "tty-menu-discard-mouse-events!");
+  SCM_CALL_0 (proc);
+}
+
 /* Display menu, wait for user's response, and return that response.  */
 static int
 tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
@@ -3430,8 +3456,9 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
 	    {
 	    case MI_QUIT_MENU:
 	      /* Remove the last help-echo, so that it doesn't
-		 re-appear after "Quit".  */
-	      show_help_echo (Qnil, Qnil, Qnil, Qnil);
+		 re-appear after "Quit".  M33 imp-1: the decision moved
+		 to (emacs terminal) tty-menu-clear-help!.  */
+	      tty_menu_clear_help ();
 	      result = TTYM_NO_SELECT;
 	      break;
 	    case MI_NEXT_ITEM:
@@ -3563,9 +3590,9 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
      displayed, probably because the user pressed and released the button
      (which invoked the menu) too quickly.  If we don't remove these events,
      Emacs will process them after we return and surprise the user.  */
-  discard_mouse_events ();
-  if (!kbd_buffer_events_waiting ())
-    clear_input_pending ();
+  /* M33 imp-1: the decision moved to (emacs terminal)
+     tty-menu-discard-mouse-events!.  */
+  tty_menu_discard_mouse_events ();
   SAFE_FREE ();
   Vinhibit_redisplay = prev_inhibit_redisplay;
   return result;
@@ -3599,24 +3626,15 @@ tty_menu_destroy (tty_menu *menu)
 static void
 tty_menu_help_callback (char const *help_string, int pane, int item)
 {
-  Lisp_Object pane_name;
-  Lisp_Object menu_object;
-  Lisp_Object menu_vec = menu_items;
-
-  CHECK_TYPE (PLAIN_VECTORP (menu_vec), Qvectorp, menu_vec);
-
-  if (EQ (AREF (menu_vec, 0), Qt))
-    pane_name = AREF (menu_vec, MENU_ITEMS_PANE_NAME);
-  else if (EQ (AREF (menu_vec, 0), Qquote))
-    /* This shouldn't happen, see xmenu_show.  */
-    pane_name = empty_unibyte_string;
-  else
-    pane_name = AREF (menu_vec, MENU_ITEMS_ITEM_NAME);
-
-  /* (menu-item MENU-NAME PANE-NUMBER)  */
-  menu_object = list3 (Qmenu_item, pane_name, make_fixnum (pane));
-  show_help_echo (help_string ? build_string (help_string) : Qnil,
- 		  Qnil, menu_object, make_fixnum (item));
+  /* M33 imp-1 - the decision body moved to (emacs terminal)
+     tty-menu-help-callback.  This C function keeps the name and the
+     fn-pointer signature at term.c:3920 (see brief.org 5.3).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "tty-menu-help-callback");
+  SCM_CALL_3 (proc,
+	      help_string ? build_string (help_string) : Qnil,
+	      make_fixnum (pane), make_fixnum (item));
 }
 
 struct tty_pop_down_menu

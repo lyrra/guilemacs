@@ -171,6 +171,8 @@
 (use-modules (emacs eval-main))
 ;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).
 (use-modules (emacs sysdep-main))
+;; M33 imp-1 — term.c TTY help/mouse consumers in (emacs terminal).
+(use-modules (emacs terminal))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

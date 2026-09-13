@@ -170,10 +170,11 @@ count -- a loose substring match would also count a comment line."
 ;;; --- 6. Static: the anchored Job 1 counts ---------------------------
 ;;; The brief warns twice about loose patterns.  Use the anchored forms
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
-;;; the site counts.
+;;; the site counts.  M33 imp-1 added two keyboard.c primitives
+;;; (--menu-items, --clear-input-pending!), so the count is 448.
 (if (not kbd)
     (report "m32/imp6/scan/keyboard.c-count" (cons 'FAIL "missing"))
-    (check "m32/imp6/count/keyboard.c-defuns" 446
+    (check "m32/imp6/count/keyboard.c-defuns" 448
            (count-prefix kbd "DEFUN (\"")))
 
 (if (not kg)

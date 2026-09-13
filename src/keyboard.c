@@ -3995,15 +3995,25 @@ kbd_buffer_store_help_event (Lisp_Object frame, Lisp_Object help)
 }
 
 
-/* Discard any mouse events in the event buffer by setting them to
-   NO_EVENT.  */
-void
-discard_mouse_events (void)
+/* M33 imp-1.  Two internal primitives for (emacs terminal).  The
+   discard_mouse_events stub retired when its last caller (term.c:3566)
+   left C; (emacs terminal) now calls kbd-buffer-discard-mouse-events!
+   directly and reads the two C items below.  */
+
+DEFUN ("--menu-items", Fmenu_items, Smenu_items, 0, 0, 0,
+       doc: /* Return the C global menu_items (storage src/menu.c:59).  */)
+  (void)
 {
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-discard-mouse-events!");
-  SCM_CALL_0 (proc);
+  return menu_items;
+}
+
+DEFUN ("--clear-input-pending!", Fclear_input_pending_bang,
+       Sclear_input_pending_bang, 0, 0, 0,
+       doc: /* Call clear_input_pending and return nil.  */)
+  (void)
+{
+  clear_input_pending ();
+  return Qnil;
 }
 
 
