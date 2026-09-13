@@ -112,19 +112,6 @@ If the form returns a string, that string is displayed.
 If `help-form' is nil, the help char is not recognized.  */);
   Vhelp_form = Qnil;
 
-  DEFVAR_INT ("extra-keyboard-modifiers", extra_keyboard_modifiers,
-	      doc: /* A mask of additional modifier keys to use with every keyboard character.
-Emacs applies the modifiers of the character stored here to each keyboard
-character it reads.  For example, after evaluating the expression
-    (setq extra-keyboard-modifiers ?\\C-x)
-all input characters will have the control modifier applied to them.
-
-Note that the character ?\\C-@, equivalent to the integer zero, does
-not count as a control character; rather, it counts as a character
-with no modifiers; thus, setting `extra-keyboard-modifiers' to zero
-cancels any modification.  */);
-  extra_keyboard_modifiers = 0;
-
   DEFVAR_LISP ("deactivate-mark", Vdeactivate_mark,
     doc: /* Whether to deactivate the mark after an editing command.
 The command loop sets this to nil before each command,
@@ -189,13 +176,6 @@ as per the args of `display-warning' (which see).
 If this variable is non-nil, `delayed-warnings-hook' will be run
 immediately after running `post-command-hook'.  */);
   Vdelayed_warnings_list = Qnil;
-
-  DEFVAR_BOOL ("mwheel-coalesce-scroll-events", mwheel_coalesce_scroll_events,
-	       doc: /* Non-nil means send a wheel event only for scrolling at least one screen line.
-Otherwise, a wheel event will be sent every time the mouse wheel is
-moved.  */);
-  mwheel_coalesce_scroll_events = true;
-
 
   /* M23 imp-3: relocated DEFVAR_KBOARD call sites.  Each registers a
      Lisp_Kboard_Objfwd forwarding into struct kboard; storage and

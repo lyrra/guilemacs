@@ -1224,7 +1224,12 @@ command_loop_1_iter_pre_read."
      ;; resolved value cell (attempt_stack_overflow_recovery_value), so
      ;; it never enters the Guile runtime on the fatal-signal path.  The
      ;; C default was true.
-     (attempt-stack-overflow-recovery ,#t))))
+     (attempt-stack-overflow-recovery ,#t)
+     ;; M33 imp-6 — 2 DEFVAR_* names moved here from keyboard-globals.c.
+     ;; No compiled C file reads either cell: xterm.c and pgtkterm.c read
+     ;; each name through (emacs xterm) / (emacs pgtk) with symbol-value.
+     (extra-keyboard-modifiers     0)
+     (mwheel-coalesce-scroll-events ,#t))))
 
 ;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
 ;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard

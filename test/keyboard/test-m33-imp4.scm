@@ -21,8 +21,8 @@
 ;;;     pinned, because it depends on the input state.
 ;;;   - a static wiring check: src/xterm.c holds the 3 dispatchers and
 ;;;     the 3 module references; the 3 old C reads are gone; the
-;;;     DEFVAR_* sites and the primitive stay C; the module boot-loads
-;;;     once.
+;;;     DEFVAR_* sites stayed C at imp-4 and moved to Scheme at imp-6;
+;;;     the module boot-loads once.
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m33-root.
 ;;;
@@ -151,15 +151,18 @@
       (check "m33/imp4/xterm.c/keeps-fabs-tests" #t
              (contains? xterm-c "(fabs (delta) > 0)"))))
 
-;;; --- 4. Static: the 2 DEFVAR_* sites stay --------------------------
+;;; --- 4. Static: the 2 DEFVAR_* sites no longer stay -----------------
+;;; imp-4 moved the readers but kept the DEFVAR_* sites in C.  M33 imp-6
+;;; moved the two sites to Scheme, so assert they are gone.  A surviving
+;;; site would make the name C-owned again.
 (define kbd-g (slurp (repo "src/keyboard-globals.c")))
 (if (not kbd-g)
     (report "m33/imp4/scan/keyboard-globals.c"
             (cons 'FAIL "src/keyboard-globals.c missing"))
     (begin
-      (check "m33/imp4/keyboard-globals.c/still-defvars-extra-keyboard" #t
+      (check "m33/imp4/keyboard-globals.c/no-defvars-extra-keyboard" #f
              (contains? kbd-g "DEFVAR_INT (\"extra-keyboard-modifiers\""))
-      (check "m33/imp4/keyboard-globals.c/still-defvars-mwheel" #t
+      (check "m33/imp4/keyboard-globals.c/no-defvars-mwheel" #f
              (contains? kbd-g "DEFVAR_BOOL (\"mwheel-coalesce-scroll-events\""))))
 
 ;;; --- 5. Static: src/keyboard.c keeps the primitive -----------------

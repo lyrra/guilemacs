@@ -25,7 +25,8 @@
 ;;;     a runtime check: the 2 name readers read the live cell.
 ;;;   - a static wiring check: src/pgtkterm.c holds the 4 dispatchers
 ;;;     and the 4 module references; the 6 old C reads are gone; the 2
-;;;     DEFVAR_* sites stay C; the module boot-loads once.
+;;;     DEFVAR_* sites stayed C at imp-5 and moved to Scheme at imp-6;
+;;;     the module boot-loads once.
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m33-root.
 ;;;
@@ -182,15 +183,18 @@
       (check "m33/imp5/pgtkterm.c/keeps-fabs-tests" #t
              (contains? pgtk-c "(fabs (delta_x) > fabs (delta_y))"))))
 
-;;; --- 5. Static: the 2 DEFVAR_* sites stay --------------------------
+;;; --- 5. Static: the 2 DEFVAR_* sites no longer stay ----------------
+;;; imp-5 kept the DEFVAR_* sites in C.  M33 imp-6 moved the two sites
+;;; to Scheme, so assert they are gone.  A surviving site would make the
+;;; name C-owned again.
 (define kbd-g (slurp (repo "src/keyboard-globals.c")))
 (if (not kbd-g)
     (report "m33/imp5/scan/keyboard-globals.c"
             (cons 'FAIL "src/keyboard-globals.c missing"))
     (begin
-      (check "m33/imp5/keyboard-globals.c/still-defvars-extra-keyboard" #t
+      (check "m33/imp5/keyboard-globals.c/no-defvars-extra-keyboard" #f
              (contains? kbd-g "DEFVAR_INT (\"extra-keyboard-modifiers\""))
-      (check "m33/imp5/keyboard-globals.c/still-defvars-mwheel" #t
+      (check "m33/imp5/keyboard-globals.c/no-defvars-mwheel" #f
              (contains? kbd-g "DEFVAR_BOOL (\"mwheel-coalesce-scroll-events\""))))
 
 ;;; --- 6. Static: the module source ----------------------------------

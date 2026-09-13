@@ -172,6 +172,9 @@ count -- a loose substring match would also count a comment line."
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
 ;;; the site counts.  M33 imp-1 added two keyboard.c primitives
 ;;; (--menu-items, --clear-input-pending!), so the count is 448.
+;;; M33 imp-6 moved extra-keyboard-modifiers (INT) and
+;;; mwheel-coalesce-scroll-events (BOOL) to Scheme, so the DEFVAR_INT
+;;; and DEFVAR_BOOL site counts drop by one each (2 -> 1).
 (if (not kbd)
     (report "m32/imp6/scan/keyboard.c-count" (cons 'FAIL "missing"))
     (check "m32/imp6/count/keyboard.c-defuns" 448
@@ -181,8 +184,8 @@ count -- a loose substring match would also count a comment line."
     (report "m32/imp6/scan/keyboard-globals.c-count" (cons 'FAIL "missing"))
     (begin
       (check "m32/imp6/count/defvar-lisp" 32 (count-prefix kg "  DEFVAR_LISP ("))
-      (check "m32/imp6/count/defvar-int" 2 (count-prefix kg "  DEFVAR_INT ("))
-      (check "m32/imp6/count/defvar-bool" 2 (count-prefix kg "  DEFVAR_BOOL ("))
+      (check "m32/imp6/count/defvar-int" 1 (count-prefix kg "  DEFVAR_INT ("))
+      (check "m32/imp6/count/defvar-bool" 1 (count-prefix kg "  DEFVAR_BOOL ("))
       (check "m32/imp6/count/defvar-kboard" 8 (count-prefix kg "  DEFVAR_KBOARD ("))
       (check "m32/imp6/count/defsym" 34 (count-prefix kg "  DEFSYM ("))))
 
