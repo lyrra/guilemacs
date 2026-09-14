@@ -225,9 +225,11 @@ count -- a loose substring match would also count a comment line
        '("xdisp_run_activate_menubar_hook"
          "xdisp_run_menu_bar_update_hook"
          "xdisp_run_window_scroll_functions"))
-      ;; Each dispatcher resolves the same-named module procedure.
+      ;; Each dispatcher resolves the same-named module procedure.  Count
+      ;; the three imp-5 refs by their module-procedure names, so the
+      ;; three imp-6 refs (test-m34-imp6.scm) do not disturb this check.
       (check "m34/imp5/xdisp.c/refs-emacs-xdisp" 3
-             (count-substring xdisp-c "scm_c_public_ref (\"emacs xdisp\""))
+             (count-substring xdisp-c "\"xdisp-run-"))
       ;; The old S1/S2 site text is gone.
       (check "m34/imp5/xdisp.c/no-old-activate" #f
              (contains? xdisp-c "safe_run_hooks (Qactivate_menubar_hook)"))

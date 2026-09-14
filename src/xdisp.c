@@ -555,6 +555,53 @@ xdisp_run_window_scroll_functions (Lisp_Object window, Lisp_Object start)
   SCM_CALL_2 (proc, window, start);
 }
 
+/* M34 imp-6 — the src/xdisp.c part-2 kboard and name readers into
+   (emacs xdisp).  One static dispatcher per target.  Each caches its
+   SCM proc in a static SCM with the SCM_UNBNDP guard, as src/frame.c and
+   src/minibuf.c do.  The C keeps the mechanism: the unwind-protect
+   frame, the dynwind blocks, and the NILP test of the S5 reader.  The
+   five sites are S1 and S3 (push_kboard, display_mode_line and
+   Fformat_mode_line), S2 and S4 (pop_kboard, the same two functions),
+   and S5 (the three Voverriding_local_map_menu_flag readers in
+   update_menu_bar, update_tab_bar, and update_tool_bar).  brief.org 6.  */
+
+/* Sites S1 and S3 (src/xdisp.c:27683, :28523): the push_kboard
+   callers.  Make the kboard smob in C (make_kboard_smob, src/guile.h)
+   and hand it to Scheme.  */
+static void
+xdisp_push_kboard (KBOARD *kb)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp", "xdisp-push-kboard!");
+  SCM_CALL_1 (proc, make_kboard_smob (kb));
+}
+
+/* Sites S2 and S4 (src/xdisp.c:27739, :28525): the pop_kboard
+   callers.  */
+static void
+xdisp_pop_kboard (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp", "xdisp-pop-kboard!");
+  SCM_CALL_0 (proc);
+}
+
+/* Site S5 (src/xdisp.c:14315, :14490, :15460): the three
+   Voverriding_local_map_menu_flag readers.  The module returns Qt
+   (cell non-nil) or Qnil (cell nil).  The C keeps NILP, so the NILP
+   width does not change.  brief.org 6.  */
+static Lisp_Object
+xdisp_overriding_local_map_menu_flag_p (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-overriding-local-map-menu-flag-p");
+  return SCM_CALL_0 (proc);
+}
+
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Test if overflow newline into fringe.  Called with iterator IT
@@ -14312,7 +14359,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  set_buffer_internal_1 (XBUFFER (w->contents));
 	  if (save_match_data)
 	    record_unwind_save_match_data ();
-	  if (NILP (Voverriding_local_map_menu_flag))
+	  if (NILP (xdisp_overriding_local_map_menu_flag_p ()))
 	    {
 	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
 	      specbind_guile (Qoverriding_local_map, Qnil);
@@ -14487,7 +14534,7 @@ update_tab_bar (struct frame *f, bool save_match_data)
 	    record_unwind_save_match_data ();
 
 	  /* Make sure that we don't accidentally use bogus keymaps.  */
-	  if (NILP (Voverriding_local_map_menu_flag))
+	  if (NILP (xdisp_overriding_local_map_menu_flag_p ()))
 	    {
 	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
 	      specbind_guile (Qoverriding_local_map, Qnil);
@@ -15457,7 +15504,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
 	    record_unwind_save_match_data ();
 
 	  /* Make sure that we don't accidentally use bogus keymaps.  */
-	  if (NILP (Voverriding_local_map_menu_flag))
+	  if (NILP (xdisp_overriding_local_map_menu_flag_p ()))
 	    {
 	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
 	      specbind_guile (Qoverriding_local_map, Qnil);
@@ -27680,7 +27727,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   /* Temporarily make frame's keyboard the current kboard so that
      kboard-local variables in the mode_line_format will get the right
      values.  */
-  push_kboard (FRAME_KBOARD (it.f));
+  xdisp_push_kboard (FRAME_KBOARD (it.f));
   record_unwind_save_match_data ();
 
   if (NILP (Vmode_line_compact)
@@ -27736,7 +27783,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
 			    STRING_MULTIBYTE (mode_string));
 	}
     }
-  pop_kboard ();
+  xdisp_pop_kboard ();
 
   dynwind_end ();
 
@@ -28520,9 +28567,9 @@ are the selected window and the WINDOW's buffer).  */)
 	= NILP (face) ? Qnil : list2 (Qface, face);
     }
 
-  push_kboard (FRAME_KBOARD (it.f));
+  xdisp_push_kboard (FRAME_KBOARD (it.f));
   display_mode_element (&it, 0, 0, 0, format, Qnil, false);
-  pop_kboard ();
+  xdisp_pop_kboard ();
 
   if (no_props)
     {

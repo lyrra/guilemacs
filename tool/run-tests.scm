@@ -178,6 +178,7 @@
   "test/keyboard/test-m34-imp3.el"              ; M34 imp-3: window.c + fileio.c safe_run_hooks callers moved to (emacs window)/(emacs fileio) (corpus prints PASS/FAIL)
   "test/keyboard/test-m34-imp4.el"              ; M34 imp-4: minibuf.c input-state callers moved to (emacs minibuf) (corpus prints PASS/FAIL)
   "test/keyboard/test-m34-imp5.el"              ; M34 imp-5: xdisp.c part-1 hook callers moved to (emacs xdisp) (corpus prints PASS/FAIL)
+  "test/keyboard/test-m34-imp6.el"              ; M34 imp-6: xdisp.c part-2 kboard + name readers moved to (emacs xdisp) (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
