@@ -32,10 +32,114 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 #include "sysstdio.h"
 #include "systty.h"
+#include "guile.h"
 
 #ifdef HAVE_NTGUI
 #include "w32term.h"
 #endif
+
+/* M34 imp-4 — the src/minibuf.c dispatchers into (emacs minibuf).
+   One static dispatcher per site group.  Each caches its SCM proc in a
+   static SCM with the SCM_UNBNDP guard, as src/window.c:4029 and
+   src/fileio.c:5794 do.  These are the first scm_c_public_ref sites in
+   src/minibuf.c.  The C keeps the mechanism: the dynwind blocks, the
+   minibuf_save_list conspairing, the stdin read, the Ferase_buffer call,
+   and the temporarily_switch_to_single_kboard call itself.
+   Pass Qt / Qnil for an elisp boolean, not #t / #f: in this Guile #nil is
+   false and #f is true, so scm_from_bool would invert the false case.
+   brief.org 7.  */
+
+/* Site 1 (src/minibuf.c:1129): the minibuffer-exit-hook run.  */
+static void
+minibuf_run_exit_minibuffer_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf",
+			     "minibuf-run-exit-minibuffer-hook!");
+  SCM_CALL_0 (proc);
+}
+
+/* Site 2 (src/minibuf.c:759): the frame value handed to
+   temporarily_switch_to_single_kboard.  Returns the frame (or Qnil).  */
+static Lisp_Object
+minibuf_single_kboard_target (Lisp_Object mini_frame)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-single-kboard-target");
+  return SCM_CALL_1 (proc, mini_frame);
+}
+
+/* Site 5.1a (src/minibuf.c:320): the unread-command-events drain.  */
+static Lisp_Object
+minibuf_unread_command_string (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-unread-command-string");
+  return SCM_CALL_0 (proc);
+}
+
+/* Site 5.1b (src/minibuf.c:696): the batch drain test.  */
+static Lisp_Object
+minibuf_batch_unread_drain_p (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-batch-unread-drain-p");
+  return SCM_CALL_0 (proc);
+}
+
+/* Site 5.2 (src/minibuf.c:768, :776, :798, :1197, :1205): the help-form /
+   overriding-local-map cell access.  */
+static Lisp_Object
+minibuf_capture_help_state (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-capture-help-state");
+  return SCM_CALL_0 (proc);
+}
+
+static void
+minibuf_set_help_form (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-set-help-form!");
+  SCM_CALL_0 (proc);
+}
+
+static void
+minibuf_restore_help_state (Lisp_Object saved)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf", "minibuf-restore-help-state!");
+  SCM_CALL_1 (proc, saved);
+}
+
+/* Site 5.3 (src/minibuf.c:1225, :1227): the deactivate-mark access.  */
+static Lisp_Object
+minibuf_capture_deactivate_mark (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf",
+			     "minibuf-capture-deactivate-mark");
+  return SCM_CALL_0 (proc);
+}
+
+static void
+minibuf_restore_deactivate_mark (Lisp_Object mark)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs minibuf",
+			     "minibuf-restore-deactivate-mark!");
+  SCM_CALL_1 (proc, mark);
+}
 
 /* List of buffers for use as minibuffers.
    The first element of the list is used for the outermost minibuffer
@@ -315,44 +419,24 @@ read_minibuf_noninteractive (Lisp_Object prompt, bool expflag,
   struct emacs_tty etty;
   bool etty_valid UNINIT;
 
-  /* FIX-guilemacs: Check if we should read from unread-command-events
-     instead of stdin (for ert-simulate-keys support in batch mode).  */
-  if (!NILP (Vexecuting_kbd_macro) && CONSP (Vunread_command_events))
-    {
-      /* Build string from unread-command-events */
-      size = 100;
-      len = 0;
-      line = xmalloc_atomic (size);
+  /* M34 imp-4 — the drain decision moved to (emacs minibuf)
+     minibuf-unread-command-string.  The module returns a string when the
+     guard holds (executing-kbd-macro non-nil and unread-command-events a
+     cons) and #nil otherwise; it pops the unread-command-events cell and
+     stops on newline / carriage return.  The C keeps the stdin
+     read below and the expflag parse.  brief.org 5.1a.  */
+  {
+    Lisp_Object drained = minibuf_unread_command_string ();
 
-      while (CONSP (Vunread_command_events))
-        {
-          Lisp_Object event = XCAR (Vunread_command_events);
-          Vunread_command_events = XCDR (Vunread_command_events);
-
-          /* Handle simple character events */
-          if (FIXNUMP (event))
-            {
-              c = XFIXNUM (event);
-
-              /* Stop on newline or carriage return */
-              if (c == '\n' || c == '\r' || c == 13)
-                break;
-
-              if (len == size)
-                line = xpalloc (line, &size, 1, -1, sizeof *line);
-              line[len++] = c;
-            }
-        }
-
-      val = make_string (line, len);
-      xfree (line);
-
-      /* If Lisp form desired instead of string, parse it.  */
-      if (expflag)
-        val = string_to_object (val, CONSP (defalt) ? XCAR (defalt) : defalt);
-
-      return val;
-    }
+    if (!NILP (drained))
+      {
+        /* If Lisp form desired instead of string, parse it.  */
+        if (expflag)
+          drained = string_to_object (drained,
+                                      CONSP (defalt) ? XCAR (defalt) : defalt);
+        return drained;
+      }
+  }
 
   /* Check, whether we need to suppress echoing.  */
   if (CHARACTERP (Vread_hide_char))
@@ -692,8 +776,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
        /* In case we are running as a daemon, only do this before
 	  detaching from the terminal.  */
        || (IS_DAEMON && DAEMON_RUNNING))
-      && (NILP (Vexecuting_kbd_macro)
-          || (!NILP (Vexecuting_kbd_macro) && CONSP (Vunread_command_events))))
+      && !NILP (minibuf_batch_unread_drain_p ()))
     {
       val = read_minibuf_noninteractive (prompt, expflag, defalt);
       dynwind_end ();
@@ -756,7 +839,16 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   if (minibuffer_auto_raise)
     Fraise_frame (mini_frame);
 
-  temporarily_switch_to_single_kboard (XFRAME (mini_frame));
+  /* M34 imp-4 — the "which frame" decision moved to (emacs minibuf)
+     minibuf-single-kboard-target.  The C keeps its own
+     temporarily_switch_to_single_kboard call; it runs only when the
+     module returns a non-nil frame.  brief.org 4.  */
+  {
+    Lisp_Object minibuf_sk_target = minibuf_single_kboard_target (mini_frame);
+
+    if (!NILP (minibuf_sk_target))
+      temporarily_switch_to_single_kboard (XFRAME (minibuf_sk_target));
+  }
 
   /* We have to do this after saving the window configuration
      since that is what restores the current buffer.  */
@@ -764,20 +856,30 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   /* Arrange to restore a number of minibuffer-related variables.
      We could bind each variable separately, but that would use lots of
      specpdl slots.  */
-  minibuf_save_list
-    = Fcons (Voverriding_local_map,
-	     Fcons (minibuf_window,
-		    Fcons (calling_frame,
-			   Fcons (calling_window,
-				  minibuf_save_list))));
-  minibuf_save_list
-    = Fcons (minibuf_prompt,
-	     Fcons (make_fixnum (minibuf_prompt_width),
-		    Fcons (Vhelp_form,
-			   Fcons (Vcurrent_prefix_arg,
-				  Fcons (Vminibuffer_history_position,
-					 Fcons (Vminibuffer_history_variable,
-						minibuf_save_list))))));
+  /* M34 imp-4 — the overriding-local-map / help-form cell reads moved
+     to (emacs minibuf) minibuf-capture-help-state.  The pair is
+     (help-form . overriding-local-map).  The C keeps the
+     minibuf_save_list mechanism and the cons positions, so the list order
+     and the number of conses are unchanged (read_minibuf_unwind walks the
+     list by position).  brief.org 5.2.  */
+  {
+    Lisp_Object minibuf_help_state = minibuf_capture_help_state ();
+
+    minibuf_save_list
+      = Fcons (XCDR (minibuf_help_state),
+	       Fcons (minibuf_window,
+		      Fcons (calling_frame,
+			     Fcons (calling_window,
+				    minibuf_save_list))));
+    minibuf_save_list
+      = Fcons (minibuf_prompt,
+	       Fcons (make_fixnum (minibuf_prompt_width),
+		      Fcons (XCAR (minibuf_help_state),
+			     Fcons (Vcurrent_prefix_arg,
+				    Fcons (Vminibuffer_history_position,
+					   Fcons (Vminibuffer_history_variable,
+						  minibuf_save_list))))));
+  }
   minibuf_save_list
     = Fcons (Fthis_command_keys_vector (), minibuf_save_list);
 
@@ -795,7 +897,10 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   minibuf_prompt = Fcopy_sequence (prompt);
   Vminibuffer_history_position = histpos;
   Vminibuffer_history_variable = histvar;
-  Vhelp_form = Vminibuffer_help_form;
+  /* M34 imp-4 — the help-form read moved to (emacs minibuf)
+     minibuf-set-help-form!: it reads minibuffer-help-form and sets
+     help-form.  brief.org 5.2.  */
+  minibuf_set_help_form ();
   /* If this minibuffer is reading a file name, that doesn't mean
      recursive ones are.  But we cannot set it to nil, because
      completion code still need to know the minibuffer is completing a
@@ -1126,7 +1231,10 @@ run_exit_minibuf_hook (Lisp_Object minibuf)
   record_unwind_current_buffer ();
   if (minibuf && BUFFER_LIVE_P (XBUFFER (minibuf)))
     Fset_buffer (minibuf);
-  safe_run_hooks (Qminibuffer_exit_hook);
+  /* M34 imp-4 — the minibuffer-exit-hook run moved to (emacs minibuf)
+     minibuf-run-exit-minibuffer-hook!.  The C keeps the dynwind block,
+     record_unwind_current_buffer, and Fset_buffer.  brief.org 3.  */
+  minibuf_run_exit_minibuffer_hook ();
   dynwind_end ();
 }
 
@@ -1194,7 +1302,13 @@ read_minibuf_unwind (void)
   minibuf_save_list = Fcdr (minibuf_save_list);
   minibuf_prompt_width = XFIXNAT (Fcar (minibuf_save_list));
   minibuf_save_list = Fcdr (minibuf_save_list);
-  Vhelp_form = Fcar (minibuf_save_list);
+  /* M34 imp-4 — the help-form / overriding-local-map restores moved to
+     (emacs minibuf) minibuf-restore-help-state!.  The two values sit at
+     separate positions in minibuf_save_list, so save the help-form value
+     here and build the (help-form . overriding-local-map) pair when the
+     overriding-local-map position is reached.  The list order and the
+     number of pops are unchanged.  brief.org 5.2.  */
+  Lisp_Object minibuf_saved_help_form = Fcar (minibuf_save_list);
   minibuf_save_list = Fcdr (minibuf_save_list);
   Vcurrent_prefix_arg = Fcar (minibuf_save_list);
   minibuf_save_list = Fcdr (minibuf_save_list);
@@ -1202,7 +1316,8 @@ read_minibuf_unwind (void)
   minibuf_save_list = Fcdr (minibuf_save_list);
   Vminibuffer_history_variable = Fcar (minibuf_save_list);
   minibuf_save_list = Fcdr (minibuf_save_list);
-  Voverriding_local_map = Fcar (minibuf_save_list);
+  minibuf_restore_help_state (Fcons (minibuf_saved_help_form,
+				     Fcar (minibuf_save_list)));
   minibuf_save_list = Fcdr (minibuf_save_list);
 #if 0
   temp = Fcar (minibuf_save_list);
@@ -1222,9 +1337,12 @@ read_minibuf_unwind (void)
     /* Prevent error in erase-buffer.  */
     specbind_guile (Qinhibit_read_only, Qt);
     specbind_guile (Qinhibit_modification_hooks, Qt);
-    old_deactivate_mark = Vdeactivate_mark;
+    /* M34 imp-4 — the deactivate-mark save / restore moved to (emacs
+       minibuf).  The C keeps Ferase_buffer and the dynwind / specbind
+       blocks.  brief.org 5.3.  */
+    old_deactivate_mark = minibuf_capture_deactivate_mark ();
     Ferase_buffer ();
-    Vdeactivate_mark = old_deactivate_mark;
+    minibuf_restore_deactivate_mark (old_deactivate_mark);
     dynwind_end ();
   }
 

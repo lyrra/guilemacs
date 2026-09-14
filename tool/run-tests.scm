@@ -176,6 +176,7 @@
   "test/keyboard/test-m34-imp1.el"              ; M34 imp-1: dispnew.c display/poll callers moved to (emacs display) (corpus prints PASS/FAIL)
   "test/keyboard/test-m34-imp2.el"              ; M34 imp-2: frame.c swallow + single-kboard callers moved to (emacs frame) (corpus prints PASS/FAIL)
   "test/keyboard/test-m34-imp3.el"              ; M34 imp-3: window.c + fileio.c safe_run_hooks callers moved to (emacs window)/(emacs fileio) (corpus prints PASS/FAIL)
+  "test/keyboard/test-m34-imp4.el"              ; M34 imp-4: minibuf.c input-state callers moved to (emacs minibuf) (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

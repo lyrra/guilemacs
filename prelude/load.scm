@@ -186,6 +186,8 @@
 ;; M34 imp-3 — window.c and fileio.c safe_run_hooks callers.
 (use-modules (emacs window))
 (use-modules (emacs fileio))
+;; M34 imp-4 — minibuf.c input-state callers.
+(use-modules (emacs minibuf))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
