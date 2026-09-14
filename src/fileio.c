@@ -5784,6 +5784,19 @@ do_auto_save_eh (Lisp_Object ignore)
   return Qnil;
 }
 
+/* M34 imp-3 — the fileio.c safe_run_hooks caller dispatcher.  Caches its
+   SCM proc in a static SCM with the SCM_UNBNDP guard, as src/dispnew.c and
+   src/frame.c do.  The C mechanism stays here: the do_auto_save message
+   push, the quit-flag save and restore, and auto_save_unwind.  brief.org 4.  */
+static void
+fileio_run_auto_save_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-run-auto-save-hook!");
+  SCM_CALL_0 (proc);
+}
+
 DEFUN ("do-auto-save", Fdo_auto_save, Sdo_auto_save, 0, 2, "",
        doc: /* Auto-save all buffers that need it.
 This auto-saves all buffers that have auto-saving enabled and
@@ -5803,7 +5816,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   (Lisp_Object no_message, Lisp_Object current_only)
 {
   struct buffer *old = current_buffer, *b;
-  Lisp_Object tail, buf, hook;
+  Lisp_Object tail, buf;
   bool auto_saved = 0;
   int do_handled_files;
   Lisp_Object oquit;
@@ -5827,8 +5840,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   oquit = Vquit_flag;
   Vquit_flag = Qnil;
 
-  hook = Qauto_save_hook;
-  safe_run_hooks (hook);
+  fileio_run_auto_save_hook ();
 
   if (STRINGP (Vauto_save_list_file_name))
     {

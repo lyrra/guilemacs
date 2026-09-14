@@ -26,6 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 #include "lisp.h"
+#include "guile.h"
 #include "buffer.h"
 #include "keyboard.h"
 #include "keymap.h"
@@ -4021,6 +4022,22 @@ run_window_change_functions_1 (Lisp_Object symbol, Lisp_Object buffer,
     }
 }
 
+/* M34 imp-3 — the window.c safe_run_hooks caller dispatcher.  Caches its
+   SCM proc in a static SCM with the SCM_UNBNDP guard, as src/dispnew.c and
+   src/frame.c do.  The C mechanism stays here: the frame walk and the
+   writes of the local bool run_window_state_change_hook.  brief.org 3.  */
+static void
+window_maybe_run_state_change_hook (bool run_hook)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs window",
+			     "window-maybe-run-state-change-hook!");
+  /* Pass Qt / Qnil, not #t / #f: in elisp only #nil is false, #f is true.
+     A scm_from_bool value would invert the false case.  brief.org 3.  */
+  SCM_CALL_1 (proc, run_hook ? Qt : Qnil);
+}
+
 
 /**
  * run_window_change_functions:
@@ -4281,8 +4298,7 @@ run_window_change_functions (void)
 
   /* Run 'window-state-change-hook' if at least one frame has changed
      state.  */
-  if (run_window_state_change_hook && !NILP (Vwindow_state_change_hook))
-    safe_run_hooks (Qwindow_state_change_hook);
+  window_maybe_run_state_change_hook (run_window_state_change_hook);
 
   /* Record changes for all frames (if asked for), selected window and
      frame.  */

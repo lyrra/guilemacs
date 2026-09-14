@@ -183,6 +183,9 @@
 (use-modules (emacs display))
 ;; M34 imp-2 — frame.c swallow and single-kboard callers in (emacs frame).
 (use-modules (emacs frame))
+;; M34 imp-3 — window.c and fileio.c safe_run_hooks callers.
+(use-modules (emacs window))
+(use-modules (emacs fileio))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
