@@ -188,6 +188,8 @@
 (use-modules (emacs fileio))
 ;; M34 imp-4 — minibuf.c input-state callers.
 (use-modules (emacs minibuf))
+;; M34 imp-5 — xdisp.c part-1 hook callers.
+(use-modules (emacs xdisp))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

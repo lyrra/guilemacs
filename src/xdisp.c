@@ -500,6 +500,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
+#include "guile.h"
 
 #ifndef FRAME_OUTPUT_DATA
 #define FRAME_OUTPUT_DATA(f) (NULL)
@@ -509,6 +510,50 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Holds the list (error).  */
 static Lisp_Object list_of_error;
+
+/* M34 imp-5 — the src/xdisp.c dispatchers into (emacs xdisp).  One
+   static dispatcher per ported hook site.  Each caches its SCM proc in a
+   static SCM with the SCM_UNBNDP guard, as src/frame.c and src/minibuf.c
+   do.  These are the first scm_c_public_ref sites in src/xdisp.c.  The C
+   keeps the mechanism: the if (!hooks_run) guard, the hooks_run = true
+   write, the if (!NILP (Vwindow_scroll_functions)) guard, the
+   make_fixnum (CHARPOS (startp)) wrap, and the SET_TEXT_POS_FROM_MARKER
+   and set_buffer_internal calls.  Site S4 (the tool-bar event store) is
+   not ported; see mod/emacs/xdisp.scm and brief.org 5.  brief.org 3, 4.  */
+
+/* Site S1 (src/xdisp.c:14279): the Lucid activate-menubar-hook run.  */
+static void
+xdisp_run_activate_menubar_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-run-activate-menubar-hook!");
+  SCM_CALL_0 (proc);
+}
+
+/* Site S2 (src/xdisp.c:14283): the menu-bar-update-hook run.  */
+static void
+xdisp_run_menu_bar_update_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-run-menu-bar-update-hook!");
+  SCM_CALL_0 (proc);
+}
+
+/* Site S3 (src/xdisp.c:18933): the window-scroll-functions run.  Pass
+   the window and the start fixnum to (emacs xdisp).  */
+static void
+xdisp_run_window_scroll_functions (Lisp_Object window, Lisp_Object start)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-run-window-scroll-functions!");
+  SCM_CALL_2 (proc, window, start);
+}
 
 #ifdef HAVE_WINDOW_SYSTEM
 
@@ -14276,11 +14321,11 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  if (!hooks_run)
 	    {
 	      /* Run the Lucid hook.  */
-	      safe_run_hooks (Qactivate_menubar_hook);
+	      xdisp_run_activate_menubar_hook ();
 
 	      /* If it has changed current-menubar from previous value,
 		 really recompute the menu-bar from the value.  */
-	      safe_run_hooks (Qmenu_bar_update_hook);
+	      xdisp_run_menu_bar_update_hook ();
 
 	      hooks_run = true;
 	    }
@@ -18930,8 +18975,7 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 
   if (!NILP (Vwindow_scroll_functions))
     {
-      safe_run_hooks_2
-	(Qwindow_scroll_functions, window, make_fixnum (CHARPOS (startp)));
+      xdisp_run_window_scroll_functions (window, make_fixnum (CHARPOS (startp)));
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
       /* In case the hook functions switch buffers.  */
       set_buffer_internal (XBUFFER (w->contents));
