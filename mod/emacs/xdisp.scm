@@ -103,7 +103,7 @@
 ;;; --- xdisp-run-window-scroll-functions! ----------------------------
 ;;; Port of the site-S3 call in run_window_scroll_functions
 ;;; (src/xdisp.c:18933):
-;;;   safe_run_hooks_2
+;;;   safe_run_hooks_2   (C stub; retired at M34 imp-7)
 ;;;     (Qwindow_scroll_functions, window, make_fixnum (CHARPOS (startp)));
 ;;; Call (emacs command-loop) safe-run-hooks-2! on the
 ;;; window-scroll-functions symbol, passing WINDOW and STARTP.  The C

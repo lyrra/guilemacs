@@ -560,12 +560,14 @@ xdisp_run_window_scroll_functions (Lisp_Object window, Lisp_Object start)
    SCM proc in a static SCM with the SCM_UNBNDP guard, as src/frame.c and
    src/minibuf.c do.  The C keeps the mechanism: the unwind-protect
    frame, the dynwind blocks, and the NILP test of the S5 reader.  The
-   five sites are S1 and S3 (push_kboard, display_mode_line and
-   Fformat_mode_line), S2 and S4 (pop_kboard, the same two functions),
-   and S5 (the three Voverriding_local_map_menu_flag readers in
-   update_menu_bar, update_tab_bar, and update_tool_bar).  brief.org 6.  */
+   five sites are S1 and S3 (the kboard push, display_mode_line and
+   Fformat_mode_line), S2 and S4 (the kboard pop, the same two
+   functions), and S5 (the three Voverriding_local_map_menu_flag
+   readers in update_menu_bar, update_tab_bar, and update_tool_bar).
+   brief.org 6.  M34 imp-7 retired the C push dispatcher, so the C
+   kboard-push stub is gone; the pop stub stays.  */
 
-/* Sites S1 and S3 (src/xdisp.c:27683, :28523): the push_kboard
+/* Sites S1 and S3 (src/xdisp.c:27683, :28523): the kboard-push
    callers.  Make the kboard smob in C (make_kboard_smob, src/guile.h)
    and hand it to Scheme.  */
 static void

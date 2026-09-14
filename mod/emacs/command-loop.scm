@@ -974,9 +974,11 @@ Mirrors src/keyboard.c top_level_1 (lines 1306-1317)."
 ;;; safe_run_hooks_maybe_narrowed).  run-hook-with-args-1 reimplements
 ;;; the walk done by the src/eval.c run_hook_with_args helper (which
 ;;; stays in C — it is not static, and six other call sites still use
-;;; it).  The three public entries are the thin-dispatcher
-;;; targets for the retained C safe_run_hooks / safe_run_hooks_2 and the
-;;; C callers of the narrowed variant; the two helpers stay private.
+;;; it).  The three public entries are the thin-dispatcher targets for
+;;; the retained C safe_run_hooks and for the C callers of the narrowed
+;;; variant; safe-run-hooks-2! answers the site that C held until imp-5
+;;; (M34 imp-7 then retired the C safe_run_hooks_2 stub).  The two
+;;; helpers stay private.
 
 ;; Cache for the narrowing shims added with this port.  The C guard
 ;; compares the computed region against the buffer's *absolute* bounds
@@ -1088,7 +1090,7 @@ Mirrors src/keyboard.c top_level_1 (lines 1306-1317)."
 (define (safe-run-hooks! hook)
   (specbind-inhibit-quit! (lambda () (run-hook-with-args-1 hook))))
 
-;; Replaces C safe_run_hooks_2.
+;; Replaced C safe_run_hooks_2 (the C stub retired at M34 imp-7).
 (define (safe-run-hooks-2! hook arg1 arg2)
   (specbind-inhibit-quit!
    (lambda () (run-hook-with-args-1 hook arg1 arg2))))

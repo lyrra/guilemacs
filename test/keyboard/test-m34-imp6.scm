@@ -8,9 +8,10 @@
 ;;; Voverriding_local_map_menu_flag readers (S5 update_menu_bar,
 ;;; update_tab_bar, update_tool_bar).  src/xdisp.c now calls three new
 ;;; static dispatchers; push_kboard and pop_kboard keep their C
-;;; definitions (they are the (emacs single-kboard) dispatchers); the
+;;; definitions at this imp (they are the (emacs single-kboard)
+;;; dispatchers); imp-7 later retired the push side.  The
 ;;; overriding-local-map-menu-flag DEFVAR_LISP stays C; no stub retires
-;;; and no keyboard.c line changes.  See docs/kb.org ** M34.
+;;; at this imp and no keyboard.c line changes.  See docs/kb.org ** M34.
 ;;;
 ;;; This corpus pins the port end state.  Two kinds of check:
 ;;;
@@ -26,8 +27,8 @@
 ;;;     import; src/xdisp.c includes guile.h, holds the three new
 ;;;     dispatcher names, has exactly six scm_c_public_ref ("emacs
 ;;;     xdisp" sites, and holds no old site text; src/keyboard.c keeps
-;;;     push_kboard / pop_kboard and its 449 DEFUNs; prelude/load.scm
-;;;     and tool/run-tests.scm register the port.
+;;;     pop_kboard (imp-7 retired push_kboard) and its 449 DEFUNs;
+;;;     prelude/load.scm and tool/run-tests.scm register the port.
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m34-root.
 ;;;
@@ -223,7 +224,9 @@ count -- a loose substring match would also count a comment line
 (if (not kbd)
     (report "m34/imp6/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp6/keyboard.c/push-still-defined" #t
+      ;; M34 imp-7 retired push_kboard (its last caller, xdisp.c, left C
+      ;; at this imp); pop_kboard keeps its live keyboard.c caller.
+      (check "m34/imp6/keyboard.c/push-retired" #f
              (contains? kbd "push_kboard (struct kboard *k)"))
       (check "m34/imp6/keyboard.c/pop-still-defined" #t
              (contains? kbd "pop_kboard (void)"))

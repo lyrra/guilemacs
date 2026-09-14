@@ -16,8 +16,8 @@
 ;;;     (no HAVE_PGTK), so it has no runtime check.
 ;;;   - a static wiring check: src/frame.c holds the two dispatchers,
 ;;;     includes guile.h, calls them, and no longer calls the two old
-;;;     sites; src/keyboard.c still defines not_single_kboard_state and
-;;;     make_kboard_smob is exposed with a declaration in guile.h.
+;;;     sites; src/keyboard.c retired not_single_kboard_state at imp-7
+;;;     and make_kboard_smob is exposed with a declaration in guile.h.
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m34-root.
 ;;;
@@ -154,7 +154,9 @@
 (if (not kbd)
     (report "m34/imp2/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp2/keyboard.c/not-single-still-defined" #t
+      ;; M34 imp-7 retired the stub (its last caller, frame.c, left C
+      ;; at this imp).  The definition is gone.
+      (check "m34/imp2/keyboard.c/not-single-retired" #f
              (contains? kbd "not_single_kboard_state (KBOARD *kboard)"))
       (check "m34/imp2/keyboard.c/make-kboard-smob-not-static" #f
              (contains? kbd "static SCM\nmake_kboard_smob"))))

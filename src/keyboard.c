@@ -1448,38 +1448,13 @@ KBOARD_LISP_FIELD ("echo-prompt",                   echo_prompt)
 #undef KBOARD_LISP_FIELD
 
 
-/* If we're in single_kboard state for kboard KBOARD,
-   get out of it.  */
-
-void
-not_single_kboard_state (KBOARD *kboard)
-{
-  /* M27 imp-1 — C body replaced by a SCM_CALL_1 into (emacs
-     single-kboard).  The single_kboard flag clear lives in Scheme
-     (not-single-kboard-state) over the M2 kboard smob.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs single-kboard", "not-single-kboard-state");
-  SCM_CALL_1 (proc, make_kboard_smob (kboard));
-}
-
 /* Maintain a stack of kboards, so other parts of Emacs
    can switch temporarily to the kboard of a given frame
    and then revert to the previous status.  The C struct
    kboard_stack node is now a Scheme list owned by the
-   (emacs single-kboard) module.  */
-
-void
-push_kboard (struct kboard *k)
-{
-  /* M27 imp-1 — C body replaced by a SCM_CALL_1 into (emacs
-     single-kboard).  push-kboard! saves current_kboard then sets it
-     to the pushed kboard, exactly like the deleted C node push.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs single-kboard", "push-kboard!");
-  SCM_CALL_1 (proc, make_kboard_smob (k));
-}
+   (emacs single-kboard) module.  M34 imp-7 retired the C push
+   dispatcher and the single-kboard-state clear; (emacs single-kboard)
+   answers both directly.  */
 
 void
 pop_kboard (void)
@@ -2510,9 +2485,10 @@ read_menu_command (void)
 }
 
 /* M22 imp-4: safe_run_hooks family moved to (emacs command-loop);
-   safe_run_hooks and safe_run_hooks_2 remain thin dispatchers for
-   cross-file callers; the other four bodies were deleted with the
-   cutover.  */
+   safe_run_hooks remains a thin dispatcher for cross-file callers;
+   the other five bodies were deleted with the cutover.  M34 imp-7
+   retired the two-argument dispatcher; its only caller moved to Scheme
+   at imp-5.  */
 
 void
 safe_run_hooks (Lisp_Object hook)
@@ -2521,15 +2497,6 @@ safe_run_hooks (Lisp_Object hook)
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs command-loop", "safe-run-hooks!");
   SCM_CALL_1 (proc, hook);
-}
-
-void
-safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1, Lisp_Object arg2)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "safe-run-hooks-2!");
-  SCM_CALL_3 (proc, hook, arg1, arg2);
 }
 
 
@@ -4067,7 +4034,7 @@ DEFUN ("--kbd-single-kboard-set!", Fc_kbd_single_kboard_set,
        doc: /* FIX-20260907-guilemacs: Internal: hard-set the C static
 `single_kboard' flag to (not V nil) and return nil.  Scheme needs a
 setter for the flag (only the getter --kbd-single-kboard-p exists) to
-drive not_single_kboard_state and temporarily-switch-to-single-kboard!
+drive the temporarily-switch-to-single-kboard!
 policy from (emacs single-kboard).  Mirrors --input-pending-set!.  */)
   (Lisp_Object v)
 {

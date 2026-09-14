@@ -5,8 +5,9 @@
 ;;; Lucid activate-menubar-hook run (S1), the menu-bar-update-hook run
 ;;; (S2), and the window-scroll-functions run (S3).  src/xdisp.c now
 ;;; calls three static dispatchers; site S4 (the tool-bar event store)
-;;; stays C (Option B).  No stub retires and no DEFVAR_* site leaves C.
-;;; See docs/kb.org ** M34.
+;;; stays C (Option B).  No stub retires at this imp and no DEFVAR_*
+;;; site leaves C; imp-7 later retired safe_run_hooks_2.  See
+;;; docs/kb.org ** M34.
 ;;;
 ;;; This corpus pins the port end state.  Two kinds of check:
 ;;;
@@ -239,12 +240,14 @@ count -- a loose substring match would also count a comment line
       (check "m34/imp5/xdisp.c/no-safe-run-hooks" #f
              (contains? xdisp-c "safe_run_hooks"))))
 
-;;; --- 5. Static: src/keyboard.c keeps the stub and its DEFUNs -------
+;;; --- 5. Static: src/keyboard.c retired the stub, keeps its DEFUNs --
 (define kbd (slurp (repo "src/keyboard.c")))
 (if (not kbd)
     (report "m34/imp5/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp5/keyboard.c/safe-run-hooks-2-still-defined" #t
+      ;; M34 imp-7 retired safe_run_hooks_2 (its last caller, xdisp.c
+      ;; S3, left C at this imp).  The definition is gone.
+      (check "m34/imp5/keyboard.c/safe-run-hooks-2-retired" #f
              (contains? kbd "safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1"))
       (check "m34/imp5/keyboard.c/defun-count" 449
              (count-prefix kbd "DEFUN (\""))))

@@ -483,8 +483,6 @@ extern bool parse_menu_item (Lisp_Object, int);
 extern void init_raw_keybuf_count (void);
 extern KBOARD *allocate_kboard (Lisp_Object);
 extern void delete_kboard (KBOARD *);
-extern void not_single_kboard_state (KBOARD *);
-extern void push_kboard (struct kboard *);
 extern void push_frame_kboard (struct frame *);
 extern void pop_kboard (void);
 extern void temporarily_switch_to_single_kboard (struct frame *);

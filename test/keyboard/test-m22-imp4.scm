@@ -13,9 +13,10 @@
 ;;;     -> safe-run-hooks-maybe-narrowed! (public)
 ;;;
 ;;; The C DEFUNs --safe-run-hooks / --safe-run-hooks-maybe-narrowed-
-;;; selected were deleted; safe_run_hooks and safe_run_hooks_2 are thin
-;;; dispatchers into the Scheme.  These tests exercise the Scheme
-;;; procedures directly and through the (repointed) C entry points.
+;;; selected were deleted.  safe_run_hooks stays a thin dispatcher into
+;;; the Scheme; M34 imp-7 retired safe_run_hooks_2 (its last C caller
+;;; left C at imp-5).  These tests exercise the Scheme procedures
+;;; directly and through the (repointed) C entry points.
 ;;;
 ;;; Sourced by test/keyboard/test-m22-imp4.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback from
