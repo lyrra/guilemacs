@@ -142,6 +142,15 @@ milestone, or from a plan, from satisfying it."
                      ((string-contains line needle) line)
                      (else (loop)))))))))
 
+(define (tracks-milestone? text tag)
+  "True when TEXT's first org heading starts with TAG, for example
+\"* M33\".  milestone.org is the live tracker and holds only the current
+milestone (cr.org F1).  This test lets a later milestone rewrite skip a
+historical check instead of failing it."
+  (and (string? text)
+       (let ((ls (split-lines text)))
+         (and (pair? ls) (string-prefix? tag (car ls))))))
+
 ;;; --- 0. The repo root must be known --------------------------------
 (if (not (defined? '%m33-root))
     (begin (report "m33/imp7/root-bound" (cons 'FAIL "not bound by wrapper"))
@@ -335,12 +344,20 @@ milestone, or from a plan, from satisfying it."
                    (contains? ov-m33 "swallow_events= has *no* M33-file"))))))
 
 (define milestone (slurp (repo "milestone.org")))
-(if (not milestone)
-    (info "m33/imp7/milestone.org/skipped" "milestone.org absent (untracked)")
-    (let ((ms-imp7 (org-section milestone "** imp-7")))
-      (if (not ms-imp7)
-          (report "m33/imp7/milestone.org/imp7"
-                  (cons 'FAIL "no ** imp-7 section in milestone.org"))
-          (check "m33/imp7/milestone.org/imp7" #t
-                 (contains? ms-imp7
-                            "test/keyboard/test-m33-imp7.{el,scm}")))))
+(cond
+ ((not milestone)
+  (info "m33/imp7/milestone.org/skipped" "milestone.org absent (untracked)"))
+ ((not (tracks-milestone? milestone "* M33"))
+  ;; milestone.org is the live tracker and holds only the current
+  ;; milestone (cr.org F1).  A later milestone rewrite drops the M33
+  ;; brief.  Pin it only while it still tracks M33; else skip.
+  (info "m33/imp7/milestone.org/skipped"
+        "milestone.org no longer tracks M33 (live tracker)"))
+ (else
+  (let ((ms-imp7 (org-section milestone "** imp-7")))
+    (if (not ms-imp7)
+        (report "m33/imp7/milestone.org/imp7"
+                (cons 'FAIL "no ** imp-7 section in milestone.org"))
+        (check "m33/imp7/milestone.org/imp7" #t
+               (contains? ms-imp7
+                          "test/keyboard/test-m33-imp7.{el,scm}"))))))
