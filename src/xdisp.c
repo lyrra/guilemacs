@@ -579,7 +579,7 @@ xdisp_push_kboard (KBOARD *kb)
   SCM_CALL_1 (proc, make_kboard_smob (kb));
 }
 
-/* Sites S2 and S4 (src/xdisp.c:27739, :28525): the pop_kboard
+/* Sites S2 and S4 (src/xdisp.c:27788, :28574): the pop_kboard
    callers.  */
 static void
 xdisp_pop_kboard (void)

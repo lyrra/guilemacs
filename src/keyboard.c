@@ -3924,7 +3924,7 @@ kbd_buffer_store_help_event (Lisp_Object frame, Lisp_Object help)
 
 
 /* M33 imp-1.  Two internal primitives for (emacs terminal).  The
-   discard_mouse_events stub retired when its last caller (term.c:3566)
+   discard_mouse_events stub retired when its last caller (term.c:3595)
    left C; (emacs terminal) now calls kbd-buffer-discard-mouse-events!
    directly and reads the two C items below.  */
 
