@@ -300,7 +300,7 @@ count -- a loose substring match would also count a comment line
     (begin
       (check "m34/imp4/keyboard.c/safe-run-hooks-still-defined" #t
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
-      (check "m34/imp4/keyboard.c/defun-count" 449
+      (check "m34/imp4/keyboard.c/defun-count" 446
              (count-prefix kbd "DEFUN (\""))))
 
 ;;; --- 6. Static: boot load and test registration --------------------

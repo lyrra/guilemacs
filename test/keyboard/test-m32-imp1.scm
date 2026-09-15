@@ -101,12 +101,13 @@
 (let ((r (safe (lambda () (wait-signal-drain -1)))))
   (check "m32/imp1/runtime/signal-drain-read-kbd-neg1" '(ok . #nil) r))
 
-;;; --- 3. Runtime: the two new C primitives are callable -------------
-;;; The build relinked src/emacs in this session, so the primitives the
-;;; module needs exist; prove it instead of only scanning the source.
+;;; --- 3. Runtime: the new C primitive is callable -------------------
+;;; M36 imp-2 retired --detect-input-pending; the detect family moved to
+;;; (emacs kbd-buffer), so the primitive is gone.  --pending-signals-p
+;;; stays.
 (let ((r (safe (lambda () ((symbol-function '--detect-input-pending))))))
   (report "m32/imp1/runtime/primitive-detect-input-pending" (list 'INFO r))
-  (check "m32/imp1/runtime/primitive-detect-input-pending-ok" 'ok (car r)))
+  (check "m32/imp1/runtime/primitive-detect-input-pending-retired" 'error (car r)))
 (let ((r (safe (lambda () ((symbol-function '--pending-signals-p))))))
   (report "m32/imp1/runtime/primitive-pending-signals-p" (list 'INFO r))
   (check "m32/imp1/runtime/primitive-pending-signals-p-ok" 'ok (car r)))
@@ -131,9 +132,10 @@
              (contains? pw "%process-pending-signals!"))
       ;; B3 case 2: each timer pass calls timer-check.
       (check "m32/imp1/module/timer-check" #t (contains? pw "%timer-check"))
-      ;; B3 case 4: the wait-again test reads detect-input-pending.
+      ;; B3 case 4: the wait-again test reads the kbd-buffer detect
+      ;; family (M36 imp-2 moved the decision out of C).
       (check "m32/imp1/module/detect-input-pending" #t
-             (contains? pw "%--detect-input-pending"))
+             (contains? pw "%detect-input-pending?"))
       ;; Both exported names are defined and exported.
       (check "m32/imp1/module/export-names" #t
              (and (contains? pw "wait-signal-drain")
@@ -171,17 +173,19 @@
 (if (not kbd-c)
     (report "m32/imp1/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m32/imp1/keyboard.c/stub-detect-input-pending" #t
+      ;; M36 imp-2 retired detect_input_pending and its primitive; the
+      ;; detect family moved to (emacs kbd-buffer).
+      (check "m32/imp1/keyboard.c/stub-detect-input-pending-retired" #f
              (contains? kbd-c "detect_input_pending (void)"))
       ;; M36 imp-1 retired the stub.
       (check "m32/imp1/keyboard.c/timer-check-retired" #f
              (contains? kbd-c "timer_check (void)"))
       (check "m32/imp1/keyboard.c/stub-process-pending-signals" #t
              (contains? kbd-c "process_pending_signals (void)"))
-      ;; The two new primitives exist.
+      ;; --pending-signals-p stays; --detect-input-pending is retired.
       (check "m32/imp1/keyboard.c/primitive-pending-signals-p" #t
              (contains? kbd-c "\"--pending-signals-p\""))
-      (check "m32/imp1/keyboard.c/primitive-detect-input-pending" #t
+      (check "m32/imp1/keyboard.c/primitive-detect-input-pending-retired" #f
              (contains? kbd-c "\"--detect-input-pending\""))))
 
 ;;; --- 7. Static: boot load ------------------------------------------

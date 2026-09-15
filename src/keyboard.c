@@ -1448,26 +1448,10 @@ KBOARD_LISP_FIELD ("echo-prompt",                   echo_prompt)
 #undef KBOARD_LISP_FIELD
 
 
-/* Maintain a stack of kboards, so other parts of Emacs
-   can switch temporarily to the kboard of a given frame
-   and then revert to the previous status.  The C struct
-   kboard_stack node is now a Scheme list owned by the
-   (emacs single-kboard) module.  M34 imp-7 retired the C push
-   dispatcher and the single-kboard-state clear; (emacs single-kboard)
-   answers both directly.  */
-
-void
-pop_kboard (void)
-{
-  /* M27 imp-1 — C body replaced by a SCM_CALL_0 into (emacs
-     single-kboard).  pop-kboard! restores the saved kboard if it is
-     still live (any terminal still carries it), else falls back to the
-     selected frame's kboard and clears single_kboard.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs single-kboard", "pop-kboard!");
-  SCM_CALL_0 (proc);
-}
+/* The kboard stack is a Scheme list owned by (emacs single-kboard).
+   M36 imp-2 retired the C pop_kboard stub; its last live caller
+   (restore_kboard_configuration) now dispatches through kbd_pop_kboard
+   below.  */
 
 /* Switch to single_kboard mode, making current_kboard the only KBOARD
   from which further input is accepted.  If F is non-nil, set its
@@ -1513,6 +1497,18 @@ temporarily_switch_to_single_kboard (struct frame *f)
   record_unwind_protect_int (restore_kboard_configuration, was_locked);
 }
 
+/* M36 imp-2 — the last pop_kboard caller.  M27 moved the policy to
+   (emacs single-kboard) pop-kboard!; this dispatcher removes the
+   double hop through the retired C stub.  */
+static void
+kbd_pop_kboard (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs single-kboard", "pop-kboard!");
+  SCM_CALL_0 (proc);
+}
+
 static void
 restore_kboard_configuration (int was_locked)
 {
@@ -1520,7 +1516,7 @@ restore_kboard_configuration (int was_locked)
   if (was_locked)
     {
       struct kboard *prev = current_kboard;
-      pop_kboard ();
+      kbd_pop_kboard ();
       /* The pop should not change the kboard.  */
       if (single_kboard && current_kboard != prev)
         emacs_abort ();
@@ -3375,16 +3371,6 @@ Used by Scheme rc-echo-cancel-or-dash.  */)
                 && (echo_kboard != current_kboard
                     || ok_to_echo_at_next_pause == NULL));
   return wrong ? Qt : Qnil;
-}
-
-DEFUN ("--rc-detect-input-pending-run-timers",
-       Fc_rc_detect_input_pending_run_timers,
-       Sc_rc_detect_input_pending_run_timers, 0, 0, 0,
-       doc: /* Internal: t if detect_input_pending_run_timers (0).
-Used by Scheme rc-prologue-echo-and-menu!.  */)
-  (void)
-{
-  return detect_input_pending_run_timers (0) ? Qt : Qnil;
 }
 
 /* M8e — tiny C shims for the Scheme-owned redisplay-loop prologue.
@@ -9242,14 +9228,6 @@ DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,
   return SCM_CALL_N (proc, args, 6);
 }
 
-/* Return true if input events are pending.  */
-
-bool
-detect_input_pending (void)
-{
-  return input_pending || get_input_pending (0);
-}
-
 /* Return true if input events other than mouse movements are
    pending.  */
 
@@ -9259,53 +9237,8 @@ detect_input_pending_ignore_squeezables (void)
   return input_pending || get_input_pending (READABLE_EVENTS_IGNORE_SQUEEZABLES);
 }
 
-/* Return true if input events are pending, and run any pending timers.  */
-
-bool
-detect_input_pending_run_timers (bool do_display)
-{
-  unsigned old_timers_run = timers_run;
-
-  if (!input_pending)
-    get_input_pending (READABLE_EVENTS_DO_TIMERS_NOW);
-
-  if (old_timers_run != timers_run && do_display)
-    redisplay_preserve_echo_area (8);
-
-  return input_pending;
-}
-
-/* M32 imp-1: Scheme-callable entry to the C input-pending test for
-   (emacs process-wait).  detect_input_pending stays C.  */
-DEFUN ("--detect-input-pending", Fc_detect_input_pending,
-       Sc_detect_input_pending, 0, 0, 0,
-       doc: /* Internal: return t when input events are pending; calls
-the C detect_input_pending ().  (emacs process-wait) uses it as the
-wait-loop termination test.  Returns t or nil.  */)
-  (void)
-{
-  return detect_input_pending () ? Qt : Qnil;
-}
-
-/* M34 imp-1: Scheme-callable entry to the C input-pending + timers
-   test for (emacs display) sit-for-pre-wait!.  It takes the live
-   DO_DISPLAY argument (the no-arg --rc-detect-input-pending-run-timers
-   hardcodes 0 and must not be widened).  detect_input_pending_run_timers
-   stays C; process.c keeps 4 callers.  brief.org 5.2.  */
-DEFUN ("--detect-input-pending-run-timers",
-       Fc_detect_input_pending_run_timers,
-       Sc_detect_input_pending_run_timers, 1, 1, 0,
-       doc: /* Internal: return t when input events are pending after
-running pending timers; calls the C detect_input_pending_run_timers
-(DO_DISPLAY).  (emacs display) uses it as the sit_for early-exit test.
-Returns t or nil.  */)
-  (Lisp_Object do_display)
-{
-  return detect_input_pending_run_timers (!NILP (do_display)) ? Qt : Qnil;
-}
-
 /* This is called in some cases before a possible quit.
-   It cases the next call to detect_input_pending to recompute input_pending.
+   It causes the next call to get_input_pending to recompute input_pending.
    So calling this function unnecessarily can't do any harm.  */
 
 void

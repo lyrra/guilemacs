@@ -619,7 +619,7 @@ Hoisted from the M8j C helper; C now exposes only the raw input
 flags, timer-aware input probe, and redisplay action."
   (when (and (>= commandflag 0)
              (%nilp ((force %rc-input-pending)))
-             (%nilp ((force %rc-detect-input-pending-run-timers))))
+             (%nilp ((force %detect-input-pending-run-timers?) #nil)))
     ((force %rc-redisplay)))
   #nil)
 
@@ -862,7 +862,7 @@ detect-input/redisplay primitives) is reachable from Scheme."
           ;; Hooks may modify buffers during auto-save.
           ((force %rc-redisplay)))))
     ;; If there is still no input available, ask for GC.
-    (when (%nilp ((force %rc-detect-input-pending-run-timers)))
+    (when (%nilp ((force %detect-input-pending-run-timers?) #nil))
       ((force %rc-gc-collect-a-little))))
   #nil)
 
@@ -970,7 +970,7 @@ via symbol-value."
                (> (- (symbol-value 'num-nonmacro-input-events)
                      ((force %rc-last-auto-save)))
                   (max interval 20))
-               (%nilp ((force %rc-detect-input-pending-run-timers))))
+               (%nilp ((force %detect-input-pending-run-timers?) #nil)))
       ((force %do-auto-save)
        (if (%nilp (symbol-value 'auto-save-no-message)) #nil #t)
        #nil)
@@ -1024,8 +1024,14 @@ to a different kboard, otherwise append a dash separator."
 (define %read-char-minibuf-menu-prompt
   (delay (module-ref (resolve-module '(emacs menu-prompt) #:ensure #t)
                      'read-char-minibuf-menu-prompt)))
-(define %rc-detect-input-pending-run-timers
-  (delay (%c '--rc-detect-input-pending-run-timers)))
+;;; M36 imp-2: the C run-timers shim is retired.  The detect family
+;;; moved to (emacs kbd-buffer); resolve its do_display-taking procedure
+;;; lazily, copying the %swallow-events idiom below.  The retired shim
+;;; hardcoded do_display = 0, so callers pass #nil (never #f — this
+;;; Guile reads #f as elisp true).
+(define %detect-input-pending-run-timers?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer) #:ensure #t)
+                     'detect-input-pending-run-timers?)))
 (define %keymapp
   (delay (%c 'keymapp)))
 
@@ -1049,7 +1055,7 @@ docs/keyboard.org §M8f."
                  (not (%nilp prev-event))
                  (not (pair? prev-event))
                  (not (pair? (symbol-value 'unread-command-events)))
-                 (%nilp ((force %rc-detect-input-pending-run-timers))))
+                 (%nilp ((force %detect-input-pending-run-timers?) #nil)))
             (let ((c ((force %read-char-minibuf-menu-prompt)
                       (rc-state-commandflag rec)
                       map)))
@@ -1073,7 +1079,7 @@ docs/keyboard.org §M8f."
 ;;; is now a thin dispatcher into (emacs kbd-buffer)
 ;;; kbd-buffer-swallow-events!, so the --rc-swallow-events double-hop
 ;;; is gone.  The port takes the do-display argument the C shim fixed
-;;; to false (C called swallow_events (false)); callers pass #f.
+;;; to false (C called swallow_events (false)); callers pass #nil.
 (define %swallow-events
   (delay (module-ref (resolve-module '(emacs kbd-buffer) #:ensure #t)
                      'kbd-buffer-swallow-events!)))
@@ -1091,8 +1097,8 @@ raw input flags and redisplay actions."
   ;; If there is pending input, process any events which are not
   ;; user-visible, such as X selection_request events.
   (when (or (not (%nilp ((force %rc-input-pending))))
-            (not (%nilp ((force %rc-detect-input-pending-run-timers)))))
-    ((force %swallow-events) #f))
+            (not (%nilp ((force %detect-input-pending-run-timers?) #nil))))
+    ((force %swallow-events) #nil))
   ;; Redisplay if no pending input, mirroring the original C loop:
   ;; while (!(input_pending && input_was_pending)) { ... }.
   (let loop ()
@@ -1103,7 +1109,7 @@ raw input flags and redisplay actions."
           ((force %rc-redisplay-preserve-echo-area))
           ((force %rc-redisplay)))
       (when (not (%nilp ((force %rc-input-pending))))
-        ((force %swallow-events) #f)
+        ((force %swallow-events) #nil)
         (loop))))
   #nil)
 

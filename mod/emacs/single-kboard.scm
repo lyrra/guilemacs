@@ -21,8 +21,10 @@
 ;;;     --selected-frame-kboard;
 ;;;   - the record_unwind_protect_int frame and its
 ;;;     restore_kboard_configuration unwind body, which stay C (see
-;;;     docs/m27-plan.org Finding 6).  Its pop_kboard () call resolves
-;;;     back through the C dispatcher to pop-kboard! here.
+;;;     docs/m27-plan.org Finding 6).  M36 imp-2 deleted the C
+;;;     pop_kboard stub, so that unwind body now calls the static
+;;;     kbd_pop_kboard dispatcher, which calls pop-kboard! here with
+;;;     one hop.
 ;;;
 ;;; The C `struct kboard_stack' node list is replaced 1:1 by the
 ;;; module-level `kboard-stack' list below.  Module-level mutable state

@@ -181,8 +181,10 @@
                   (contains? display-src "sit-for-done?")
                   (contains? display-src "redisplay-swallow!")
                   (contains? display-src "maybe-gen-help-event!")))
-      (check "m34/imp1/module/new-primitive" #t
-             (contains? display-src "%--detect-input-pending-run-timers"))
+      ;; M36 imp-2: the detect family moved to (emacs kbd-buffer);
+      ;; display.scm now resolves it lazily.
+      (check "m34/imp1/module/detect-run-timers-reader" #t
+             (contains? display-src "%detect-input-pending-run-timers?"))
       (check "m34/imp1/module/sigio-guard-moved" #t
              (contains? display-src "--sigio-or-poll-usable-p"))
       (check "m34/imp1/module/gobble" #t (contains? display-src "gobble-input!"))
@@ -245,14 +247,16 @@
       (check "m34/imp1/dispnew.c/five-public-refs" 5
              (count-substring dispnew "scm_c_public_ref (\"emacs display\""))))
 
-;;; --- 6. Static: src/keyboard.c holds the one-argument primitive ----
+;;; --- 6. Static: the one-argument primitive is retired --------------
+;;; M36 imp-2 retired --detect-input-pending-run-timers; the do_display
+;;; test now lives in (emacs kbd-buffer).
 (define kbd (slurp (repo "src/keyboard.c")))
 (if (not kbd)
     (report "m34/imp1/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp1/keyboard.c/primitive-present" #t
+      (check "m34/imp1/keyboard.c/primitive-retired" #f
              (contains? kbd "\"--detect-input-pending-run-timers\""))
-      (check "m34/imp1/keyboard.c/primitive-one-arg" #t
+      (check "m34/imp1/keyboard.c/primitive-one-arg-retired" #f
              (contains? kbd "Sc_detect_input_pending_run_timers, 1, 1, 0"))))
 
 ;;; --- 7. Static: boot load and test registration --------------------

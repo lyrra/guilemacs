@@ -8,7 +8,7 @@
 ;;; status_notify call, and the loop's own break/continue control.
 ;;; See docs/m32-plan.org A3.
 ;;;
-;;; Two M32 exported procedures, plus two M36 ones:
+;;; Two M32 exported procedures, plus three M36 ones:
 ;;;
 ;;;   wait-signal-drain   -- the read_kbd >= 0 / pending_signals choice
 ;;;                          (process.c:5392-5398).
@@ -17,6 +17,8 @@
 ;;;                          (process.c:5924-5937, pre-M36).
 ;;;   wait-input-pending? -- M36: the site B swallow decision
 ;;;                          (process.c:5944-5958, pre-M36).
+;;;   wait-skip-select?   -- M36 imp-2: the no_avail decision
+;;;                          (process.c:5713-5723, pre-M36).
 ;;;
 ;;; The two breaks that leave the outer while (1) loop
 ;;; (requeued_command_events_pending_p at :5499-5501, and the
@@ -34,21 +36,17 @@
   #:export (wait-signal-drain
             wait-run-timers
             wait-swallow!
-            wait-input-pending?))
+            wait-input-pending?
+            wait-skip-select?))
 
 ;; C shims.  --maybe-quit, --timers-run, --redisplay-preserve-echo-area
 ;; and the --pending-signals-* pair already exist (src/keyboard.c).
-;; --pending-signals-p and --detect-input-pending are new M32 imp-1
-;; entries: the module must read the pending-signals flag (also written
-;; by a signal handler) and the C detect_input_pending test.
+;; --pending-signals-p is a new M32 imp-1 entry: the module must read
+;; the pending-signals flag (also written by a signal handler).
 (defelisp %--maybe-quit                   --maybe-quit)
 (defelisp %--pending-signals-p            --pending-signals-p)
 (defelisp %--timers-run                   --timers-run)
 (defelisp %--redisplay-preserve-echo-area --redisplay-preserve-echo-area)
-(defelisp %--detect-input-pending         --detect-input-pending)
-;; M36 imp-1: the do_display-taking C test for the swallow decisions.
-;; detect_input_pending_run_timers stays C.
-(defelisp %--detect-input-pending-run-timers --detect-input-pending-run-timers)
 
 ;; (emacs timers) timer-check returns #nil (no active timer) or a
 ;; (SEC . NSEC) wait pair; its own loop consumes the #t "call again"
@@ -69,6 +67,15 @@
 (define %kbd-buffer-swallow-events!
   (delay (module-ref (resolve-module '(emacs kbd-buffer))
                      'kbd-buffer-swallow-events!)))
+
+;; M36 imp-2: the detect family moved into (emacs kbd-buffer).  Resolve
+;; both procedures lazily, like the swallow mechanism above.
+(define %detect-input-pending?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'detect-input-pending?)))
+(define %detect-input-pending-run-timers?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'detect-input-pending-run-timers?)))
 
 ;; Elisp truthiness: every value but #nil is true.  Each module carries
 ;; its own copy (see mod/emacs/recent-keys.scm).
@@ -102,7 +109,7 @@ pair."
           ;; retry unless input is now pending.  redisplay 9.
           (begin
             ((force %--redisplay-preserve-echo-area) 9)
-            (if (not (eq? ((force %--detect-input-pending)) #nil))
+            (if (not (eq? ((force %detect-input-pending?)) #nil))
                 delay
                 (loop)))
           delay))))
@@ -114,18 +121,18 @@ pair."
 
 (define (wait-swallow! read-kbd do-display)
   "Port of the site A decision (src/process.c:5924-5937, pre-M36):
-when READ-KBD is nonzero, test detect_input_pending_run_timers; if
+when READ-KBD is nonzero, test detect-input-pending-run-timers?; if
 input is pending, swallow events, then retest.  Returns elisp t when
 the wait loop must leave, else elisp nil (#nil); the C dispatcher
 (src/process.c wait_swallow) reads the result with NILP.  Return #nil,
 not Scheme #f, for false: this Guile reads #f as elisp true
-(src/frame.c:66).  detect_input_pending_run_timers stays C."
+(src/frame.c:66)."
   (let ((dd (if do-display #t #nil)))
     (if (not (= read-kbd 0))
-        (if (truthy? ((force %--detect-input-pending-run-timers) dd))
+        (if (truthy? ((force %detect-input-pending-run-timers?) dd))
             (begin
               ((force %kbd-buffer-swallow-events!) dd)
-              (if (truthy? ((force %--detect-input-pending-run-timers) dd))
+              (if (truthy? ((force %detect-input-pending-run-timers?) dd))
                   #t
                   #nil))
             #nil)
@@ -133,18 +140,35 @@ not Scheme #f, for false: this Guile reads #f as elisp true
 
 (define (wait-input-pending? read-kbd do-display)
   "Port of the site B decision (src/process.c:5944-5958, pre-M36):
-when READ-KBD is 0 and detect_input_pending reports input, swallow
-events without running timers.  Returns elisp t when it swallowed,
-else elisp nil (#nil); return #nil, not Scheme #f, for false, because
-this Guile reads #f as elisp true (src/frame.c:66).
+when READ-KBD is 0 and input is pending, swallow events without running
+timers.  Returns elisp t when it swallowed, else elisp nil (#nil);
+return #nil, not Scheme #f, for false, because this Guile reads #f as
+elisp true (src/frame.c:66).
 
 The C caller (src/process.c wait_input_pending) ignores the result on
 purpose: the pre-M36 code left site B's retest disabled (#if 0:
 'Exiting when read_kbd doesn't request that seems wrong').  Do not add
-a retest or a break at site B.  detect_input_pending stays C."
+a retest or a break at site B."
   (if (and (= read-kbd 0)
-           (truthy? ((force %--detect-input-pending))))
+           (truthy? ((force %detect-input-pending?))))
       (begin
         ((force %kbd-buffer-swallow-events!) (if do-display #t #nil))
         #t)
+      #nil))
+
+;; M36 imp-2: the no_avail decision of the wait loop (src/process.c
+;; pre-M36 no_avail block at :5713-5723).  The retired C test read
+;; detect_input_pending; the decision moves here.  C keeps nfds,
+;; no_avail, and the FD_ZERO call.  Return elisp t or #nil; the C
+;; dispatcher (src/process.c wait_skip_select) reads the result with
+;; NILP, so return #nil, not a Scheme false value, for false.
+
+(define (wait-skip-select? read-kbd)
+  "Port of the no_avail decision (src/process.c:5713-5723, pre-M36):
+when READ-KBD is nonzero and input is pending, the C skips the select
+call.  Returns elisp t or #nil.  C keeps nfds, no_avail, and the
+FD_ZERO call."
+  (if (and (not (= read-kbd 0))
+           (truthy? ((force %detect-input-pending?))))
+      #t
       #nil))

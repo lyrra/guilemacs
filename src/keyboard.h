@@ -484,7 +484,6 @@ extern void init_raw_keybuf_count (void);
 extern KBOARD *allocate_kboard (Lisp_Object);
 extern void delete_kboard (KBOARD *);
 extern void push_frame_kboard (struct frame *);
-extern void pop_kboard (void);
 extern void temporarily_switch_to_single_kboard (struct frame *);
 extern void input_poll_signal (int);
 extern void start_polling (void);

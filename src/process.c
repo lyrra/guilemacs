@@ -5324,6 +5324,22 @@ wait_input_pending (int read_kbd, bool do_display)
   SCM_CALL_2 (proc, INT_TO_INTEGER (read_kbd), scm_from_bool (do_display));
 }
 
+/* M36 imp-2: the no_avail decision of the wait loop (pre-M36 test at
+   src/process.c:5723).  Static and local to process.c: the loop's
+   control stays C.  See wait-skip-select? in (emacs process-wait); it
+   returns elisp t / #nil, so !NILP is the right read (a Scheme #f
+   would read as true).  */
+
+static bool
+wait_skip_select (int read_kbd)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait", "wait-skip-select?");
+  SCM result = SCM_CALL_1 (proc, INT_TO_INTEGER (read_kbd));
+  return !NILP (result);
+}
+
 /* M32 imp-2: dispatcher into (emacs process-error) for the send_process
    EINTR-loop drain.  Static and local to process.c: the C entry point
    stays C.  See send-process-drain-signals! in the module.  */
@@ -5708,19 +5724,19 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 waiting for keyboard input or a cell change (which can be
 	 triggered by processing X events).  In the latter case, set
 	 nfds to 1 to avoid breaking the loop.  */
+      /* The following code doesn't make any sense for just the
+	 wait_for_cell case, because the input-pending test (now
+	 wait-skip-select? in (emacs process-wait)) returns
+	 whether or not the keyboard buffer isn't empty or there
+	 is mouse movement.  Any keyboard input that arrives
+	 while waiting for a cell will cause the select call to
+	 be skipped, and gobble_input to be called even when
+	 there is no input available from the terminal itself.
+	 Skipping the call to select also causes the timeout to
+	 be ignored.  (bug#46935) */
+      /* || !NILP (wait_for_cell) */
       no_avail = 0;
-      if ((read_kbd
-	   /* The following code doesn't make any sense for just the
-	      wait_for_cell case, because detect_input_pending returns
-	      whether or not the keyboard buffer isn't empty or there
-	      is mouse movement.  Any keyboard input that arrives
-	      while waiting for a cell will cause the select call to
-	      be skipped, and gobble_input to be called even when
-	      there is no input available from the terminal itself.
-	      Skipping the call to select also causes the timeout to
-	      be ignored.  (bug#46935) */
-	   /* || !NILP (wait_for_cell) */)
-	  && detect_input_pending ())
+      if (wait_skip_select (read_kbd))
 	{
 	  nfds = read_kbd ? 0 : 1;
 	  no_avail = 1;
@@ -5950,7 +5966,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 to give it higher priority than subprocesses.  */
 
       /* M36 imp-1: the swallow decision lives in (emacs process-wait).
-	 Port of the former read_kbd != 0 -> detect_input_pending_run_timers
+	 Port of the former read_kbd != 0 -> detect-input-pending-run-timers?
 	 -> swallow_events -> retest sequence.  See wait-swallow! in the
 	 module and docs/m36-plan.org.  */
       if (wait_swallow (read_kbd, do_display))
@@ -5969,7 +5985,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 	 (We used to do this only if wait_for_cell.)  */
       /* M36 imp-1: the swallow decision lives in (emacs process-wait).
-	 Port of the former read_kbd == 0 && detect_input_pending ->
+	 Port of the former read_kbd == 0 && detect-input-pending? ->
 	 swallow_events sequence.  See wait-input-pending? in the module
 	 and docs/m36-plan.org.  */
       wait_input_pending (read_kbd, do_display);

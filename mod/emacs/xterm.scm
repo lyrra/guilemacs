@@ -41,11 +41,11 @@
 ;;; elisp fixnum; #nil is elisp nil; no module-level mutable state.
 ;;; The module adds no C primitive.  It reads the 2 name cells with the
 ;;; delayed (emacs-elisp runtime) symbol-value and the input state with
-;;; the delayed C primitive --detect-input-pending.
+;;; (emacs kbd-buffer) detect-input-pending?, resolved lazily.
 
 (define-module (emacs xterm)
   #:use-module (emacs elisp-ref)      ; defelisp
-  #:use-module (emacs-elisp runtime)  ; symbol-value, --detect-input-pending
+  #:use-module (emacs-elisp runtime)  ; symbol-value
   #:declarative? #t
   #:export (x-help-event-action
             x-input-pending?
@@ -53,10 +53,14 @@
             x-mwheel-coalesce-scroll-events?))
 
 ;;; --- delayed C references ------------------------------------------
-;;; The 2 names are cell readers.  The C keeps the mechanism.  The
-;;; primitive --detect-input-pending stays C (src/keyboard.c:9346).
-(defelisp %--detect-input-pending --detect-input-pending)
+;;; The 2 names are cell readers.  The C keeps the mechanism.
 (defelisp %symbol-value           symbol-value)
+
+;; M36 imp-2: the input test moved to (emacs kbd-buffer).  Resolve it
+;; lazily, like the other cross-module targets.
+(define %detect-input-pending?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'detect-input-pending?)))
 
 ;;; --- Helpers -------------------------------------------------------
 ;;; Each module carries its own copy.  See mod/emacs/recent-keys.scm:38.
@@ -71,7 +75,7 @@
 ;;; current_timespec read, the timespec_cmp test, the FD_ZERO / FD_SET
 ;;; build, the timeout, and the pselect call.  brief.org 3.
 (define (x-input-pending?)
-  (truthy? ((force %--detect-input-pending))))
+  (truthy? ((force %detect-input-pending?))))
 
 ;;; --- x-extra-keyboard-modifiers ------------------------------------
 ;;; Port of the reads at src/xterm.c:20363 and :24261.  Return the

@@ -172,13 +172,16 @@ count -- a loose substring match would also count a comment line."
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
 ;;; the site counts.  M33 imp-1 added two keyboard.c primitives
 ;;; (--menu-items, --clear-input-pending!), and M34 imp-1 added one more
-;;; (--detect-input-pending-run-timers), so the count is 449.
+;;; (--detect-input-pending-run-timers), so the count reached 449.
+;;; M36 imp-2 retired three DEFUNs (pop_kboard, detect_input_pending,
+;;; detect_input_pending_run_timers) and three --=-shims, so the count
+;;; is now 446.
 ;;; M33 imp-6 moved extra-keyboard-modifiers (INT) and
 ;;; mwheel-coalesce-scroll-events (BOOL) to Scheme, so the DEFVAR_INT
 ;;; and DEFVAR_BOOL site counts drop by one each (2 -> 1).
 (if (not kbd)
     (report "m32/imp6/scan/keyboard.c-count" (cons 'FAIL "missing"))
-    (check "m32/imp6/count/keyboard.c-defuns" 449
+    (check "m32/imp6/count/keyboard.c-defuns" 446
            (count-prefix kbd "DEFUN (\"")))
 
 (if (not kg)

@@ -212,8 +212,10 @@ match here; the caller checks below separate them."
 (if (not kbd)
     (report "m35/imp2/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m35/imp2/def/pop-kboard" #t
-             (contains? kbd "pop_kboard (void)"))
+      ;; M36 imp-2 retired pop_kboard; the kbd_pop_kboard dispatcher is
+      ;; not a bare pop_kboard token.
+      (check "m35/imp2/def/pop-kboard-retired" #f
+             (contains? kbd "\npop_kboard (void)"))
       (check "m35/imp2/def/safe-run-hooks" #t
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       ;; M36 imp-1 retired both stubs.
@@ -221,9 +223,10 @@ match here; the caller checks below separate them."
              (contains? kbd "swallow_events (bool do_display)"))
       (check "m35/imp2/def/gen-help-event" #t
              (contains? kbd "gen_help_event (Lisp_Object help"))
-      (check "m35/imp2/def/detect-input-pending" #t
+      ;; M36 imp-2 retired the detect family.
+      (check "m35/imp2/def/detect-input-pending-retired" #f
              (contains? kbd "detect_input_pending (void)"))
-      (check "m35/imp2/def/detect-input-pending-run-timers" #t
+      (check "m35/imp2/def/detect-input-pending-run-timers-retired" #f
              (contains? kbd "detect_input_pending_run_timers (bool do_display)"))
       (check "m35/imp2/def/timer-check-retired" #f
              (contains? kbd "timer_check (void)"))
@@ -252,18 +255,21 @@ match here; the caller checks below separate them."
 (check "m35/imp2/keep/gen-help-event/pgtkterm.c" #t
        (contains? pgtk-c "gen_help_event (Qnil, frame_obj, Qnil, Qnil, 0)"))
 
-;;; --- 4. The other seven stubs keep C (verdict E3) -----------------
-(check "m35/imp2/keep/pop-kboard" #t
-       (contains? kbd "pop_kboard ();"))
+;;; --- 4. The other stubs: disposition after M36 imp-2 ---------------
+;;; M36 imp-2 retired pop_kboard and the detect family; their remaining
+;;; stub keepers (safe_run_hooks, gen_help_event, gobble_input,
+;;; kbd_buffer_store_event) stay C.
+(check "m35/imp2/keep/pop-kboard-retired" #f
+       (contains? kbd "\n      pop_kboard ();"))
 (check "m35/imp2/keep/swallow-events-retired" #f
        (contains? process-c "swallow_events (do_display)"))
-(check "m35/imp2/keep/detect-input-pending/process.c" #t
+(check "m35/imp2/keep/detect-input-pending/process.c-retired" #f
        (contains? process-c "detect_input_pending ()"))
-(check "m35/imp2/keep/detect-input-pending/keyboard.c" #t
+(check "m35/imp2/keep/detect-input-pending/keyboard.c-retired" #f
        (contains? kbd "detect_input_pending () ? Qt"))
-(check "m35/imp2/keep/detect-input-pending-run-timers/process.c" #t
+(check "m35/imp2/keep/detect-input-pending-run-timers/process.c-retired" #f
        (contains? process-c "detect_input_pending_run_timers (do_display)"))
-(check "m35/imp2/keep/detect-input-pending-run-timers/keyboard.c" #t
+(check "m35/imp2/keep/detect-input-pending-run-timers/keyboard.c-retired" #f
        (contains? kbd "detect_input_pending_run_timers (!NILP (do_display))"))
 (check "m35/imp2/keep/timer-check-retired" #f
        (contains? process-c "timer_check ()"))

@@ -372,21 +372,26 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
        (scheme-code-occurs? pgobble "timespec"))
 
 ;;; --- 7. The brief.org §9 surface anchors hold ---------------------
+;;; M36 imp-2 retired three stubs, three shims, and the pop_kboard
+;;; definition, and added three dispatchers, so the anchors moved:
+;;; keyboard.c 11305 -> 11238, DEFUNs 449 -> 446, shims 423 -> 420,
+;;; combined 11795 -> 11728, scm_c_public_ref 155 -> 156.  Re-pinned at
+;;; the imp-2 HEAD.
 (if (not kbd)
     (report "m36/imp1/scan/keyboard.c-counts" (cons 'FAIL "missing"))
     (begin
-      (check "m36/imp1/count/keyboard.c-lines" 11305
+      (check "m36/imp1/count/keyboard.c-lines" 11238
              (count-substr kbd "\n"))
-      (check "m36/imp1/count/keyboard.c-defuns" 449
+      (check "m36/imp1/count/keyboard.c-defuns" 446
              (count-prefix kbd "DEFUN (\""))
-      (check "m36/imp1/count/keyboard.c-shims" 423
+      (check "m36/imp1/count/keyboard.c-shims" 420
              (count-prefix kbd "DEFUN (\"--"))))
 (info "m36/imp1/count/keyboard-globals.c-lines" (count-substr kg "\n"))
-(check "m36/imp1/count/combined-lines" 11795
+(check "m36/imp1/count/combined-lines" 11728
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp1/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp1/count/scm-c-public-ref-sites" 155
+(check "m36/imp1/count/scm-c-public-ref-sites" 156
        (src-site-count))
 
 ;;; --- 8. Static: the corpus is registered in the keyboard group ----

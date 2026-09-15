@@ -4618,9 +4618,7 @@ extern Lisp_Object tool_bar_items (Lisp_Object, int *);
 void handle_input_available_signal (int);
 #endif
 extern Lisp_Object pending_funcalls;
-extern bool detect_input_pending (void);
 extern bool detect_input_pending_ignore_squeezables (void);
-extern bool detect_input_pending_run_timers (bool);
 extern void safe_run_hooks (Lisp_Object);
 extern Lisp_Object read_menu_command (void);
 extern Lisp_Object recursive_edit_1 (void);

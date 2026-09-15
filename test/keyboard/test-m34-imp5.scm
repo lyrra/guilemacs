@@ -249,7 +249,7 @@ count -- a loose substring match would also count a comment line
       ;; S3, left C at this imp).  The definition is gone.
       (check "m34/imp5/keyboard.c/safe-run-hooks-2-retired" #f
              (contains? kbd "safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1"))
-      (check "m34/imp5/keyboard.c/defun-count" 449
+      (check "m34/imp5/keyboard.c/defun-count" 446
              (count-prefix kbd "DEFUN (\""))))
 
 ;;; --- 6. Static: boot load and test registration --------------------

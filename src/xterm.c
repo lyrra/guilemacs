@@ -932,7 +932,7 @@ x_defer_selection_requests (void)
 		{
 		  kbd_fetch_ptr = X_NEXT_KBD_EVENT (event);
 
-		  /* `detect_input_pending' will then recompute
+		  /* `get_input_pending' will then recompute
 		     whether or not pending input events exist.  */
 		  input_pending = false;
 		}
@@ -31841,7 +31841,7 @@ x_delete_selection_requests (struct x_display_info *dpyinfo)
 		   moved_events * sizeof *kbd_fetch_ptr);
 	  kbd_fetch_ptr = X_NEXT_KBD_EVENT (kbd_fetch_ptr);
 
-	  /* `detect_input_pending' will then recompute whether or not
+	  /* `get_input_pending' will then recompute whether or not
 	     pending input events exist.  */
 	  input_pending = false;
 	}

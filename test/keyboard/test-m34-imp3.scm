@@ -234,7 +234,7 @@ count -- a loose substring match would also count a comment line
       ;; Use the anchored counter (kb defun-count-anchor): a loose
       ;; substring match would also count the doc-comment continuation
       ;; line whose text begins with "DEFUN".
-      (check "m34/imp3/keyboard.c/defun-count" 449
+      (check "m34/imp3/keyboard.c/defun-count" 446
              (count-prefix kbd "DEFUN (\""))))
 
 ;;; --- 7. Static: boot load and test registration --------------------

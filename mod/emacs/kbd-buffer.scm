@@ -63,6 +63,8 @@
             kbd-buffer-swallow-events!
             kbd-buffer-discard-mouse-events!
             kbd-buffer-events-waiting
+            detect-input-pending?
+            detect-input-pending-run-timers?
             stuff-buffered-input))
 
 ;;; --- Constants ------------------------------------------------------
@@ -1249,6 +1251,38 @@ relies on this advance).  Returns #t/#nil."
                 #t
                 #nil))
           (loop (modulo (+ idx 1) KBD-BUFFER-SIZE))))))
+
+;;; --- M36 imp-2: the detect family ---------------------------------
+;;; The retired C stubs only mapped a bool to t/nil.  The decision
+;;; moves here.  C keeps the input_pending global, the get_input_pending
+;;; dispatcher, and the timers_run counter.
+
+(define (kbd-buffer-input-pending?)
+  "Read the C global input_pending.  Elisp t or #nil."
+  (if (truthy? ((force %--rc-input-pending))) #t #nil))
+
+(define (detect-input-pending?)
+  "Port of C detect_input_pending (src/keyboard.c:9248-9251):
+input_pending OR get_input_pending (0).  The `or' short-circuits, as
+C's `||' does.  Returns elisp t or elisp #nil.  Return #nil, not
+Scheme #f, for false: this Guile reads #f as elisp true."
+  (if (truthy? (kbd-buffer-input-pending?))
+      #t
+      (if (truthy? ((force %--get-input-pending) 0)) #t #nil)))
+
+(define (detect-input-pending-run-timers? do-display)
+  "Port of C detect_input_pending_run_timers (src/keyboard.c:9265-9276).
+Snapshot timers_run.  When input_pending is false, call
+get_input_pending (READABLE-EVENTS-DO-TIMERS-NOW) for its side effect.
+When the counter changed and DO-DISPLAY is true, redisplay the echo
+area with code 8.  Return the input_pending state as elisp t or #nil."
+  (let ((old ((force %--timers-run))))
+    (when (not (truthy? (kbd-buffer-input-pending?)))
+      ((force %--get-input-pending) READABLE-EVENTS-DO-TIMERS-NOW))
+    (when (and (not (= ((force %--timers-run)) old))
+               (truthy? do-display))
+      ((force %--redisplay-preserve-echo-area) 8))
+    (if (truthy? (kbd-buffer-input-pending?)) #t #nil)))
 
 ;;; --- M22 imp-3: stuff-buffered-input --------------------------------
 ;;; Port of C stuff_buffered_input (src/keyboard.c).  Stuff

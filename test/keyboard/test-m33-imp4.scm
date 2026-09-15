@@ -165,14 +165,16 @@
       (check "m33/imp4/keyboard-globals.c/no-defvars-mwheel" #f
              (contains? kbd-g "DEFVAR_BOOL (\"mwheel-coalesce-scroll-events\""))))
 
-;;; --- 5. Static: src/keyboard.c keeps the primitive -----------------
+;;; --- 5. Static: keyboard.c no longer keeps the primitive ----------
+;;; M36 imp-2 retired detect_input_pending and its primitive; the xterm
+;;; input test reads the (emacs kbd-buffer) port.
 (define kbd-c (slurp (repo "src/keyboard.c")))
 (if (not kbd-c)
     (report "m33/imp4/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m33/imp4/keyboard.c/still-defines-detect-input-pending" #t
+      (check "m33/imp4/keyboard.c/detect-input-pending-retired" #f
              (contains? kbd-c "detect_input_pending (void)"))
-      (check "m33/imp4/keyboard.c/still-defines-primitive" #t
+      (check "m33/imp4/keyboard.c/primitive-retired" #f
              (contains? kbd-c "--detect-input-pending"))))
 
 ;;; --- 6. Static: the module source ----------------------------------

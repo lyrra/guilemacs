@@ -242,7 +242,9 @@ historical check instead of failing it."
 (if (not process-c)
     (report "m33/imp7/scan/process.c" (cons 'FAIL "src/process.c missing"))
     (begin
-      (check "m33/imp7/stays-c/detect-input-pending-process" #t
+      ;; M36 imp-2 retired the stub and moved the decision to
+      ;; (emacs process-wait).
+      (check "m33/imp7/stays-c/detect-input-pending-process-retired" #f
              (contains? process-c "detect_input_pending ()"))
       ;; M36 imp-1 retired the stub and moved the decision to
       ;; (emacs process-wait).
@@ -277,13 +279,14 @@ historical check instead of failing it."
 ;;; The brief warns twice about loose patterns.  Use the anchored forms
 ;;; only: "^DEFUN (\"" for the DEFUN count and "^  DEFVAR_*/DEFSYM (" for
 ;;; the site counts.  M33 added no new keyboard.c primitive.  M34 imp-1
-;;; added one (--detect-input-pending-run-timers), so the count is 449;
+;;; added one (--detect-input-pending-run-timers), so the count reached
+;;; 449; M36 imp-2 retired three DEFUNs, so the count is 446.
 ;;; and imp-6 moved extra-keyboard-modifiers (INT) and
 ;;; mwheel-coalesce-scroll-events (BOOL) to Scheme, so the DEFVAR_INT and
 ;;; DEFVAR_BOOL site counts are 1 each.
 (if (not kbd)
     (report "m33/imp7/scan/keyboard.c-count" (cons 'FAIL "missing"))
-    (check "m33/imp7/count/keyboard.c-defuns" 449
+    (check "m33/imp7/count/keyboard.c-defuns" 446
            (count-prefix kbd "DEFUN (\"")))
 
 ;;; --- 8. Static: keyboard-globals.c keeps the anchored split --------

@@ -307,28 +307,31 @@ holds TOKEN as a whole identifier.  This mirrors the scan
 (define config-h   (slurp (repo "src/config.h")))
 
 ;;; --- 1. The anchored counts ---------------------------------------
-;;; The brief.org §3 method.  The measured values are the M35 end state:
-;;; keyboard.c 11,305, keyboard-globals.c 490, combined 11,795, DEFUNs
-;;; 449, --=-shims 423, scm_c_public_ref sites 155.  (M36 imp-1
-;;; re-measured: the two retired stubs leave keyboard.c.)
+;;; The brief.org §3 method.  M35 end state: keyboard.c 11,305,
+;;; keyboard-globals.c 490, combined 11,795, DEFUNs 449, --=-shims 423,
+;;; scm_c_public_ref sites 155.  M36 imp-1 and imp-2 re-measured: the
+;;; retired stubs and shims leave keyboard.c, so the anchors move to
+;;; 11,238 / 490 / 11,728 / 446 / 420 / 156.
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m35/imp3/count/keyboard.c-lines" 11305
+      (check "m35/imp3/count/keyboard.c-lines" 11238
              (count-substr kbd "\n"))
-      (check "m35/imp3/count/keyboard.c-defuns" 449
+      (check "m35/imp3/count/keyboard.c-defuns" 446
              (count-prefix kbd "DEFUN (\""))
-      (check "m35/imp3/count/keyboard.c-shims" 423
+      (check "m35/imp3/count/keyboard.c-shims" 420
              (count-prefix kbd "DEFUN (\"--"))))
 (if (not kg)
     (report "m35/imp3/scan/keyboard-globals.c" (cons 'FAIL "missing"))
     (check "m35/imp3/count/keyboard-globals.c-lines" 490
            (count-substr kg "\n")))
-(check "m35/imp3/count/combined-lines" 11795
+(check "m35/imp3/count/combined-lines" 11728
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m35/imp3/count/scm-c-public-ref-sites" 155
+(check "m35/imp3/count/scm-c-public-ref-sites" 156
        (src-site-count))
-;; A detail check: keyboard.c holds 73 of the sites.
+;; A detail check: keyboard.c holds 71 of the sites (the retired
+;; pop_kboard body loses one and the kbd_pop_kboard dispatcher adds one,
+;; so the count holds).
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c-sites" (cons 'FAIL "missing"))
     (check "m35/imp3/count/keyboard.c-sites" 71
@@ -368,14 +371,15 @@ holds TOKEN as a whole identifier.  This mirrors the scan
 (check "m35/imp3/retired/not-single/frame.c" #f
        (contains-token? frame-c "not_single_kboard_state"))
 
-;;; --- 4. The nine residual stubs keep a live buildable C caller ----
+;;; --- 4. The residual stubs: disposition after M36 imp-2 ------------
 ;;; One check per stub.  The caller is in a buildable .c file.  An NS
-;;; file does not count: HAVE_NS is undefined (src/config.h).  The
-;;; definitions stay in keyboard.c (see test-m35-imp2.scm).
+;;; file does not count: HAVE_NS is undefined (src/config.h).  M36 imp-2
+;;; retired pop_kboard and the detect family; the other stubs keep a
+;;; live caller (see test-m35-imp2.scm).
 (check "m35/imp3/ns/have-ns-undefined" #t
        (contains? config-h "/* #undef HAVE_NS */"))
-(check "m35/imp3/keep/pop-kboard" #t
-       (contains? kbd "pop_kboard ();"))
+(check "m35/imp3/keep/pop-kboard-retired" #f
+       (contains? kbd "\n      pop_kboard ();"))
 (check "m35/imp3/keep/safe-run-hooks/emacs.c" #t
        (contains? emacs-c "safe_run_hooks (Qkill_emacs_hook)"))
 (check "m35/imp3/keep/safe-run-hooks/xmenu.c" #t
@@ -389,9 +393,10 @@ holds TOKEN as a whole identifier.  This mirrors the scan
        (contains? xterm-c "gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
 (check "m35/imp3/keep/gen-help-event/pgtkterm.c" #t
        (contains? pgtk-c "gen_help_event (Qnil, frame_obj, Qnil, Qnil, 0)"))
-(check "m35/imp3/keep/detect-input-pending" #t
+;; M36 imp-2 retired the detect family.
+(check "m35/imp3/keep/detect-input-pending-retired" #f
        (contains? process-c "detect_input_pending ()"))
-(check "m35/imp3/keep/detect-input-pending-run-timers" #t
+(check "m35/imp3/keep/detect-input-pending-run-timers-retired" #f
        (contains? process-c "detect_input_pending_run_timers (do_display)"))
 (check "m35/imp3/keep/timer-check-retired" #f
        (contains? process-c "timer_check ()"))
@@ -453,11 +458,13 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
 ;;; --- 7. The guard test of imp-1 stays correct ---------------------
 ;;; brief.org §5.2 item 7.  The two current-line-number anchors must
 ;;; stay current.  imp-1 repaired them and pinned them; imp-3 keeps them
-;;; correct.  Check the live comment line, not a prose phrase.
+;;; correct.  M36 imp-2 moved the keyboard.c anchor from :3927 to :3913
+;;; (14 lines of retired stubs left above it).  Check the live comment
+;;; line, not a prose phrase.
 (check "m35/imp3/imp1/xdisp.c:582" #t
        (contains? (line-n xdisp-c 582) "(src/xdisp.c:27788, :28574)"))
-(check "m35/imp3/imp1/keyboard.c:3927" #t
-       (contains? (line-n kbd 3927) "(term.c:3595)"))
+(check "m35/imp3/imp1/keyboard.c:3913" #t
+       (contains? (line-n kbd 3913) "(term.c:3595)"))
 (check "m35/imp3/imp1/corpus-registered" #t
        (contains? run-tests "\"test/keyboard/test-m35-imp1.el\""))
 
@@ -466,8 +473,17 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
 ;;; milestone-overview.org.  When a doc file is absent, print an INFO
 ;;; line instead of a FAIL: the check is skipped, not failed.
 ;;;
-;;; The counts check (brief.org §5.2 item 1): each measured value must
-;;; equal the value recorded in the doc.
+;;; The counts check (brief.org §5.2 item 1): each value recorded in the
+;;; doc must equal the M35 close-out value.  The M35 record is history:
+;;; later milestones move the live tree (cr.org G1).  M36 imp-1 moved
+;;; keyboard.c to 11,305 and the combined surface to 11,795; M36 imp-2
+;;; moved keyboard.c to 11,238, the combined surface to 11,728, and the
+;;; scm_c_public_ref sites to 156.  Pin the *record*, not the live tree.
+(define m35-kbd-lines      (comma-format 11338))
+(define m35-kg-lines       (comma-format 490))
+(define m35-combined-lines (comma-format 11828))
+(define m35-scp-sites      (comma-format 155))
+
 (define (doc-metric label section key name value)
   "Check that the paragraph of SECTION that names NAME also holds VALUE.
 This is a name-plus-value check: the value must sit in the paragraph
@@ -478,18 +494,20 @@ that names the metric, so a value in unrelated prose does not pass
            (and para (string-contains para value) #t))))
 
 (define (doc-records-counts label section)
-  "For each measured count, find the paragraph in SECTION that names the
-metric, and require the formatted value in that same paragraph.  This
-is stronger than a whole-section substring match (cr.org F2)."
+  "Find the paragraph in SECTION that names each M35 close-out metric and
+require the recorded M35 value in that same paragraph.  The M35 record
+is history, so the live tree may differ (cr.org G1).  This is a
+name-plus-value check, stronger than a whole-section substring match
+(cr.org F2)."
   (doc-metric label section "keyboard.c-lines"
-              "keyboard.c" (comma-format (count-substr kbd "\n")))
+              "keyboard.c" m35-kbd-lines)
   (doc-metric label section "keyboard-globals.c-lines"
-              "keyboard-globals.c" (comma-format (count-substr kg "\n")))
+              "keyboard-globals.c" m35-kg-lines)
   ;; The combined total sits with keyboard-globals.c in every record.
   (doc-metric label section "combined-lines"
-              "keyboard-globals.c" (comma-format combined))
+              "keyboard-globals.c" m35-combined-lines)
   (doc-metric label section "scm-c-public-ref-sites"
-              "scm_c_public_ref" (comma-format (src-site-count))))
+              "scm_c_public_ref" m35-scp-sites))
 
 (define kb (slurp (repo "docs/kb.org")))
 (if (not kb)

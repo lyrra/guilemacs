@@ -265,10 +265,12 @@ historical check instead of failing it."
 (if (not kbd)
     (report "m34/imp7/scan/keyboard.c-keep" (cons 'FAIL "missing"))
     (begin
-      (check "m34/imp7/kept/pop-kboard/definition" #t
-             (contains? kbd "pop_kboard (void)"))
-      (check "m34/imp7/kept/pop-kboard/caller" #t
-             (contains? kbd "pop_kboard ();"))
+      ;; M36 imp-2 retired pop_kboard; the kbd_pop_kboard dispatcher in
+      ;; keyboard.c is not a bare pop_kboard token.
+      (check "m34/imp7/kept/pop-kboard/definition-retired" #f
+             (contains? kbd "\npop_kboard (void)"))
+      (check "m34/imp7/kept/pop-kboard/caller-retired" #f
+             (contains? kbd "\n      pop_kboard ();"))
       (check "m34/imp7/kept/safe-run-hooks/definition" #t
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       (check "m34/imp7/kept/gobble-input" #t
@@ -285,7 +287,8 @@ historical check instead of failing it."
       ;; M36 imp-1 retired the stub.
       (check "m34/imp7/kept/swallow-events-retired" #f
              (contains? process-c "swallow_events (do_display)"))
-      (check "m34/imp7/kept/detect-input-pending" #t
+      ;; M36 imp-2 retired the stub.
+      (check "m34/imp7/kept/detect-input-pending-retired" #f
              (contains? process-c "detect_input_pending ()"))
       ;; M36 imp-1 retired the stub.
       (check "m34/imp7/kept/timer-check-retired" #f
@@ -322,8 +325,9 @@ historical check instead of failing it."
 ;;; site count via `grep -rn 'scm_c_public_ref' src/*.c src/*.h`.  The
 ;;; measured numbers at imp-7: 11,338 + 490 = 11,828 (132 under the
 ;;; budget); 155 sites (158 before; the deletions remove 3 dispatcher
-;;; sites).  Record the counts as INFO pairs, never as assertions.
-(check "m34/imp7/count/keyboard.c-defuns" 449
+;;; sites).  The DEFUN count was 449; M36 imp-2 retired three DEFUNs, so
+;;; it is now 446.  Record the counts as INFO pairs, never as assertions.
+(check "m34/imp7/count/keyboard.c-defuns" 446
        (count-prefix kbd "DEFUN (\""))
 (info "m34/imp7/count/keyboard.c-lines" (count-substr kbd "\n"))
 (info "m34/imp7/count/keyboard-globals.c-lines" (count-substr kg "\n"))

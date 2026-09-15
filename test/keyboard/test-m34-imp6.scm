@@ -26,8 +26,9 @@
 ;;;     lazy cross-module refs and no eager (emacs single-kboard)
 ;;;     import; src/xdisp.c includes guile.h, holds the three new
 ;;;     dispatcher names, has exactly six scm_c_public_ref ("emacs
-;;;     xdisp" sites, and holds no old site text; src/keyboard.c keeps
-;;;     pop_kboard (imp-7 retired push_kboard) and its 449 DEFUNs;
+;;;     xdisp" sites, and holds no old site text; src/keyboard.c holds
+;;;     no push_kboard and no pop_kboard (imp-7 retired push_kboard,
+;;;     M36 imp-2 retired pop_kboard) and 446 DEFUNs;
 ;;;     prelude/load.scm and tool/run-tests.scm register the port.
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m34-root.
@@ -225,12 +226,14 @@ count -- a loose substring match would also count a comment line
     (report "m34/imp6/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
       ;; M34 imp-7 retired push_kboard (its last caller, xdisp.c, left C
-      ;; at this imp); pop_kboard keeps its live keyboard.c caller.
+      ;; at this imp); M36 imp-2 retired pop_kboard.  The anchored form
+      ;; starts the match at a line start, so the static kbd_pop_kboard
+      ;; dispatcher is not a bare pop_kboard token (cr.org G2).
       (check "m34/imp6/keyboard.c/push-retired" #f
              (contains? kbd "push_kboard (struct kboard *k)"))
-      (check "m34/imp6/keyboard.c/pop-still-defined" #t
-             (contains? kbd "pop_kboard (void)"))
-      (check "m34/imp6/keyboard.c/defun-count" 449
+      (check "m34/imp6/keyboard.c/pop-retired" #f
+             (contains? kbd "\npop_kboard (void)"))
+      (check "m34/imp6/keyboard.c/defun-count" 446
              (count-prefix kbd "DEFUN (\""))))
 
 ;;; --- 7. Static: boot load and test registration --------------------

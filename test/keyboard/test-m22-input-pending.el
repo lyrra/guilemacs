@@ -1,8 +1,8 @@
 ;;; test-m22-input-pending.el --- M22 imp-1 parity test suite.
 ;;;
-;;; imp-1: get-input-pending! port of C get_input_pending (used by
-;;; detect_input_pending and friends) and the recent-keys ring resize
-;;; port of C update_recent_keys (used by lossage-size).
+;;; imp-1: get-input-pending! port of C get_input_pending (still used
+;;; by detect_input_pending_ignore_squeezables) and the recent-keys
+;;; ring resize port of C update_recent_keys (used by lossage-size).
 ;;;
 ;;; Wraps test/keyboard/test-m22-input-pending.scm — the Scheme test
 ;;; corpus.  Loads the Scheme file via eval-scheme, then reads back

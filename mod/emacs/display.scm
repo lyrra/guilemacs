@@ -28,9 +28,10 @@
 ;;; SIGIO branch.  The gobble reaches (emacs gobble) gobble-input!
 ;;; through the same lazy module-ref the C gobble_input stub uses.
 ;;;
-;;; The module adds one C primitive, --detect-input-pending-run-timers
-;;; (src/keyboard.c, brief.org 5.2); it reads the executing-kbd-macro
-;;; name through symbol-value.
+;;; M36 imp-2: the detect family moved to (emacs kbd-buffer); this
+;;; module resolves detect-input-pending? and
+;;; detect-input-pending-run-timers? lazily.  It reads the
+;;; executing-kbd-macro name through symbol-value.
 ;;;
 ;;; Conventions (identical to M9-M33, cf. mod/emacs/process-wait.scm):
 ;;; defelisp delayed references for every C DEFUN ((force %--foo)); #nil
@@ -48,19 +49,22 @@
             maybe-gen-help-event!))
 
 ;;; --- delayed C references ------------------------------------------
-(defelisp %--detect-input-pending-run-timers
-  --detect-input-pending-run-timers)
-(defelisp %--detect-input-pending             --detect-input-pending)
 (defelisp %--sigio-or-poll-usable-p           --sigio-or-poll-usable-p)
 (defelisp %symbol-value                       symbol-value)
 
-;; (emacs kbd-buffer) holds the swallow_events port, (emacs help-echo)
-;; the gen_help_event port, and (emacs gobble) the gobble_input port.
-;; Resolve each lazily, like the other cross-module targets, so the
-;; module does not eagerly import them.
+;; (emacs kbd-buffer) holds the swallow_events and detect-family ports,
+;; (emacs help-echo) the gen_help_event port, and (emacs gobble) the
+;; gobble_input port.  Resolve each lazily, like the other cross-module
+;; targets, so the module does not eagerly import them.
 (define %kbd-buffer-swallow-events!
   (delay (module-ref (resolve-module '(emacs kbd-buffer))
                      'kbd-buffer-swallow-events!)))
+(define %detect-input-pending?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'detect-input-pending?)))
+(define %detect-input-pending-run-timers?
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'detect-input-pending-run-timers?)))
 (define %gen-help-event
   (delay (module-ref (resolve-module '(emacs help-echo)) 'gen-help-event)))
 (define %gobble-input!
@@ -87,7 +91,7 @@
 ;;; Qnil return.
 (define (sit-for-pre-wait! do-display)
   ((force %kbd-buffer-swallow-events!) do-display)
-  (if (or (not (%nilp ((force %--detect-input-pending-run-timers)
+  (if (or (not (%nilp ((force %detect-input-pending-run-timers?)
                        (if do-display #t #nil))))
           (not (%nilp ((force %symbol-value) 'executing-kbd-macro))))
       #t
@@ -176,7 +180,7 @@ parse must call %sit-for-timeout-parse directly."
 ;;; The reading / curbuf-eq-winbuf set_buffer_internal switch stays C.
 (define (sit-for-done? nbytes)
   (if (or (> nbytes 0)
-          (not (%nilp ((force %--detect-input-pending)))))
+          (not (%nilp ((force %detect-input-pending?)))))
       #t
       #nil))
 
