@@ -100,11 +100,13 @@
              (contains? xterm-c "x_help_event_action (do_help,"))
       (check "m33/imp3/xterm.c/guard-in-c" #t
              (contains? xterm-c "hold_quit && hold_quit->kind != NO_EVENT"))
-      ;; The gen_help_event stub stays (its retirement waits for M34).
-      (check "m33/imp3/xterm.c/still-calls-gen-help-event" #t
-             (contains? xterm-c "gen_help_event (help_echo_string, frame,"))
-      (check "m33/imp3/xterm.c/still-clears-and-calls-gen-help-event" #t
-             (contains? xterm-c "gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
+      ;; M36 imp-4 retired the gen_help_event stub.  The help block now
+      ;; calls the local static dispatcher x_gen_help_event, which
+      ;; targets (emacs help-echo) gen-help-event.
+      (check "m33/imp3/xterm.c/uses-x-gen-help-event" #t
+             (contains? xterm-c "x_gen_help_event (help_echo_string, frame,"))
+      (check "m33/imp3/xterm.c/uses-x-gen-help-event-clear" #t
+             (contains? xterm-c "x_gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
       ;; The old branch head is gone.
       (check "m33/imp3/xterm.c/no-old-do-help-branch" #f
              (contains? xterm-c "if (do_help > 0)"))
@@ -115,18 +117,18 @@
       (check "m33/imp3/xterm.c/keeps-xsetframe" #t
              (contains? xterm-c "XSETFRAME (frame, f)"))))
 
-;;; --- 4. Static: src/keyboard.c still defines gen_help_event --------
+;;; --- 4. Static: src/keyboard.c no longer defines gen_help_event ----
 (define kbd-c (slurp (repo "src/keyboard.c")))
 (if (not kbd-c)
     (report "m33/imp3/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
-    (check "m33/imp3/keyboard.c/still-defines-gen-help-event" #t
+    (check "m33/imp3/keyboard.c/gen-help-event-retired" #f
            (contains? kbd-c "gen_help_event (Lisp_Object help, Lisp_Object frame")))
 
-;;; --- 5. Static: src/keyboard.h still declares gen_help_event -------
+;;; --- 5. Static: src/keyboard.h no longer declares gen_help_event ---
 (define kbd-h (slurp (repo "src/keyboard.h")))
 (if (not kbd-h)
     (report "m33/imp3/scan/keyboard.h" (cons 'FAIL "src/keyboard.h missing"))
-    (check "m33/imp3/keyboard.h/still-declares-gen-help-event" #t
+    (check "m33/imp3/keyboard.h/gen-help-event-retired" #f
            (contains? kbd-h "extern void gen_help_event (Lisp_Object, Lisp_Object, Lisp_Object,")))
 
 ;;; --- 6. Static: the module source shapes the decision arms ---------

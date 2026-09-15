@@ -414,18 +414,18 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
 (if (not kbd)
     (report "m36/imp2/scan/keyboard.c-counts" (cons 'FAIL "missing"))
     (begin
-      (check "m36/imp2/count/keyboard.c-lines" 11238
+      (check "m36/imp2/count/keyboard.c-lines" 11221
              (count-substr kbd "\n"))
       (check "m36/imp2/count/keyboard.c-defuns" 446
              (count-prefix kbd "DEFUN (\""))
       (check "m36/imp2/count/keyboard.c-shims" 420
              (count-prefix kbd "DEFUN (\"--"))))
 (info "m36/imp2/count/keyboard-globals.c-lines" (count-substr kg "\n"))
-(check "m36/imp2/count/combined-lines" 11728
+(check "m36/imp2/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp2/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp2/count/scm-c-public-ref-sites" 156
+(check "m36/imp2/count/scm-c-public-ref-sites" 159
        (src-site-count))
 
 ;;; --- 12. Static: the corpus is registered in the keyboard group ---

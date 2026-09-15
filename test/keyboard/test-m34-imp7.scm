@@ -295,8 +295,12 @@ historical check instead of failing it."
              (contains? process-c "timer_check ()"))))
 
 (define xterm-c (slurp (repo "src/xterm.c")))
-(check "m34/imp7/kept/gen-help-event" #t
-       (contains? xterm-c "gen_help_event ("))
+;; M36 imp-4 retired the stub.  xterm.c now calls its local static
+;; dispatcher x_gen_help_event, so the bare stub call text is gone.
+(check "m34/imp7/kept/gen-help-event-retired" #f
+       (contains? xterm-c " gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
+(check "m34/imp7/uses-x-gen-help-event" #t
+       (contains? xterm-c "x_gen_help_event (help_echo_string, frame,"))
 
 (define dbusbind-c (slurp (repo "src/dbusbind.c")))
 (check "m34/imp7/kept/kbd-buffer-store-event" #t

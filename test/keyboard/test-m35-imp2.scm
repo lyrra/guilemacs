@@ -223,7 +223,8 @@ match here; the caller checks below separate them."
       ;; M36 imp-1 retired both stubs.
       (check "m35/imp2/def/swallow-events-retired" #f
              (contains? kbd "swallow_events (bool do_display)"))
-      (check "m35/imp2/def/gen-help-event" #t
+      ;; M36 imp-4 retired gen_help_event.
+      (check "m35/imp2/def/gen-help-event-retired" #f
              (contains? kbd "gen_help_event (Lisp_Object help"))
       ;; M36 imp-2 retired the detect family.
       (check "m35/imp2/def/detect-input-pending-retired" #f
@@ -250,18 +251,19 @@ match here; the caller checks below separate them."
 (check "m35/imp2/keep/safe-run-hooks/pgtkmenu.c" #t
        (contains? pgtkmenu-c "safe_run_hooks (Qmenu_bar_update_hook)"))
 
-;;; --- 3. gen_help_event keeps C (verdict E2) -----------------------
-;;; Callers in xterm.c and pgtkterm.c.  nsterm.m is NS and does not
-;;; count.
-(check "m35/imp2/keep/gen-help-event/xterm.c" #t
-       (contains? xterm-c "gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
+;;; --- 3. gen_help_event retired except the unbuilt pgtk caller -----
+;;; M36 imp-4 moved the buildable xterm.c caller to the local static
+;;; dispatcher x_gen_help_event.  pgtkterm.c is unbuilt (HAVE_PGTK is
+;;; undefined), so its text stays.  nsterm.m is NS and does not count.
+(check "m35/imp2/keep/gen-help-event/retired" #f
+       (contains? xterm-c " gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
 (check "m35/imp2/keep/gen-help-event/pgtkterm.c" #t
        (contains? pgtk-c "gen_help_event (Qnil, frame_obj, Qnil, Qnil, 0)"))
 
-;;; --- 4. The other stubs: disposition after M36 imp-2 ---------------
-;;; M36 imp-2 retired pop_kboard and the detect family; their remaining
-;;; stub keepers (safe_run_hooks, gen_help_event, gobble_input,
-;;; kbd_buffer_store_event) stay C.
+;;; --- 4. The other stubs: disposition after M36 imp-4 ---------------
+;;; M36 imp-2 retired pop_kboard and the detect family; M36 imp-3
+;;; retired safe_run_hooks; M36 imp-4 retired gen_help_event.  Their
+;;; remaining stub keepers (gobble_input, kbd_buffer_store_event) stay C.
 (check "m35/imp2/keep/pop-kboard-retired" #f
        (contains? kbd "\n      pop_kboard ();"))
 (check "m35/imp2/keep/swallow-events-retired" #f

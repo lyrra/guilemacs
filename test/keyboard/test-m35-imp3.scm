@@ -309,13 +309,13 @@ holds TOKEN as a whole identifier.  This mirrors the scan
 ;;; --- 1. The anchored counts ---------------------------------------
 ;;; The brief.org §3 method.  M35 end state: keyboard.c 11,305,
 ;;; keyboard-globals.c 490, combined 11,795, DEFUNs 449, --=-shims 423,
-;;; scm_c_public_ref sites 155.  M36 imp-1 and imp-2 re-measured: the
-;;; retired stubs and shims leave keyboard.c, so the anchors move to
-;;; 11,238 / 490 / 11,728 / 446 / 420 / 156.
+;;; scm_c_public_ref sites 155.  M36 imp-1, imp-2, and imp-4
+;;; re-measured: the retired stubs and shims leave keyboard.c, so the
+;;; anchors move to 11,221 / 490 / 11,711 / 446 / 420 / 159.
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m35/imp3/count/keyboard.c-lines" 11238
+      (check "m35/imp3/count/keyboard.c-lines" 11221
              (count-substr kbd "\n"))
       (check "m35/imp3/count/keyboard.c-defuns" 446
              (count-prefix kbd "DEFUN (\""))
@@ -325,16 +325,17 @@ holds TOKEN as a whole identifier.  This mirrors the scan
     (report "m35/imp3/scan/keyboard-globals.c" (cons 'FAIL "missing"))
     (check "m35/imp3/count/keyboard-globals.c-lines" 490
            (count-substr kg "\n")))
-(check "m35/imp3/count/combined-lines" 11728
+(check "m35/imp3/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m35/imp3/count/scm-c-public-ref-sites" 156
+(check "m35/imp3/count/scm-c-public-ref-sites" 159
        (src-site-count))
-;; A detail check: keyboard.c holds 71 of the sites (the retired
-;; pop_kboard body loses one and the kbd_pop_kboard dispatcher adds one,
-;; so the count holds).
+;; A detail check: keyboard.c holds 70 of the sites.  M36 imp-4 retired
+;; the gen_help_event body, which held one site, so keyboard.c went from
+;; 71 to 70; xterm.c gained the dispatcher site, so the total holds at
+;; 159.
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c-sites" (cons 'FAIL "missing"))
-    (check "m35/imp3/count/keyboard.c-sites" 71
+    (check "m35/imp3/count/keyboard.c-sites" 70
            (count-lines-with kbd "scm_c_public_ref")))
 
 ;;; --- 2. The budget ------------------------------------------------
@@ -389,8 +390,9 @@ holds TOKEN as a whole identifier.  This mirrors the scan
 ;; M36 imp-1 retired swallow_events and timer_check.
 (check "m35/imp3/keep/swallow-events-retired" #f
        (contains? process-c "swallow_events (do_display)"))
-(check "m35/imp3/keep/gen-help-event/xterm.c" #t
-       (contains? xterm-c "gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
+;; M36 imp-4 retired the xterm.c caller; pgtkterm.c is unbuilt.
+(check "m35/imp3/keep/gen-help-event/retired" #f
+       (contains? xterm-c " gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
 (check "m35/imp3/keep/gen-help-event/pgtkterm.c" #t
        (contains? pgtk-c "gen_help_event (Qnil, frame_obj, Qnil, Qnil, 0)"))
 ;; M36 imp-2 retired the detect family.
@@ -459,12 +461,13 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
 ;;; brief.org §5.2 item 7.  The two current-line-number anchors must
 ;;; stay current.  imp-1 repaired them and pinned them; imp-3 keeps them
 ;;; correct.  M36 imp-2 moved the keyboard.c anchor from :3927 to :3913
-;;; (14 lines of retired stubs left above it).  Check the live comment
-;;; line, not a prose phrase.
+;;; (14 lines of retired stubs left above it).  M36 imp-4 retired
+;;; gen_help_event above the anchor, so it moved from :3913 to :3896.
+;;; Check the live comment line, not a prose phrase.
 (check "m35/imp3/imp1/xdisp.c:582" #t
        (contains? (line-n xdisp-c 582) "(src/xdisp.c:27788, :28574)"))
-(check "m35/imp3/imp1/keyboard.c:3913" #t
-       (contains? (line-n kbd 3913) "(term.c:3595)"))
+(check "m35/imp3/imp1/keyboard.c:3896" #t
+       (contains? (line-n kbd 3896) "(term.c:3595)"))
 (check "m35/imp3/imp1/corpus-registered" #t
        (contains? run-tests "\"test/keyboard/test-m35-imp1.el\""))
 

@@ -18907,7 +18907,8 @@ x_find_selection_owner (struct x_display_info *dpyinfo, Atom selection)
 /* M33 imp-3 — the help-event decision moved to (emacs xterm)
    x-help-event-action.  This C function keeps the mechanism: the
    frame conversion, the input-pending flag, the XInput2 interaction
-   call, the gen_help_event calls, and the event count.  brief.org 4.2.  */
+   call, the x_gen_help_event calls (M36 imp-4), and the event
+   count.  brief.org 4.2.  */
 static int
 x_help_event_action (int do_help, bool hold_quit_p)
 {
@@ -18916,6 +18917,21 @@ x_help_event_action (int do_help, bool hold_quit_p)
     proc = scm_c_public_ref ("emacs xterm", "x-help-event-action");
   return scm_to_int (SCM_CALL_2 (proc, scm_from_int (do_help),
                                  scm_from_bool (hold_quit_p)));
+}
+
+/* M36 imp-4 — the xterm.c gen_help_event caller dispatcher.  The C
+   stub left C; this static dispatcher caches its SCM proc in a static
+   SCM behind the SCM_UNBNDP guard.  The decision lives in (emacs
+   xterm) x-help-event-action (M33).  The C forms the arguments because
+   the help globals belong to src/xdisp.c.  brief.org 4, 5.  */
+static void
+x_gen_help_event (Lisp_Object help, Lisp_Object frame, Lisp_Object window,
+                  Lisp_Object object, ptrdiff_t pos)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs help-echo", "gen-help-event");
+  SCM_CALL_5 (proc, help, frame, window, object, INT_TO_INTEGER (pos));
 }
 
 /* M33 imp-4 — the extra-keyboard-modifiers read moved to (emacs xterm)
@@ -25702,13 +25718,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                                      gen_help_device,
                                      gen_help_time);
 #endif
-            gen_help_event (help_echo_string, frame, help_echo_window,
-                            help_echo_object, help_echo_pos);
+            x_gen_help_event (help_echo_string, frame, help_echo_window,
+                              help_echo_object, help_echo_pos);
           }
         else
           {
             help_echo_string = Qnil;
-            gen_help_event (Qnil, frame, Qnil, Qnil, 0);
+            x_gen_help_event (Qnil, frame, Qnil, Qnil, 0);
           }
         count++;
       }

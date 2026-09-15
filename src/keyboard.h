@@ -507,8 +507,6 @@ kbd_buffer_store_event_hold (struct input_event *event,
   kbd_buffer_store_buffered_event ((union buffered_input_event *) event,
 				   hold_quit);
 }
-extern void gen_help_event (Lisp_Object, Lisp_Object, Lisp_Object,
-                            Lisp_Object, ptrdiff_t);
 extern void kbd_buffer_store_help_event (Lisp_Object, Lisp_Object);
 extern Lisp_Object menu_item_eval_property (Lisp_Object);
 extern bool kbd_buffer_events_waiting (void);

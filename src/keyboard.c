@@ -3871,28 +3871,11 @@ boundary where eassert may be compiled out.  */)
   return make_fixnum (position_to_Time (p));
 }
 
-/* Generate a HELP_EVENT input_event and store it in the keyboard
-   buffer.
-
-   HELP is the help form.
-
-   FRAME and WINDOW are the frame and window where the help is
-   generated.  OBJECT is the Lisp object where the help was found (a
-   buffer, a string, an overlay, or nil if neither from a string nor
-   from a buffer).  POS is the position within OBJECT where the help
-   was found.  */
-
-void
-gen_help_event (Lisp_Object help, Lisp_Object frame, Lisp_Object window,
-		Lisp_Object object, ptrdiff_t pos)
-{
-  /* M16 imp-3 — C body replaced by a SCM_CALL_5 into the Scheme
-     procedure in (emacs help-echo) gen-help-event.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs help-echo", "gen-help-event");
-  SCM_CALL_5 (proc, help, frame, window, object, INT_TO_INTEGER (pos));
-}
+/* M36 imp-4 — gen_help_event retired.  The definition and its extern
+   left C.  The last live buildable caller, the src/xterm.c help block,
+   now calls the local static dispatcher x_gen_help_event, which targets
+   (emacs help-echo) gen-help-event.  The unbuilt NS and PGTK callers
+   keep the name; HAVE_NS and HAVE_PGTK are undefined.  brief.org 5.3.  */
 
 
 /* Store HELP_EVENTs for HELP on FRAME in the input queue.  */

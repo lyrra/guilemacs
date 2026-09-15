@@ -26,6 +26,8 @@
 ;;;   10. The prior corpora pin the new retired state.
 ;;;   11. cr.org F2: the pgtk.scm note no longer names the dead
 ;;;       --detect-input-pending shim.
+;;;   12. cr1.org F1: the sibling count anchors track the live
+;;;       scm_c_public_ref site count.
 ;;;
 ;;; All checks read files, so the corpus is batch-safe.
 ;;;
@@ -346,14 +348,14 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
 (if (not kbd)
     (report "m36/imp3/scan/keyboard.c-counts" (cons 'FAIL "missing"))
     (begin
-      (check "m36/imp3/count/keyboard.c-lines" 11238
+      (check "m36/imp3/count/keyboard.c-lines" 11221
              (count-substr kbd "\n"))
       (check "m36/imp3/count/keyboard.c-defuns" 446
              (count-prefix kbd "DEFUN (\""))
       (check "m36/imp3/count/keyboard.c-shims" 420
              (count-prefix kbd "DEFUN (\"--"))))
 (info "m36/imp3/count/keyboard-globals.c-lines" (count-substr kg "\n"))
-(check "m36/imp3/count/combined-lines" 11728
+(check "m36/imp3/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp3/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
@@ -412,3 +414,46 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
              (contains? pgtk-scm "--detect-input-pending"))
       (check "m36/imp3/cr/F2/pgtk-repaired" #t
              (contains? pgtk-scm "It needs no such"))))
+
+;;; --- 12. cr1.org F1: the sibling count anchors track the source ----
+;;; The review found that the imp-3 commit moved the scm_c_public_ref
+;;; site count from 156 to 159 but left three older corpora anchored at
+;;; 156 (test-m36-imp1, test-m36-imp2, test-m35-imp3), so each of those
+;;; checks failed "expected 156 got 159".  The anchors are now re-pinned
+;;; and this section keeps them honest: it reads the anchor out of each
+;;; sibling corpus and compares it with the live count, so a later
+;;; surface move cannot leave a corpus behind.  cr1.org F1, F5.
+(define (first-int text)
+  "The first run of digits in TEXT as a number, or #f."
+  (let loop ((chars (string->list text)))
+    (cond ((null? chars) #f)
+          ((char-numeric? (car chars))
+           (let scan ((cs chars) (acc '()))
+             (if (and (pair? cs) (char-numeric? (car cs)))
+                 (scan (cdr cs) (cons (car cs) acc))
+                 (string->number (list->string (reverse acc))))))
+          (else (loop (cdr chars))))))
+
+(define (anchor-site-count text)
+  "The integer pinned by the first (check ... scm-c-public-ref-sites)
+line of TEXT, or #f."
+  (if (not (string? text))
+      #f
+      (let loop ((lines (split-lines text)))
+        (cond ((null? lines) #f)
+              ((and (string-contains (car lines) "(check")
+                    (string-contains (car lines) "scm-c-public-ref-sites"))
+               (let ((i (string-contains (car lines) "scm-c-public-ref-sites")))
+                 (first-int (substring (car lines)
+                                       (+ i (string-length
+                                             "scm-c-public-ref-sites"))
+                                       (string-length (car lines))))))
+              (else (loop (cdr lines)))))))
+
+(define measured-sites (src-site-count))
+(check "m36/imp3/anchor/m36-imp1" measured-sites
+       (anchor-site-count (slurp (repo "test/keyboard/test-m36-imp1.scm"))))
+(check "m36/imp3/anchor/m36-imp2" measured-sites
+       (anchor-site-count (slurp (repo "test/keyboard/test-m36-imp2.scm"))))
+(check "m36/imp3/anchor/m35-imp3" measured-sites
+       (anchor-site-count m35-imp3))
