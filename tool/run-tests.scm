@@ -182,6 +182,7 @@
   "test/keyboard/test-m34-imp7.el"              ; M34 imp-7 close-out audit: the three stub retirements (safe_run_hooks_2, push_kboard, not_single_kboard_state), the kept stubs, and the anchored counts (corpus prints PASS/FAIL)
   "test/keyboard/test-m35-imp1.el"              ; M35 imp-1: two reclaimed comment anchors (pop_kboard site lines, discard_mouse_events caller) (corpus prints PASS/FAIL)
   "test/keyboard/test-m35-imp2.el"              ; M35 imp-2: residual-stub disposition — keep gen_help_event and safe_run_hooks C, name M36+ (corpus prints PASS/FAIL)
+  "test/keyboard/test-m35-imp3.el"              ; M35 imp-3 close-out audit: the final remnant, the anchored counts, the budget, and the M35 accounting (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
