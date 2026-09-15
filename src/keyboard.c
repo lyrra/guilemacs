@@ -4943,17 +4943,6 @@ process_special_events (void)
   SCM_CALL_0 (proc);
 }
 
-/* Process any events that are not user-visible, run timer events that
-   are ripe, and return, without reading any user-visible events.  */
-
-void
-swallow_events (bool do_display)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-swallow-events!");
-  SCM_CALL_1 (proc, do_display ? Qt : Qnil);
-}
 
 /* Record the start of when Emacs is idle,
    for the sake of running idle-time timers.  */
@@ -5016,28 +5005,6 @@ decode_timer (Lisp_Object timer)
   Lisp_Object slot3 = AREF (timer, 3);
   Lisp_Object slot8 = AREF (timer, 8);
   return list4_to_timespec (slot1, slot2, slot3, slot8);
-}
-
-
-/* Check whether a timer has fired.  To prevent larger problems we simply
-   disregard elements that are not proper timers.  Do not make a circular
-   timer list for the time being.
-
-   Returns the time to wait until the next timer fires.
-   If no timer is active, return an invalid value.
-
-   As long as any timer is ripe, we run it.  */
-
-struct timespec
-timer_check (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs timers", "timer-check");
-  SCM result = SCM_CALL_0 (proc);
-  if (NILP (result))
-    return invalid_timespec ();
-  return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
 }
 
 DEFUN ("current-idle-time", Fcurrent_idle_time, Scurrent_idle_time, 0, 0, 0,

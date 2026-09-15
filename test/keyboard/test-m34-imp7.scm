@@ -282,11 +282,13 @@ historical check instead of failing it."
 (if (not process-c)
     (report "m34/imp7/scan/process.c" (cons 'FAIL "src/process.c missing"))
     (begin
-      (check "m34/imp7/kept/swallow-events" #t
+      ;; M36 imp-1 retired the stub.
+      (check "m34/imp7/kept/swallow-events-retired" #f
              (contains? process-c "swallow_events (do_display)"))
       (check "m34/imp7/kept/detect-input-pending" #t
              (contains? process-c "detect_input_pending ()"))
-      (check "m34/imp7/kept/timer-check" #t
+      ;; M36 imp-1 retired the stub.
+      (check "m34/imp7/kept/timer-check-retired" #f
              (contains? process-c "timer_check ()"))))
 
 (define xterm-c (slurp (repo "src/xterm.c")))

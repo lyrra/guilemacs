@@ -183,7 +183,8 @@
     (begin
       (check "m33/imp2/keyboard.c/no-show-help-echo-def" #f
              (contains? kbd-c "show_help_echo (Lisp_Object"))
-      (check "m33/imp2/keyboard.c/still-defines-timer-check" #t
+      ;; M36 imp-1 retired the stub.
+      (check "m33/imp2/keyboard.c/timer-check-retired" #f
              (contains? kbd-c "timer_check (void)"))))
 
 ;;; --- 8. Static: src/keyboard.h no longer declares the stub ---------

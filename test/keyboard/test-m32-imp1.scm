@@ -151,9 +151,9 @@
       ;; The old inline decision code is gone from the live copy.
       (check "m32/imp1/process.c/no-old-signal-drain" #f
              (contains? proc-c "else if (pending_signals)"))
-      ;; The only remaining `timer_delay = timer_check ()' is the dead
-      ;; MS-DOS copy (:8119, not subprocesses); the live copy is clean.
-      (check "m32/imp1/process.c/old-timer-body-only-in-dead-copy" 1
+      ;; M36 imp-1 deleted the dead MS-DOS copy and retired timer_check,
+      ;; so no `timer_delay = timer_check ()' remains anywhere.
+      (check "m32/imp1/process.c/no-timer-check-call" 0
              (count-occurrences proc-c "timer_delay = timer_check ()"))
       ;; The two thin dispatchers are defined local to process.c, so
       ;; keyboard.c does not grow for them.
@@ -173,7 +173,8 @@
     (begin
       (check "m32/imp1/keyboard.c/stub-detect-input-pending" #t
              (contains? kbd-c "detect_input_pending (void)"))
-      (check "m32/imp1/keyboard.c/stub-timer-check" #t
+      ;; M36 imp-1 retired the stub.
+      (check "m32/imp1/keyboard.c/timer-check-retired" #f
              (contains? kbd-c "timer_check (void)"))
       (check "m32/imp1/keyboard.c/stub-process-pending-signals" #t
              (contains? kbd-c "process_pending_signals (void)"))

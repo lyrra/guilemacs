@@ -216,7 +216,8 @@ match here; the caller checks below separate them."
              (contains? kbd "pop_kboard (void)"))
       (check "m35/imp2/def/safe-run-hooks" #t
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
-      (check "m35/imp2/def/swallow-events" #t
+      ;; M36 imp-1 retired both stubs.
+      (check "m35/imp2/def/swallow-events-retired" #f
              (contains? kbd "swallow_events (bool do_display)"))
       (check "m35/imp2/def/gen-help-event" #t
              (contains? kbd "gen_help_event (Lisp_Object help"))
@@ -224,7 +225,7 @@ match here; the caller checks below separate them."
              (contains? kbd "detect_input_pending (void)"))
       (check "m35/imp2/def/detect-input-pending-run-timers" #t
              (contains? kbd "detect_input_pending_run_timers (bool do_display)"))
-      (check "m35/imp2/def/timer-check" #t
+      (check "m35/imp2/def/timer-check-retired" #f
              (contains? kbd "timer_check (void)"))
       (check "m35/imp2/def/gobble-input" #t
              (contains? kbd "gobble_input (void)"))
@@ -254,7 +255,7 @@ match here; the caller checks below separate them."
 ;;; --- 4. The other seven stubs keep C (verdict E3) -----------------
 (check "m35/imp2/keep/pop-kboard" #t
        (contains? kbd "pop_kboard ();"))
-(check "m35/imp2/keep/swallow-events" #t
+(check "m35/imp2/keep/swallow-events-retired" #f
        (contains? process-c "swallow_events (do_display)"))
 (check "m35/imp2/keep/detect-input-pending/process.c" #t
        (contains? process-c "detect_input_pending ()"))
@@ -264,7 +265,7 @@ match here; the caller checks below separate them."
        (contains? process-c "detect_input_pending_run_timers (do_display)"))
 (check "m35/imp2/keep/detect-input-pending-run-timers/keyboard.c" #t
        (contains? kbd "detect_input_pending_run_timers (!NILP (do_display))"))
-(check "m35/imp2/keep/timer-check" #t
+(check "m35/imp2/keep/timer-check-retired" #f
        (contains? process-c "timer_check ()"))
 (check "m35/imp2/keep/gobble-input" #t
        (contains? kbd "gobble_input ()"))

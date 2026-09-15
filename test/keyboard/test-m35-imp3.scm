@@ -308,12 +308,13 @@ holds TOKEN as a whole identifier.  This mirrors the scan
 
 ;;; --- 1. The anchored counts ---------------------------------------
 ;;; The brief.org §3 method.  The measured values are the M35 end state:
-;;; keyboard.c 11,338, keyboard-globals.c 490, combined 11,828, DEFUNs
-;;; 449, --=-shims 423, scm_c_public_ref sites 155.
+;;; keyboard.c 11,305, keyboard-globals.c 490, combined 11,795, DEFUNs
+;;; 449, --=-shims 423, scm_c_public_ref sites 155.  (M36 imp-1
+;;; re-measured: the two retired stubs leave keyboard.c.)
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m35/imp3/count/keyboard.c-lines" 11338
+      (check "m35/imp3/count/keyboard.c-lines" 11305
              (count-substr kbd "\n"))
       (check "m35/imp3/count/keyboard.c-defuns" 449
              (count-prefix kbd "DEFUN (\""))
@@ -323,14 +324,14 @@ holds TOKEN as a whole identifier.  This mirrors the scan
     (report "m35/imp3/scan/keyboard-globals.c" (cons 'FAIL "missing"))
     (check "m35/imp3/count/keyboard-globals.c-lines" 490
            (count-substr kg "\n")))
-(check "m35/imp3/count/combined-lines" 11828
+(check "m35/imp3/count/combined-lines" 11795
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m35/imp3/count/scm-c-public-ref-sites" 155
        (src-site-count))
 ;; A detail check: keyboard.c holds 73 of the sites.
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c-sites" (cons 'FAIL "missing"))
-    (check "m35/imp3/count/keyboard.c-sites" 73
+    (check "m35/imp3/count/keyboard.c-sites" 71
            (count-lines-with kbd "scm_c_public_ref")))
 
 ;;; --- 2. The budget ------------------------------------------------
@@ -381,7 +382,8 @@ holds TOKEN as a whole identifier.  This mirrors the scan
        (contains? xmenu-c "safe_run_hooks (Qactivate_menubar_hook)"))
 (check "m35/imp3/keep/safe-run-hooks/pgtkmenu.c" #t
        (contains? pgtkmenu-c "safe_run_hooks (Qmenu_bar_update_hook)"))
-(check "m35/imp3/keep/swallow-events" #t
+;; M36 imp-1 retired swallow_events and timer_check.
+(check "m35/imp3/keep/swallow-events-retired" #f
        (contains? process-c "swallow_events (do_display)"))
 (check "m35/imp3/keep/gen-help-event/xterm.c" #t
        (contains? xterm-c "gen_help_event (Qnil, frame, Qnil, Qnil, 0)"))
@@ -391,7 +393,7 @@ holds TOKEN as a whole identifier.  This mirrors the scan
        (contains? process-c "detect_input_pending ()"))
 (check "m35/imp3/keep/detect-input-pending-run-timers" #t
        (contains? process-c "detect_input_pending_run_timers (do_display)"))
-(check "m35/imp3/keep/timer-check" #t
+(check "m35/imp3/keep/timer-check-retired" #f
        (contains? process-c "timer_check ()"))
 (check "m35/imp3/keep/gobble-input" #t
        (contains? kbd "gobble_input ()"))

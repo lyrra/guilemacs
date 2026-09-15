@@ -244,7 +244,9 @@ historical check instead of failing it."
     (begin
       (check "m33/imp7/stays-c/detect-input-pending-process" #t
              (contains? process-c "detect_input_pending ()"))
-      (check "m33/imp7/stays-c/swallow-events" #t
+      ;; M36 imp-1 retired the stub and moved the decision to
+      ;; (emacs process-wait).
+      (check "m33/imp7/stays-c/swallow-events-retired" #f
              (contains? process-c "swallow_events (do_display)"))))
 
 (define nsmenu-m (slurp (repo "src/nsmenu.m")))

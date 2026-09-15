@@ -5296,6 +5296,34 @@ wait_run_timers (bool do_display)
   return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
 }
 
+/* M36 imp-1: thin dispatchers into (emacs process-wait), which now owns
+   the swallow_events decisions of the wait loop.  Static and local to
+   process.c: the loop's control stays C.  See wait-swallow! and
+   wait-input-pending? in the module and docs/m36-plan.org.  The module
+   returns elisp booleans (t / #nil), so !NILP is the right read; a
+   Scheme #f would read as true.  wait_input_pending discards the result
+   on purpose (site B never exits the loop).  */
+
+static bool
+wait_swallow (int read_kbd, bool do_display)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait", "wait-swallow!");
+  SCM result = SCM_CALL_2 (proc, INT_TO_INTEGER (read_kbd),
+                           scm_from_bool (do_display));
+  return !NILP (result);
+}
+
+static void
+wait_input_pending (int read_kbd, bool do_display)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait", "wait-input-pending?");
+  SCM_CALL_2 (proc, INT_TO_INTEGER (read_kbd), scm_from_bool (do_display));
+}
+
 /* M32 imp-2: dispatcher into (emacs process-error) for the send_process
    EINTR-loop drain.  Static and local to process.c: the C entry point
    stays C.  See send-process-drain-signals! in the module.  */
@@ -5921,20 +5949,12 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
       /* If there is any, return immediately
 	 to give it higher priority than subprocesses.  */
 
-      if (read_kbd != 0)
-	{
-	  bool leave = false;
-
-	  if (detect_input_pending_run_timers (do_display))
-	    {
-	      swallow_events (do_display);
-	      if (detect_input_pending_run_timers (do_display))
-		leave = true;
-	    }
-
-	  if (leave)
-	    break;
-	}
+      /* M36 imp-1: the swallow decision lives in (emacs process-wait).
+	 Port of the former read_kbd != 0 -> detect_input_pending_run_timers
+	 -> swallow_events -> retest sequence.  See wait-swallow! in the
+	 module and docs/m36-plan.org.  */
+      if (wait_swallow (read_kbd, do_display))
+	break;
 
       /* If there is unread keyboard input, also return.  */
       if (read_kbd != 0
@@ -5948,14 +5968,11 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	 That would causes delays in pasting selections, for example.
 
 	 (We used to do this only if wait_for_cell.)  */
-      if (read_kbd == 0 && detect_input_pending ())
-	{
-	  swallow_events (do_display);
-#if 0  /* Exiting when read_kbd doesn't request that seems wrong, though.  */
-	  if (detect_input_pending ())
-	    break;
-#endif
-	}
+      /* M36 imp-1: the swallow decision lives in (emacs process-wait).
+	 Port of the former read_kbd == 0 && detect_input_pending ->
+	 swallow_events sequence.  See wait-input-pending? in the module
+	 and docs/m36-plan.org.  */
+      wait_input_pending (read_kbd, do_display);
 
       /* Exit now if the cell we're waiting for became non-nil.  */
       if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
@@ -8106,230 +8123,7 @@ keyboard_bit_set (fd_set *mask)
 }
 # endif
 
-#else  /* not subprocesses */
-
-/* This is referenced in thread.c:run_thread (which is never actually
-   called, since threads are not enabled for this configuration.  */
-void
-update_processes_for_thread_death (Lisp_Object dying_thread)
-{
-}
-
-/* Defined in msdos.c.  */
-extern int sys_select (int, fd_set *, fd_set *, fd_set *,
-		       struct timespec *, void *);
-
-/* Implementation of wait_reading_process_output, assuming that there
-   are no subprocesses.  Used only by the MS-DOS build.
-
-   Wait for timeout to elapse and/or keyboard input to be available.
-
-   TIME_LIMIT is:
-     timeout in seconds
-     If negative, gobble data immediately available but don't wait for any.
-
-   NSECS is:
-     an additional duration to wait, measured in nanoseconds
-     If TIME_LIMIT is zero, then:
-       If NSECS == 0, there is no limit.
-       If NSECS > 0, the timeout consists of NSECS only.
-       If NSECS < 0, gobble data immediately, as if TIME_LIMIT were negative.
-
-   READ_KBD is:
-     0 to ignore keyboard input, or
-     1 to return when input is available, or
-     -1 means caller will actually read the input, so don't throw to
-       the quit handler.
-
-   see full version for other parameters. We know that wait_proc will
-     always be NULL, since `subprocesses' isn't defined.
-
-   DO_DISPLAY means redisplay should be done to show subprocess
-   output that arrives.
-
-   Return -1 signifying we got no output and did not try.  */
-
-int
-wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
-			     bool do_display,
-			     Lisp_Object wait_for_cell,
-			     struct Lisp_Process *wait_proc, int just_wait_proc)
-{
-  register int nfds;
-  struct timespec end_time, timeout;
-  enum { MINIMUM = -1, TIMEOUT, FOREVER } wait;
-
-  if (TYPE_MAXIMUM (time_t) < time_limit)
-    time_limit = TYPE_MAXIMUM (time_t);
-
-  if (time_limit < 0 || nsecs < 0)
-    wait = MINIMUM;
-  else if (time_limit > 0 || nsecs > 0)
-    {
-      wait = TIMEOUT;
-      end_time = timespec_add (current_timespec (),
-                               make_timespec (time_limit, nsecs));
-    }
-  else
-    wait = FOREVER;
-
-  /* Turn off periodic alarms (in case they are in use)
-     and then turn off any other atimers,
-     because the select emulator uses alarms.  */
-  turn_on_atimers (0);
-
-  while (1)
-    {
-      bool timeout_reduced_for_timers = false;
-      fd_set waitchannels;
-      int xerrno;
-
-      /* If calling from keyboard input, do not quit
-	 since we want to return C-g as an input character.
-	 Otherwise, do pending quit if requested.  */
-      if (read_kbd >= 0)
-	maybe_quit ();
-
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
-	break;
-
-      /* Compute time from now till when time limit is up.  */
-      /* Exit if already run out.  */
-      if (wait == TIMEOUT)
-	{
-	  struct timespec now = current_timespec ();
-	  if (timespec_cmp (end_time, now) <= 0)
-	    break;
-	  timeout = timespec_sub (end_time, now);
-	}
-      else
-	timeout = make_timespec (wait < TIMEOUT ? 0 : 100000, 0);
-
-      /* If our caller will not immediately handle keyboard events,
-	 run timer events directly.
-	 (Callers that will immediately read keyboard events
-	 call timer_delay on their own.)  */
-      if (NILP (wait_for_cell))
-	{
-	  struct timespec timer_delay;
-
-	  do
-	    {
-	      unsigned old_timers_run = timers_run;
-	      timer_delay = timer_check ();
-	      if (timers_run != old_timers_run && do_display)
-		/* We must retry, since a timer may have requeued itself
-		   and that could alter the time delay.  */
-		redisplay_preserve_echo_area (14);
-	      else
-		break;
-	    }
-	  while (!detect_input_pending ());
-
-	  /* If there is unread keyboard input, also return.  */
-	  if (read_kbd != 0
-	      && requeued_command_events_pending_p ())
-	    break;
-
-	  if (timespec_valid_p (timer_delay))
-	    {
-	      if (timespec_cmp (timer_delay, timeout) < 0)
-		{
-		  timeout = timer_delay;
-		  timeout_reduced_for_timers = true;
-		}
-	    }
-	}
-
-      /* Cause C-g and alarm signals to take immediate action,
-	 and cause input available signals to zero out timeout.  */
-      if (read_kbd < 0)
-	set_waiting_for_input (&timeout);
-
-      /* If a frame has been newly mapped and needs updating,
-	 reprocess its display stuff.  */
-      if (frame_garbaged && do_display)
-	{
-	  clear_waiting_for_input ();
-	  redisplay_preserve_echo_area (15);
-	  if (read_kbd < 0)
-	    set_waiting_for_input (&timeout);
-	}
-
-      /* Wait till there is something to do.  */
-      FD_ZERO (&waitchannels);
-      if (read_kbd && detect_input_pending ())
-	nfds = 0;
-      else
-	{
-	  if (read_kbd || !NILP (wait_for_cell))
-	    FD_SET (0, &waitchannels);
-	  nfds = pselect (1, &waitchannels, NULL, NULL, &timeout, NULL);
-	}
-
-      xerrno = errno;
-
-      /* Make C-g and alarm signals set flags again.  */
-      clear_waiting_for_input ();
-
-      /*  If we woke up due to SIGWINCH, actually change size now.  */
-      do_pending_window_change (0);
-
-      if (wait < FOREVER && nfds == 0 && ! timeout_reduced_for_timers)
-	/* We waited the full specified time, so return now.  */
-	break;
-
-      if (nfds == -1)
-	{
-	  /* If the system call was interrupted, then go around the
-	     loop again.  */
-	  if (xerrno == EINTR)
-	    FD_ZERO (&waitchannels);
-	  else
-	    report_file_errno ("Failed select", Qnil, xerrno);
-	}
-
-      /* Check for keyboard input.  */
-
-      if (read_kbd
-	  && detect_input_pending_run_timers (do_display))
-	{
-	  swallow_events (do_display);
-	  if (detect_input_pending_run_timers (do_display))
-	    break;
-	}
-
-      /* If there is unread keyboard input, also return.  */
-      if (read_kbd
-	  && requeued_command_events_pending_p ())
-	break;
-
-      /* If wait_for_cell. check for keyboard input
-	 but don't run any timers.
-	 ??? (It seems wrong to me to check for keyboard
-	 input at all when wait_for_cell, but the code
-	 has been this way since July 1994.
-	 Try changing this after version 19.31.)  */
-      if (! NILP (wait_for_cell)
-	  && detect_input_pending ())
-	{
-	  swallow_events (do_display);
-	  if (detect_input_pending ())
-	    break;
-	}
-
-      /* Exit now if the cell we're waiting for became non-nil.  */
-      if (! NILP (wait_for_cell) && ! NILP (XCAR (wait_for_cell)))
-	break;
-    }
-
-  turn_on_atimers (1);
-
-  return -1;
-}
-
-#endif	/* not subprocesses */
+#endif	/* subprocesses */
 
 /* The following functions are needed even if async subprocesses are
    not supported.  Some of them are no-op stubs in that case.  */
