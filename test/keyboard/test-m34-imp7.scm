@@ -271,13 +271,13 @@ historical check instead of failing it."
              (contains? kbd "\npop_kboard (void)"))
       (check "m34/imp7/kept/pop-kboard/caller-retired" #f
              (contains? kbd "\n      pop_kboard ();"))
-      (check "m34/imp7/kept/safe-run-hooks/definition" #t
+      (check "m34/imp7/kept/safe-run-hooks/definition-retired" #f
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       (check "m34/imp7/kept/gobble-input" #t
              (contains? kbd "gobble_input (void)"))))
 
 (define emacs-c (slurp (repo "src/emacs.c")))
-(check "m34/imp7/kept/safe-run-hooks/emacs.c" #t
+(check "m34/imp7/kept/safe-run-hooks/emacs.c-retired" #f
        (contains? emacs-c "safe_run_hooks (Qkill_emacs_hook)"))
 
 (define process-c (slurp (repo "src/process.c")))

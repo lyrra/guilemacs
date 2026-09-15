@@ -24,6 +24,8 @@
             safe-run-hooks!
             safe-run-hooks-2!
             safe-run-hooks-maybe-narrowed!
+            run-echo-area-clear-hook!
+            run-kill-emacs-hook!
             init-command-loop-registrations
             init-m23-imp4-registrations
             init-m23-imp5-registrations))
@@ -1094,6 +1096,25 @@ Mirrors src/keyboard.c top_level_1 (lines 1306-1317)."
 (define (safe-run-hooks-2! hook arg1 arg2)
   (specbind-inhibit-quit!
    (lambda () (run-hook-with-args-1 hook arg1 arg2))))
+
+;;; M36 imp-3 — the caller side of the retired C safe_run_hooks stub.
+;;; The C keeps the guard (if (!NILP (echo_area_buffer[0]))) and the
+;;; mechanism; this module owns the hook decision and runs the hook
+;;; itself through safe-run-hooks!.  See brief.org 3, 7.
+
+;; Replaces the C safe_run_hooks (Qecho_area_clear_hook) call at
+;; src/keyboard.c:3050 and the --rc-echo-area-wipe call at :3115.
+(define (run-echo-area-clear-hook!)
+  (safe-run-hooks! 'echo-area-clear-hook))
+
+;; Replaces the C safe_run_hooks / call1 (Qkill_emacs_hook) branch at
+;; src/emacs.c:2700.  NONINTERACTIVE is the C bool, passed as elisp t
+;; (#t) or elisp nil (#nil).  C stays responsible for the outer
+;; find_symbol_value (Qkill_emacs_hook) guard.
+(define (run-kill-emacs-hook! noninteractive)
+  (if (not (%nilp noninteractive))
+      (safe-run-hooks! 'kill-emacs-hook)
+      ((%c 'run-hook-query-error-with-timeout) 'kill-emacs-hook)))
 
 ;; Replaces C safe_run_hooks_maybe_narrowed.  When long-line
 ;; optimizations are active and the computed region differs from the

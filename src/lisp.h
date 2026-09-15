@@ -4619,7 +4619,6 @@ void handle_input_available_signal (int);
 #endif
 extern Lisp_Object pending_funcalls;
 extern bool detect_input_pending_ignore_squeezables (void);
-extern void safe_run_hooks (Lisp_Object);
 extern Lisp_Object read_menu_command (void);
 extern Lisp_Object recursive_edit_1 (void);
 extern void record_auto_save (void);

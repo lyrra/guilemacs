@@ -228,7 +228,7 @@ count -- a loose substring match would also count a comment line
 (if (not kbd)
     (report "m34/imp3/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp3/keyboard.c/safe-run-hooks-still-defined" #t
+      (check "m34/imp3/keyboard.c/safe-run-hooks-retired" #f
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       ;; DoD 5: no stub retires at imp-3, so the DEFUN count is stable.
       ;; Use the anchored counter (kb defun-count-anchor): a loose

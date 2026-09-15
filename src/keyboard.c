@@ -2480,19 +2480,19 @@ read_menu_command (void)
   return SCM_CALL_0 (proc);
 }
 
-/* M22 imp-4: safe_run_hooks family moved to (emacs command-loop);
-   safe_run_hooks remains a thin dispatcher for cross-file callers;
-   the other five bodies were deleted with the cutover.  M34 imp-7
-   retired the two-argument dispatcher; its only caller moved to Scheme
-   at imp-5.  */
-
-void
-safe_run_hooks (Lisp_Object hook)
+/* M36 imp-3 — the keyboard.c safe_run_hooks caller dispatcher.  The C
+   stub left C; the two echo-area callers below share this dispatcher,
+   which caches its SCM proc in a static SCM behind the SCM_UNBNDP
+   guard (as src/window.c and src/fileio.c do).  The module (emacs
+   command-loop) owns the hook decision and runs the hook itself.  */
+static void
+kbd_run_echo_area_clear_hook (void)
 {
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "safe-run-hooks!");
-  SCM_CALL_1 (proc, hook);
+    proc = scm_c_public_ref ("emacs command-loop",
+			     "run-echo-area-clear-hook!");
+  SCM_CALL_0 (proc);
 }
 
 
@@ -3047,7 +3047,7 @@ return nil.  Caller has already verified the Block 1 gate.  */)
 
   /* Now wipe the echo area.  */
   if (!NILP (echo_area_buffer[0]))
-    safe_run_hooks (Qecho_area_clear_hook);
+    kbd_run_echo_area_clear_hook ();
   clear_message (1, 0);
   echo_truncate (0);
 
@@ -3112,7 +3112,7 @@ Used by Scheme rc-event-translate-and-record!.  */)
 {
   if (!NILP (echo_area_buffer[0]))
     {
-      safe_run_hooks (Qecho_area_clear_hook);
+      kbd_run_echo_area_clear_hook ();
       clear_message (1, 0);
       /* If we were showing the echo-area message on top of an
          active minibuffer, resize the mini-window.  */
@@ -11193,10 +11193,10 @@ syms_of_keyboard (void)
   DEFSYM (Qtouchscreen, "touchscreen");
 
   /* M23 imp-5 review: this Fset stays in C with its DEFSYM
-     (Qecho_area_clear_hook, above).  The symbol is Group D — still
-     consumed from C (safe_run_hooks Qecho_area_clear_hook), so its
-     DEFSYM cannot move yet; the Fset zeroing its value keeps its pair
-     together (brief.org B).  */
+     (Qecho_area_clear_hook, above).  M36 imp-3 moved the last
+     safe_run_hooks caller out of C, so the symbol is no longer
+     consumed by a C run; the DEFSYM and this Fset stay paired here
+     (brief.org B, M36 imp-3 6).  */
   Fset (Qecho_area_clear_hook, Qnil);
 
 

@@ -380,9 +380,9 @@ holds TOKEN as a whole identifier.  This mirrors the scan
        (contains? config-h "/* #undef HAVE_NS */"))
 (check "m35/imp3/keep/pop-kboard-retired" #f
        (contains? kbd "\n      pop_kboard ();"))
-(check "m35/imp3/keep/safe-run-hooks/emacs.c" #t
+(check "m35/imp3/keep/safe-run-hooks/emacs.c-retired" #f
        (contains? emacs-c "safe_run_hooks (Qkill_emacs_hook)"))
-(check "m35/imp3/keep/safe-run-hooks/xmenu.c" #t
+(check "m35/imp3/keep/safe-run-hooks/xmenu.c-retired" #f
        (contains? xmenu-c "safe_run_hooks (Qactivate_menubar_hook)"))
 (check "m35/imp3/keep/safe-run-hooks/pgtkmenu.c" #t
        (contains? pgtkmenu-c "safe_run_hooks (Qmenu_bar_update_hook)"))

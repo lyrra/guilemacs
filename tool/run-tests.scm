@@ -185,6 +185,7 @@
   "test/keyboard/test-m35-imp3.el"              ; M35 imp-3 close-out audit: the final remnant, the anchored counts, the budget, and the M35 accounting (corpus prints PASS/FAIL)
   "test/keyboard/test-m36-imp1.el"              ; M36 imp-1: retire swallow_events and timer_check; port the process.c input-state callers to (emacs process-wait) (corpus prints PASS/FAIL)
   "test/keyboard/test-m36-imp2.el"              ; M36 imp-2: retire pop_kboard and the detect family; port the last keyboard.c callers to (emacs single-kboard)/(emacs kbd-buffer)/(emacs process-wait) (corpus prints PASS/FAIL)
+  "test/keyboard/test-m36-imp3.el"              ; M36 imp-3: retire safe_run_hooks; port the startup/menu/echo-area callers to (emacs command-loop)/(emacs xdisp) (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

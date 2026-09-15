@@ -35,8 +35,8 @@
 ;;; Conventions (identical to M9-M33): a guilemacs Scheme integer is an
 ;;; elisp fixnum; #nil is elisp nil; no module-level mutable state.  The
 ;;; module adds no C primitive.  It reads the two name cells with the
-;;; delayed (emacs-elisp runtime) symbol-value.  It needs no
-;;; --detect-input-pending: pgtkterm.c has no XTflash analogue.
+;;; delayed (emacs-elisp runtime) symbol-value.  It needs no such
+;;; detect shim: pgtkterm.c has no XTflash analogue.
 
 (define-module (emacs pgtk)
   #:use-module (emacs elisp-ref)      ; defelisp

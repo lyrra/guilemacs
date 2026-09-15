@@ -948,6 +948,32 @@ apply_systemfont_to_menu (struct frame *f, Widget w)
 
 #endif
 
+/* M36 imp-3 — the xmenu.c safe_run_hooks caller dispatchers.  The C stub
+   left C; each static dispatcher caches its SCM proc in a static SCM
+   behind the SCM_UNBNDP guard (as src/window.c and src/fileio.c do).
+   The module (emacs xdisp) already owns these two menu hooks and runs
+   them through safe-run-hooks!.  The C keeps the menubar mechanism.
+   brief.org 3, 4.  */
+static void
+xmenu_run_activate_menubar_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-run-activate-menubar-hook!");
+  SCM_CALL_0 (proc);
+}
+
+static void
+xmenu_run_menu_bar_update_hook (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-run-menu-bar-update-hook!");
+  SCM_CALL_0 (proc);
+}
+
 /* Set the contents of the menubar widgets of frame F.  */
 
 void
@@ -1019,11 +1045,11 @@ set_frame_menubar (struct frame *f, bool deep_p)
       set_buffer_internal_1 (XBUFFER (buffer));
 
       /* Run the Lucid hook.  */
-      safe_run_hooks (Qactivate_menubar_hook);
+      xmenu_run_activate_menubar_hook ();
 
       /* If it has changed current-menubar from previous value,
 	 really recompute the menubar from the value.  */
-      safe_run_hooks (Qmenu_bar_update_hook);
+      xmenu_run_menu_bar_update_hook ();
       fset_menu_bar_items (f, menu_bar_items (FRAME_MENU_BAR_ITEMS (f)));
 
       items = FRAME_MENU_BAR_ITEMS (f);

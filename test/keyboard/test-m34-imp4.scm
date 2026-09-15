@@ -298,7 +298,7 @@ count -- a loose substring match would also count a comment line
 (if (not kbd)
     (report "m34/imp4/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
     (begin
-      (check "m34/imp4/keyboard.c/safe-run-hooks-still-defined" #t
+      (check "m34/imp4/keyboard.c/safe-run-hooks-retired" #f
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       (check "m34/imp4/keyboard.c/defun-count" 446
              (count-prefix kbd "DEFUN (\""))))

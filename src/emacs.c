@@ -2635,6 +2635,22 @@ sort_args (int argc, char **argv)
   xfree (priority);
 }
 
+/* M36 imp-3 — the emacs.c safe_run_hooks caller dispatcher.  The C stub
+   left C; this static dispatcher caches its SCM proc in a static SCM
+   behind the SCM_UNBNDP guard (as src/window.c and src/fileio.c do).
+   The module (emacs command-loop) owns the decision: it runs
+   kill-emacs-hook through safe-run-hooks! when NONINTERACTIVE is set,
+   and calls run-hook-query-error-with-timeout otherwise.  The C keeps
+   the outer find_symbol_value (Qkill_emacs_hook) guard.  brief.org 3.  */
+static void
+emacs_run_kill_emacs_hook (bool noninteractive)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "run-kill-emacs-hook!");
+  SCM_CALL_1 (proc, noninteractive ? Qt : Qnil);
+}
+
 DEFUN ("kill-emacs", Fkill_emacs, Skill_emacs, 0, 2, "P",
        doc: /* Exit the Emacs job and kill it.
 If ARG is an integer, return ARG as the exit program code.
@@ -2695,12 +2711,7 @@ killed.  */
      set.  */
   waiting_for_input = 0;
   if (!NILP (find_symbol_value (Qkill_emacs_hook)))
-    {
-      if (noninteractive)
-	safe_run_hooks (Qkill_emacs_hook);
-      else
-	call1 (Qrun_hook_query_error_with_timeout, Qkill_emacs_hook);
-    }
+    emacs_run_kill_emacs_hook (noninteractive);
 
 #ifdef HAVE_X_WINDOWS
   /* Transfer any clipboards we own to the clipboard manager.  */

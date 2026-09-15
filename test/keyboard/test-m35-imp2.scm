@@ -216,7 +216,9 @@ match here; the caller checks below separate them."
       ;; not a bare pop_kboard token.
       (check "m35/imp2/def/pop-kboard-retired" #f
              (contains? kbd "\npop_kboard (void)"))
-      (check "m35/imp2/def/safe-run-hooks" #t
+      ;; M36 imp-3 retired safe_run_hooks; the kbd_run_echo_area_clear_hook
+      ;; dispatcher is not a bare safe_run_hooks token.
+      (check "m35/imp2/def/safe-run-hooks-retired" #f
              (contains? kbd "safe_run_hooks (Lisp_Object hook)"))
       ;; M36 imp-1 retired both stubs.
       (check "m35/imp2/def/swallow-events-retired" #f
@@ -235,14 +237,15 @@ match here; the caller checks below separate them."
       (check "m35/imp2/def/kbd-buffer-store-event" #t
              (contains? kbd "kbd_buffer_store_event (register struct input_event"))))
 
-;;; --- 2. safe_run_hooks keeps C (verdict E1) -----------------------
-;;; Callers in four buildable files: emacs.c, keyboard.c, xmenu.c, and
-;;; pgtkmenu.c.  nsmenu.m is NS and does not count.
-(check "m35/imp2/keep/safe-run-hooks/emacs.c" #t
+;;; --- 2. safe_run_hooks retired except the unbuilt pgtk caller ------
+;;; M36 imp-3 moved the buildable callers (emacs.c, keyboard.c, xmenu.c)
+;;; out of C.  The pgtkmenu.c caller is unbuilt (HAVE_PGTK is
+;;; undefined), so its text stays.  nsmenu.m is NS and does not count.
+(check "m35/imp2/keep/safe-run-hooks/emacs.c-retired" #f
        (contains? emacs-c "safe_run_hooks (Qkill_emacs_hook)"))
-(check "m35/imp2/keep/safe-run-hooks/keyboard.c" #t
+(check "m35/imp2/keep/safe-run-hooks/keyboard.c-retired" #f
        (contains? kbd "safe_run_hooks (Qecho_area_clear_hook)"))
-(check "m35/imp2/keep/safe-run-hooks/xmenu.c" #t
+(check "m35/imp2/keep/safe-run-hooks/xmenu.c-retired" #f
        (contains? xmenu-c "safe_run_hooks (Qactivate_menubar_hook)"))
 (check "m35/imp2/keep/safe-run-hooks/pgtkmenu.c" #t
        (contains? pgtkmenu-c "safe_run_hooks (Qmenu_bar_update_hook)"))
