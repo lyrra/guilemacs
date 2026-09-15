@@ -202,7 +202,14 @@ Returns #t if lexically bound, #f otherwise."
               ;; Found an interpreter environment binding
               ;; Check if symbol is in the old environment
               (let ((env (vector-ref entry 1)))
-                (if (and (pair? env) (assq symbol env))
+                ;; ENV is an elisp lexical environment alist.  Its leading
+                ;; element may be the marker `t' (#t here), and Emacs's own
+                ;; `assq' silently skips any non-cons element -- Guile's does
+                ;; not, so scan manually and skip non-pairs to match.
+                (if (let scan ((e env))
+                      (cond ((not (pair? e)) #f)
+                            ((and (pair? (car e)) (eq? (caar e) symbol)) #t)
+                            (else (scan (cdr e)))))
                     #t
                     (loop (cdr stack))))
               (loop (cdr stack)))))))
