@@ -193,6 +193,7 @@
   "test/keyboard/test-m37-imp3.el"              ; M37 imp-3 close-out: the two verdicts, the empty reclaim set, the kept remnant, the surface anchors, the budget, and the accounting (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   "test/keyboard/test-m38-imp1.el"              ; M38 imp-1: the ERT count mismatch must fail the run (corpus prints PASS/FAIL)
+  "test/keyboard/test-m38-imp2.el"              ; M38 imp-2: the m29 dropped-token scan is comment-blind and matches whole identifiers (corpus prints PASS/FAIL)
   )
 (group
   "test/src/eval-tests.el"

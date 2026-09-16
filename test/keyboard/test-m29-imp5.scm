@@ -18,7 +18,8 @@
 ;;;
 ;;;   1. no dropped-platform token survives in src/keyboard.c (tokens
 ;;;      MSDOS, WINDOWSNT, HAVE_NS, HAIKU, ANDROID, DOS_NT, NTGUI),
-;;;      after stripping the kept inert FRAME_MSDOS_P macro name;
+;;;      after the C comments are removed and the kept inert
+;;;      FRAME_MSDOS_P macro name is stripped;
 ;;;   2. every config-variance arm survives: USE_TOOLKIT_SCROLL_BARS,
 ;;;      HAVE_X_WINDOWS, HAVE_TEXT_CONVERSION;
 ;;;   3. every Lisp / etc path deleted by brief.org Step 3 is gone;
@@ -76,6 +77,79 @@
             (loop (+ idx flen)
                   (cons (substring s start idx) out)))))))
 
+;;; strip-comments: return S with every C comment removed and replaced
+;;; by one space.  Block comments run from /* to the next */; line
+;;; comments run from // to the end of the line (the newline stays).
+;;; String ("...") and character ('...') literals are kept, as is a
+;;; backslash escape inside either.  A /* inside a string is text, not
+;;; a comment start.  Walk the text once with the state CODE, BLOCK,
+;;; LINE, STRING, or CHAR.
+(define (strip-comments s)
+  (let ((n (string-length s)))
+    (let loop ((i 0) (state 'code) (out '()))
+      (if (>= i n)
+          (list->string (reverse out))
+          (let ((c (string-ref s i)))
+            (define (peek k)
+              ;; the character k positions ahead, or #f at the end.
+              (let ((j (+ i k)))
+                (if (< j n) (string-ref s j) #f)))
+            (case state
+              ((code)
+               (cond
+                ((and (char=? c #\/) (eqv? (peek 1) #\*))
+                 (loop (+ i 2) 'block (cons #\space out)))
+                ((and (char=? c #\/) (eqv? (peek 1) #\/))
+                 (loop (+ i 2) 'line (cons #\space out)))
+                ((char=? c #\") (loop (+ i 1) 'string (cons c out)))
+                ((char=? c #\') (loop (+ i 1) 'char (cons c out)))
+                (else (loop (+ i 1) 'code (cons c out)))))
+              ((block)
+               (if (and (char=? c #\*) (eqv? (peek 1) #\/))
+                   (loop (+ i 2) 'code out)
+                   (loop (+ i 1) 'block out)))
+              ((line)
+               (if (char=? c #\newline)
+                   (loop (+ i 1) 'code (cons c out))
+                   (loop (+ i 1) 'line out)))
+              ((string)
+               (cond
+                ((char=? c #\\)
+                 (if (eqv? (peek 1) #f)
+                     (loop (+ i 1) 'string (cons c out))
+                     (loop (+ i 2) 'string (cons (peek 1) (cons c out)))))
+                ((char=? c #\") (loop (+ i 1) 'code (cons c out)))
+                (else (loop (+ i 1) 'string (cons c out)))))
+              ((char)
+               (cond
+                ((char=? c #\\)
+                 (if (eqv? (peek 1) #f)
+                     (loop (+ i 1) 'char (cons c out))
+                     (loop (+ i 2) 'char (cons (peek 1) (cons c out)))))
+                ((char=? c #\') (loop (+ i 1) 'code (cons c out)))
+                (else (loop (+ i 1) 'char (cons c out)))))))))))
+
+;;; ident-hit?: true when TOKEN occurs in S as a whole C identifier.
+;;; A whole-identifier match is stricter than the old substring match,
+;;; so it cannot hide a live token: HAVE_NS must not match HAVE_NSX.
+;;; C identifier characters are [A-Za-z0-9_].
+(define (ident-char? c)
+  (and c (or (char-alphabetic? c) (char-numeric? c) (char=? c #\_))))
+
+(define (ident-hit? s token)
+  (let ((tlen (string-length token))
+        (slen (string-length s)))
+    (let loop ((start 0))
+      (let ((idx (string-contains s token start)))
+        (if (not idx)
+            #f
+            (let ((before (if (= idx 0) #f (string-ref s (- idx 1))))
+                  (after (if (>= (+ idx tlen) slen) #f
+                             (string-ref s (+ idx tlen)))))
+              (if (and (not (ident-char? before)) (not (ident-char? after)))
+                  #t
+                  (loop (+ idx 1)))))))))
+
 ;;; --- 0. The repo root must be known --------------------------------
 (if (not (defined? '%m29-root))
     (begin (report "m29-root-bound" (cons 'FAIL "not bound by wrapper"))
@@ -85,15 +159,16 @@
 
 ;;; --- 1. No dropped-platform token in src/keyboard.c -----------------
 ;;; FRAME_MSDOS_P is an inert frame macro (brief.org "What stays"), not
-;;; an #ifdef arm, so it is stripped before the scan.
+;;; an #ifdef arm, so it is stripped before the scan.  The C comments
+;;; are removed first, so a token in a comment is not a hit.
 (define kbd-tokens '("MSDOS" "WINDOWSNT" "HAVE_NS" "HAIKU" "ANDROID"
                      "DOS_NT" "NTGUI"))
 
 (let ((body (slurp (repo "src/keyboard.c"))))
   (if (not body)
       (report "kbd:present" (cons 'FAIL "src/keyboard.c missing"))
-      (let* ((stripped (strip-all body "FRAME_MSDOS_P"))
-             (hits (filter (lambda (tok) (has? stripped tok)) kbd-tokens)))
+      (let* ((stripped (strip-all (strip-comments body) "FRAME_MSDOS_P"))
+             (hits (filter (lambda (tok) (ident-hit? stripped tok)) kbd-tokens)))
         (if (null? hits)
             (report "kbd:no-dropped-token" 'PASS)
             (report "kbd:no-dropped-token"
