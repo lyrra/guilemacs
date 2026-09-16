@@ -369,8 +369,7 @@ or #f.  A value must sit in the paragraph that names the metric."
                   (let ((l (line-n mod line)))
                     (and l
                          (scheme-code-line? l)
-                         (pair? (code-token-lines l name))))
-                  #t)))
+                         (pair? (code-token-lines l name)))))))
     ;; §3.2 defines a dead shim with two conditions: no Scheme caller
     ;; AND no C caller.  The checks above prove the first condition.
     ;; This proves the second too: no live buildable src/*.c file calls
