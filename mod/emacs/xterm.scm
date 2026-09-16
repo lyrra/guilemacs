@@ -14,8 +14,10 @@
 ;;;   x-help-event-action -- src/xterm.c:25629-25657, the three-way
 ;;;                          choice of the help block in
 ;;;                          handle_one_xevent.
-;;;   x-input-pending?     -- src/xterm.c:11603, the input test of
-;;;                          XTflash.  brief.org 3.
+;;;   x-input-pending?     -- src/xterm.c:11553 (the shim
+;;;                          x_input_pending), the input test of
+;;;                          XTflash; the pselect body is :11633.
+;;;                          brief.org 3.
 ;;;   x-extra-keyboard-modifiers -- src/xterm.c:20363 and :24261, the
 ;;;                          fixnum mask read.  brief.org 4.1.
 ;;;   x-mwheel-coalesce-scroll-events? -- src/xterm.c:22829, the
@@ -69,7 +71,8 @@
   (not (eq? x #nil)))
 
 ;;; --- x-input-pending? ----------------------------------------------
-;;; Port of the input test at src/xterm.c:11603 in XTflash.  Return #t
+;;; Port of the input test at src/xterm.c:11553 (shim x_input_pending;
+;;; pselect body :11633) in XTflash.  Return #t
 ;;; when input events are pending.  The primitive returns elisp t or
 ;;; elisp nil, so normalize with truthy?.  The C keeps the loop: the
 ;;; current_timespec read, the timespec_cmp test, the FD_ZERO / FD_SET

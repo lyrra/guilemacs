@@ -188,6 +188,7 @@
   "test/keyboard/test-m36-imp3.el"              ; M36 imp-3: retire safe_run_hooks; port the startup/menu/echo-area callers to (emacs command-loop)/(emacs xdisp) (corpus prints PASS/FAIL)
   "test/keyboard/test-m36-imp4.el"              ; M36 imp-4: retire gen_help_event; port the xterm.c help caller to its static dispatcher (corpus prints PASS/FAIL)
   "test/keyboard/test-m36-imp5.el"              ; M36 imp-5 close-out audit: the seven retirements, the surface anchors, the budget, the unbuilt callers, and the M36 accounting (corpus prints PASS/FAIL)
+  "test/keyboard/test-m37-imp1.el"              ; M37 imp-1 reclaim step: no read-path shim is dead, the kept C drain/arm, the corrected census rows and the added Q1 consumers, and the xterm.scm comment (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
