@@ -192,6 +192,7 @@
   "test/keyboard/test-m37-imp2.el"              ; M37 imp-2 ring verdict: the kbd_buffer[] ring stays C, the seven-consumer census and the two proofs, the kept cells/accessors/remnants, the empty reclaim set, and the surface anchors (corpus prints PASS/FAIL)
   "test/keyboard/test-m37-imp3.el"              ; M37 imp-3 close-out: the two verdicts, the empty reclaim set, the kept remnant, the surface anchors, the budget, and the accounting (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
+  "test/keyboard/test-m38-imp1.el"              ; M38 imp-1: the ERT count mismatch must fail the run (corpus prints PASS/FAIL)
   )
 (group
   "test/src/eval-tests.el"
@@ -496,6 +497,14 @@
 ;;;  )
    (group "test/lisp/progmodes/sql-tests.el") ; fails
 
+;; M38 imp-1: the count-mismatch fixture.  Normally green, so it never
+;; reddens a run; the m38-imp1 corpus runs it stressed
+;; (GUILEMACS_M38_FIXTURE=1) to prove the harness exits non-zero on a
+;; count mismatch.  Kept out of the keyboard group (brief.org M38 imp-1).
+ (group
+  "test/m38/test-m38-imp1-fixture.el"
+  )
+
  ))
 
 (define %emacs-exec "../src/temacs")
@@ -731,30 +740,49 @@
     (format #t "running ===> ~a~%" args)
     (let* ((port (open-input-pipe (string-join args " ")))
            (pass '())
+           (skipped 0)
            (tot 0)
-           ;; match: ^   passed  1/1  allout-test-range-overlaps (0.000 sec)$
-           (re (make-regexp ".* passed[ ]*([0-9]*)/[0-9]*[ ]*([^ ]*) .*")))
+           ;; Match an ERT per-test result line:
+           ;;   passed  1/3  allout-test-range-overlaps (0.000 sec)
+           ;;   FAILED  3/3  name (0.000 sec)
+           ;; Group 1 is the result word, group 2 the index N, group 3 the
+           ;; total M, group 4 the test name.  ERT prints the total M on
+           ;; every result line (passed or not).  Do NOT key on the index N:
+           ;; N stops at the last PASS, so a failing LAST test hides the
+           ;; count mismatch (M38 D1, review F1).
+           (re (make-regexp "^[ ]*(passed|failed|FAILED|skipped|SKIPPED|aborted|ABORTED|quit|QUIT|unknown|UNKNOWN|PASSED)[ ]+([0-9]+)/([0-9]+)[ ]+([^ ]*)")))
       (let loop ((line (get-line port)))
         (cond
          ((eof-object? line) #f)
          (else
           (format #t "~a:~a >>> ~a~%" (+ (length pass) %total-passed-tests)
                   %total-failed-tests line)
-          (cond
-           ((string-contains line " passed ")
-            (let ((f (list-matches re line)))
-              (unless (null? f)
-                (let* ((pos-cnt (vector-ref (car f) 2))
-                       (pos-name (vector-ref (car f) 3))
-                       (pass-count (substring line (car pos-cnt) (cdr pos-cnt)))
-                       (test-name (substring line (car pos-name) (cdr pos-name))))
-                  (push! pass test-name)
-                  (set! tot (string->number pass-count)))))
-            (loop (get-line port)))
-           (else (loop (get-line port)))))))
-      (if (not (= (length pass) tot)) ; assert test protocol
+          (let ((f (list-matches re line)))
+            (unless (null? f)
+              (let* ((pos-res (vector-ref (car f) 2))
+                     (pos-tot (vector-ref (car f) 4))
+                     (pos-name (vector-ref (car f) 5))
+                     (result (substring line (car pos-res) (cdr pos-res)))
+                     (total (substring line (car pos-tot) (cdr pos-tot)))
+                     (test-name (substring line (car pos-name) (cdr pos-name))))
+                (set! tot (string->number total))
+                (cond
+                 ((string-ci=? result "passed") (push! pass test-name))
+                 ((string-ci=? result "skipped") (set! skipped (1+ skipped))))))
+          (loop (get-line port))))))
+      ;; Assert the ERT test protocol.  ERT ran TOT tests, but only the
+      ;; observed pass names plus controlled skips were accounted for.  A
+      ;; difference means a test failed with no other record (false green,
+      ;; M38 D1).  Keep the ERROR text and record the mismatch in the fail
+      ;; list, so the single exit path at the report reaches it.  Do not
+      ;; change PASS.
+      (if (not (= (+ (length pass) skipped) tot))
           (format #t "ERROR: ~a passed, but ~a counted pass.~%" (length pass) tot))
-      (list pass pass '()))))
+      (list pass pass
+            (if (= (+ (length pass) skipped) tot)
+                '()
+                (list (format #f "ERT count mismatch: ~a passed, but ~a counted pass"
+                              (length pass) tot)))))))
 
 (define (run-tests files keys)
   (flush-all-ports)
@@ -857,8 +885,6 @@
            (num-total-passed-gen-tests (length %total-passed-gen-tests))
            (num-total-passed-ert-tests (length %total-passed-ert-tests))
            (num-total-failed-gen-tests (length %total-failed-gen-tests))
-           (num-total-missing-ert-tests ; (length %total-failed-ert-tests)
-                    (- num-total-ert-tests num-total-passed-ert-tests))
            (failed-gen (filter (lambda (x)
                                  (not (member x %total-passed-gen-tests)))
                                %total-gen-tests))
@@ -866,7 +892,10 @@
                                  (and (not (member (car x) %total-passed-ert-tests))
                                       (not (member (car x) %skipped-tests))))
                                %total-ert-tests))
-           (num-total-failed-ert-tests (length failed-ert)))
+           (num-total-failed-ert-tests (+ (length failed-ert)
+                                          ;; M38 D1: count mismatches recorded
+                                          ;; by run-tests-loadup-emacs.
+                                          (length %total-failed-ert-tests))))
       (format #t "~%")
       (if (not (null? %total-failed-gen-tests))
           (format #t "~%~%* failed generated tests ~s~%" %total-failed-gen-tests))
@@ -877,8 +906,11 @@
       (if (not (null? failed-ert))
           (format #t "failed ERT tests: ~s~%~%" failed-ert))
       (format #t "Read failures when reading ERT test files: ~s~%" %read-failures)
-      (format #t "Total number of missing tests: ~a   ;; found during emit/scan, but never runned, ie most probably failed~%"
-              (length failed-ert))
+      ;; M38 D1/review F3: this line must agree with the "fail ERT" cell of
+      ;; the table below.  Use num-total-failed-ert-tests, which is the
+      ;; scanned-missing set plus the count-mismatch accumulator.
+      (format #t "Total number of failed/missing ERT tests: ~a   ;; scanned but never runned, or counted but not passed~%"
+              num-total-failed-ert-tests)
       (format #t "--------------------------------------------~%")
       (print-report-table
        (list '("" "gen" "ERT" "total" "")
