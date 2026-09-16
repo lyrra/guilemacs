@@ -32,6 +32,17 @@
 
 (princ "=== m21 read-key-sequence test suite ===\n")
 
+;; M38 imp-3: shared input-state reset (brief.org §8.2); unwind-protect so
+;; the defaults are restored on the normal and the non-local exit path
+;; (brief.org §8.1).  This corpus writes last-input-event,
+;; last-nonmenu-event and num-nonmacro-input-events (brief.org §5.1); the
+;; imp-4 end-to-end block below also drives read-key-sequence.
+(let ((dir (file-name-directory (or load-file-name default-directory))))
+  (unless (fboundp 'm38-imp3-reset-input-state)
+    (load (expand-file-name "test-m38-imp3-reset.el" dir) nil t)))
+(let ((m38-imp3-entry-buffer (current-buffer)))
+ (unwind-protect
+  (progn
 ;; Run the Scheme test corpus.  Populates test-results in the
 ;; (guile-user) module.  Resolve the corpus path from load-file-name so
 ;; it works both from the repo root (run-all-tests.el) and from the
@@ -136,3 +147,7 @@ STATUS is either the symbol `PASS' or a FAIL list (FAIL KEY ...)."
                      (if ok "" (format " %S" (cdr result)))))))
   (princ (format "=== %d passed, %d failed, %d total ===\n"
                  pass fail (+ pass fail))))
+  )
+  (condition-case e
+      (m38-imp3-reset-input-state m38-imp3-entry-buffer)
+    (error (princ (format "M38-IMP3-RESET-ERROR: %S\n" e))))))

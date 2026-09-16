@@ -14,6 +14,16 @@
 
 (princ "=== m13-store test suite ===\n")
 
+;; M38 imp-3: load the shared input-state reset (brief.org §8.2) and run
+;; the corpus inside unwind-protect, so the C/Scheme defaults are
+;; restored on the normal AND the non-local exit path (brief.org §8.1).
+;; This corpus writes last-event-frame (brief.org §5.1).
+(let ((dir (file-name-directory (or load-file-name default-directory))))
+  (unless (fboundp 'm38-imp3-reset-input-state)
+    (load (expand-file-name "test-m38-imp3-reset.el" dir) nil t)))
+(let ((m38-imp3-entry-buffer (current-buffer)))
+ (unwind-protect
+  (progn
 ;; Run the Scheme test corpus.  Populates test-results in the
 ;; (guile-user) module.  Resolve the corpus path from load-file-name so
 ;; it works both from the repo root (run-all-tests.el) and from the
@@ -42,3 +52,7 @@
                      (if ok "" (format " %S" (cdr result)))))))
   (princ (format "=== %d passed, %d failed, %d total ===\n"
                  pass fail (+ pass fail))))
+  )
+  (condition-case e
+      (m38-imp3-reset-input-state m38-imp3-entry-buffer)
+    (error (princ (format "M38-IMP3-RESET-ERROR: %S\n" e))))))

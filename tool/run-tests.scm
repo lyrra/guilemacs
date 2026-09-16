@@ -194,6 +194,7 @@
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   "test/keyboard/test-m38-imp1.el"              ; M38 imp-1: the ERT count mismatch must fail the run (corpus prints PASS/FAIL)
   "test/keyboard/test-m38-imp2.el"              ; M38 imp-2: the m29 dropped-token scan is comment-blind and matches whole identifiers (corpus prints PASS/FAIL)
+  "test/keyboard/test-m38-imp3.el"              ; M38 imp-3: the keyboard input-state leak is isolated; two --filter=keyboard runs give the same empty FAIL set (corpus prints PASS/FAIL)
   )
 (group
   "test/src/eval-tests.el"

@@ -67,6 +67,18 @@
       thunk
       (lambda () ((%sym '--rc-record-stack-pop))))))
 
+;;; --- 0. Drain the kbd_buffer ring -------------------------------------
+;;; M38 imp-3 (brief.org §8.4 item 6).  Every keyboard corpus runs in
+;;; ONE emacs process (tool/run-tests.scm:12).  A corpus that leaves an
+;;; event in kbd_buffer[] makes the loop's first check (fetch != store)
+;;; break before the timed branch, so the end-time-expiry checks in
+;;; section 5 would read a leftover (switch-frame nil) instead of nil.
+;;; Drain the ring at the start so those checks are correct for EVERY
+;;; file order.  fetch := store.
+((%sym '--kbd-set-fetch-ptr-index) ((%sym '--kbd-store-ptr-index)))
+(check "ring/drained-on-entry" #t
+       (= ((%sym '--kbd-fetch-ptr-index)) ((%sym '--kbd-store-ptr-index))))
+
 ;;; --- 1. Registration --------------------------------------------------
 
 (check "registration/kbd-buffer-get-event" #t

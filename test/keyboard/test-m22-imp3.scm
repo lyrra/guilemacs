@@ -47,6 +47,13 @@
 (define %store-ev   (delay (%sym '--kbd-store-buffered-event)))
 (define %input-pending (delay (%sym '--rc-input-pending)))
 
+;;; M38 imp-3 Pattern B (brief.org §8.3): record the recent-keys ring
+;;; length at corpus start.  The ring has no clear from elisp or Scheme,
+;;; so the section-6 victim asserts the corpus did not GROW the ring
+;;; (delta 0) instead of an absolute 0 that an earlier keyboard corpus
+;;; (test-m20-menu-prompt, brief.org §5.1) can leak into.  Order-safe.
+(define m22-imp3-ring-before ((%c 'length) ((%c 'recent-keys))))
+
 ;;; ---------------------------------------------------------------------
 ;;; 1. New C shims all resolve.
 ;;;
@@ -110,11 +117,27 @@
     (check "m22/imp3/some-mouse-moved/track-off" #nil (some-mouse-moved)))
   (lambda () ((%c '--track-mouse-set!) saved-track-mouse)))
 
+;; M38 imp-3 Pattern B (brief.org §8.3): the per-frame C mouse_moved bit
+;; has no Scheme clearer (--frame-set-mouse-moved! only SETS), so an
+;; earlier corpus or a real X event can leave a frame flagged and a
+;; hard-coded nil would flake.  Measure the corpus's OWN effect: with
+;; tracking on and no new motion, some-mouse-moved returns exactly the
+;; frame that was already flagged before we enabled tracking (none in a
+;; clean run).  --frame-mouse-moved-p reads the raw bit, independent of
+;; track_mouse.
+(define (m22-imp3-first-moved-frame)
+  (let loop ((fs ((%c '--frame-list-raw))))
+    (cond ((null? fs) #nil)
+          ((eq? #nil ((%c '--frame-mouse-moved-p) (car fs))) (loop (cdr fs)))
+          (else (car fs)))))
+
 (dynamic-wind
   (lambda () #f)
   (lambda ()
-    ((%c '--track-mouse-set!) #t)
-    (check "m22/imp3/some-mouse-moved/track-on-no-motion" #nil (some-mouse-moved)))
+    (let ((moved-before (m22-imp3-first-moved-frame)))
+      ((%c '--track-mouse-set!) #t)
+      (check "m22/imp3/some-mouse-moved/track-on-no-motion"
+             moved-before (some-mouse-moved))))
   (lambda () ((%c '--track-mouse-set!) saved-track-mouse)))
 
 ;; track-mouse-set! / --track-mouse roundtrip.
@@ -326,7 +349,10 @@
              8 (lambda () ((%c 'point)))))
 
 ;;; ---------------------------------------------------------------------
-;;; 6. The corpus must not pollute the recent-keys ring: m3-recent-keys
-;;; ERT tests assert the ring is empty at batch startup.
+;;; 6. The corpus must not pollute the recent-keys ring.  Pattern B
+;;; (brief.org §8.3): the ring has no clear from elisp or Scheme, so
+;;; assert the corpus added no key (length after == length before)
+;;; instead of an absolute 0 that test-m20-menu-prompt's read loop can
+;;; leak into (brief.org §5.1).
 (check "m22/imp3/recent-keys-ring-empty-after"
-       0 ((%c 'length) ((%c 'recent-keys))))
+       m22-imp3-ring-before ((%c 'length) ((%c 'recent-keys))))

@@ -613,12 +613,25 @@ DEFUN name string (cr.org F7).  For example
       (check "m37/imp3/doc/milestone-overview/m37-closed" #t
              (and (contains? o "M37") (contains? o "CLOSED 2026-09-16")))
       (info "m37/imp3/doc/milestone-overview/skipped" "absent")))
+;; milestone.org is the LIVE tracker: a later milestone rewrite replaces
+;; the M37 text.  Same guard as test-m35-imp3.scm:542 (brief.org §7):
+;; pin the close-out anchor only while milestone.org still tracks M37.
+(define (tracks-milestone? text tag)
+  "True when TEXT's first org heading starts with TAG (e.g. \"* M37\")."
+  (and (string? text)
+       (let ((ls (split-lines text)))
+         (and (pair? ls) (string-prefix? tag (car ls))))))
 (let ((m (slurp (repo "milestone.org"))))
-  (if m
-      (check "m37/imp3/doc/milestone.org/close-out" #t
-             (and (contains? m "M37 is CLOSED")
-                  (contains? m "973983f")))
-      (info "m37/imp3/doc/milestone.org/skipped" "milestone.org absent")))
+  (cond
+   ((not m)
+    (info "m37/imp3/doc/milestone.org/skipped" "milestone.org absent"))
+   ((not (tracks-milestone? m "* M37"))
+    (info "m37/imp3/doc/milestone.org/skipped"
+          "milestone.org no longer tracks M37 (live tracker)"))
+   (else
+    (check "m37/imp3/doc/milestone.org/close-out" #t
+           (and (contains? m "M37 is CLOSED")
+                (contains? m "973983f"))))))
 
 ;;; --- 9. Drift guard: the sibling corpora carry the anchors -------
 ;;; The checks prove only that the sibling corpus FILES contain the
