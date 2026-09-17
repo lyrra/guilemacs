@@ -197,6 +197,9 @@
   "test/keyboard/test-m38-imp3.el"              ; M38 imp-3: the keyboard input-state leak is isolated; two --filter=keyboard runs give the same empty FAIL set (corpus prints PASS/FAIL)
   "test/keyboard/test-m38-imp4.el"              ; M38 imp-4 close-out: the surface table and the accounting are pinned; two --filter=keyboard runs give the same empty FAIL set (corpus prints PASS/FAIL)
   )
+(group (m39) ; M39 imp-0 audit (docs/m39-plan.org)
+  "test/m39/test-m39-imp0-audit.el"            ; M39 imp-0: the plan's wait line number, DEFUN count, regroup counts, and absence of a subprocesses fallback match src/process.c
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
