@@ -169,6 +169,8 @@
 (use-modules (emacs process-error))
 ;; M39 imp-2 — process.c read/write decision paths in (emacs process-io).
 (use-modules (emacs process-io))
+;; M39 imp-3 — process.c Group A accessors in (emacs process-accessors).
+(use-modules (emacs process-accessors))
 ;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
 (use-modules (emacs eval-main))
 ;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).
@@ -217,6 +219,8 @@
 (init-recent-keys-registrations)
 ;; M30 imp-2 — bind the converted bool accessor names to (emacs cell-accessors).
 (init-cell-accessors-registrations)
+;; M39 imp-3 — (emacs process-accessors) self-registers its accessors
+;; through define-elisp-inline when the module loads (use-modules above).
 (init-recursive-edit-registrations)
 (init-this-command-keys-registrations)
 (init-command-loop-registrations)

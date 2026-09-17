@@ -201,6 +201,8 @@
   "test/m39/test-m39-imp0-audit.el"            ; M39 imp-0: the plan's wait line number, DEFUN count, regroup counts, and absence of a subprocesses fallback match src/process.c
   "test/m39/test-m39-imp1.el"                  ; M39 imp-1: the accept-process-output decision path moved into (emacs process-wait); the ported (secs nsecs flag) contract and the src/process.c wiring
   "test/m39/test-m39-imp2.el"                  ; M39 imp-2: the process read/write decision paths moved into (emacs process-io); the state gate and gap-move contract and the src/process.c wiring
+  "test/m39/test-m39-imp3.el"                  ; M39 imp-3: the process Group A accessors moved into (emacs process-accessors); the --process-ref/--process-set! bridge and the retired-DEFUN wiring
+  "test/m39/test-m39-imp3-e2e.el"              ; M39 imp-3 e2e: the moved accessors called on a live pipe process
   )
 (group
   "test/src/eval-tests.el"

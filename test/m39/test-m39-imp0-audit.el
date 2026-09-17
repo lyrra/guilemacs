@@ -10,7 +10,7 @@
 ;;;         (5416 at the imp-0 base, +11 after imp-1, +46 after imp-2),
 ;;;         not 5329, and there is no #ifndef subprocesses fallback.
 ;;;   D2 -- the DEFUN count is 64 and the six regrouped syscall members
-;;;         exist; the plan's group counts are 27/6/18/9/3.
+;;;         exist; the plan's group counts are 27/6/19/9/3.
 ;;;
 ;;; Each check is printed as an INFO PASS/FAIL line and turned into an
 ;;; ERT test so the harness counts it.  A read error is a real error,
@@ -56,23 +56,26 @@
 ;; two (emacs process-io) dispatchers at the same place: 5427 -> 5462.
 ;; imp-2 then shortened the send_process state-gate call by one line, so
 ;; the Fdelete_process #else line drifted 8295 -> 8306 -> 8349 -> 8348.
-;; The wait line 5462 is unchanged: the imp-2 dispatchers kept their line
-;; count.)
-(m39-imp0--check "wait-definition-at-5462"
-                 (eql 5462 (m39-imp0--line-of
+;; imp-3 adds the --process-ref/--process-set! bridge and retires the
+;; Group A accessors above these lines: the wait line 5462 -> 5461 and
+;; the #else line 8348 -> 8341.)
+(m39-imp0--check "wait-definition-at-5461"
+                 (eql 5461 (m39-imp0--line-of
                             "src/process.c"
                             "^wait_reading_process_output (intmax_t")))
 (m39-imp0--check "no-ifndef-subprocesses"
                  (= 0 (m39-imp0--count "src/process.c"
                                        "^(ifndef subprocesses")))
-(m39-imp0--check "else-subprocesses-at-8348"
-                 (eql 8348 (m39-imp0--line-of
+(m39-imp0--check "else-subprocesses-at-8341"
+                 (eql 8341 (m39-imp0--line-of
                             "src/process.c"
                             "^#else  /[*] subprocesses [*]/")))
 
-;; D2: the DEFUN total and the six re-grouped members.
-(m39-imp0--check "defun-count-64"
-                 (= 64 (m39-imp0--count "src/process.c" "^DEFUN (\"")))
+;; D2: the DEFUN total and the six re-grouped members.  imp-3 retired 12
+;; Group A DEFUNs and the dead #if 0 process-connection DEFUN, and added
+;; the two bridge DEFUNs --process-ref/--process-set!: 64 -> 52.
+(m39-imp0--check "defun-count-52"
+                 (= 52 (m39-imp0--count "src/process.c" "^DEFUN (\"")))
 (dolist (name '("process-running-child-p" "set-network-process-option"
                 "process-datagram-address" "set-process-datagram-address"
                 "set-process-window-size" "set-process-coding-system"))
@@ -94,7 +97,7 @@
                                                  "\n"))))
 (m39-imp0--check "plan-group-counts"
                  (string-match-p
-                  "A 27 \\+ B 6 \\+ C 18 \\+ D 9 \\+ E 3 = 64"
+                  "A 27 \\+ B 6 \\+ C 19 \\+ D 9 \\+ E 3 = 64"
                   (mapconcat #'identity
                              (m39-imp0--lines "docs/m39-plan.org")
                              "\n")))

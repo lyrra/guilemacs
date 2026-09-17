@@ -1059,6 +1059,136 @@ get_process (register Lisp_Object name)
   return proc;
 }
 
+/* M39 imp-3: table-driven process-slot bridge.  The struct
+   Lisp_Process slot stays C; the accessor *decision* moves to
+   (emacs process-accessors).  Most rows use a byte offset; the two
+   bool slots are bit-fields, so they cannot take an address and get a
+   kind that names the field.  See mod/emacs/process-accessors.scm.  */
+
+enum proc_slot_kind
+{
+  PROC_LISP_OBJECT,
+  PROC_PID,
+  PROC_LISP_LIST,
+  PROC_BOOL_INHERIT,
+  PROC_BOOL_KILL_QUERY
+};
+
+struct proc_slot_entry
+{
+  const char *name;
+  size_t offset;
+  enum proc_slot_kind kind;
+};
+
+static const struct proc_slot_entry proc_slot_table[] =
+  {
+    { "command", offsetof (struct Lisp_Process, command), PROC_LISP_OBJECT },
+    { "buffer", offsetof (struct Lisp_Process, buffer), PROC_LISP_OBJECT },
+    { "mark", offsetof (struct Lisp_Process, mark), PROC_LISP_OBJECT },
+    { "filter", offsetof (struct Lisp_Process, filter), PROC_LISP_OBJECT },
+    { "sentinel", offsetof (struct Lisp_Process, sentinel),
+      PROC_LISP_OBJECT },
+    { "thread", offsetof (struct Lisp_Process, thread), PROC_LISP_OBJECT },
+    { "plist", offsetof (struct Lisp_Process, plist), PROC_LISP_OBJECT },
+    { "decode_coding_system",
+      offsetof (struct Lisp_Process, decode_coding_system),
+      PROC_LISP_OBJECT },
+    { "encode_coding_system",
+      offsetof (struct Lisp_Process, encode_coding_system),
+      PROC_LISP_OBJECT },
+    { "pid", offsetof (struct Lisp_Process, pid), PROC_PID },
+    /* The two bool slots are bit-fields: no address, hence no offset.
+       The kind reads or writes the named field directly.  */
+    { "inherit_coding_system_flag", 0, PROC_BOOL_INHERIT },
+    { "kill_without_query", 0, PROC_BOOL_KILL_QUERY },
+    /* Write rows.  --set-plist runs CHECK_LIST; the bool rows store
+       !NILP (VAL) and the module owns the invert.  */
+    { "--set-plist", offsetof (struct Lisp_Process, plist), PROC_LISP_LIST },
+    { "--set-inherit-coding-system-flag", 0, PROC_BOOL_INHERIT },
+    { "--set-query-on-exit-flag", 0, PROC_BOOL_KILL_QUERY },
+  };
+
+static const struct proc_slot_entry *
+lookup_proc_slot (Lisp_Object name)
+{
+  CHECK_SYMBOL (name);
+  const char *s = SSDATA (SYMBOL_NAME (name));
+  for (int i = 0; i < ARRAYELTS (proc_slot_table); i++)
+    if (strcmp (s, proc_slot_table[i].name) == 0)
+      return &proc_slot_table[i];
+  return NULL;
+}
+
+DEFUN ("--process-ref", Fprocess_ref, Sprocess_ref, 2, 2, 0,
+       doc: /* Internal: return slot NAME of PROCESS.  */)
+  (Lisp_Object process, Lisp_Object name)
+{
+  CHECK_PROCESS (process);
+  const struct proc_slot_entry *e = lookup_proc_slot (name);
+
+  if (e == NULL)
+    xsignal2 (Qerror, build_string ("unknown process slot"), name);
+
+  struct Lisp_Process *p = XPROCESS (process);
+  char *base = (char *) p;
+  switch (e->kind)
+    {
+    case PROC_LISP_OBJECT:
+    case PROC_LISP_LIST:
+      return *(Lisp_Object *) (base + e->offset);
+
+    case PROC_PID:
+      return make_fixnum (p->pid);
+
+    case PROC_BOOL_INHERIT:
+      return p->inherit_coding_system_flag ? Qt : Qnil;
+
+    case PROC_BOOL_KILL_QUERY:
+      return p->kill_without_query ? Qt : Qnil;
+    }
+
+  emacs_abort ();
+}
+
+DEFUN ("--process-set!", Fprocess_set, Sprocess_set, 3, 3, 0,
+       doc: /* Internal: set slot NAME of PROCESS to VAL.  Return VAL.  */)
+  (Lisp_Object process, Lisp_Object name, Lisp_Object val)
+{
+  CHECK_PROCESS (process);
+  const struct proc_slot_entry *e = lookup_proc_slot (name);
+
+  if (e == NULL)
+    xsignal2 (Qerror, build_string ("unknown process slot"), name);
+
+  struct Lisp_Process *p = XPROCESS (process);
+  char *base = (char *) p;
+  switch (e->kind)
+    {
+    case PROC_LISP_OBJECT:
+      *(Lisp_Object *) (base + e->offset) = val;
+      break;
+
+    case PROC_LISP_LIST:
+      CHECK_LIST (val);
+      *(Lisp_Object *) (base + e->offset) = val;
+      break;
+
+    case PROC_BOOL_INHERIT:
+      p->inherit_coding_system_flag = !NILP (val);
+      break;
+
+    case PROC_BOOL_KILL_QUERY:
+      p->kill_without_query = !NILP (val);
+      break;
+
+    default:
+      emacs_abort ();
+    }
+
+  return val;
+}
+
 
 /* Fdelete_process promises to immediately forget about the process, but in
    reality, Emacs needs to remember those processes until they have been
@@ -1217,19 +1347,8 @@ If PROCESS has not yet exited or died, return 0.  */)
   return make_fixnum (0);
 }
 
-DEFUN ("process-id", Fprocess_id, Sprocess_id, 1, 1, 0,
-       doc: /* Return the process id of PROCESS.
-This is the pid of the external process which PROCESS uses or talks to,
-an integer.
-For a network, serial, and pipe connections, this value is nil.  */)
-  (register Lisp_Object process)
-{
-  pid_t pid;
-
-  CHECK_PROCESS (process);
-  pid = XPROCESS (process)->pid;
-  return pid ? INT_TO_INTEGER (pid) : Qnil;
-}
+/* M39 imp-3: the `process-id' DEFUN moved to (emacs process-accessors).
+   The pid slot stays C; the pid != 0 test lives in the module.  */
 
 DEFUN ("process-name", Fprocess_name, Sprocess_name, 1, 1, 0,
        doc: /* Return the name of PROCESS, as a string.
@@ -1241,17 +1360,8 @@ possibly modified to make it unique among process names.  */)
   return XPROCESS (process)->name;
 }
 
-DEFUN ("process-command", Fprocess_command, Sprocess_command, 1, 1, 0,
-       doc: /* Return the command that was executed to start PROCESS.
-This is a list of strings, the first string being the program executed
-and the rest of the strings being the arguments given to it.
-For a network or serial or pipe connection, this is nil (process is running)
-or t (process is stopped).  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->command;
-}
+/* M39 imp-3: the `process-command' DEFUN moved to (emacs
+   process-accessors).  The command slot stays C.  */
 
 DEFUN ("process-tty-name", Fprocess_tty_name, Sprocess_tty_name, 1, 2, 0,
        doc: /* Return the name of the terminal PROCESS uses, or nil if none.
@@ -1314,24 +1424,8 @@ Return BUFFER.  */)
   return buffer;
 }
 
-DEFUN ("process-buffer", Fprocess_buffer, Sprocess_buffer,
-       1, 1, 0,
-       doc: /* Return the buffer PROCESS is associated with.
-The default process filter inserts output from PROCESS into this buffer.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->buffer;
-}
-
-DEFUN ("process-mark", Fprocess_mark, Sprocess_mark,
-       1, 1, 0,
-       doc: /* Return the marker for the end of the last output from PROCESS.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->mark;
-}
+/* M39 imp-3: the `process-buffer' and `process-mark' DEFUNs moved to
+   (emacs process-accessors).  The buffer and mark slots stay C.  */
 
 static void
 set_process_filter_masks (struct Lisp_Process *p)
@@ -1406,15 +1500,9 @@ The string argument is normally a multibyte string, except:
   return filter;
 }
 
-DEFUN ("process-filter", Fprocess_filter, Sprocess_filter,
-       1, 1, 0,
-       doc: /* Return the filter function of PROCESS.
-See `set-process-filter' for more info on filter functions.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->filter;
-}
+/* M39 imp-3: the `process-filter' and `process-sentinel' DEFUNs moved to
+   (emacs process-accessors); `set-process-sentinel' keeps its C body.
+   The filter and sentinel slots stay C.  */
 
 DEFUN ("set-process-sentinel", Fset_process_sentinel, Sset_process_sentinel,
        2, 2, 0,
@@ -1435,16 +1523,6 @@ It gets two arguments: the process, and a string describing the change.  */)
   if (NETCONN1_P (p) || SERIALCONN1_P (p) || PIPECONN1_P (p))
     pset_childp (p, plist_put (p->childp, QCsentinel, sentinel));
   return sentinel;
-}
-
-DEFUN ("process-sentinel", Fprocess_sentinel, Sprocess_sentinel,
-       1, 1, 0,
-       doc: /* Return the sentinel of PROCESS.
-See `set-process-sentinel' for more info on sentinels.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->sentinel;
 }
 
 DEFUN ("set-process-thread", Fset_process_thread, Sset_process_thread,
@@ -1477,15 +1555,8 @@ If THREAD is nil, the process is unlocked.  */)
   return thread;
 }
 
-DEFUN ("process-thread", Fprocess_thread, Sprocess_thread,
-       1, 1, 0,
-       doc: /* Return the locking thread of PROCESS.
-If PROCESS is unlocked, this function returns nil.  */)
-  (Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->thread;
-}
+/* M39 imp-3: the `process-thread' DEFUN moved to (emacs
+   process-accessors).  The thread slot stays C.  */
 
 DEFUN ("set-process-window-size", Fset_process_window_size,
        Sset_process_window_size, 3, 3, 0,
@@ -1508,55 +1579,10 @@ nil otherwise.  */)
     return Qt;
 }
 
-DEFUN ("set-process-inherit-coding-system-flag",
-       Fset_process_inherit_coding_system_flag,
-       Sset_process_inherit_coding_system_flag, 2, 2, 0,
-       doc: /* Determine whether buffer of PROCESS will inherit coding-system.
-If the second argument FLAG is non-nil, then the variable
-`buffer-file-coding-system' of the buffer associated with PROCESS
-will be bound to the value of the coding system used to decode
-the process output.
-
-This is useful when the coding system specified for the process buffer
-leaves either the character code conversion or the end-of-line conversion
-unspecified, or if the coding system used to decode the process output
-is more appropriate for saving the process buffer.
-
-Binding the variable `inherit-process-coding-system' to non-nil before
-starting the process is an alternative way of setting the inherit flag
-for the process which will run.
-
-This function returns FLAG.  */)
-  (register Lisp_Object process, Lisp_Object flag)
-{
-  CHECK_PROCESS (process);
-  XPROCESS (process)->inherit_coding_system_flag = !NILP (flag);
-  return flag;
-}
-
-DEFUN ("set-process-query-on-exit-flag",
-       Fset_process_query_on_exit_flag, Sset_process_query_on_exit_flag,
-       2, 2, 0,
-       doc: /* Specify if query is needed for PROCESS when Emacs is exited.
-If the second argument FLAG is non-nil, Emacs will query the user before
-exiting or killing a buffer if PROCESS is running.  This function
-returns FLAG.  */)
-  (register Lisp_Object process, Lisp_Object flag)
-{
-  CHECK_PROCESS (process);
-  XPROCESS (process)->kill_without_query = NILP (flag);
-  return flag;
-}
-
-DEFUN ("process-query-on-exit-flag",
-       Fprocess_query_on_exit_flag, Sprocess_query_on_exit_flag,
-       1, 1, 0,
-       doc: /* Return the current value of query-on-exit flag for PROCESS.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return (XPROCESS (process)->kill_without_query ? Qnil : Qt);
-}
+/* M39 imp-3: the `set-process-inherit-coding-system-flag',
+   `set-process-query-on-exit-flag', and `process-query-on-exit-flag'
+   DEFUNs moved to (emacs process-accessors).  The two bool slots stay C;
+   the module owns the invert the old bodies had.  */
 
 DEFUN ("process-contact", Fprocess_contact, Sprocess_contact,
        1, 3, 0,
@@ -1615,38 +1641,11 @@ waiting for the process to be fully set up.*/)
   return plist_get (contact, key);
 }
 
-DEFUN ("process-plist", Fprocess_plist, Sprocess_plist,
-       1, 1, 0,
-       doc: /* Return the plist of PROCESS.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->plist;
-}
-
-DEFUN ("set-process-plist", Fset_process_plist, Sset_process_plist,
-       2, 2, 0,
-       doc: /* Replace the plist of PROCESS with PLIST.  Return PLIST.  */)
-  (Lisp_Object process, Lisp_Object plist)
-{
-  CHECK_PROCESS (process);
-  CHECK_LIST (plist);
-
-  pset_plist (XPROCESS (process), plist);
-  return plist;
-}
-
-#if 0 /* Turned off because we don't currently record this info
-	 in the process.  Perhaps add it.  */
-DEFUN ("process-connection", Fprocess_connection, Sprocess_connection, 1, 1, 0,
-       doc: /* Return the connection type of PROCESS.
-The value is nil for a pipe, t or `pty' for a pty, or `stream' for
-a socket connection.  */)
-  (Lisp_Object process)
-{
-  return XPROCESS (process)->type;
-}
-#endif
+/* M39 imp-3: the `process-plist' and `set-process-plist' DEFUNs moved to
+   (emacs process-accessors).  The plist slot stays C; the module writes
+   it through --process-set! with the `--set-plist' row, which keeps the
+   CHECK_LIST.  The disabled `process-connection' DEFUN (#if 0, never
+   built) is removed with them.  */
 
 DEFUN ("process-type", Fprocess_type, Sprocess_type, 1, 1, 0,
        doc: /* Return the connection type of PROCESS.
@@ -8142,15 +8141,9 @@ encode subprocess input. */)
   return Qnil;
 }
 
-DEFUN ("process-coding-system",
-       Fprocess_coding_system, Sprocess_coding_system, 1, 1, 0,
-       doc: /* Return a cons of coding systems for decoding and encoding of PROCESS.  */)
-  (register Lisp_Object process)
-{
-  CHECK_PROCESS (process);
-  return Fcons (XPROCESS (process)->decode_coding_system,
-		XPROCESS (process)->encode_coding_system);
-}
+/* M39 imp-3: the `process-coding-system' DEFUN moved to (emacs
+   process-accessors).  The decode/encode slots stay C; the module
+   builds the cons.  */
 
 
 

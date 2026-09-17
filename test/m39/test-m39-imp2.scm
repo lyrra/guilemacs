@@ -218,12 +218,14 @@
       ;; docs/m39-plan.org §"Imp list" (imp-2b).
       (check "m39/imp2/process.c/keeps-multibyte-branch" #t
              (contains? proc-c "STRINGP (object) && STRING_MULTIBYTE (object)"))
-      ;; Line pins of the imp-2 region (measured at the write HEAD).
-      (check "m39/imp2/process.c/pin-send-process" 6812
+      ;; Line pins of the imp-2 region.  imp-3 added the process-slot
+      ;; bridge above them and retired the Group A accessors: each line
+      ;; drifted by -1 (6812 -> 6811, 7048 -> 7047, 7087 -> 7086).
+      (check "m39/imp2/process.c/pin-send-process" 6811
              (line-of proc-c "send_process (Lisp_Object proc, const char *buf"))
-      (check "m39/imp2/process.c/pin-send-region" 7048
+      (check "m39/imp2/process.c/pin-send-region" 7047
              (line-of proc-c "DEFUN (\"process-send-region\""))
-      (check "m39/imp2/process.c/pin-send-string" 7087
+      (check "m39/imp2/process.c/pin-send-string" 7086
              (line-of proc-c "DEFUN (\"process-send-string\""))))
 
 ;;; --- 6. Static: the module is registered with the prelude -----------
