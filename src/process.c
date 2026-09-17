@@ -4883,6 +4883,12 @@ deactivate_process (Lisp_Object proc)
 }
 
 
+/* M39 imp-1: forward decl.  The dispatcher into (emacs process-wait) is
+   defined next to wait_signal_drain below, after this caller.  */
+static int accept_process_output_decision (Lisp_Object, Lisp_Object,
+					   Lisp_Object, bool,
+					   intmax_t *, int *);
+
 DEFUN ("accept-process-output", Faccept_process_output, Saccept_process_output,
        0, 4, 0,
        doc: /* Allow any pending output from subprocesses to be read by Emacs.
@@ -4929,52 +4935,28 @@ corresponding connection was closed.  */)
   else
     just_this_one = Qnil;
 
+  /* M39 imp-1: the type checks stay C -- they signal and touch the
+     error data.  The timeout arithmetic and the just-this-one flag
+     mapping move to (emacs process-wait).  The checked values cross
+     the bridge.  */
   if (!NILP (millisec))
-    { /* Obsolete calling convention using integers rather than floats.  */
-      CHECK_FIXNUM (millisec);
-      if (NILP (seconds))
-	seconds = make_float (XFIXNUM (millisec) / 1000.0);
-      else
-	{
-	  CHECK_FIXNUM (seconds);
-	  seconds = make_float (XFIXNUM (millisec) / 1000.0 + XFIXNUM (seconds));
-	}
-    }
-
-  secs = 0;
-  nsecs = -1;
-
-  if (!NILP (seconds))
     {
-      if (FIXNUMP (seconds))
-	{
-	  if (XFIXNUM (seconds) > 0)
-	    {
-	      secs = XFIXNUM (seconds);
-	      nsecs = 0;
-	    }
-	}
-      else if (FLOATP (seconds))
-	{
-	  if (XFLOAT_DATA (seconds) > 0)
-	    {
-	      struct timespec t = dtotimespec (XFLOAT_DATA (seconds));
-	      secs = min (t.tv_sec, WAIT_READING_MAX);
-	      nsecs = t.tv_nsec;
-	    }
-	}
-      else
-	wrong_type_argument (Qnumberp, seconds);
+      CHECK_FIXNUM (millisec);
+      if (!NILP (seconds))
+	CHECK_FIXNUM (seconds);
     }
-  else if (! NILP (process))
-    nsecs = 0;
+  else if (!NILP (seconds) && !FIXNUMP (seconds) && !FLOATP (seconds))
+    wrong_type_argument (Qnumberp, seconds);
+
+  int just_this_one_flag
+    = accept_process_output_decision (seconds, millisec, just_this_one,
+				      !NILP (process), &secs, &nsecs);
 
   return
     ((wait_reading_process_output (secs, nsecs, 0, 0,
 				   Qnil,
 				   !NILP (process) ? XPROCESS (process) : NULL,
-				   (NILP (just_this_one) ? 0
-				    : !FIXNUMP (just_this_one) ? 1 : -1))
+				   just_this_one_flag)
       <= 0)
      ? Qnil : Qt);
 }
@@ -5338,6 +5320,35 @@ wait_skip_select (int read_kbd)
     proc = scm_c_public_ref ("emacs process-wait", "wait-skip-select?");
   SCM result = SCM_CALL_1 (proc, INT_TO_INTEGER (read_kbd));
   return !NILP (result);
+}
+
+/* M39 imp-1: dispatcher into (emacs process-wait) for the
+   accept-process-output timeout decision.  Static and local to
+   process.c: the wait_reading_process_output call and the process
+   pointer stay C.  The Scheme procedure returns a (SECS NSECS FLAG)
+   list; FLAG is the wait_reading_process_output just-this-one
+   argument.  See accept-process-output-decision in the module.  The
+   out-params are the C caller's locals: SECS_OUT is intmax_t and
+   NSECS_OUT is int.  */
+
+static int
+accept_process_output_decision (Lisp_Object seconds, Lisp_Object millisec,
+				Lisp_Object just_this_one, bool have_process,
+				intmax_t *secs_out, int *nsecs_out)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-wait",
+			     "accept-process-output-decision");
+  SCM result = SCM_CALL_4 (proc, seconds, millisec, just_this_one,
+			   scm_from_bool (have_process));
+  /* SECS may be larger than the Guile fixnum range: the module caps it
+     to WAIT_READING_MAX, which is INTMAX_MAX on this 64-bit build.
+     XFIXNUM would shift a bignum pointer and return garbage.  Read it
+     with the range-safe scm_to_intmax (like src/dispnew.c:6855).  */
+  *secs_out = scm_to_intmax (XCAR (result));
+  *nsecs_out = scm_to_int (XCAR (XCDR (result)));
+  return scm_to_int (XCAR (XCDR (XCDR (result))));
 }
 
 /* M32 imp-2: dispatcher into (emacs process-error) for the send_process

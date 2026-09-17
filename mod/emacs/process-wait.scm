@@ -19,6 +19,9 @@
 ;;;                          (process.c:5944-5958, pre-M36).
 ;;;   wait-skip-select?   -- M36 imp-2: the no_avail decision
 ;;;                          (process.c:5713-5723, pre-M36).
+;;;   accept-process-output-decision -- M39 imp-1: the accept-process-output
+;;;                          timeout / just-this-one decision
+;;;                          (process.c:4932-4970, pre-M39).
 ;;;
 ;;; The two breaks that leave the outer while (1) loop
 ;;; (requeued_command_events_pending_p at :5499-5501, and the
@@ -37,7 +40,8 @@
             wait-run-timers
             wait-swallow!
             wait-input-pending?
-            wait-skip-select?))
+            wait-skip-select?
+            accept-process-output-decision))
 
 ;; C shims.  --maybe-quit, --timers-run, --redisplay-preserve-echo-area
 ;; and the --pending-signals-* pair already exist (src/keyboard.c).
@@ -126,7 +130,7 @@ input is pending, swallow events, then retest.  Returns elisp t when
 the wait loop must leave, else elisp nil (#nil); the C dispatcher
 (src/process.c wait_swallow) reads the result with NILP.  Return #nil,
 not Scheme #f, for false: this Guile reads #f as elisp true
-(src/frame.c:66)."
+(the elisp-nil convention: #f is not #nil)."
   (let ((dd (if do-display #t #nil)))
     (if (not (= read-kbd 0))
         (if (truthy? ((force %detect-input-pending-run-timers?) dd))
@@ -143,7 +147,7 @@ not Scheme #f, for false: this Guile reads #f as elisp true
 when READ-KBD is 0 and input is pending, swallow events without running
 timers.  Returns elisp t when it swallowed, else elisp nil (#nil);
 return #nil, not Scheme #f, for false, because this Guile reads #f as
-elisp true (src/frame.c:66).
+elisp true (#f is not #nil).
 
 The C caller (src/process.c wait_input_pending) ignores the result on
 purpose: the pre-M36 code left site B's retest disabled (#if 0:
@@ -172,3 +176,84 @@ FD_ZERO call."
            (truthy? ((force %detect-input-pending?))))
       #t
       #nil))
+
+;; M39 imp-1: the accept-process-output timeout decision (src/process.c
+;; pre-M39 body at :4932-4970).  The C keeps CHECK_PROCESS, the thread
+;; check, the XPROCESS pointer, and the wait_reading_process_output
+;; call; this owns the timeout arithmetic and the just-this-one flag
+;; mapping.  The caller (src/process.c accept_process_output_decision)
+;; passes the already type-checked SECONDS (elisp nil, a fixnum, or a
+;; float) and MILLISEC (elisp nil or a fixnum), the JUST-THIS-ONE value,
+;; and whether PROCESS is non-nil.  A Scheme #f would read as elisp true
+;; (#f is not #nil), so #nil is the elisp nil here.
+
+;; TIMESPEC_HZ and dtotimespec mirror lib/timespec.h and
+;; lib/dtotimespec.c.  dtotimespec rounds SEC toward positive infinity
+;; into a (SEC . NSEC) pair with NSEC in [0, 1e9).
+(define TIMESPEC-HZ 1000000000)
+
+;; WAIT_READING_MAX = min (TYPE_MAXIMUM (time_t), INTMAX_MAX) on the
+;; 64-bit build (src/lisp.h:4706): the float-timeout secs cap.
+(define WAIT-READING-MAX (- (expt 2 63) 1))
+(define TIME-T-MIN (- (expt 2 63)))
+
+(define (dtotimespec sec)
+  "Convert the double SEC to a (SEC . NSEC) pair, rounding toward
+positive infinity (lib/dtotimespec.c).  Mirrors the C overflow guards."
+  (cond
+    ((not (< TIME-T-MIN sec)) (list TIME-T-MIN 0))
+    ((not (< sec (+ 1 WAIT-READING-MAX))) (list WAIT-READING-MAX
+                                                (- TIMESPEC-HZ 1)))
+    (else
+     (let* ((s (inexact->exact (truncate sec)))
+            (frac (* TIMESPEC-HZ (- sec s)))
+            (ns (inexact->exact (truncate frac)))
+            (ns (+ ns (if (< ns frac) 1 0)))
+            (s (+ s (quotient ns TIMESPEC-HZ)))
+            (ns (remainder ns TIMESPEC-HZ)))
+       (if (< ns 0)
+           (list (- s 1) (+ ns TIMESPEC-HZ))
+           (list s ns))))))
+
+(define (accept-process-output-decision seconds millisec just-this-one
+                                         have-process)
+  "Port of the accept-process-output timeout decision
+(src/process.c:4932-4970, pre-M39): fix up the obsolete MILLISEC
+integer convention into a fractional SECONDS, turn SECONDS into a
+(secs, nsecs) timeout with the WAIT_READING_MAX secs cap and the
+nsecs = 0 default for a non-nil PROCESS, and map JUST-THIS-ONE to the
+{-1, 0, 1} wait flag.  Returns (SECS NSECS JUST-THIS-ONE-FLAG) as
+integers for wait_reading_process_output.  The C owns the type checks
+and the final <= 0 -> t/#nil mapping."
+  (let* ((sec (if (eq? millisec #nil)
+                  seconds
+                  (let ((ms (/ millisec 1000.0)))
+                    (if (eq? seconds #nil)
+                        ms
+                        (+ ms seconds)))))
+         (secs 0)
+         (nsecs -1))
+    (cond
+      ((not (eq? sec #nil))
+       (cond
+         ((exact-integer? sec)
+          (when (> sec 0)
+            (set! secs sec)
+            (set! nsecs 0)))
+         ((inexact? sec)
+          (when (> sec 0)
+            (let ((t (dtotimespec sec)))
+              (set! secs (min (car t) WAIT-READING-MAX))
+              (set! nsecs (cadr t)))))))
+      (have-process
+       (set! nsecs 0)))
+    (list secs nsecs
+          ;; Match the pre-port C test `!FIXNUMP (just_this_one) ? 1 : -1':
+          ;; only a fixnum (not a bignum) gives -1.  Use the Guile fixnum
+          ;; bounds so a bignum just-this-one gives 1, like the C.
+          (cond ((eq? just-this-one #nil) 0)
+                ((and (exact-integer? just-this-one)
+                      (<= most-negative-fixnum just-this-one
+                          most-positive-fixnum))
+                 -1)
+                (else 1)))))

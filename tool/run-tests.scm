@@ -199,6 +199,7 @@
   )
 (group (m39) ; M39 imp-0 audit (docs/m39-plan.org)
   "test/m39/test-m39-imp0-audit.el"            ; M39 imp-0: the plan's wait line number, DEFUN count, regroup counts, and absence of a subprocesses fallback match src/process.c
+  "test/m39/test-m39-imp1.el"                  ; M39 imp-1: the accept-process-output decision path moved into (emacs process-wait); the ported (secs nsecs flag) contract and the src/process.c wiring
   )
 (group
   "test/src/eval-tests.el"
