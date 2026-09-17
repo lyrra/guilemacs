@@ -34,17 +34,22 @@
 
 (defun m38-imp3-reset-input-state (&optional buf)
   "Restore the input-state names to their defaults (brief.org §5.4).
-Reset BUF (the buffer current when the corpus started), or the current
-buffer, because `deactivate-mark' is buffer-local (§8.4 item 4).  Run
-the defaults through eval-scheme so the two relocated names use the
-(emacs command-loop) defaults, not a C cell."
+Make BUF current first, then clear.  BUF is the buffer current when
+the corpus started, so re-selecting it also undoes a current-buffer
+change (§8.4 item 4: \"if the cause is a change of the current buffer,
+restore the buffer too\").  `deactivate-mark' is buffer-local, so the
+clear must run with BUF current.  Do NOT wrap the clear in
+`with-current-buffer': that restores the leaked buffer on exit and
+leaves it current (review F2).  Run the defaults through eval-scheme so
+the two relocated names use the (emacs command-loop) defaults, not a C
+cell."
   (let ((b (if (bufferp buf) buf (current-buffer))))
-    (with-current-buffer b
-      (eval-scheme
-       "(begin
-          (set-symbol-value! 'last-input-event #nil)
-          (set-symbol-value! 'last-nonmenu-event #nil)
-          (set-symbol-value! 'last-event-frame #nil)
-          (set-symbol-value! 'deactivate-mark #nil)
-          (set-symbol-value! 'last-event-device #nil)
-          (set-symbol-value! 'num-nonmacro-input-events 0))"))))
+    (set-buffer b)
+    (eval-scheme
+     "(begin
+        (set-symbol-value! 'last-input-event #nil)
+        (set-symbol-value! 'last-nonmenu-event #nil)
+        (set-symbol-value! 'last-event-frame #nil)
+        (set-symbol-value! 'deactivate-mark #nil)
+        (set-symbol-value! 'last-event-device #nil)
+        (set-symbol-value! 'num-nonmacro-input-events 0))")))

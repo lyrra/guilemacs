@@ -57,4 +57,4 @@
   )
   (condition-case e
       (m38-imp3-reset-input-state m38-imp3-entry-buffer)
-    (error (princ (format "M38-IMP3-RESET-ERROR: %S\n" e))))))
+    (error (princ (format "ERROR: M38-IMP3-RESET-ERROR %S\n" e))))))

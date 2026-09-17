@@ -14,6 +14,17 @@
 ;;; Sourced by test/keyboard/test-m22-imp3.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback from
 ;;; elisp.  Same harness as test-m22-input-pending.scm.
+;;;
+;;; M38 imp-3 Pattern B deviation (brief.org §8.3, review F10).  §8.3
+;;; offers two options for a no-reset victim: clear the flag of the
+;;; frame before the check, or read only the frame the corpus controls.
+;;; The per-frame mouse_moved bit has no Scheme clearer
+;;; (--frame-set-mouse-moved! only SETS), so this corpus uses a third,
+;;; equivalent measure: it records the first flagged frame of
+;;; --frame-list-raw before it turns tracking on, then asserts the same
+;;; frame after.  §8.3's goal -- remove the order dependency -- is met.
+;;; The recent-keys victim makes the same delta measure (ring length
+;;; after == ring length before).
 
 (use-modules (emacs read-key-sequence))
 (use-modules (emacs command-loop))

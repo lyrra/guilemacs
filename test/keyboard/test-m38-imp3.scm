@@ -23,7 +23,18 @@
 ;;;      FAIL set (exit criterion 3).  This check reads the two log
 ;;;      files the .el wrapper wrote; the wrapper binds their paths and
 ;;;      the two exit statuses.  Under the recursion guard the wrapper
-;;;      binds nothing and the check is an INFO line.
+;;;      binds nothing and the check is an INFO line;
+;;;  11. the wrapper bounds each nested run with `timeout' (review F5).
+;;;
+;;; Residual risk (§5.1 NOTE, review F3).  brief.org §5.1 records that
+;;; "Virtual core pointer" and "Virtual core keyboard" are real X device
+;;; names, so a real event picked up by a corpus can write
+;;; last-event-device from PRODUCTION code, not from a corpus.  The
+;;; reset covers only the 2 kbd writers, and an X event during any other
+;;; corpus is not covered.  §8.1 directs: record the finding and name a
+;;; follow-up.  Disposition: follow-up in M38 imp-4 (close-out); see
+;;; docs/m38-plan.org §D3.  The value is harmless in production (a real
+;;; device name), so the test side is not patched further.
 ;;;
 ;;; Batch-safe: it reads files.  The repo root is bound as %m38-root.
 
@@ -80,12 +91,18 @@
                            out))
               (loop (+ nl 1) (cons (substring text start nl) out)))))))
 
-;; fail-set: the corpus FAIL lines of a harness log, sorted.  brief.org
-;; §5.2 prints them as "FAIL <name> [...]"; ERT prints "FAILED n/m ...",
-;; which the trailing space excludes.
+;; fail-set: the corpus FAIL lines and the harness ERROR lines of a
+;; harness log, sorted.  brief.org §5.2 prints a test failure as
+;; "FAIL <name> [...]"; ERT prints "FAILED n/m ...", which the trailing
+;; space excludes.  The harness also reports an ERT count mismatch as
+;; "ERROR: ..." (review F8); a run that fails only by a count mismatch
+;; has no FAIL line, so the ERROR prefix is required for a full failure
+;; test.  The exit-status check covers that case too.
 (define (fail-set path)
   (let ((lines (split-lines* (slurp path))))
-    (sort (filter (lambda (l) (string-prefix? "FAIL " l)) lines)
+    (sort (filter (lambda (l) (or (string-prefix? "FAIL " l)
+                                  (string-prefix? "ERROR:" l)))
+                  lines)
           string<?)))
 
 ;;; --- 1. The repo root must be known --------------------------------
@@ -106,17 +123,31 @@
 
 ;;; --- 2. Each writer loads the helper and clears inside unwind-protect
 ;;; A bare call is not enough: the clear must run on the non-local exit
-;;; path too (§8.1), so the file must also contain unwind-protect.
+;;; path too (§8.1), so the file must also contain unwind-protect.  Match
+;;; the EXACT call form (review F7): a writer that stops calling the
+;;; helper but keeps the words in a comment must fail this check.
+(define m38-imp3-call-form "(m38-imp3-reset-input-state m38-imp3-entry-buffer)")
 (define (writer-clears? file)
   (let ((b (slurp (repo file))))
     (and b
          (has? b "test-m38-imp3-reset.el")
-         (has? b "m38-imp3-reset-input-state")
+         (has? b m38-imp3-call-form)
          (has? b "unwind-protect"))))
 
 (for-each
  (lambda (f)
    (check (string-append "m38/imp3/writer-clears/" f) #t (writer-clears? f)))
+ m38-imp3-writers)
+
+;;; --- 2b. A reset error reaches the fail-set (review §3.4) ----------
+;;; The writer cleanup prints the reset error with the "ERROR:" prefix,
+;;; so both the harness fail-set and the two-run check (§10) see it.  A
+;;; bare "M38-IMP3-RESET-ERROR:" line matches neither the FAIL prefix
+;;; nor the ERROR prefix, so a failing reset could pass the gate.
+(for-each
+ (lambda (f)
+   (check (string-append "m38/imp3/writer-reset-error/" f) #t
+          (has? (slurp (repo f)) "ERROR: M38-IMP3-RESET-ERROR")))
  m38-imp3-writers)
 
 ;;; --- 3. The helper's name list is the §5.4 list --------------------
@@ -131,17 +162,38 @@
    "deactivate-mark" "last-event-device" "num-nonmacro-input-events"))
 (check "m38/imp3/helper/runs-from-eval-scheme" #t
        (has? m38-imp3-helper "eval-scheme"))
+;; F2: the helper must make the entry buffer current (set-buffer), NOT
+;; wrap the clear in with-current-buffer (which restores the leaked
+;; buffer on exit and leaves it current).  Match the exact (set-buffer b)
+;; call, not the docstring word.
 (check "m38/imp3/helper/restores-entry-buffer" #t
-       (has? m38-imp3-helper "with-current-buffer"))
+       (has? m38-imp3-helper "(set-buffer b)"))
+(check "m38/imp3/helper/no-with-current-buffer" #f
+       (has? m38-imp3-helper "(with-current-buffer"))
+
+;;; --- 3b. The wrapper bounds each nested run (review F5) ------------
+(define m38-imp3-wrapper (slurp (repo "test/keyboard/test-m38-imp3.el")))
+(check "m38/imp3/behavior/nested-run-timeout" #t
+       (and (has? m38-imp3-wrapper "timeout")
+            (has? m38-imp3-wrapper "m38-imp3-gate-timeout-seconds")))
+;; The nested --filter=keyboard run also loads the imp-4 pin, so the
+;; child must carry BOTH recursion guards (review §3.1); otherwise each
+;; nested run starts the imp-4 pair too and the gate multiplies.
+(check "m38/imp3/behavior/guards-both-pins" #t
+       (and (has? m38-imp3-wrapper "GUILEMACS_M38_IMP3_GATE=1")
+            (has? m38-imp3-wrapper "GUILEMACS_M38_IMP4_GATE=1")))
 
 ;;; --- 4. No other writer; the §5.1 list is complete -----------------
 ;;; Scan the keyboard .el corpora for a reset CALL SITE.  The helper's
 ;;; own (defun ...) does not match the call prefix.  The set of callers
-;;; must equal the §5.1 writer list.
+;;; must equal the §5.1 writer list.  Exclude the helper file by NAME
+;;; (review F6): a later docstring or comment that writes the call form
+;;; would otherwise add the helper to the caller set.
 (define (reset-caller? name)
   (and (string-suffix? ".el" name)
+       (not (string=? name "test-m38-imp3-reset.el"))
        (has? (slurp (string-append %m38-root "/test/keyboard/" name))
-             "(m38-imp3-reset-input-state ")))
+             m38-imp3-call-form)))
 
 (define m38-imp3-callers
   (sort (filter reset-caller?
