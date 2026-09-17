@@ -221,11 +221,14 @@
       ;; Line pins of the imp-2 region.  imp-3 added the process-slot
       ;; bridge above them and retired the Group A accessors: each line
       ;; drifted by -1 (6812 -> 6811, 7048 -> 7047, 7087 -> 7086).
-      (check "m39/imp2/process.c/pin-send-process" 6811
+      ;; imp-4 added the type slot read row to the bridge above them:
+      ;; each line drifted by +4 (6811 -> 6815, 7047 -> 7051,
+      ;; 7086 -> 7090).
+      (check "m39/imp2/process.c/pin-send-process" 6815
              (line-of proc-c "send_process (Lisp_Object proc, const char *buf"))
-      (check "m39/imp2/process.c/pin-send-region" 7047
+      (check "m39/imp2/process.c/pin-send-region" 7051
              (line-of proc-c "DEFUN (\"process-send-region\""))
-      (check "m39/imp2/process.c/pin-send-string" 7086
+      (check "m39/imp2/process.c/pin-send-string" 7090
              (line-of proc-c "DEFUN (\"process-send-string\""))))
 
 ;;; --- 6. Static: the module is registered with the prelude -----------

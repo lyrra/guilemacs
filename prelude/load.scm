@@ -171,6 +171,9 @@
 (use-modules (emacs process-io))
 ;; M39 imp-3 — process.c Group A accessors in (emacs process-accessors).
 (use-modules (emacs process-accessors))
+;; M39 imp-4 — process.c signal family decision path in
+;; (emacs process-signal).
+(use-modules (emacs process-signal))
 ;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
 (use-modules (emacs eval-main))
 ;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).

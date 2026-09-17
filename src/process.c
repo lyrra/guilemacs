@@ -1098,6 +1098,10 @@ static const struct proc_slot_entry proc_slot_table[] =
       offsetof (struct Lisp_Process, encode_coding_system),
       PROC_LISP_OBJECT },
     { "pid", offsetof (struct Lisp_Process, pid), PROC_PID },
+    /* M39 imp-4 read row: the process type symbol (real / network /
+       serial / pipe), read by the stop-process / continue-process
+       connection gate in (emacs process-signal).  */
+    { "type", offsetof (struct Lisp_Process, type), PROC_LISP_OBJECT },
     /* The two bool slots are bit-fields: no address, hence no offset.
        The kind reads or writes the named field directly.  */
     { "inherit_coding_system_flag", 0, PROC_BOOL_INHERIT },
@@ -7312,121 +7316,11 @@ process_send_signal (Lisp_Object process, int signo, Lisp_Object current_group,
   unblock_child_signal (&oldset);
 }
 
-DEFUN ("internal-default-interrupt-process",
-       Finternal_default_interrupt_process,
-       Sinternal_default_interrupt_process, 0, 2, 0,
-       doc: /* Default function to interrupt process PROCESS.
-It shall be the last element in list `interrupt-process-functions'.
-See function `interrupt-process' for more details on usage.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  process_send_signal (process, SIGINT, current_group, 0);
-  return process;
-}
-
-DEFUN ("interrupt-process", Finterrupt_process, Sinterrupt_process, 0, 2, 0,
-       doc: /* Interrupt process PROCESS.
-PROCESS may be a process, a buffer, or the name of a process or buffer.
-No arg or nil means current buffer's process.
-Second arg CURRENT-GROUP non-nil means send signal to
-the current process-group of the process's controlling terminal
-rather than to the process's own process group.
-If the process is a shell, this means interrupt current subjob
-rather than the shell.
-
-If CURRENT-GROUP is `lambda', and if the shell owns the terminal,
-don't send the signal.
-
-This function calls the functions of `interrupt-process-functions' in
-the order of the list, until one of them returns non-nil.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  return CALLN (Frun_hook_with_args_until_success, Qinterrupt_process_functions,
-		process, current_group);
-}
-
-DEFUN ("kill-process", Fkill_process, Skill_process, 0, 2,
-       "(list (read-process-name \"Kill process\"))",
-       doc: /* Kill process PROCESS.  May be process or name of one.
-See function `interrupt-process' for more details on usage.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  process_send_signal (process, SIGKILL, current_group, 0);
-  return process;
-}
-
-DEFUN ("quit-process", Fquit_process, Squit_process, 0, 2, 0,
-       doc: /* Send QUIT signal to process PROCESS.  May be process or name of one.
-See function `interrupt-process' for more details on usage.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  process_send_signal (process, SIGQUIT, current_group, 0);
-  return process;
-}
-
-DEFUN ("stop-process", Fstop_process, Sstop_process, 0, 2, 0,
-       doc: /* Stop process PROCESS.  May be process or name of one.
-See function `interrupt-process' for more details on usage.
-If PROCESS is a network or serial or pipe connection, inhibit handling
-of incoming traffic.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  if (PROCESSP (process) && (NETCONN_P (process) || SERIALCONN_P (process)
-			     || PIPECONN_P (process)))
-    {
-      struct Lisp_Process *p;
-
-      p = XPROCESS (process);
-      if (NILP (p->command)
-	  && p->infd >= 0)
-	delete_read_fd (p->infd);
-      pset_command (p, Qt);
-      return process;
-    }
-#ifndef SIGTSTP
-  error ("No SIGTSTP support");
-#else
-  process_send_signal (process, SIGTSTP, current_group, 0);
-#endif
-  return process;
-}
-
-DEFUN ("continue-process", Fcontinue_process, Scontinue_process, 0, 2, 0,
-       doc: /* Continue process PROCESS.  May be process or name of one.
-See function `interrupt-process' for more details on usage.
-If PROCESS is a network or serial process, resume handling of incoming
-traffic.  */)
-  (Lisp_Object process, Lisp_Object current_group)
-{
-  if (PROCESSP (process) && (NETCONN_P (process) || SERIALCONN_P (process)
-			     || PIPECONN_P (process)))
-    {
-      struct Lisp_Process *p;
-
-      p = XPROCESS (process);
-      eassert (p->infd < FD_SETSIZE);
-      if (EQ (p->command, Qt)
-	  && p->infd >= 0
-	  && (!EQ (p->filter, Qt) || EQ (p->status, Qlisten)))
-	{
-	  add_process_read_fd (p->infd);
-#ifdef WINDOWSNT
-	  if (fd_info[ p->infd ].flags & FILE_SERIAL)
-	    PurgeComm (fd_info[ p->infd ].hnd, PURGE_RXABORT | PURGE_RXCLEAR);
-#else /* not WINDOWSNT */
-	  tcflush (p->infd, TCIFLUSH);
-#endif /* not WINDOWSNT */
-	}
-      pset_command (p, Qnil);
-      return process;
-    }
-#ifdef SIGCONT
-    process_send_signal (process, SIGCONT, current_group, 0);
-#else
-    error ("No SIGCONT support");
-#endif
-  return process;
-}
+/* M39 imp-4: the internal-default-interrupt-process, interrupt-process,
+   kill-process, quit-process, stop-process, and continue-process DEFUNs
+   retired here.  Their decision moved to (emacs process-signal); the
+   elisp names are reinstalled by define-elisp-inline.  The mechanism
+   (process_send_signal, the fd work) stays in the bridge DEFUNs above.  */
 
 /* Return the integer value of the signal whose abbreviation is ABBR,
    or a negative number if there is no such signal.  */
@@ -7449,81 +7343,124 @@ abbr_to_signal (char const *name)
   return -1;
 }
 
-DEFUN ("internal-default-signal-process",
-       Finternal_default_signal_process,
-       Sinternal_default_signal_process, 2, 3, 0,
-       doc: /* Default function to send PROCESS the signal with code SIGCODE.
-It shall be the last element in list `signal-process-functions'.
-See function `signal-process' for more details on usage.  */)
-  (Lisp_Object process, Lisp_Object sigcode, Lisp_Object remote)
+/* M39 imp-4: the mechanism bridge for (emacs process-signal).  The
+   signal-family *decision* moved to Scheme; these DEFUNs stay C and hold
+   the mechanism the recipe names: process_send_signal, the stop/continue
+   fd work (delete_read_fd / add_process_read_fd / tcflush / pset_command),
+   abbr_to_signal, the kill(2) syscall, the static get_process,
+   string_to_number, and the CHECK_PROCESS pid resolution.  Scheme reaches
+   each through the imported `symbol-function`; get-process is the
+   existing C DEFUN and needs no bridge.  See
+   mod/emacs/process-signal.scm.  */
+
+DEFUN ("--signal-send", Fsignal_send, Ssignal_send, 3, 3, 0,
+       doc: /* Internal: send SIGNAL to PROCESS's group.  See process_send_signal.  */)
+  (Lisp_Object process, Lisp_Object signal, Lisp_Object current_group)
+{
+  process_send_signal (process, XFIXNUM (signal), current_group, 0);
+  return process;
+}
+
+DEFUN ("--signal-stop-connection", Fsignal_stop_connection,
+       Ssignal_stop_connection, 1, 1, 0,
+       doc: /* Internal: the stop-process connection fd work.  */)
+  (Lisp_Object process)
+{
+  struct Lisp_Process *p = XPROCESS (process);
+  if (NILP (p->command) && p->infd >= 0)
+    delete_read_fd (p->infd);
+  pset_command (p, Qt);
+  return process;
+}
+
+DEFUN ("--signal-continue-connection", Fsignal_continue_connection,
+       Ssignal_continue_connection, 1, 1, 0,
+       doc: /* Internal: the continue-process connection fd work.  */)
+  (Lisp_Object process)
+{
+  struct Lisp_Process *p = XPROCESS (process);
+  eassert (p->infd < FD_SETSIZE);
+  if (EQ (p->command, Qt) && p->infd >= 0
+      && (!EQ (p->filter, Qt) || EQ (p->status, Qlisten)))
+    {
+      add_process_read_fd (p->infd);
+#ifdef WINDOWSNT
+      if (fd_info[p->infd].flags & FILE_SERIAL)
+	PurgeComm (fd_info[p->infd].hnd, PURGE_RXABORT | PURGE_RXCLEAR);
+#else /* not WINDOWSNT */
+      tcflush (p->infd, TCIFLUSH);
+#endif /* not WINDOWSNT */
+    }
+  pset_command (p, Qnil);
+  return process;
+}
+
+DEFUN ("--signal-name-to-number", Fsignal_name_to_number,
+       Ssignal_name_to_number, 1, 1, 0,
+       doc: /* Internal: return the signal number named by string NAME, or -1.  */)
+  (Lisp_Object name)
+{
+  CHECK_STRING (name);
+  return make_fixnum (abbr_to_signal (SSDATA (name)));
+}
+
+DEFUN ("--signal-kill", Fsignal_kill, Ssignal_kill, 2, 2, 0,
+       doc: /* Internal: the kill(2) syscall.  Return its result.  */)
+  (Lisp_Object pid_arg, Lisp_Object signal)
 {
   pid_t pid;
-  int signo;
-
-  if (STRINGP (process))
-    {
-      Lisp_Object tem = Fget_process (process);
-      if (NILP (tem))
-	{
-	  ptrdiff_t len;
-	  tem = string_to_number (SSDATA (process), 10, &len);
-	  if ((IEEE_FLOATING_POINT ? NILP (tem) : !NUMBERP (tem))
-	      || len != SBYTES (process))
-	    return Qnil;
-	}
-      process = tem;
-    }
-  else if (!NUMBERP (process))
-    process = get_process (process);
-
-  if (NILP (process))
-    return process;
-
-  if (NUMBERP (process))
-    CONS_TO_INTEGER (process, pid_t, pid);
-  else
-    {
-      CHECK_PROCESS (process);
-      pid = XPROCESS (process)->pid;
-      if (pid <= 0)
-	error ("Cannot signal process %s", SDATA (XPROCESS (process)->name));
-    }
-
-  if (FIXNUMP (sigcode))
-    signo = check_integer_range (sigcode, INT_MIN, INT_MAX);
-  else
-    {
-      char *name;
-
-      CHECK_SYMBOL (sigcode);
-      name = SSDATA (SYMBOL_NAME (sigcode));
-
-      signo = abbr_to_signal (name);
-      if (signo < 0)
-	error ("Undefined signal name %s", name);
-    }
-
-  return make_fixnum (kill (pid, signo));
+  CONS_TO_INTEGER (pid_arg, pid_t, pid);
+  return make_fixnum (kill (pid, XFIXNUM (signal)));
 }
 
-DEFUN ("signal-process", Fsignal_process, Ssignal_process,
-       2, 3, "(list (read-string \"Process (name or number): \") (read-signal-name))",
-       doc: /* Send PROCESS the signal with code SIGCODE.
-PROCESS may also be a number specifying the process id of the
-process to signal; in this case, the process need not be a child of
-this Emacs.
-If PROCESS is a process object which contains the property
-`remote-pid', or PROCESS is a number and REMOTE is a remote file name,
-PROCESS is interpreted as process on the respective remote host, which
-will be the process to signal.
-If PROCESS is a string, it is interpreted as process object with the
-respective process name, or as a number.
-SIGCODE may be an integer, or a symbol whose name is a signal name.  */)
-  (Lisp_Object process, Lisp_Object sigcode, Lisp_Object remote)
+DEFUN ("--signal-resolve-process", Fsignal_resolve_process,
+       Ssignal_resolve_process, 1, 1, 0,
+       doc: /* Internal: resolve NAME as the signal family does.
+
+NAME may be a process, a buffer, a buffer name, or nil (the current
+buffer); a string is first tried as a process name.  This is the static
+get_process, which the retired internal-default-signal-process used for
+its non-number PROCESS.  Return a process, or signal an error.  */)
+  (Lisp_Object name)
 {
-  return CALLN (Frun_hook_with_args_until_success, Qsignal_process_functions,
-		process, sigcode, remote);
+  return get_process (name);
 }
+
+DEFUN ("--signal-string-to-number", Fsignal_string_to_number,
+       Ssignal_string_to_number, 1, 1, 0,
+       doc: /* Internal: parse STRING as a base-10 number, requiring the
+whole string.  Return the number, or nil.  */)
+  (Lisp_Object string)
+{
+  ptrdiff_t len;
+  Lisp_Object tem;
+
+  CHECK_STRING (string);
+  tem = string_to_number (SSDATA (string), 10, &len);
+  if ((IEEE_FLOATING_POINT ? NILP (tem) : !NUMBERP (tem))
+      || len != SBYTES (string))
+    return Qnil;
+  return tem;
+}
+
+DEFUN ("--signal-process-pid", Fsignal_process_pid,
+       Ssignal_process_pid, 1, 1, 0,
+       doc: /* Internal: return the pid of process PROCESS.  Error when
+it is not a live subprocess (pid <= 0).  */)
+  (Lisp_Object process)
+{
+  CHECK_PROCESS (process);
+  pid_t pid = XPROCESS (process)->pid;
+  if (pid <= 0)
+    error ("Cannot signal process %s", SDATA (XPROCESS (process)->name));
+  return make_fixnum (pid);
+}
+
+/* M39 imp-4: the internal-default-signal-process and signal-process
+   DEFUNs retired here.  Their decision (the process resolution and the
+   sigcode choice) moved to (emacs process-signal); the mechanism
+   (abbr_to_signal, kill(2), Fget_process, string_to_number) stays in the
+   bridge DEFUNs above.  */
 
 DEFUN ("process-send-eof", Fprocess_send_eof, Sprocess_send_eof, 0, 1, 0,
        doc: /* Make PROCESS see end-of-file in its input.

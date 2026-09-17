@@ -203,6 +203,8 @@
   "test/m39/test-m39-imp2.el"                  ; M39 imp-2: the process read/write decision paths moved into (emacs process-io); the state gate and gap-move contract and the src/process.c wiring
   "test/m39/test-m39-imp3.el"                  ; M39 imp-3: the process Group A accessors moved into (emacs process-accessors); the --process-ref/--process-set! bridge and the retired-DEFUN wiring
   "test/m39/test-m39-imp3-e2e.el"              ; M39 imp-3 e2e: the moved accessors called on a live pipe process
+  "test/m39/test-m39-imp4.el"                  ; M39 imp-4: the process signal family moved into (emacs process-signal); the retired DEFUNs, the --signal-* bridge, the type slot row, the image.c rewire
+  "test/m39/test-m39-imp4-e2e.el"              ; M39 imp-4 e2e: the moved signal names called live (fboundp, signal-process, the stop/continue gate)
   )
 (group
   "test/src/eval-tests.el"

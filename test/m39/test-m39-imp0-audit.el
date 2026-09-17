@@ -6,9 +6,10 @@
 ;;; fails the run.  It has no C dependency: it only reads files.
 ;;;
 ;;; It covers the review findings (cr.org):
-;;;   D1 -- wait_reading_process_output is defined at src/process.c:5462
-;;;         (5416 at the imp-0 base, +11 after imp-1, +46 after imp-2),
-;;;         not 5329, and there is no #ifndef subprocesses fallback.
+;;;   D1 -- wait_reading_process_output is defined at src/process.c:5465
+;;;         (5416 at the imp-0 base, +11 after imp-1, +46 after imp-2,
+;;;         +4 after imp-4's type slot row), not 5329, and there is no
+;;;         #ifndef subprocesses fallback.
 ;;;   D2 -- the DEFUN count is 64 and the six regrouped syscall members
 ;;;         exist; the plan's group counts are 27/6/19/9/3.
 ;;;
@@ -58,16 +59,21 @@
 ;; the Fdelete_process #else line drifted 8295 -> 8306 -> 8349 -> 8348.
 ;; imp-3 adds the --process-ref/--process-set! bridge and retires the
 ;; Group A accessors above these lines: the wait line 5462 -> 5461 and
-;; the #else line 8348 -> 8341.)
-(m39-imp0--check "wait-definition-at-5461"
-                 (eql 5461 (m39-imp0--line-of
+;; the #else line 8348 -> 8341.  imp-4 adds the type slot read row to the
+;; proc_slot_table above these lines: the wait line 5461 -> 5465.  imp-4
+;; also retires the eight signal-family DEFUNs below these lines, so the
+;; #else line drifts 8341 -> 8271.  The imp-4 review correction swaps the
+;; --signal-get-process bridge for --signal-resolve-process above these
+;; lines: the #else line drifts 8271 -> 8278.)
+(m39-imp0--check "wait-definition-at-5465"
+                 (eql 5465 (m39-imp0--line-of
                             "src/process.c"
                             "^wait_reading_process_output (intmax_t")))
 (m39-imp0--check "no-ifndef-subprocesses"
                  (= 0 (m39-imp0--count "src/process.c"
                                        "^(ifndef subprocesses")))
-(m39-imp0--check "else-subprocesses-at-8341"
-                 (eql 8341 (m39-imp0--line-of
+(m39-imp0--check "else-subprocesses-at-8278"
+                 (eql 8278 (m39-imp0--line-of
                             "src/process.c"
                             "^#else  /[*] subprocesses [*]/")))
 

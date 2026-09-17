@@ -22,6 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
+#include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -12673,7 +12674,10 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
      cache and its image should contain a process object.  */
   img = c->images[i];
   eassert (PROCESSP (img->lisp_data));
-  Fkill_process (img->lisp_data, Qnil);
+  /* M39 imp-4: the kill-process DEFUN retired.  Call the C mechanism
+     entry --signal-send directly (send SIGKILL to the GS process), so
+     the cleanup path does not depend on the elisp load order.  */
+  call3 (intern ("--signal-send"), img->lisp_data, make_fixnum (SIGKILL), Qnil);
   img->lisp_data = Qnil;
 
 #if defined (HAVE_X_WINDOWS)
