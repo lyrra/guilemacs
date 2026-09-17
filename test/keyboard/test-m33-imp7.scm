@@ -333,10 +333,10 @@ historical check instead of failing it."
             (check "m33/imp7/kb.org/imp7-note" #t
                    (contains? kb-m33 "imp-7 (2026-09-13; the close-out"))))))
 
-(define overview (slurp (repo "docs/milestone-overview.org")))
+(define overview (slurp (repo "docs/milestone-overview-closed.org")))
 (if (not overview)
     (info "m33/imp7/overview/skipped"
-          "docs/milestone-overview.org absent (untracked)")
+          "docs/milestone-overview-closed.org absent (untracked)")
     (let ((ov-m33 (org-section overview "*** M33")))
       (if (not ov-m33)
           (report "m33/imp7/overview/m33-closed"

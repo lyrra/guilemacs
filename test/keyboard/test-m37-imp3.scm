@@ -9,8 +9,8 @@
 ;;;    0. The repo root is bound by the wrapper (%m37-root).
 ;;;    1. The surface anchors are unchanged (imp-3 changes no C file):
 ;;;       keyboard.c 11,221 lines, 446 DEFUNs, 420 --=-shims;
-;;;       keyboard-globals.c 490; combined 11,711; 159 scm_c_public_ref
-;;;       sites.
+;;;       keyboard-globals.c 490; combined 11,711; 162 scm_c_public_ref
+;;;       sites (159 until M39, cr.org F1).
 ;;;    2. The budget: combined <= 11,960.
 ;;;    3. Verdict Q1 -- the kbd_buffer[] ring stays C.  The seven
 ;;;       raw-array consumers hold their symbol at their line:
@@ -379,7 +379,7 @@ starts with HEADING, up to the next same-or-shallower heading."
     (check "m37/imp3/count/keyboard-globals.c-lines" 490 (count-substr kg "\n")))
 (define combined (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m37/imp3/count/combined-lines" 11711 combined)
-(check "m37/imp3/count/scm-c-public-ref-sites" 159 (src-site-count))
+(check "m37/imp3/count/scm-c-public-ref-sites" 162 (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------
 (check "m37/imp3/budget/under-11960" #t (<= combined 11960))
@@ -499,7 +499,7 @@ DEFUN name string (cr.org F7).  For example
             ("--terminal-read-socket-hook!" "gobble.scm" 210)
             ("--frame-make-pointer-visible!" "gobble.scm" 221)
             ("--pending-signals-set!"       "gobble.scm" 229)
-            ("--pending-signals-p"          "process-wait.scm" 93)
+            ("--pending-signals-p"          "process-wait.scm" 97)
             ("--pending-signals-p"          "process-error.scm" 94)))
 
 ;;; The five shims share one registration block in src/keyboard.x.  Pin

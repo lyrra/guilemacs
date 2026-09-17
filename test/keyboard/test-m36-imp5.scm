@@ -10,7 +10,8 @@
 ;;;    1. The repo root is bound by the wrapper (%m36-root).
 ;;;    2. The brief.org 4 surface anchors hold: keyboard.c 11,221 lines,
 ;;;       keyboard-globals.c 490, combined 11,711, 446 DEFUNs, 420
-;;;       --=-shims, 159 scm_c_public_ref sites, 70 in keyboard.c.
+;;;       --=-shims, 162 scm_c_public_ref sites (159 until M39,
+;;;       cr.org F1), 70 in keyboard.c.
 ;;;    3. The budget: combined <= 11,960.  The margin is printed as INFO.
 ;;;    4. The seven retirements: swallow_events, timer_check, pop_kboard,
 ;;;       detect_input_pending, detect_input_pending_run_timers,
@@ -367,7 +368,7 @@ shallower level.  Return #f when the heading is absent."
            (count-substr kg "\n")))
 (check "m36/imp5/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m36/imp5/count/scm-c-public-ref-sites" 159
+(check "m36/imp5/count/scm-c-public-ref-sites" 162
        (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------
@@ -586,10 +587,10 @@ shallower level.  Return #f when the heading is absent."
                    (contains? kb-m36 "imp-5 landing"))
             (doc-records-close-out "m36/imp5/kb.org/count" kb-m36)))))
 
-(define overview (slurp (repo "docs/milestone-overview.org")))
+(define overview (slurp (repo "docs/milestone-overview-closed.org")))
 (if (not overview)
     (info "m36/imp5/overview/skipped"
-          "docs/milestone-overview.org absent (untracked)")
+          "docs/milestone-overview-closed.org absent (untracked)")
     (let ((ov-m36 (org-section overview "*** M36")))
       (if (not ov-m36)
           (report "m36/imp5/overview/m36-closed"

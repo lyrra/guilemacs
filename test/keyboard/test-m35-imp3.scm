@@ -327,12 +327,13 @@ holds TOKEN as a whole identifier.  This mirrors the scan
            (count-substr kg "\n")))
 (check "m35/imp3/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m35/imp3/count/scm-c-public-ref-sites" 159
+(check "m35/imp3/count/scm-c-public-ref-sites" 162
        (src-site-count))
 ;; A detail check: keyboard.c holds 70 of the sites.  M36 imp-4 retired
 ;; the gen_help_event body, which held one site, so keyboard.c went from
-;; 71 to 70; xterm.c gained the dispatcher site, so the total holds at
-;; 159.
+;; 71 to 70; xterm.c gained the dispatcher site, so the total held at
+;; 159 through M38.  M39 re-measured: the process ports added three
+;; sites, so the total is now 162 (cr.org F1).
 (if (not kbd)
     (report "m35/imp3/scan/keyboard.c-sites" (cons 'FAIL "missing"))
     (check "m35/imp3/count/keyboard.c-sites" 70
@@ -526,10 +527,10 @@ name-plus-value check, stronger than a whole-section substring match
                    (contains? kb-m35 "imp-3 ("))
             (doc-records-counts "m35/imp3/kb.org/count" kb-m35)))))
 
-(define overview (slurp (repo "docs/milestone-overview.org")))
+(define overview (slurp (repo "docs/milestone-overview-closed.org")))
 (if (not overview)
     (info "m35/imp3/overview/skipped"
-          "docs/milestone-overview.org absent (untracked)")
+          "docs/milestone-overview-closed.org absent (untracked)")
     (let ((ov-m35 (org-section overview "*** M35")))
       (if (not ov-m35)
           (report "m35/imp3/overview/m35-closed"

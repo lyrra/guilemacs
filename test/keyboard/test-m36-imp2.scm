@@ -228,6 +228,21 @@ count as a returned value."
                                 (else (skip (+ j 1)))))
                         (begin (write-char c out) (loop (+ i 1))))))))))))
 
+(define (strip-scheme-comments text)
+  "Return TEXT with each `;' comment removed to the end of its line.
+Used after strip-scheme-strings, so a `;' inside a string is already
+gone.  M39 imp-1/2 inserted comment blocks between the definitions in
+(emacs process-wait); a comment that cites `#f' must not count as code."
+  (if (not (string? text)) ""
+      (string-join
+       (map (lambda (l)
+              (let loop ((i 0))
+                (cond ((>= i (string-length l)) l)
+                      ((char=? (string-ref l i) #\;) (substring l 0 i))
+                      (else (loop (1+ i))))))
+            (split-lines text))
+       "\n")))
+
 (define (def-region text sig)
   "The text of the top-level definition whose head is SIG, up to the
 next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
@@ -387,7 +402,7 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
 (if (not pgobble)
     (report "m36/imp2/scan/bools-wait" (cons 'FAIL "process-wait.scm missing"))
     (let* ((ws (def-region pgobble "(define (wait-skip-select? read-kbd)"))
-           (ws-c (strip-scheme-strings (or ws ""))))
+           (ws-c (strip-scheme-comments (strip-scheme-strings (or ws "")))))
       (check "m36/imp2/process-wait/wait-skip-select-returns-nil" #t
              (contains? ws-c "#nil"))
       (check "m36/imp2/process-wait/wait-skip-select-no-scheme-false" #f
@@ -425,7 +440,7 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp2/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp2/count/scm-c-public-ref-sites" 159
+(check "m36/imp2/count/scm-c-public-ref-sites" 162
        (src-site-count))
 
 ;;; --- 12. Static: the corpus is registered in the keyboard group ---

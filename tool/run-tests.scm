@@ -205,6 +205,7 @@
   "test/m39/test-m39-imp3-e2e.el"              ; M39 imp-3 e2e: the moved accessors called on a live pipe process
   "test/m39/test-m39-imp4.el"                  ; M39 imp-4: the process signal family moved into (emacs process-signal); the retired DEFUNs, the --signal-* bridge, the type slot row, the image.c rewire
   "test/m39/test-m39-imp4-e2e.el"              ; M39 imp-4 e2e: the moved signal names called live (fboundp, signal-process, the stop/continue gate)
+  "test/m39/test-m39-imp5.el"                  ; M39 imp-5 close-out: the surface table, the two line pins (5465, 8278), the M39 state words in the working docs, and this registration (corpus registers ERT tests)
   )
 (group
   "test/src/eval-tests.el"

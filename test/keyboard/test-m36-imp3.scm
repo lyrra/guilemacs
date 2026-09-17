@@ -359,7 +359,7 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp3/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp3/count/scm-c-public-ref-sites" 159
+(check "m36/imp3/count/scm-c-public-ref-sites" 162
        (src-site-count))
 
 ;;; --- 9. Static: the corpus is registered in the keyboard group ----
@@ -423,6 +423,9 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
 ;;; and this section keeps them honest: it reads the anchor out of each
 ;;; sibling corpus and compares it with the live count, so a later
 ;;; surface move cannot leave a corpus behind.  cr1.org F1, F5.
+;;; M39 re-measured: the process ports added three scm_c_public_ref sites
+;;; (src/process.c 8 -> 11), so the live count is now 162 and every
+;;; sibling anchor is re-pinned to 162.  cr.org F1.
 (define (first-int text)
   "The first run of digits in TEXT as a number, or #f."
   (let loop ((chars (string->list text)))

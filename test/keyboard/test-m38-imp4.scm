@@ -170,7 +170,7 @@
        (count-prefix-lines (repo "src/keyboard.c") "DEFUN (\""))
 (check "m38/imp4/surface/shims" 420
        (count-prefix-lines (repo "src/keyboard.c") "DEFUN (\"--"))
-(check "m38/imp4/surface/public-ref-sites" 159
+(check "m38/imp4/surface/public-ref-sites" 162
        (apply + (map (lambda (p) (count-substr (slurp p) "scm_c_public_ref"))
                      (src-c-h))))
 
@@ -188,15 +188,19 @@
                   (cons 'FAIL "no ** M38 section in docs/kb.org"))
           (begin
             (check "m38/imp4/doc/kb-m38-heading" #t (has? kb-m38 "** M38"))
+            ;; ASCII anchors only: the harness and the corpus disagree on the
+            ;; decoding of the =docs/kb.org= em-dash, so an em-dash literal
+            ;; never matches there.  Pin the two ASCII halves instead.
             (check "m38/imp4/doc/kb-m38-closed" #t
-                   (has? kb-m38 "isolated — CLOSED (imp-4 close-out)"))
+                   (and (has? kb-m38 "the input-state leak is isolated")
+                        (has? kb-m38 "CLOSED (imp-4 close-out)")))
             (check "m38/imp4/doc/kb-status-done" #t (has? kb-m38 "status :: done"))))))
 
 ;;; --- 4. docs/milestone-overview.org §M38 says CLOSED ----------------
-(define m38-imp4-overview (slurp (repo "docs/milestone-overview.org")))
+(define m38-imp4-overview (slurp (repo "docs/milestone-overview-closed.org")))
 (if (not m38-imp4-overview)
     (info "m38/imp4/doc/overview/skipped"
-          "docs/milestone-overview.org absent (untracked)")
+          "docs/milestone-overview-closed.org absent (untracked)")
     (let ((ov-m38 (org-section m38-imp4-overview "*** M38")))
       (if (not ov-m38)
           (report "m38/imp4/doc/overview-m38-closed"
@@ -206,19 +210,26 @@
                        "test-harness integrity and the two M37 open items (CLOSED)")))))
 
 ;;; --- 5. milestone.org §M38 says CLOSED, imp-4 recorded --------------
+;;; milestone.org is the LIVE tracker: a later milestone rewrite (M39
+;;; imp-5 trimmed it to the current milestone) drops the M38 section.
+;;; Same guard as test-m36-imp5.scm and test-m37-imp3.scm: pin the
+;;; close-out anchor only while milestone.org still tracks M38.
 (define m38-imp4-milestone (slurp (repo "milestone.org")))
 (if (not m38-imp4-milestone)
     (info "m38/imp4/doc/milestone/skipped" "milestone.org absent (untracked)")
-    (let ((ms-m38 (org-section m38-imp4-milestone "* M38")))
-      (if (not ms-m38)
-          (report "m38/imp4/doc/milestone-m38-closed"
-                  (cons 'FAIL "no * M38 section in milestone.org"))
-          (begin
-            (check "m38/imp4/doc/milestone-m38-closed" #t
-                   (has? ms-m38
-                         "test-harness integrity and the two M37 open items (CLOSED)"))
-            (check "m38/imp4/doc/milestone-imp4-record" #t
-                   (and (has? ms-m38 "imp-4") (has? ms-m38 "Close-out")))))))
+    (if (not (string-contains m38-imp4-milestone "\n* M38"))
+        (info "m38/imp4/doc/milestone/skipped"
+              "milestone.org no longer tracks M38 (live tracker)")
+        (let ((ms-m38 (org-section m38-imp4-milestone "* M38")))
+          (if (not ms-m38)
+              (report "m38/imp4/doc/milestone-m38-closed"
+                      (cons 'FAIL "no * M38 section in milestone.org"))
+              (begin
+                (check "m38/imp4/doc/milestone-m38-closed" #t
+                       (has? ms-m38
+                             "test-harness integrity and the two M37 open items (CLOSED)"))
+                (check "m38/imp4/doc/milestone-imp4-record" #t
+                       (and (has? ms-m38 "imp-4") (has? ms-m38 "Close-out"))))))))
 
 ;;; --- 6. The two-run proof (exit criterion 3) -----------------------
 (if (not (defined? '%m38-imp4-run1))
@@ -255,9 +266,11 @@
             (has? m38-imp4-self "docs/kb.org absent (untracked)")))
 (check "m38/imp4/shape/overview-absent-guarded" #t
        (and (has? m38-imp4-self "(if (not m38-imp4-overview)")
-            (has? m38-imp4-self "docs/milestone-overview.org absent (untracked)")))
+            (has? m38-imp4-self "docs/milestone-overview-closed.org absent (untracked)")))
 (check "m38/imp4/shape/milestone-absent-guarded" #t
        (and (has? m38-imp4-self "(if (not m38-imp4-milestone)")
             (has? m38-imp4-self "milestone.org absent (untracked)")))
+(check "m38/imp4/shape/milestone-live-tracker-guarded" #t
+       (has? m38-imp4-self "milestone.org no longer tracks M38 (live tracker)"))
 
 (reverse test-results)

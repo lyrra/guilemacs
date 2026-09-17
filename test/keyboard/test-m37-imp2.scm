@@ -18,8 +18,8 @@
 ;;;    1. The repo root is bound by the wrapper (%m37-root).
 ;;;    2. The surface anchors are unchanged (imp-2 changes no C file):
 ;;;       keyboard.c 11,221 lines, 446 DEFUNs, 420 --=-shims;
-;;;       keyboard-globals.c 490; combined 11,711; 159 scm_c_public_ref
-;;;       sites.  The budget is 11,960.
+;;;       keyboard-globals.c 490; combined 11,711; 162 scm_c_public_ref
+;;;       sites (159 until M39, cr.org F1).  The budget is 11,960.
 ;;;    3. The ring verdict (§3.1): the seven consumer rows each hold
 ;;;       the named symbol at the named line (xterm.c:905, :31826,
 ;;;       :18660; textconv.c:591, :1607, :1716; emacs.c:2829).  The
@@ -312,7 +312,7 @@ starts with HEADING, up to the next same-or-shallower heading."
     (check "m37/imp2/count/keyboard-globals.c-lines" 490 (count-substr kg "\n")))
 (define combined (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m37/imp2/count/combined-lines" 11711 combined)
-(check "m37/imp2/count/scm-c-public-ref-sites" 159 (src-site-count))
+(check "m37/imp2/count/scm-c-public-ref-sites" 162 (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------
 (check "m37/imp2/budget/under-11960" #t (<= combined 11960))
@@ -433,7 +433,7 @@ starts with HEADING, up to the next same-or-shallower heading."
             ("--terminal-read-socket-hook!" "gobble.scm" 210)
             ("--frame-make-pointer-visible!" "gobble.scm" 221)
             ("--pending-signals-set!"       "gobble.scm" 229)
-            ("--pending-signals-p"          "process-wait.scm" 93)
+            ("--pending-signals-p"          "process-wait.scm" 97)
             ("--pending-signals-p"          "process-error.scm" 94)))
 
 ;;; --- 6b. Negative controls (cr.org F1) ----------------------------
