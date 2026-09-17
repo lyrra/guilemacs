@@ -5365,6 +5365,41 @@ send_process_drain_signals (void)
   SCM_CALL_0 (proc);
 }
 
+/* M39 imp-2: dispatcher into (emacs process-io) for the send_process
+   process-state gate.  Static and local to process.c.  The C keeps
+   update_status and the error signals; the module owns the decision and
+   reads p->status and p->outfd.  It returns 0 ok, 1 not running, 2
+   output fd closed.  */
+
+static int
+send_process_state_decision (Lisp_Object status, int outfd)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-io",
+			     "send-process-state-decision");
+  SCM result = SCM_CALL_2 (proc, status, scm_from_int (outfd));
+  return scm_to_int (result);
+}
+
+/* M39 imp-2: dispatcher into (emacs process-io) for the GPT gap-move
+   test of Fprocess_send_region.  Static and local to process.c: the
+   CHAR_TO_BYTE pair, move_gap_both, and the byte addresses stay C.  The
+   module returns elisp t / #nil; !NILP is the right read (a Scheme #f
+   would read as true).  */
+
+static bool
+process_send_region_gap_move (EMACS_INT start, EMACS_INT end, EMACS_INT gpt)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-io",
+			     "process-send-region-gap-move?");
+  SCM result = SCM_CALL_3 (proc, INT_TO_INTEGER (start),
+			   INT_TO_INTEGER (end), INT_TO_INTEGER (gpt));
+  return !NILP (result);
+}
+
 #if defined HAVE_ANDROID && !defined ANDROID_STUBIFY	\
   && defined THREADS_ENABLED
 
@@ -6789,9 +6824,13 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 
   if (p->raw_status_new)
     update_status (p);
-  if (! EQ (p->status, Qrun))
+  /* M39 imp-2: the process-state gate moved to (emacs process-io)
+     send-process-state-decision.  The module reads p->status and
+     p->outfd; the C keeps the update_status refresh and the errors.  */
+  int send_state = send_process_state_decision (p->status, p->outfd);
+  if (send_state == 1)
     error ("Process %s not running: %s", SDATA (p->name), SDATA (status_message (p)));
-  if (p->outfd < 0)
+  if (send_state == 2)
     error ("Output file descriptor of %s is closed", SDATA (p->name));
 
   eassert (p->outfd < FD_SETSIZE);
@@ -7030,7 +7069,10 @@ set up yet, this function will block until socket setup has completed.  */)
   start_byte = CHAR_TO_BYTE (XFIXNUM (start));
   end_byte = CHAR_TO_BYTE (XFIXNUM (end));
 
-  if (XFIXNUM (start) < GPT && XFIXNUM (end) > GPT)
+  /* M39 imp-2: the gap-move decision moved to (emacs process-io)
+     process-send-region-gap-move?.  CHAR_TO_BYTE, move_gap_both, and the
+     byte addresses stay C.  */
+  if (process_send_region_gap_move (XFIXNUM (start), XFIXNUM (end), GPT))
     move_gap_both (XFIXNUM (start), start_byte);
 
   if (NETCONN_P (proc))

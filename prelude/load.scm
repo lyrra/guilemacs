@@ -167,6 +167,8 @@
 ;; M32 imp-2 — process.c error paths + send_process drain in
 ;; (emacs process-error).
 (use-modules (emacs process-error))
+;; M39 imp-2 — process.c read/write decision paths in (emacs process-io).
+(use-modules (emacs process-io))
 ;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
 (use-modules (emacs eval-main))
 ;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).

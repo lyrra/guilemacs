@@ -6,9 +6,9 @@
 ;;; fails the run.  It has no C dependency: it only reads files.
 ;;;
 ;;; It covers the review findings (cr.org):
-;;;   D1 -- wait_reading_process_output is defined at src/process.c:5422
-;;;         (5416 at the imp-0 base), not 5329, and there is no #ifndef
-;;;         subprocesses fallback.
+;;;   D1 -- wait_reading_process_output is defined at src/process.c:5462
+;;;         (5416 at the imp-0 base, +11 after imp-1, +46 after imp-2),
+;;;         not 5329, and there is no #ifndef subprocesses fallback.
 ;;;   D2 -- the DEFUN count is 64 and the six regrouped syscall members
 ;;;         exist; the plan's group counts are 27/6/18/9/3.
 ;;;
@@ -51,18 +51,22 @@
            (should ,ok))))
 
 ;; D1: the wait definition line and the absence of a subprocesses fallback.
-;; (imp-1 added the accept-process-output dispatcher before the wait
-;; definition, so both lines drifted +6 from the imp-0 values: 5416 -> 5422
-;; and 8295 -> 8301.)
-(m39-imp0--check "wait-definition-at-5422"
-                 (eql 5422 (m39-imp0--line-of
+;; (imp-1 added the accept-process-output dispatcher and its forward
+;; declaration before the wait definition: 5416 -> 5427.  imp-2 added the
+;; two (emacs process-io) dispatchers at the same place: 5427 -> 5462.
+;; imp-2 then shortened the send_process state-gate call by one line, so
+;; the Fdelete_process #else line drifted 8295 -> 8306 -> 8349 -> 8348.
+;; The wait line 5462 is unchanged: the imp-2 dispatchers kept their line
+;; count.)
+(m39-imp0--check "wait-definition-at-5462"
+                 (eql 5462 (m39-imp0--line-of
                             "src/process.c"
                             "^wait_reading_process_output (intmax_t")))
 (m39-imp0--check "no-ifndef-subprocesses"
                  (= 0 (m39-imp0--count "src/process.c"
                                        "^(ifndef subprocesses")))
-(m39-imp0--check "else-subprocesses-at-8301"
-                 (eql 8301 (m39-imp0--line-of
+(m39-imp0--check "else-subprocesses-at-8348"
+                 (eql 8348 (m39-imp0--line-of
                             "src/process.c"
                             "^#else  /[*] subprocesses [*]/")))
 
@@ -78,8 +82,8 @@
                          (concat "^DEFUN (\"" (regexp-quote name) "\"")))))
 
 ;; The plan must carry the corrected numbers, not the stale ones.
-(m39-imp0--check "plan-has-5422"
-                 (string-match-p "src/process\\.c:5422"
+(m39-imp0--check "plan-has-5462"
+                 (string-match-p "src/process\\.c:5462"
                                  (mapconcat #'identity
                                             (m39-imp0--lines "docs/m39-plan.org")
                                             "\n")))
