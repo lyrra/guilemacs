@@ -9,8 +9,8 @@
 ;;;   1. the Step 2 surface table, as the measured value;
 ;;;   2. the two line pins of Step 2 (5465 and 8278), held by
 ;;;      test/m39/test-m39-imp0-audit.el;
-;;;   3. the M39 state words in milestone.org and docs/kb.org, the
-;;;      as-built imp-5 line in docs/m39-plan.org, and the close-out
+;;;   3. the M39 state words in the durable record docs/kb.org ** M39,
+;;;      the as-built imp-5 line in docs/m39-plan.org, and the close-out
 ;;;      state in docs/milestone-overview.org;
 ;;;   4. that this corpus is registered in tool/run-tests.scm.
 ;;;
@@ -136,22 +136,28 @@
                  (m39-imp5--file-contains-p "test/m39/test-m39-imp0-audit.el"
                                             "\"else-subprocesses-at-8278\""))
 
-;;; --- 3. The M39 state words in the working docs ----------------------
+;;; --- 3. The M39 state words in the durable record --------------------
+;;
+;; cr.org F2/F4 and brief.org §7: a close-out pin must read a *durable*
+;; record, not the live tracker.  milestone.org now tracks M40, so it no
+;; longer holds the M39 state words.  The durable M39 record is
+;; docs/kb.org ** M39 ("M39 close-out record"); the road map line is
+;; docs/milestone-overview.org.  Keep each pin exact: a bad value fails.
 
-;; milestone.org: M39 is closed, the imp-5 row is present, and the
-;; surface table holds the measured value.
+;; docs/kb.org ** M39: the close-out state words and the hash.
 (m39-imp5--check "milestone-M39-closed"
-                 (m39-imp5--file-contains-p "milestone.org"
-                                            "src/process.c port (CLOSED)"))
+                 (m39-imp5--file-contains-p "docs/kb.org"
+                                            "the src/process.c port (CLOSED)"))
 (m39-imp5--check "milestone-M39-closed-row"
-                 (m39-imp5--file-contains-p "milestone.org" "| M39       | CLOSED"))
+                 (m39-imp5--file-contains-p "docs/kb.org"
+                                            "imp-0 … imp-5 landed"))
 (m39-imp5--check "milestone-imp5-row"
-                 (m39-imp5--file-contains-p "milestone.org"
+                 (m39-imp5--file-contains-p "docs/kb.org"
                                             "close-out: re-measure the surface, run the gates, record"))
-;; cr.org F2: the brief (Step 6) asks for the close-out commit hash.
+;; cr.org F3: pin the current close-out hash, not the dead pre-rebase 24e24e3.
 (m39-imp5--check "milestone-imp5-hash"
-                 (m39-imp5--file-contains-p "milestone.org"
-                                            "imp-5 =24e24e3= (close-out)"))
+                 (m39-imp5--file-contains-p "docs/kb.org"
+                                            "imp-5 =764ec06= (close-out)"))
 (m39-imp5--check "milestone-surface-8843"
                  (m39-imp5--file-contains-p "milestone.org" "8,843"))
 ;; cr.org F3: anchor the value in the row that names the metric, not a bare
@@ -183,10 +189,11 @@
                                             "imp-5 as-built (2026-09-17)"))
 
 ;; docs/milestone-overview.org: M39 moved to the closed list with its hash.
-;; cr.org F3: the old check only matched the bare string "M39".
+;; cr.org F3: the old check matched the bare string "M39"; it also pinned the
+;; dead pre-rebase hash 24e24e3.  Pin the current close-out hash 764ec06.
 (m39-imp5--check "overview-M39-closed"
                  (m39-imp5--file-contains-p "docs/milestone-overview.org"
-                                            "imp-5 =24e24e3= close-out"))
+                                            "imp-5 =764ec06= close-out"))
 (m39-imp5--check "overview-M39-closed-word"
                  (m39-imp5--file-contains-p "docs/milestone-overview.org"
                                             "8,860 → 8,843 as-built; CLOSED"))
