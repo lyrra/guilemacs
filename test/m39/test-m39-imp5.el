@@ -148,7 +148,10 @@
 (m39-imp5--check "milestone-M39-closed"
                  (m39-imp5--file-contains-p "docs/kb.org"
                                             "the src/process.c port (CLOSED)"))
-(m39-imp5--check "milestone-M39-closed-row"
+;; cr.org F6: the old check name said "row"; the needle is the state
+;; bullet "imp-0 … imp-5 landed" in the ** M39 close-out record, not a
+;; table row.  Rename the check to fit the needle.
+(m39-imp5--check "milestone-M39-state-landed"
                  (m39-imp5--file-contains-p "docs/kb.org"
                                             "imp-0 … imp-5 landed"))
 (m39-imp5--check "milestone-imp5-row"

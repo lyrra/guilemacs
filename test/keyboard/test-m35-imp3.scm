@@ -513,9 +513,15 @@ name-plus-value check, stronger than a whole-section substring match
   (doc-metric label section "scm-c-public-ref-sites"
               "scm_c_public_ref" m35-scp-sites))
 
-(define kb (slurp (repo "docs/kb.org")))
+;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
+;; kb2 reduction).  It holds no per-milestone historical detail, only the
+;; reduction's self-links.  Treat the reduced record like an absent doc
+;; file: skip the historical pins, do not fail them.
+(define kb (let ((f (slurp (repo "docs/kb.org"))))
+             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
+                 #f f)))
 (if (not kb)
-    (info "m35/imp3/kb.org/skipped" "docs/kb.org absent (untracked)")
+    (info "m35/imp3/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
     (let ((kb-m35 (org-section kb "** M35")))
       (if (not kb-m35)
           (report "m35/imp3/kb.org/status-closed"

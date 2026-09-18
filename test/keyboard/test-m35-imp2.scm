@@ -395,9 +395,15 @@ table row for STUB with the verdict keep C and that milestone."
     ("kbd_buffer_store_event" . "final remnant")))
 (define stub-verdicts-all (append stub-verdicts-e1e2 stub-verdicts-e3))
 
-(define kb (slurp (repo "docs/kb.org")))
+;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
+;; kb2 reduction).  It holds no per-milestone historical detail, only the
+;; reduction's self-links.  Treat the reduced record like an absent doc
+;; file: skip the historical pins, do not fail them.
+(define kb (let ((f (slurp (repo "docs/kb.org"))))
+             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
+                 #f f)))
 (if (not kb)
-    (info "m35/imp2/kb.org/skipped" "docs/kb.org absent (untracked)")
+    (info "m35/imp2/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
     (let ((kb-m35 (org-section kb "** M35")))
       (if (not kb-m35)
           (report "m35/imp2/kb.org/imp2-done"

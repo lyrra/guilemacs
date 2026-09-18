@@ -320,9 +320,15 @@ historical check instead of failing it."
 ;;; no kb.org and no milestone-overview.org.  When a doc file is absent,
 ;;; print an INFO line instead of a FAIL: the check is skipped, not
 ;;; failed (cr.org F4).
-(define kb (slurp (repo "docs/kb.org")))
+;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
+;; kb2 reduction).  It holds no per-milestone historical detail, only the
+;; reduction's self-links.  Treat the reduced record like an absent doc
+;; file: skip the historical pins, do not fail them.
+(define kb (let ((f (slurp (repo "docs/kb.org"))))
+             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
+                 #f f)))
 (if (not kb)
-    (info "m33/imp7/kb.org/skipped" "docs/kb.org absent (untracked)")
+    (info "m33/imp7/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
     (let ((kb-m33 (org-section kb "** M33")))
       (if (not kb-m33)
           (report "m33/imp7/kb.org/status-closed"

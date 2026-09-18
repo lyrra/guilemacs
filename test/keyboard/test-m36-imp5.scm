@@ -573,9 +573,15 @@ shallower level.  Return #f when the heading is absent."
   (doc-metric label section "combined-lines" "keyboard-globals.c" "11,711")
   (doc-metric label section "scm-c-public-ref-sites" "scm_c_public_ref" "159"))
 
-(define kb (slurp (repo "docs/kb.org")))
+;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
+;; kb2 reduction).  It holds no per-milestone historical detail, only the
+;; reduction's self-links.  Treat the reduced record like an absent doc
+;; file: skip the historical pins, do not fail them.
+(define kb (let ((f (slurp (repo "docs/kb.org"))))
+             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
+                 #f f)))
 (if (not kb)
-    (info "m36/imp5/kb.org/skipped" "docs/kb.org absent (untracked)")
+    (info "m36/imp5/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
     (let ((kb-m36 (org-section kb "** M36")))
       (if (not kb-m36)
           (report "m36/imp5/kb.org/status-closed"
