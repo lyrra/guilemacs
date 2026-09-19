@@ -19,6 +19,8 @@
 
 (princ "=== m39 imp-2 (process read/write decisions) test suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m39-imp2.scm" dir))
@@ -52,15 +54,13 @@
              (ok (eq status 'PASS)))
         (cond
          (ok
-          (eval `(ert-deftest ,(intern (format "m39-imp2/%s" name)) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test (format "m39-imp2/%s" name) status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern (format "m39-imp2/%s" name)) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test (format "m39-imp2/%s" name) status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     ;; --- end-to-end through the subrs and their C dispatchers
@@ -74,8 +74,7 @@
                      (make-pipe-process :name "m39-imp2-pipe" :noquery t)
                    (error nil)))
            (made (processp pipe)))
-      (eval `(ert-deftest m39-imp2/e2e/make-pipe-process ()
-               (should ',made)))
+      (imp-register-bool-as-ert-test "m39-imp2/e2e/make-pipe-process" made)
       (if made
           (setq pass (1+ pass))
         (setq fail (1+ fail)))
@@ -107,7 +106,7 @@
                (errored (condition-case err
                             (progn (funcall (cdr c)) nil)
                           (error t))))
-          (eval `(ert-deftest ,(intern name) () (should ',errored)))
+          (imp-register-bool-as-ert-test name errored)
           (if errored
               (setq pass (1+ pass))
             (setq fail (1+ fail)))

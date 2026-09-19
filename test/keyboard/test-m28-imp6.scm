@@ -146,7 +146,7 @@
 
 ;;; --- 4. Print -- do not assert -- the current remnant line counts -----
 ;;; The counts move with every later milestone, so they are informational
-;;; only.  Locate src/ from the test cwd: run-tests.sh runs from test/,
+;;; only.  Locate src/ from the test cwd, runs from test/,
 ;;; run-all-tests.el from the repo root, so probe both.
 (define (count-lines path)
   (call-with-input-file path

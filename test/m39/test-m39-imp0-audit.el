@@ -19,6 +19,8 @@
 
 (princ "=== m39 imp-0 audit suite ===\n")
 
+(require 'imp-ert-report)
+
 (defvar m39-imp0--root
   (file-name-as-directory
    (expand-file-name "../.." (file-name-directory (or load-file-name
@@ -48,8 +50,7 @@
 (defun m39-imp0--check (name ok)
   "Report and register one check.  OK is a boolean."
   (princ (format "INFO m39/imp0/%s %s\n" name (if ok "PASS" "FAIL")))
-  (eval `(ert-deftest ,(intern (format "m39-imp0/%s" name)) ()
-           (should ,ok))))
+  (imp-register-bool-as-ert-test (format "m39-imp0/%s" name) ok))
 
 ;; D1: the wait definition line and the absence of a subprocesses fallback.
 ;; (imp-1 added the accept-process-output dispatcher and its forward

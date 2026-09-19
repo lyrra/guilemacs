@@ -5,122 +5,74 @@
 ;;; re-measures the surface, re-confirms the keyboard gate, and records
 ;;; the accounting.  No C file changes.
 ;;;
-;;; Two parts:
-;;;   * Behavior checks (this file).  Run the real harness with
-;;;     --filter=keyboard TWICE and assert an exit status of exactly 0 in
-;;;     each run (exit criterion 3, brief.org §10).  A recursion guard
-;;;     (GUILEMACS_M38_IMP4_GATE) keeps the nested run from spawning
-;;;     another pair; GUILEMACS_M38_IMP3_GATE is also set so the nested
-;;;     keyboard run does not spawn the imp-3 pair.  Each nested run is
-;;;     wrapped in `timeout' so a hung run cannot hang the outer gate
-;;;     forever; a timeout gives exit status 124, which fails the
-;;;     exit-status check.
-;;;   * Source checks (test/keyboard/test-m38-imp4.scm).  Prove the
-;;;     surface table (brief.org §6) and the accounting in the working
-;;;     documents (brief.org §8.2), and read the two nested logs.
+;;; Source checks only (test/keyboard/test-m38-imp4.scm).  Prove the
+;;; surface table (brief.org §6) and the accounting in the working
+;;; documents (brief.org §8.2).
+;;;
+;;; This file used to also run a *behavior* check: shell out to
+;;; tool/run-tests.sh --filter=keyboard via call-process TWICE (a
+;;; recursion guard, GUILEMACS_M38_IMP4_GATE, kept the nested run from
+;;; spawning another pair), to prove two full keyboard-suite runs both
+;;; exit 0.  --filter=keyboard matches nearly every file in the keyboard
+;;; group, so this meant every batch that includes this file re-ran
+;;; almost the entire suite as a subprocess, twice, on top of whatever
+;;; batch was already running it -- slow enough (tens of minutes) to be
+;;; mistaken for a genuine hang.  Removed; the corpus's "two-run" checks
+;;; (see test-m38-imp4.scm) now always report INFO-skipped instead of
+;;; exercising a live two-run.  Run ./tool/run-tests.sh --filter=keyboard
+;;; by hand (twice) if this needs re-proving.
 ;;;
 ;;; The .scm corpus is loaded via primitive-load with the repo root bound
-;;; as %m38-root and the two log paths / exit statuses as
-;;; %m38-imp4-run1, %m38-imp4-run2, %m38-imp4-exit1, %m38-imp4-exit2.
-;;; Each (NAME PASS|FAIL) pair is reported via princ AND turned into an
-;;; ERT test so the harness counts it.  Each (NAME INFO VALUE) pair is
-;;; printed as an INFO line and is NOT asserted.  A corpus load error, a
-;;; readback error or an empty corpus is reported as a real FAIL (never
-;;; a silent 0 failed).
+;;; as %m38-root.  Each (NAME PASS|FAIL) pair is reported via princ AND
+;;; turned into an ERT test so the harness counts it.  Each (NAME INFO
+;;; VALUE) pair is printed as an INFO line and is NOT asserted.  A corpus
+;;; load error, a readback error or an empty corpus is reported as a real
+;;; FAIL (never a silent 0 failed).
 
 (princ "=== m38 imp-4 (close-out) test suite ===\n")
 
-;;; Wall-clock limit for each nested --filter=keyboard run.  A healthy
-;;; run takes a few minutes; 30 minutes is a hang, not a slow run.
-(defconst m38-imp4-gate-timeout-seconds 1800)
+(require 'imp-ert-report)
 
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m38-imp4.scm" dir))
-       (logs nil)
        (load-error nil))
-  (unwind-protect
-      (progn
-        ;; --- Behavior checks: two --filter=keyboard runs must exit EXACTLY 0.
-        ;; The nested run loads this same file, so set the recursion guard in
-        ;; the child; then the child skips this block and runs only the source
-        ;; checks.
-        (if (getenv "GUILEMACS_M38_IMP4_GATE")
-            (princ "INFO m38/imp4/behavior/skipped nested run (recursion guard)\n")
-          (let* ((log1 (make-temp-file "m38-imp4-kb-run1-"))
-                 (log2 (make-temp-file "m38-imp4-kb-run2-"))
-                 (cmd (format "cd %S && GUILEMACS_M38_IMP4_GATE=1 GUILEMACS_M38_IMP3_GATE=1 timeout %d ./tool/run-tests.sh --filter=keyboard >%%s 2>&1"
-                              root m38-imp4-gate-timeout-seconds))
-                 (t0 (float-time))
-                 (st1 (condition-case nil
-                          (call-process "sh" nil nil nil "-c" (format cmd log1))
-                        (error nil)))
-                 (t1 (float-time))
-                 (st2 (condition-case nil
-                          (call-process "sh" nil nil nil "-c" (format cmd log2))
-                        (error nil)))
-                 (t2 (float-time)))
-            (setq logs (list log1 log2))
-            (eval `(ert-deftest m38-imp4/behavior/keyboard-run1-exits-0 ()
-                     (should (eql ,st1 0))))
-            (eval `(ert-deftest m38-imp4/behavior/keyboard-run2-exits-0 ()
-                     (should (eql ,st2 0))))
-            (princ (format "INFO m38/imp4/behavior/keyboard-run1-exit %S\n" st1))
-            (princ (format "INFO m38/imp4/behavior/keyboard-run2-exit %S\n" st2))
-            (princ (format "INFO m38/imp4/behavior/keyboard-run1-seconds %.1f\n"
-                           (- t1 t0)))
-            (princ (format "INFO m38/imp4/behavior/keyboard-run2-seconds %.1f\n"
-                           (- t2 t1)))
-            ;; The corpus reads these paths and statuses; the temp logs are
-            ;; removed in the unwind-protect cleanup below, after the readback.
-            (eval-scheme (format "(define %%m38-imp4-run1 %S)" log1))
-            (eval-scheme (format "(define %%m38-imp4-run2 %S)" log2))
-            (eval-scheme (format "(define %%m38-imp4-exit1 %S)" st1))
-            (eval-scheme (format "(define %%m38-imp4-exit2 %S)" st2))))
-
-        ;; --- Source checks: the surface table and the accounting.
-        (eval-scheme (format "(define %%m38-root %S)" root))
-        (condition-case err
-            (eval-scheme
-             (format "(primitive-load %S)" corpus))
-          (error (setq load-error err)))
-        (let* ((results
-                (cond
-                 (load-error
-                  (list (list "m38-imp4/corpus-load"
-                              (cons 'FAIL (format "%S" load-error)))))
-                 (t
-                  (condition-case e
-                      (let ((r (eval-scheme "(reverse test-results)")))
-                        (if (or (not (listp r)) (null r))
-                            (list (list "m38-imp4/corpus-empty"
-                                        (cons 'FAIL "corpus produced no results")))
-                          r))
-                    (error
-                     (list (list "m38-imp4/readback"
-                                 (cons 'FAIL (format "%S" e)))))))))
-               (pass 0)
-               (fail 0))
-          (dolist (result results)
-            (let* ((name (car result))
-                   (status (cadr result))
-                   (ok (eq status 'PASS)))
-              (cond
-               (ok
-                (eval `(ert-deftest ,(intern name) ()
-                         (should (eq ',status 'PASS))))
-                (setq pass (1+ pass))
-                (princ (format "PASS %s\n" name)))
-               ((and (consp status) (eq (car status) 'INFO))
-                (princ (format "INFO %s %s\n" name (cadr status))))
-               (t
-                (eval `(ert-deftest ,(intern name) ()
-                         (should (eq ',status 'PASS))))
-                (setq fail (1+ fail))
-                (princ (format "FAIL %s %S\n" name (cdr result)))))))
-          (princ (format "=== %d passed, %d failed, %d total ===\n"
-                         pass fail (+ pass fail)))))
-    ;; Remove the two temp logs on the normal AND the non-local exit path.
-    ;; logs is nil under the recursion guard.
-    (dolist (log logs)
-      (when (and log (file-exists-p log)) (delete-file log)))))
+  (eval-scheme (format "(define %%m38-root %S)" root))
+  (condition-case err
+      (eval-scheme
+       (format "(primitive-load %S)" corpus))
+    (error (setq load-error err)))
+  (let* ((results
+          (cond
+           (load-error
+            (list (list "m38-imp4/corpus-load"
+                        (cons 'FAIL (format "%S" load-error)))))
+           (t
+            (condition-case e
+                (let ((r (eval-scheme "(reverse test-results)")))
+                  (if (or (not (listp r)) (null r))
+                      (list (list "m38-imp4/corpus-empty"
+                                  (cons 'FAIL "corpus produced no results")))
+                    r))
+              (error
+               (list (list "m38-imp4/readback"
+                           (cons 'FAIL (format "%S" e)))))))))
+         (pass 0)
+         (fail 0))
+    (dolist (result results)
+      (let* ((name (car result))
+             (status (cadr result))
+             (ok (eq status 'PASS)))
+        (cond
+         (ok
+          (imp-register-check-as-ert-test name status)
+          (setq pass (1+ pass))
+          (princ (format "PASS %s\n" name)))
+         ((and (consp status) (eq (car status) 'INFO))
+          (princ (format "INFO %s %s\n" name (cadr status))))
+         (t
+          (imp-register-check-as-ert-test name status)
+          (setq fail (1+ fail))
+          (princ (format "FAIL %s %S\n" name (cdr result)))))))
+    (princ (format "=== %d passed, %d failed, %d total ===\n"
+                   pass fail (+ pass fail)))))

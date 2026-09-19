@@ -24,21 +24,14 @@
 ;;;     (14 buildable + NS), not 16.  The earlier count included
 ;;;     keyboard.c, which holds the definition and no live call.
 ;;;
-;;; The corpus also pins the record in the docs.  docs/ is untracked
-;;; (.gitignore holds "docs"), so a fresh clone has no kb.org and no
-;;; m35-plan.org.  When a doc file is absent, an INFO line is printed
-;;; and the check is skipped, not failed.
-;;;
-;;; Every stub must name its later milestone (cr.org F3/F4).  One check
-;;; per stub reads the stub name in a table row and the milestone token
-;;; in that row, in docs/m35-plan.org §E3 and in docs/kb.org ** M35.  A
-;;; prose mention does not match, so a dropped row, a wrong verdict, or
-;;; a wrong milestone fails the check.
-;;;
-;;; Limit (cr.org F8): the corpus pins the call text, not the line
-;;; number.  A recorded caller line moves with the code; the call text
-;;; does not.  The line numbers stay in the docs and are re-confirmed by
-;;; grep at each new HEAD.
+;;; (This corpus used to also check docs/m35-plan.org §"Residual-stub
+;;; disposition", docs/kb.org's ** M35 section, and milestone.org's
+;;; Exit-criterion section for a matching disposition record.  docs/ is
+;;; gitignored and not kept in sync with the git-tracked test/code work,
+;;; so those checks either skipped or failed on stale local docs
+;;; unrelated to code correctness.  Removed; the disposition itself
+;;; (which stub retires, which stays, and why) is still pinned by the
+;;; keep-proof and census checks above.)
 ;;;
 ;;; All checks read files, so the corpus needs no C entry point and is
 ;;; batch-safe.
@@ -115,63 +108,6 @@ character on either side.  This matches the grep form \\bNAME\\b."
       (let loop ((acc '()))
         (let ((line (read-line port)))
           (if (eof-object? line) (reverse acc) (loop (cons line acc))))))))
-
-(define (stars line)
-  "Return the number of leading '*' characters in LINE."
-  (let loop ((i 0))
-    (if (and (< i (string-length line)) (char=? (string-ref line i) #\*))
-        (loop (1+ i)) i)))
-
-(define (heading-line? line)
-  "True when LINE is an org-mode heading: stars, then a space."
-  (let ((n (stars line)))
-    (and (> n 0)
-         (< n (string-length line))
-         (char=? (string-ref line n) #\space))))
-
-(define (org-section text heading)
-  "Return the org-mode section of TEXT introduced by the heading line
-that starts with HEADING, up to but not including the next heading line
-at the same or a shallower level.  Return #f when no such heading line
-is present.  Scoping a check to one section stops text from another
-milestone, or from a plan, from satisfying it."
-  (and (string? text)
-       (let* ((ls (split-lines text))
-              (level (stars heading))
-              (start (list-index (lambda (l) (string-prefix? heading l)) ls)))
-         (and start
-              (let loop ((i (1+ start)))
-                (cond
-                 ((>= i (length ls))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 ((and (heading-line? (list-ref ls i))
-                       (<= (stars (list-ref ls i)) level))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 (else (loop (1+ i)))))))))
-
-(define (line-with text needle)
-  "Return the first line of TEXT that contains NEEDLE, or #f."
-  (and (string? text)
-       (call-with-input-string text
-         (lambda (port)
-           (let loop ()
-             (let ((line (read-line port)))
-               (cond ((eof-object? line) #f)
-                     ((string-contains line needle) line)
-                     (else (loop)))))))))
-
-(define (tracks-milestone? text tag)
-  "True when TEXT's first org heading starts with TAG, for example
-\"* M35\".  milestone.org is the live tracker and holds only the current
-milestone (cr.org F1).  This test lets a later milestone rewrite skip a
-historical check instead of failing it."
-  (and (string? text)
-       (let ((ls (split-lines text)))
-         (and (pair? ls) (string-prefix? tag (car ls))))))
 
 (define (files-with-token dir suffix token)
   "Names of the files in DIR whose name ends with SUFFIX and whose text
@@ -345,114 +281,3 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
               (and kg-end
                    (< kg-start reg-idx)
                    (< reg-idx kg-end)))))
-
-;;; --- 7. Static: the disposition is recorded, one check per stub ---
-;;; docs/ is untracked, so a fresh clone has no kb.org and no
-;;; m35-plan.org.  When a doc file is absent, print an INFO line instead
-;;; of a FAIL: the check is skipped, not failed.  Scope each check to
-;;; its own section.
-;;;
-;;; Every residual stub must name its later milestone (cr.org F3/F4).
-;;; The check reads the stub name in a table row ("| =STUB=") and the
-;;; milestone token in that row.  A prose mention does not match, so a
-;;; dropped row, a wrong verdict, or a wrong milestone fails the check.
-;;; Check the stub name and the milestone token, not a whole sentence
-;;; (cr.org F4).  ASCII-only string literals: eval-scheme decodes them
-;;; differently from the UTF-8 doc text.
-
-(define (row-with text stub)
-  "Return the first line of TEXT that names STUB as a table row
-\"| =STUB=\", or #f.  The \"| =\" prefix excludes a prose mention.  The
-trailing \"=\" keeps detect_input_pending apart from
-detect_input_pending_run_timers."
-  (and (string? text)
-       (line-with text (string-append "| =" stub "="))))
-
-(define (check-stub-rows label text stubs)
-  "For each (STUB . MILESTONE) pair in STUBS, check that TEXT holds a
-table row for STUB with the verdict keep C and that milestone."
-  (for-each
-   (lambda (pair)
-     (let ((row (row-with text (car pair))))
-       (check (string-append label "/" (car pair)) #t
-              (and (string? row)
-                   (contains? row "keep C")
-                   (contains? row (cdr pair))))))
-   stubs))
-
-;; E1 and E2 (safe_run_hooks, gen_help_event) are prose sections; E3 is
-;; a table with one row per stub.
-(define stub-verdicts-e1e2
-  '(("safe_run_hooks" . "M36+")
-    ("gen_help_event" . "M36+")))
-(define stub-verdicts-e3
-  '(("pop_kboard" . "M36+")
-    ("swallow_events" . "M36+")
-    ("detect_input_pending" . "M36+")
-    ("detect_input_pending_run_timers" . "M36+")
-    ("timer_check" . "M36+")
-    ("gobble_input" . "final remnant")
-    ("kbd_buffer_store_event" . "final remnant")))
-(define stub-verdicts-all (append stub-verdicts-e1e2 stub-verdicts-e3))
-
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m35/imp2/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m35 (org-section kb "** M35")))
-      (if (not kb-m35)
-          (report "m35/imp2/kb.org/imp2-done"
-                  (cons 'FAIL "no ** M35 section in docs/kb.org"))
-          (begin
-            (check "m35/imp2/kb.org/imp2-done" #t
-                   (contains? kb-m35 "*done*"))
-            (check-stub-rows "m35/imp2/kb.org/stub" kb-m35
-                             stub-verdicts-all)))))
-
-(define m35-plan (slurp (repo "docs/m35-plan.org")))
-(if (not m35-plan)
-    (info "m35/imp2/m35-plan.org/skipped" "docs/m35-plan.org absent (untracked)")
-    (let ((plan-e (org-section m35-plan "* Residual-stub disposition")))
-      (if (not plan-e)
-          (report "m35/imp2/m35-plan.org/imp2-decision"
-                  (cons 'FAIL "no Residual-stub disposition section"))
-          (let ((e1 (org-section plan-e "** E1"))
-                (e2 (org-section plan-e "** E2"))
-                (e3 (org-section plan-e "** E3")))
-            (check "m35/imp2/m35-plan.org/imp2-decision" #t
-                   (contains? plan-e "imp-2 decision"))
-            ;; E1 and E2 are prose sections.
-            (check "m35/imp2/m35-plan.org/e1/safe-run-hooks" #t
-                   (and (contains? e1 "=safe_run_hooks=")
-                        (contains? e1 "keep C")
-                        (contains? e1 "M36+")))
-            (check "m35/imp2/m35-plan.org/e2/gen-help-event" #t
-                   (and (contains? e2 "=gen_help_event=")
-                        (contains? e2 "keep C")
-                        (contains? e2 "M36+")))
-            ;; E3 is a table, one row per stub.
-            (check-stub-rows "m35/imp2/m35-plan.org/e3" e3
-                             stub-verdicts-e3)))))
-
-(define milestone (slurp (repo "milestone.org")))
-(cond
- ((not milestone)
-  (info "m35/imp2/milestone.org/skipped" "milestone.org absent (untracked)"))
- ((not (tracks-milestone? milestone "* M35"))
-  ;; milestone.org is the live tracker and holds only the current
-  ;; milestone (cr.org F1).  A later milestone rewrite drops the M35
-  ;; brief.  Pin it only while it still tracks M35; else skip.
-  (info "m35/imp2/milestone.org/skipped"
-        "milestone.org no longer tracks M35 (live tracker)"))
- (else
-  (let ((ms-exit (org-section milestone "** Exit criterion")))
-    (if (not ms-exit)
-        (report "m35/imp2/milestone.org/exit-3"
-                (cons 'FAIL "no Exit criterion section in milestone.org"))
-        (check "m35/imp2/milestone.org/exit-3" #t
-               (contains? ms-exit "Done (imp-2)."))))))

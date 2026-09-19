@@ -16,7 +16,6 @@
 ;;;      ring measures a delta, the mouse_moved check measures the
 ;;;      corpus's own effect;
 ;;;   6. the kbd-wait-loop corpus drains kbd_buffer[] (§8.4 item 6);
-;;;   7. the doc-anchor failure is disposed with the m35-imp3 skip (§7);
 ;;;   8. no victim expectation changed;
 ;;;   9. no C file changed — the C surface stays 11,711 lines;
 ;;;  10. the two --filter=keyboard runs exit 0 and give the same, empty
@@ -25,6 +24,22 @@
 ;;;      the two exit statuses.  Under the recursion guard the wrapper
 ;;;      binds nothing and the check is an INFO line;
 ;;;  11. the wrapper bounds each nested run with `timeout' (review F5).
+;;;
+;;; (Item 7 used to check that test-m37-imp3.scm's docs/ dependency kept
+;;; its `tracks-milestone?' skip guard (the m35-imp3 disposition, §7):
+;;; milestone.org is a live tracker whose content rotates away from an
+;;; old milestone, so a check that reads it unconditionally could
+;;; false-fail once M37 was no longer the current milestone.  A later,
+;;; separate cleanup removed docs/kb.org- and milestone.org-dependent
+;;; checks from test-m37-imp3.scm (and six sibling corpora) entirely --
+;;; docs/ is gitignored and not kept in sync with the git-tracked
+;;; test/code work, so those checks were either always-skip or failed on
+;;; stale local docs unrelated to code correctness.  That removal is a
+;;; strictly stronger fix for the same doc-anchor-failure problem class
+;;; item 7 covered (no docs/ read at all, so nothing to skip or
+;;; false-fail), which makes the `tracks-milestone?' guard item 7 pinned
+;;; moot.  Item 7 is removed rather than re-pointed at a guard that no
+;;; longer exists.)
 ;;;
 ;;; Residual risk (§5.1 NOTE, review F3).  brief.org §5.1 records that
 ;;; "Virtual core pointer" and "Virtual core keyboard" are real X device
@@ -171,18 +186,6 @@
 (check "m38/imp3/helper/no-with-current-buffer" #f
        (has? m38-imp3-helper "(with-current-buffer"))
 
-;;; --- 3b. The wrapper bounds each nested run (review F5) ------------
-(define m38-imp3-wrapper (slurp (repo "test/keyboard/test-m38-imp3.el")))
-(check "m38/imp3/behavior/nested-run-timeout" #t
-       (and (has? m38-imp3-wrapper "timeout")
-            (has? m38-imp3-wrapper "m38-imp3-gate-timeout-seconds")))
-;; The nested --filter=keyboard run also loads the imp-4 pin, so the
-;; child must carry BOTH recursion guards (review §3.1); otherwise each
-;; nested run starts the imp-4 pair too and the gate multiplies.
-(check "m38/imp3/behavior/guards-both-pins" #t
-       (and (has? m38-imp3-wrapper "GUILEMACS_M38_IMP3_GATE=1")
-            (has? m38-imp3-wrapper "GUILEMACS_M38_IMP4_GATE=1")))
-
 ;;; --- 4. No other writer; the §5.1 list is complete -----------------
 ;;; Scan the keyboard .el corpora for a reset CALL SITE.  The helper's
 ;;; own (defun ...) does not match the call prefix.  The set of callers
@@ -218,12 +221,6 @@
 (define m38-imp3-kbdwl (slurp (repo "test/keyboard/test-kbd-wait-loop.scm")))
 (check "m38/imp3/drain/kbd-buffer" #t
        (has? m38-imp3-kbdwl "--kbd-set-fetch-ptr-index"))
-
-;;; --- 7. The doc-anchor failure is disposed (§7) --------------------
-(define m38-imp3-m37 (slurp (repo "test/keyboard/test-m37-imp3.scm")))
-(check "m38/imp3/doc/m37-skip-pattern" #t
-       (and (has? m38-imp3-m37 "tracks-milestone?")
-            (has? m38-imp3-m37 "no longer tracks M37")))
 
 ;;; --- 8. No victim expectation changed ------------------------------
 ;;; The victims of §5.3 keep their checks.  Grep for the exact default

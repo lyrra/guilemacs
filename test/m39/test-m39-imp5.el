@@ -25,6 +25,8 @@
 
 (princ "=== m39 imp-5 close-out suite ===\n")
 
+(require 'imp-ert-report)
+
 (defvar m39-imp5--root
   (file-name-as-directory
    (expand-file-name "../.." (file-name-directory (or load-file-name
@@ -87,8 +89,7 @@
 (defun m39-imp5--check (name ok)
   "Report and register one check.  OK is a boolean."
   (princ (format "%s m39/imp5/%s\n" (if ok "PASS" "FAIL") name))
-  (eval `(ert-deftest ,(intern (format "m39-imp5/%s" name)) ()
-           (should ,ok))))
+  (imp-register-bool-as-ert-test (format "m39-imp5/%s" name) ok))
 
 ;;; --- 1. The Step 2 surface table, as the measured value --------------
 

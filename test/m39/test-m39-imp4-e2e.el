@@ -13,11 +13,13 @@
 
 (princ "=== m39 imp-4 (process signal family) e2e suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((pass 0)
        (fail 0)
        (check (lambda (name thunk)
                 (let ((res (condition-case err (funcall thunk) (error nil))))
-                  (eval `(ert-deftest ,(intern name) () (should ',res)))
+                  (imp-register-bool-as-ert-test name res)
                   (if res (setq pass (1+ pass)) (setq fail (1+ fail)))
                   (princ (format "%s %s\n" (if res "PASS" "FAIL") name))))))
   ;; The eight moved names still register as elisp functions.

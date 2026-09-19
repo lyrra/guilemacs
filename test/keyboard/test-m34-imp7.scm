@@ -18,9 +18,14 @@
 ;;;     timer_check, gobble_input, kbd_buffer_store_event, and
 ;;;     track-mouse each keep a live C caller.
 ;;;
-;;; The corpus also pins the anchored surface counts and the record in
-;;; the docs.  All checks read files, so the corpus needs no C entry
-;;; point and is batch-safe.
+;;; The corpus also pins the anchored surface counts.  All checks read
+;;; files, so the corpus needs no C entry point and is batch-safe.
+;;;
+;;; (This corpus used to also check docs/kb.org, docs/milestone-
+;;; overview.org, and milestone.org for a §M34 close-out record.  docs/
+;;; is gitignored and not kept in sync with the git-tracked test/code
+;;; work, so those checks either skipped or failed on stale local docs
+;;; unrelated to code correctness.  Removed.)
 ;;;
 ;;; The repo root is bound by the .el wrapper as %m34-root.
 ;;;
@@ -153,43 +158,6 @@ scm_c_public_ref.  This is the recorded brief.org Step-4 method:
         (let ((line (read-line port)))
           (if (eof-object? line) (reverse acc) (loop (cons line acc))))))))
 
-(define (stars line)
-  "Return the number of leading '*' characters in LINE."
-  (let loop ((i 0))
-    (if (and (< i (string-length line)) (char=? (string-ref line i) #\*))
-        (loop (1+ i)) i)))
-
-(define (heading-line? line)
-  "True when LINE is an org-mode heading: stars, then a space."
-  (let ((n (stars line)))
-    (and (> n 0)
-         (< n (string-length line))
-         (char=? (string-ref line n) #\space))))
-
-(define (org-section text heading)
-  "Return the org-mode section of TEXT introduced by the heading line
-that starts with HEADING, up to but not including the next heading line
-at the same or a shallower level.  Return #f when no such heading line
-is present.  Scoping a check to one section stops text from another
-milestone, or from a plan, from satisfying it."
-  (and (string? text)
-       (let* ((ls (split-lines text))
-              (level (stars heading))
-              (start (list-index (lambda (l) (string-prefix? heading l)) ls)))
-         (and start
-              (let loop ((i (1+ start)))
-                (cond
-                 ((>= i (length ls))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 ((and (heading-line? (list-ref ls i))
-                       (<= (stars (list-ref ls i)) level))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 (else (loop (1+ i)))))))))
-
 (define (line-with text needle)
   "Return the first line of TEXT that contains NEEDLE, or #f."
   (and (string? text)
@@ -200,15 +168,6 @@ milestone, or from a plan, from satisfying it."
                (cond ((eof-object? line) #f)
                      ((string-contains line needle) line)
                      (else (loop)))))))))
-
-(define (tracks-milestone? text tag)
-  "True when TEXT's first org heading starts with TAG, for example
-\"* M34\".  milestone.org is the live tracker and holds only the current
-milestone (cr.org F1).  This test lets a later milestone rewrite skip a
-historical check instead of failing it."
-  (and (string? text)
-       (let ((ls (split-lines text)))
-         (and (pair? ls) (string-prefix? tag (car ls))))))
 
 ;;; --- 0. The repo root must be known --------------------------------
 (if (not (defined? '%m34-root))
@@ -260,8 +219,7 @@ historical check instead of failing it."
        (contains-token? frame-c "not_single_kboard_state"))
 
 ;;; --- 4. Static: the kept stubs still have a live C caller ---------
-;;; Each keeps a caller outside the M34 files.  The name and the reason
-;;; are recorded in docs/kb.org ** M34 and milestone.org.
+;;; Each keeps a caller outside the M34 files.
 (if (not kbd)
     (report "m34/imp7/scan/keyboard.c-keep" (cons 'FAIL "missing"))
     (begin
@@ -347,57 +305,3 @@ historical check instead of failing it."
 (check "m34/imp7/run-tests.scm/registers-el" #t
        (and (contains? reg-line "\"test/keyboard/test-m34-imp7.el\"")
             (contains? reg-line "close-out")))
-
-;;; --- 7. Static: the accounting is recorded ------------------------
-;;; docs/ is untracked (.gitignore holds "docs"), so a fresh clone has
-;;; no kb.org and no milestone-overview.org.  When a doc file is absent,
-;;; print an INFO line instead of a FAIL: the check is skipped, not
-;;; failed.  Scope each check to its own section.
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m34/imp7/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m34 (org-section kb "** M34")))
-      (if (not kb-m34)
-          (report "m34/imp7/kb.org/status-closed"
-                  (cons 'FAIL "no ** M34 section in docs/kb.org"))
-          (begin
-            (check "m34/imp7/kb.org/status-closed" #t
-                   (contains? kb-m34 "status :: closed"))
-            (check "m34/imp7/kb.org/imp7-note" #t
-                   (contains? kb-m34 "imp-7 ("))))))
-
-(define overview (slurp (repo "docs/milestone-overview.org")))
-(if (not overview)
-    (info "m34/imp7/overview/skipped"
-          "docs/milestone-overview.org absent (untracked)")
-    (let ((ov-m34 (org-section overview "*** M34")))
-      (if (not ov-m34)
-          (report "m34/imp7/overview/m34-closed"
-                  (cons 'FAIL "no *** M34 section in the overview"))
-          (check "m34/imp7/overview/m34-closed" #t
-                 (contains? ov-m34 "CLOSED")))))
-
-(define milestone (slurp (repo "milestone.org")))
-(cond
- ((not milestone)
-  (info "m34/imp7/milestone.org/skipped" "milestone.org absent (untracked)"))
- ((not (tracks-milestone? milestone "* M34"))
-  ;; milestone.org is the live tracker and holds only the current
-  ;; milestone (cr.org F1).  A later milestone rewrite drops the M34
-  ;; brief.  Pin it only while it still tracks M34; else skip.
-  (info "m34/imp7/milestone.org/skipped"
-        "milestone.org no longer tracks M34 (live tracker)"))
- (else
-  (let ((ms-imp7 (org-section milestone "** Next commit brief")))
-    (if (not ms-imp7)
-        (report "m34/imp7/milestone.org/imp7"
-                (cons 'FAIL "no imp-7 section in milestone.org"))
-        (check "m34/imp7/milestone.org/imp7" #t
-               (contains? ms-imp7
-                          "test/keyboard/test-m34-imp7.{el,scm}"))))))

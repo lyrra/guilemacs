@@ -34,16 +34,17 @@
 ;;;       live Scheme caller at the recorded line, and (d) no C code
 ;;;       caller in any live buildable src/*.c file.  A shim with a
 ;;;       caller is not dead, so it stays.
-;;;    7. The records: docs/kb.org ** M37 carries the verdict.  Skip
-;;;       with an INFO line when the file is absent.
 ;;;    8. Registration: tool/run-tests.scm names
 ;;;       test/keyboard/test-m37-imp2.el in the keyboard group, after
 ;;;       the m37-imp1 row.
 ;;;    9. Drift guard: the sibling corpora (M34 imp-7, M36 imp-1) still
 ;;;       carry their anchors.
 ;;;
-;;; The docs/ checks read untracked files.  When a doc file is absent,
-;;; the check prints an INFO line and skips; it does not fail.
+;;; (Item 7 used to check that docs/kb.org's ** M37 section carried the
+;;; ring verdict.  docs/ is gitignored and not kept in sync with the
+;;; git-tracked test/code work, so the check either skipped or failed on
+;;; stale local docs unrelated to code correctness.  Removed; the
+;;; verdict itself is still pinned by item 3 above.)
 ;;;
 ;;; All checks read files, so the corpus needs no C entry point and is
 ;;; batch-safe.  The repo root is bound by the .el wrapper as %m37-root.
@@ -452,27 +453,6 @@ starts with HEADING, up to the next same-or-shallower heading."
 (check "m37/imp2/shim/negative/missing-module" #f
        (and (slurp (repo "mod/emacs/no-such-module.scm"))
             #t))
-
-;;; --- 7. The records: docs/kb.org ** M37 (untracked) ---------------
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m37/imp2/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m37 (org-section kb "** M37")))
-      (if (not kb-m37)
-          (report "m37/imp2/kb.org/section" (cons 'FAIL "no ** M37 section"))
-          (begin
-            (check "m37/imp2/kb.org/verdict-stays-c" #t
-                   (contains? kb-m37 "stays C"))
-            (check "m37/imp2/kb.org/seven-consumers" #t
-                   (and kb-m37 (contains? kb-m37 "x_find_monitors_changed_event")))
-            (check "m37/imp2/kb.org/emacs-drain" #t
-                   (and kb-m37 (contains? kb-m37 "2829")))))))
 
 ;;; --- 8. Static: registered in the keyboard group ------------------
 (define run-tests (slurp (repo "tool/run-tests.scm")))

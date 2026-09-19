@@ -13,13 +13,15 @@
 
 (princ "=== m39 imp-3 (process Group A accessors) e2e suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((pipe (condition-case err
                  (make-pipe-process :name "m39-imp3-pipe" :noquery t)
                (error nil)))
        (made (processp pipe))
        (pass 0)
        (fail 0))
-  (eval `(ert-deftest m39-imp3/e2e/make-pipe-process () (should ',made)))
+  (imp-register-bool-as-ert-test "m39-imp3/e2e/make-pipe-process" made)
   (if made (setq pass (1+ pass)) (setq fail (1+ fail)))
   (princ (format "%s m39-imp3/e2e/make-pipe-process\n"
                  (if made "PASS" "FAIL")))
@@ -52,7 +54,7 @@
                       (lambda () (symbolp (process-status pipe))))))
       (let* ((name (car c))
              (res (condition-case err (funcall (cdr c)) (error nil))))
-        (eval `(ert-deftest ,(intern name) () (should ',res)))
+        (imp-register-bool-as-ert-test name res)
         (if res (setq pass (1+ pass)) (setq fail (1+ fail)))
         (princ (format "%s %s\n" (if res "PASS" "FAIL") name))))
     (ignore-errors (delete-process pipe)))

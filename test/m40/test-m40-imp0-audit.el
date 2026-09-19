@@ -23,6 +23,8 @@
 
 (princ "=== m40 imp-0 audit suite ===\n")
 
+(require 'imp-ert-report)
+
 (defvar m40-imp0--root
   (file-name-as-directory
    (expand-file-name "../.." (file-name-directory (or load-file-name
@@ -65,8 +67,7 @@
 (defun m40-imp0--check (name ok)
   "Report and register one check.  OK is a boolean."
   (princ (format "%s m40/imp0/%s\n" (if ok "PASS" "FAIL") name))
-  (eval `(ert-deftest ,(intern (format "m40-imp0/%s" name)) ()
-           (should ,ok))))
+  (imp-register-bool-as-ert-test (format "m40-imp0/%s" name) ok))
 
 ;;; --- 1. docs/m40-plan.org: the base, the target, the choice ----------
 

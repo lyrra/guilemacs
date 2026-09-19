@@ -34,9 +34,12 @@
 ;;;       anchors.  The m36 and keyboard gates prove live greenness.
 ;;;   10. The two live comment anchors stay current: src/xdisp.c:582 and
 ;;;       src/keyboard.c:3896.
-;;;   11. The accounting: docs/kb.org ** M36, docs/milestone-overview.org
-;;;       §M36, and milestone.org.  docs/ is untracked, so an absent doc
-;;;       prints an INFO line and skips the check, it does not fail it.
+;;;
+;;; (Item 11 used to check docs/kb.org's ** M36 section, docs/
+;;; milestone-overview.org's §M36, and milestone.org for a close-out
+;;; record.  docs/ is gitignored and not kept in sync with the
+;;; git-tracked test/code work, so those checks either skipped or
+;;; failed on stale local docs unrelated to code correctness.  Removed.)
 ;;;
 ;;; All checks read files, so the corpus needs no C entry point and is
 ;;; batch-safe.
@@ -253,83 +256,6 @@ is scanned too (cr.org F5): a lone definition does not count as a caller."
                   (string-append (substring s start i)
                                  (if (string=? acc "") "" ",")
                                  acc)))))))
-
-;;; --- doc helpers (m35 imp-3 corpus) -------------------------------
-(define (paragraphs text)
-  "Split TEXT into paragraphs: each is a list of consecutive non-blank
-lines.  A blank line separates paragraphs."
-  (if (not (string? text))
-      '()
-      (let loop ((lines (split-lines text)) (cur '()) (acc '()))
-        (cond ((null? lines)
-               (reverse (if (null? cur) acc (cons (reverse cur) acc))))
-              ((string-null? (string-trim (car lines)))
-               (loop (cdr lines) '() (if (null? cur) acc (cons (reverse cur) acc))))
-              (else (loop (cdr lines) (cons (car lines) cur) acc))))))
-
-(define (paragraph-naming text token)
-  "Return the first paragraph of TEXT that contains TOKEN, joined with
-newlines, or #f.  A value must sit in the paragraph that names the
-metric, not merely anywhere in the section."
-  (let loop ((ps (paragraphs text)))
-    (cond ((null? ps) #f)
-          ((string-contains (string-join (car ps) "\n") token)
-           (string-join (car ps) "\n"))
-          (else (loop (cdr ps))))))
-
-(define (doc-metric label section key name value)
-  "Check that some paragraph of SECTION names NAME and also holds VALUE.
-A value must sit in the paragraph that names the metric, so a value in
-unrelated prose does not pass (cr.org F2).  All paragraphs are searched,
-because a section may record a start state and a close-out state, and the
-close-out value must appear in a paragraph that names the metric."
-  (check (string-append label "/" key) #t
-         (and (string? section)
-              (any (lambda (p)
-                     (let ((s (string-join p "\n")))
-                       (and (string-contains s name)
-                            (string-contains s value))))
-                   (paragraphs section))
-              #t)))
-
-(define (stars line)
-  (let loop ((i 0))
-    (if (and (< i (string-length line)) (char=? (string-ref line i) #\*))
-        (loop (1+ i)) i)))
-
-(define (heading-line? line)
-  (let ((n (stars line)))
-    (and (> n 0)
-         (< n (string-length line))
-         (char=? (string-ref line n) #\space))))
-
-(define (org-section text heading)
-  "Return the org-mode section of TEXT introduced by the heading line
-that starts with HEADING, up to the next heading at the same or a
-shallower level.  Return #f when the heading is absent."
-  (and (string? text)
-       (let* ((ls (split-lines text))
-              (level (stars heading))
-              (start (list-index (lambda (l) (string-prefix? heading l)) ls)))
-         (and start
-              (let loop ((i (1+ start)))
-                (cond
-                 ((>= i (length ls))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 ((and (heading-line? (list-ref ls i))
-                       (<= (stars (list-ref ls i)) level))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 (else (loop (1+ i)))))))))
-
-(define (tracks-milestone? text tag)
-  "True when TEXT's first org heading starts with TAG."
-  (and (string? text)
-       (let ((ls (split-lines text)))
-         (and (pair? ls) (string-prefix? tag (car ls))))))
 
 ;;; --- 0. The repo root must be known --------------------------------
 (if (not (defined? '%m36-root))
@@ -562,69 +488,3 @@ shallower level.  Return #f when the heading is absent."
        (contains? (line-n xdisp-c 582) "(src/xdisp.c:27788, :28574)"))
 (check "m36/imp5/guard/keyboard.c:3896" #t
        (contains? (line-n kbd 3896) "(term.c:3595)"))
-
-;;; --- 10. The accounting --------------------------------------------
-;;; docs/ is untracked, so a fresh clone has no kb.org and no
-;;; milestone-overview.org.  When a doc file is absent, print an INFO
-;;; line; do not fail.
-(define (doc-records-close-out label section)
-  (doc-metric label section "keyboard.c-lines" "keyboard.c" "11,221")
-  (doc-metric label section "keyboard-globals.c-lines" "keyboard-globals.c" "490")
-  (doc-metric label section "combined-lines" "keyboard-globals.c" "11,711")
-  (doc-metric label section "scm-c-public-ref-sites" "scm_c_public_ref" "159"))
-
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m36/imp5/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m36 (org-section kb "** M36")))
-      (if (not kb-m36)
-          (report "m36/imp5/kb.org/status-closed"
-                  (cons 'FAIL "no ** M36 section in docs/kb.org"))
-          (begin
-            (check "m36/imp5/kb.org/status-closed" #t
-                   (contains? kb-m36 "status :: closed"))
-            (check "m36/imp5/kb.org/imp5-landing" #t
-                   (contains? kb-m36 "imp-5 landing"))
-            (doc-records-close-out "m36/imp5/kb.org/count" kb-m36)))))
-
-(define overview (slurp (repo "docs/milestone-overview-closed.org")))
-(if (not overview)
-    (info "m36/imp5/overview/skipped"
-          "docs/milestone-overview-closed.org absent (untracked)")
-    (let ((ov-m36 (org-section overview "*** M36")))
-      (if (not ov-m36)
-          (report "m36/imp5/overview/m36-closed"
-                  (cons 'FAIL "no *** M36 section in the overview"))
-          (begin
-            (check "m36/imp5/overview/m36-closed" #t
-                   (contains? ov-m36 "CLOSED"))
-            (doc-records-close-out "m36/imp5/overview/count" ov-m36)))))
-
-(define milestone (slurp (repo "milestone.org")))
-(cond
- ((not milestone)
-  (info "m36/imp5/milestone.org/skipped" "milestone.org absent (untracked)"))
- ((not (tracks-milestone? milestone "* M36"))
-  (info "m36/imp5/milestone.org/skipped"
-        "milestone.org no longer tracks M36 (live tracker)"))
- (else
-  (let ((ms-status (org-section milestone "** Status"))
-        (ms-imps (org-section milestone "** Imps")))
-    (check "m36/imp5/milestone.org/status-closed" #t
-           (and (contains? ms-status "closed")
-                (contains? ms-status "imp-5")))
-    (check "m36/imp5/milestone.org/imp5-done" #t
-           (and (contains? ms-imps "imp-5")
-                (contains? ms-imps "DONE")))
-    ;; cr.org F2: the out-of-scope note must cite keyboard.c:9218 and
-    ;; must not claim a live C caller.
-    (check "m36/imp5/milestone.org/detect-ignore-9218" #t
-           (contains? milestone "keyboard.c:9218"))
-    (check "m36/imp5/milestone.org/detect-ignore-no-c-caller-claim" #f
-           (contains? milestone "keyboard.c:9257")))))

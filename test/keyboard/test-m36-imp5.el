@@ -20,6 +20,8 @@
 
 (princ "=== m36 imp-5 (close-out) test suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m36-imp5.scm" dir))
@@ -53,15 +55,13 @@
              (ok (eq status 'PASS)))
         (cond
          (ok
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"

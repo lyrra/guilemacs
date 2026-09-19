@@ -19,6 +19,8 @@
 
 (princ "=== m33 imp-4 (xterm.c input test + 2 name readers) test suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m33-imp4.scm" dir))
@@ -52,15 +54,13 @@
              (ok (eq status 'PASS)))
         (cond
          (ok
-          (eval `(ert-deftest ,(intern (format "m33-imp4/%s" name)) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test (format "m33-imp4/%s" name) status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern (format "m33-imp4/%s" name)) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test (format "m33-imp4/%s" name) status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"

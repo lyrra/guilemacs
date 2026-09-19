@@ -94,43 +94,6 @@ count -- a loose substring match would also count a comment line."
         (let ((line (read-line port)))
           (if (eof-object? line) (reverse acc) (loop (cons line acc))))))))
 
-(define (stars line)
-  "Return the number of leading '*' characters in LINE."
-  (let loop ((i 0))
-    (if (and (< i (string-length line)) (char=? (string-ref line i) #\*))
-        (loop (1+ i)) i)))
-
-(define (heading-line? line)
-  "True when LINE is an org-mode heading: stars, then a space."
-  (let ((n (stars line)))
-    (and (> n 0)
-         (< n (string-length line))
-         (char=? (string-ref line n) #\space))))
-
-(define (org-section text heading)
-  "Return the org-mode section of TEXT introduced by the heading line
-that starts with HEADING, up to but not including the next heading line
-at the same or a shallower level.  Return #f when no such heading line
-is present.  Scoping a check to one section stops text from another
-milestone, or from a plan, from satisfying it."
-  (and (string? text)
-       (let* ((ls (split-lines text))
-              (level (stars heading))
-              (start (list-index (lambda (l) (string-prefix? heading l)) ls)))
-         (and start
-              (let loop ((i (1+ start)))
-                (cond
-                 ((>= i (length ls))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 ((and (heading-line? (list-ref ls i))
-                       (<= (stars (list-ref ls i)) level))
-                  (string-concatenate
-                   (map (lambda (l) (string-append l "\n"))
-                        (list-head (list-tail ls start) (- i start)))))
-                 (else (loop (1+ i)))))))))
-
 (define (line-with text needle)
   "Return the first line of TEXT that contains NEEDLE, or #f."
   (and (string? text)
@@ -141,15 +104,6 @@ milestone, or from a plan, from satisfying it."
                (cond ((eof-object? line) #f)
                      ((string-contains line needle) line)
                      (else (loop)))))))))
-
-(define (tracks-milestone? text tag)
-  "True when TEXT's first org heading starts with TAG, for example
-\"* M33\".  milestone.org is the live tracker and holds only the current
-milestone (cr.org F1).  This test lets a later milestone rewrite skip a
-historical check instead of failing it."
-  (and (string? text)
-       (let ((ls (split-lines text)))
-         (and (pair? ls) (string-prefix? tag (car ls))))))
 
 ;;; --- 0. The repo root must be known --------------------------------
 (if (not (defined? '%m33-root))
@@ -310,65 +264,10 @@ historical check instead of failing it."
        (and (contains? reg-line "\"test/keyboard/test-m33-imp7.el\"")
             (contains? reg-line "close-out audit")))
 
-;;; --- 10. Static: the accounting is recorded ------------------------
-;;; Job 4 records the close-out.  Each check is scoped to its section
-;;; only: a whole-file search is satisfied by text from another
-;;; milestone, or from a plan, so it cannot prove the M33 record
-;;; (cr.org F1).
-;;;
-;;; docs/ is untracked (.gitignore holds "docs"), so a fresh clone has
-;;; no kb.org and no milestone-overview.org.  When a doc file is absent,
-;;; print an INFO line instead of a FAIL: the check is skipped, not
-;;; failed (cr.org F4).
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m33/imp7/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m33 (org-section kb "** M33")))
-      (if (not kb-m33)
-          (report "m33/imp7/kb.org/status-closed"
-                  (cons 'FAIL "no ** M33 section in docs/kb.org"))
-          (begin
-            (check "m33/imp7/kb.org/status-closed" #t
-                   (contains? kb-m33 "status :: closed"))
-            (check "m33/imp7/kb.org/imp7-note" #t
-                   (contains? kb-m33 "imp-7 (2026-09-13; the close-out"))))))
-
-(define overview (slurp (repo "docs/milestone-overview-closed.org")))
-(if (not overview)
-    (info "m33/imp7/overview/skipped"
-          "docs/milestone-overview-closed.org absent (untracked)")
-    (let ((ov-m33 (org-section overview "*** M33")))
-      (if (not ov-m33)
-          (report "m33/imp7/overview/m33-closed"
-                  (cons 'FAIL "no *** M33 section in the overview"))
-          (begin
-            (check "m33/imp7/overview/m33-closed" #t
-                   (contains? ov-m33
-                              "terminal read path + help/menu (CLOSED 2026-09-13"))
-            (check "m33/imp7/overview/swallow-events-correction" #t
-                   (contains? ov-m33 "swallow_events= has *no* M33-file"))))))
-
-(define milestone (slurp (repo "milestone.org")))
-(cond
- ((not milestone)
-  (info "m33/imp7/milestone.org/skipped" "milestone.org absent (untracked)"))
- ((not (tracks-milestone? milestone "* M33"))
-  ;; milestone.org is the live tracker and holds only the current
-  ;; milestone (cr.org F1).  A later milestone rewrite drops the M33
-  ;; brief.  Pin it only while it still tracks M33; else skip.
-  (info "m33/imp7/milestone.org/skipped"
-        "milestone.org no longer tracks M33 (live tracker)"))
- (else
-  (let ((ms-imp7 (org-section milestone "** imp-7")))
-    (if (not ms-imp7)
-        (report "m33/imp7/milestone.org/imp7"
-                (cons 'FAIL "no ** imp-7 section in milestone.org"))
-        (check "m33/imp7/milestone.org/imp7" #t
-               (contains? ms-imp7
-                          "test/keyboard/test-m33-imp7.{el,scm}"))))))
+;;; (Job 4 -- the close-out accounting -- used to check docs/kb.org's
+;;; ** M33 section, docs/milestone-overview.org's §M33, and
+;;; milestone.org's imp-7 section for a matching close-out record.
+;;; docs/ is gitignored and not kept in sync with the git-tracked
+;;; test/code work, so those checks either skipped or failed on stale
+;;; local docs unrelated to code correctness.  Removed; the retirement
+;;; and count claims themselves are still pinned by items 1-8 above.)

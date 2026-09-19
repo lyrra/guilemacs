@@ -121,8 +121,14 @@ comment mention of the same text is not."
 ;;; wrapper must register each ERT test under the bare name.  A
 ;;; second "m35-imp1/" prefix would make the ERT name
 ;;; "m35-imp1/m35/imp1/...".  This pins that form.
+;;;
+;;; The registration call used to be a literal `(intern name)' inside
+;;; an `(eval \`(ert-deftest ...))' at each call site; that was replaced
+;;; by a plain call to the shared `imp-register-check-as-ert-test'
+;;; helper (test/imp-ert-report.el), which takes NAME bare -- so the
+;;; anchor is now the helper call, not the old `intern' text.
 (define wrapper (slurp (repo "test/keyboard/test-m35-imp1.el")))
 (check "m35/imp1/wrapper/ert-name-bare" #t
-       (contains? wrapper "(intern name)"))
+       (contains? wrapper "(imp-register-check-as-ert-test name status)"))
 (check "m35/imp1/wrapper/no-double-prefix" #f
-       (contains? wrapper "(intern (format \"m35-imp1/%s\" name))"))
+       (contains? wrapper "(format \"m35-imp1/%s\" name)"))

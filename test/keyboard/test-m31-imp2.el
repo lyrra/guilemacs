@@ -16,6 +16,8 @@
 
 (princ "=== m31 imp-2 (SIGDANGER arm + auto-save-interval to Scheme) test suite ===\n")
 
+(require 'imp-ert-report)
+
 ;; The corpus emits one (NAME STATUS) pair per check.  A corpus FAIL, a
 ;; corpus load error and a readback error must all surface as a real
 ;; FAIL -- never as a silent "0 failed".  Each pair also becomes an ERT
@@ -53,8 +55,7 @@
              (status (cadr result))
              (ok (eq status 'PASS)))
         ;; Define the ERT test so the harness metric sees it.
-        (eval `(ert-deftest ,(intern (format "m31-imp2/%s" name)) ()
-                 (should (eq ',status 'PASS))))
+        (imp-register-check-as-ert-test (format "m31-imp2/%s" name) status)
         (if ok
             (progn
               (setq pass (1+ pass))

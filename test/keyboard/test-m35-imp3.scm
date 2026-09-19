@@ -8,10 +8,6 @@
 ;;;
 ;;; Seven checks (brief.org §5.2):
 ;;;
-;;;   1. The anchored counts.  Read src/keyboard.c and
-;;;      src/keyboard-globals.c with the brief.org §3 method.  Assert
-;;;      each value equals the value recorded in docs/kb.org ** M35 and
-;;;      milestone.org §M35.
 ;;;   2. The budget.  Assert combined <= 11,960.  Print the margin as
 ;;;      INFO.
 ;;;   3. The three M34 retirements stay gone: safe_run_hooks_2,
@@ -25,19 +21,12 @@
 ;;;   5. The kbd_buffer_store_event census.  Assert 15 caller files (14
 ;;;      buildable + 1 NS = nsterm.m).  This is the imp-0 correction to
 ;;;      the earlier "16".
-;;;   6. The accounting rows exist.  Assert that docs/kb.org ** M35 holds
-;;;      status :: closed, that docs/milestone-overview.org §M35 says
-;;;      CLOSED, and that milestone.org marks imp-3 done.
 ;;;   7. The guard test of imp-1 stays correct.  Keep the two comment
 ;;;      anchors current: src/xdisp.c:582 and src/keyboard.c:3927.
 ;;;
 ;;; Each check reads the name and the value that it pins.  A single
 ;;; prose phrase is not enough.  A dropped row, a wrong count, or a
 ;;; wrong verdict fails the check.
-;;;
-;;; docs/ is untracked (.gitignore holds "docs"), so a fresh clone has
-;;; no kb.org and no milestone-overview.org.  When a doc file is absent,
-;;; an INFO line is printed and the check is skipped, not failed.
 ;;;
 ;;; All checks read files, so the corpus needs no C entry point and is
 ;;; batch-safe.
@@ -473,10 +462,6 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
        (contains? run-tests "\"test/keyboard/test-m35-imp1.el\""))
 
 ;;; --- 8. Static: the accounting is recorded ------------------------
-;;; docs/ is untracked, so a fresh clone has no kb.org and no
-;;; milestone-overview.org.  When a doc file is absent, print an INFO
-;;; line instead of a FAIL: the check is skipped, not failed.
-;;;
 ;;; The counts check (brief.org §5.2 item 1): each value recorded in the
 ;;; doc must equal the M35 close-out value.  The M35 record is history:
 ;;; later milestones move the live tree (cr.org G1).  M36 imp-1 moved
@@ -512,61 +497,6 @@ name-plus-value check, stronger than a whole-section substring match
               "keyboard-globals.c" m35-combined-lines)
   (doc-metric label section "scm-c-public-ref-sites"
               "scm_c_public_ref" m35-scp-sites))
-
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m35/imp3/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m35 (org-section kb "** M35")))
-      (if (not kb-m35)
-          (report "m35/imp3/kb.org/status-closed"
-                  (cons 'FAIL "no ** M35 section in docs/kb.org"))
-          (begin
-            (check "m35/imp3/kb.org/status-closed" #t
-                   (contains? kb-m35 "status :: closed"))
-            (check "m35/imp3/kb.org/imp3-record" #t
-                   (contains? kb-m35 "imp-3 ("))
-            (doc-records-counts "m35/imp3/kb.org/count" kb-m35)))))
-
-(define overview (slurp (repo "docs/milestone-overview-closed.org")))
-(if (not overview)
-    (info "m35/imp3/overview/skipped"
-          "docs/milestone-overview-closed.org absent (untracked)")
-    (let ((ov-m35 (org-section overview "*** M35")))
-      (if (not ov-m35)
-          (report "m35/imp3/overview/m35-closed"
-                  (cons 'FAIL "no *** M35 section in the overview"))
-          (begin
-            (check "m35/imp3/overview/m35-closed" #t
-                   (contains? ov-m35 "CLOSED"))
-            (doc-records-counts "m35/imp3/overview/count" ov-m35)))))
-
-(define milestone (slurp (repo "milestone.org")))
-(cond
- ((not milestone)
-  (info "m35/imp3/milestone.org/skipped" "milestone.org absent (untracked)"))
- ((not (tracks-milestone? milestone "* M35"))
-  ;; milestone.org is the live tracker and holds only the current
-  ;; milestone.  A later milestone rewrite drops the M35 brief.  Pin it
-  ;; only while it still tracks M35; else skip.
-  (info "m35/imp3/milestone.org/skipped"
-        "milestone.org no longer tracks M35 (live tracker)"))
- (else
-  (let ((ms-status (org-section milestone "** Status"))
-        (ms-imps (org-section milestone "** Imps"))
-        (ms-stands (org-section milestone "** Where the port stands")))
-    (check "m35/imp3/milestone.org/status-closed" #t
-           (and (contains? ms-status "closed")
-                (contains? ms-status "imp-3")))
-    (check "m35/imp3/milestone.org/imp3-done" #t
-           (and (contains? ms-imps "imp-3")
-                (contains? ms-imps "DONE")))
-    (doc-records-counts "m35/imp3/milestone.org/count" ms-stands))))
 
 ;;; --- 9. Self-test of the name-plus-value matcher ------------------
 ;;; The cr.org F2 fix: the doc count check reads the name and the value

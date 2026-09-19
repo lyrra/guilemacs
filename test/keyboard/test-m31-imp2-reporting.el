@@ -17,6 +17,8 @@
 
 (princ "=== m31 imp-2 reporting guards test suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m31-imp2-reporting.scm" dir))
@@ -49,8 +51,7 @@
              (status (cadr result))
              (ok (eq status 'PASS)))
         ;; Define the ERT test so the harness metric sees it.
-        (eval `(ert-deftest ,(intern (format "m31-imp2r/%s" name)) ()
-                 (should (eq ',status 'PASS))))
+        (imp-register-check-as-ert-test (format "m31-imp2r/%s" name) status)
         (if ok
             (progn
               (setq pass (1+ pass))

@@ -1,7 +1,5 @@
 ;;; test-m35-imp3.el --- M35 imp-3 (close-out) suite.
 ;;;
-;;; Pins the M35 imp-3 close-out (brief.org): the anchored surface
-;;; counts match the records in docs/kb.org and milestone.org, the
 ;;; combined surface is under the 11,960 budget, the three M34
 ;;; retirements stay gone, the nine residual stubs keep a live
 ;;; buildable C caller, the kbd_buffer_store_event census is 15 caller
@@ -18,6 +16,8 @@
 ;;; FAIL (never a silent 0 failed).
 
 (princ "=== m35 imp-3 (close-out) test suite ===\n")
+
+(require 'imp-ert-report)
 
 ;; The corpus emits one (NAME STATUS) pair per check.  A corpus FAIL, a
 ;; corpus load error and a readback error must all surface as a real
@@ -60,16 +60,14 @@
           ;; Define the ERT test so the harness metric sees it.
           ;; The corpus name is already namespaced (m35/imp3/...), so use
           ;; it verbatim; do not prepend a second m35-imp3/ prefix.
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           ;; Informational (printed, not asserted): counts.
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"

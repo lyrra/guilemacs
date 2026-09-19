@@ -68,8 +68,7 @@
 
 ;; Pick a directory we can actually write to at runtime, so the test
 ;; still runs in sandboxes that block /tmp.  Prefer $TMPDIR, then /tmp,
-;; then the current working directory (test/ under tool/run-tests.sh,
-;; the repo root under run-all-tests.el).  Probes each candidate by
+;; then the current working directory.  Probes each candidate by
 ;; creating+deleting a file; returns #f if none is writable.
 (define (writable-temp-dir)
   (let ((candidates (append (if (getenv "TMPDIR")

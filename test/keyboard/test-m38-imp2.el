@@ -5,13 +5,19 @@
 ;;; so the HAVE_NS doc comment (added by M36 imp-4) is not a hit, and the
 ;;; match is strict (whole C identifier).  No C file changes.
 ;;;
-;;; Two parts:
-;;;   * Behavior checks (this file).  Run the real harness with
-;;;     --filter=m29-imp5 and --filter=m29-imp6.  Each must exit exactly 0
-;;;     (brief.org gate commands).  This proves exit criterion 4.
-;;;   * Source checks (test/keyboard/test-m38-imp2.scm).  Prove the
-;;;     stripper rules, the positive/negative controls, the strict match,
-;;;     and the clean src/keyboard.c.
+;;; Source checks only (test/keyboard/test-m38-imp2.scm).  Prove the
+;;; stripper rules, the positive/negative controls, the strict match, and
+;;; the clean src/keyboard.c.
+;;;
+;;; This file used to also run a *behavior* check: shell out to
+;;; tool/run-tests.sh --filter=m29-imp5 and --filter=m29-imp6 via
+;;; call-process, to prove those filters exit 0 for real.  That nested
+;;; run-tests.sh-inside-run-tests.sh recursion made any batch including
+;;; this file re-run chunks of the suite as a subprocess -- slow, and
+;;; combined with the similar (much larger, --filter=keyboard) recursion
+;;; in test-m38-imp3/4.el, was mistaken for a hang.  Removed; run
+;;; ./tool/run-tests.sh --filter=m29-imp5 (and m29-imp6) by hand if this
+;;; needs re-proving.
 ;;;
 ;;; The .scm corpus is loaded via primitive-load with the repo root bound
 ;;; as %m38-root.  Each (NAME PASS|FAIL) pair is reported via princ AND
@@ -22,27 +28,12 @@
 
 (princ "=== m38 imp-2 (comment-blind dropped-token scan) test suite ===\n")
 
+(require 'imp-ert-report)
+
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
        (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m38-imp2.scm" dir))
        (load-error nil))
-  ;; --- Behavior checks: the two m29 filters must exit EXACTLY 0.  The
-  ;; error message D2 produced is gone, so the harness is green.
-  (dolist (filter '("m29-imp5" "m29-imp6"))
-    (let* ((log (make-temp-file (format "m38-imp2-%s-" filter)))
-           (status
-            (condition-case nil
-                (call-process
-                 "sh" nil nil nil "-c"
-                 (format "cd %S && ./tool/run-tests.sh --filter=%s >%S 2>&1"
-                         root filter log))
-              (error nil))))
-      (when (file-exists-p log) (delete-file log))
-      (eval `(ert-deftest ,(intern (format "m38-imp2/behavior/%s-exits-0"
-                                           filter)) ()
-               (should (eql ,status 0))))))
-
-  ;; --- Source checks: the stripper rules and the scan shape.
   ;; The corpus reads the source tree, so tell it where the root is.
   (eval-scheme (format "(define %%m38-root %S)" root))
   (condition-case err
@@ -72,15 +63,13 @@
              (ok (eq status 'PASS)))
         (cond
          (ok
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"

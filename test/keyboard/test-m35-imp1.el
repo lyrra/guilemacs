@@ -23,6 +23,8 @@
 
 (princ "=== m35 imp-1 (two reclaimed comment anchors) test suite ===\n")
 
+(require 'imp-ert-report)
+
 ;; The corpus emits one (NAME STATUS) pair per check.  A corpus FAIL, a
 ;; corpus load error and a readback error must all surface as a real
 ;; FAIL -- never as a silent "0 failed".  Each PASS/FAIL pair also
@@ -64,16 +66,14 @@
           ;; Define the ERT test so the harness metric sees it.
           ;; The corpus name is already namespaced (m35/imp1/...), so use
           ;; it verbatim; do not prepend a second m35-imp1/ prefix.
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq pass (1+ pass))
           (princ (format "PASS %s\n" name)))
          ((and (consp status) (eq (car status) 'INFO))
           ;; Informational (printed, not asserted): counts.
           (princ (format "INFO %s %s\n" name (cadr status))))
          (t
-          (eval `(ert-deftest ,(intern name) ()
-                   (should (eq ',status 'PASS))))
+          (imp-register-check-as-ert-test name status)
           (setq fail (1+ fail))
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"

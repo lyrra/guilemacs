@@ -37,14 +37,13 @@
 ;;;    7. Registration: tool/run-tests.scm names
 ;;;       test/keyboard/test-m37-imp3.el in the keyboard group, after
 ;;;       the m37-imp2 row.
-;;;    8. The accounting: docs/kb.org ** M37 carries the imp-3
-;;;       close-out, the close-out hash, the status line, and the
-;;;       recorded gate result.  Skip with an INFO line when absent.
 ;;;    9. Drift guard: the sibling corpora (M37 imp-1, M37 imp-2) still
 ;;;       carry their anchors.
 ;;;
-;;; The docs/ checks read untracked files.  When a doc file is absent,
-;;; the check prints an INFO line and skips; it does not fail.
+;;; (Item 8 used to check that docs/kb.org's ** M37 section carried the
+;;; imp-3 close-out record.  docs/ is gitignored and not kept in sync
+;;; with the git-tracked test/code work, so the check either skipped or
+;;; failed on stale local docs unrelated to code correctness.  Removed.)
 ;;;
 ;;; All checks read files, so the corpus needs no C entry point and is
 ;;; batch-safe.  The repo root is bound by the .el wrapper as %m37-root.
@@ -558,86 +557,6 @@ DEFUN name string (cr.org F7).  For example
                    (< reg-idx kg-end))))
   (check "m37/imp3/run-tests.scm/after-imp2-row" #t
          (and imp2-idx reg-idx (< imp2-idx reg-idx))))
-
-;;; --- 8. The accounting: docs/kb.org ** M37 (untracked) ------------
-;;; The close-out record must carry the close-out hash, the status line,
-;;; and the real gate result (cr.org F6).  A substring-only scan would
-;;; pass while the numbers and the status field were wrong.
-;; cr.org F1: docs/kb.org is now the reduced ontology knowledge base (the
-;; kb2 reduction).  It holds no per-milestone historical detail, only the
-;; reduction's self-links.  Treat the reduced record like an absent doc
-;; file: skip the historical pins, do not fail them.
-(define kb (let ((f (slurp (repo "docs/kb.org"))))
-             (if (and f (string-contains f "Historical detail: [[file:kb.org::"))
-                 #f f)))
-(if (not kb)
-    (info "m37/imp3/kb.org/skipped" "docs/kb.org absent or reduced (cr.org F1)")
-    (let ((kb-m37 (org-section kb "** M37")))
-      (if (not kb-m37)
-          (report "m37/imp3/kb.org/section" (cons 'FAIL "no ** M37 section"))
-          (begin
-            (check "m37/imp3/kb.org/close-out-recorded" #t
-                   (contains? kb-m37 "imp-3 close-out"))
-            (check "m37/imp3/kb.org/verdict-stays-c" #t
-                   (contains? kb-m37 "stays C"))
-            (check "m37/imp3/kb.org/remnant-named" #t
-                   (contains? kb-m37 "kbd_buffer_store_event"))
-            ;; F5: the entry itself (not just the paragraph) must be closed.
-            (check "m37/imp3/kb.org/status-closed" #t
-                   (contains? kb-m37 "status :: closed"))
-            (check "m37/imp3/kb.org/summary-closed" #t
-                   (contains? kb-m37 "CLOSED (imp-3 close-out"))
-            ;; F6: pin the close-out hash.
-            (check "m37/imp3/kb.org/close-out-hash" #t
-                   (contains? kb-m37 "973983f"))
-            ;; F1/F2: the gate is not green, and the deterministic ERT
-            ;; failures are named as real failures, not as hidden noise.
-            (check "m37/imp3/kb.org/gate-not-green" #t
-                   (contains? kb-m37 "not green"))
-            (check "m37/imp3/kb.org/ert-failures-named" #t
-                   (and (contains? kb-m37 "m29-imp5/kbd:no-dropped-token")
-                        (contains? kb-m37 "m29-imp6/kbd:no-dropped-token")))
-            ;; F3/F4: the order-dependent leak set, and the no-owner verdict.
-            (check "m37/imp3/kb.org/leak-device-named" #t
-                   (contains? kb-m37 "last-event-device"))
-            (check "m37/imp3/kb.org/leak-set-varies" #t
-                   (contains? kb-m37 "varies by run"))
-            (check "m37/imp3/kb.org/leak-owner-verdict" #t
-                   (contains? kb-m37 "leak has no single owner"))))))
-
-;;; --- 8b. The other three records (criterion 6) --------------------
-;;; Criterion 6 asks for four records.  Each skips with an INFO line
-;;; when the untracked file is absent.
-(let ((a (slurp (repo "docs/arch.org"))))
-  (if a
-      (check "m37/imp3/doc/arch.org/m37-close" #t
-             (and (contains? a "M37 close")
-                  (contains? a "no architecture change")))
-      (info "m37/imp3/doc/arch.org/skipped" "docs/arch.org absent")))
-(let ((o (slurp (repo "docs/milestone-overview.org"))))
-  (if o
-      (check "m37/imp3/doc/milestone-overview/m37-closed" #t
-             (and (contains? o "M37") (contains? o "CLOSED 2026-09-16")))
-      (info "m37/imp3/doc/milestone-overview/skipped" "absent")))
-;; milestone.org is the LIVE tracker: a later milestone rewrite replaces
-;; the M37 text.  Same guard as test-m35-imp3.scm:542 (brief.org §7):
-;; pin the close-out anchor only while milestone.org still tracks M37.
-(define (tracks-milestone? text tag)
-  "True when TEXT's first org heading starts with TAG (e.g. \"* M37\")."
-  (and (string? text)
-       (let ((ls (split-lines text)))
-         (and (pair? ls) (string-prefix? tag (car ls))))))
-(let ((m (slurp (repo "milestone.org"))))
-  (cond
-   ((not m)
-    (info "m37/imp3/doc/milestone.org/skipped" "milestone.org absent"))
-   ((not (tracks-milestone? m "* M37"))
-    (info "m37/imp3/doc/milestone.org/skipped"
-          "milestone.org no longer tracks M37 (live tracker)"))
-   (else
-    (check "m37/imp3/doc/milestone.org/close-out" #t
-           (and (contains? m "M37 is CLOSED")
-                (contains? m "973983f"))))))
 
 ;;; --- 9. Drift guard: the sibling corpora carry the anchors -------
 ;;; The checks prove only that the sibling corpus FILES contain the
