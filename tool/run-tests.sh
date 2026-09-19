@@ -20,4 +20,4 @@ export GUILE_AUTO_COMPILE=0
 
 cd test
 
-guile -L ../tool -l ../tool/run-tests.scm -e main -- $*
+guile -L ../tool -l ../tool/run-tests.scm -e main -- "$@"
