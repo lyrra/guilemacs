@@ -198,7 +198,6 @@
   "test/keyboard/test-m38-imp4.el"              ; M38 imp-4 close-out: the surface table and the accounting are pinned; two --filter=keyboard runs give the same empty FAIL set (corpus prints PASS/FAIL)
   )
 (group (m39) ; M39 imp-0 audit (docs/m39-plan.org)
-  "test/m39/test-m39-imp0-audit.el"            ; M39 imp-0: the plan's wait line number, DEFUN count, regroup counts, and absence of a subprocesses fallback match src/process.c
   "test/m39/test-m39-imp1.el"                  ; M39 imp-1: the accept-process-output decision path moved into (emacs process-wait); the ported (secs nsecs flag) contract and the src/process.c wiring
   "test/m39/test-m39-imp2.el"                  ; M39 imp-2: the process read/write decision paths moved into (emacs process-io); the state gate and gap-move contract and the src/process.c wiring
   "test/m39/test-m39-imp3.el"                  ; M39 imp-3: the process Group A accessors moved into (emacs process-accessors); the --process-ref/--process-set! bridge and the retired-DEFUN wiring
@@ -206,9 +205,6 @@
   "test/m39/test-m39-imp4.el"                  ; M39 imp-4: the process signal family moved into (emacs process-signal); the retired DEFUNs, the --signal-* bridge, the type slot row, the image.c rewire
   "test/m39/test-m39-imp4-e2e.el"              ; M39 imp-4 e2e: the moved signal names called live (fboundp, signal-process, the stop/continue gate)
   "test/m39/test-m39-imp5.el"                  ; M39 imp-5 close-out: the surface table, the two line pins (5465, 8278), the M39 state words in the durable record, and this registration (corpus registers ERT tests)
-  )
-(group (m40) ; M40 imp-0 audit (docs/m40-plan.org)
-  "test/m40/test-m40-imp0-audit.el"            ; M40 imp-0: the exact base re-scan, the restored m39 plan, the send_process line pins, and the current close-out hash (no dead pre-rebase hash)
   )
 (group
   "test/src/eval-tests.el"

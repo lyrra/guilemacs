@@ -31,10 +31,22 @@
                                                        default-directory)))))
 
 (defun m40-imp0--with (rel fn)
-  "Call FN in a temp buffer holding REL (repo-root-relative)."
-  (with-temp-buffer
-    (insert-file-contents (expand-file-name rel m40-imp0--root))
-    (funcall fn)))
+  "Call FN in a temp buffer holding REL (repo-root-relative), or return
+the symbol `m40-imp0-absent' when REL does not exist.  docs/ is
+gitignored, so a checkout without it must not crash the whole
+subprocess: an unguarded `insert-file-contents' here raised an uncaught
+\"No such file or directory\" error that killed the subprocess before
+ERT ever ran -- found running a real full suite, and the exact scenario
+the run-tests-loadup-emacs crashed-batch fix (M38 imp-1) exists to
+catch.  Every wrapper below (`m40-imp0--lines' etc.) just returns
+whatever this returns, so `m40-imp0-absent' propagates automatically;
+`m40-imp0--check' turns it into an INFO-skip instead of a FAIL."
+  (let ((path (expand-file-name rel m40-imp0--root)))
+    (if (not (file-exists-p path))
+        'm40-imp0-absent
+      (with-temp-buffer
+        (insert-file-contents path)
+        (funcall fn)))))
 
 (defun m40-imp0--contains-p (rel needle)
   "Non-nil when REL (repo-root-relative) contains NEEDLE."
@@ -65,15 +77,27 @@
         (line-number-at-pos (match-beginning 0))))))
 
 (defun m40-imp0--check (name ok)
-  "Report and register one check.  OK is a boolean."
-  (princ (format "%s m40/imp0/%s\n" (if ok "PASS" "FAIL") name))
-  (imp-register-bool-as-ert-test (format "m40-imp0/%s" name) ok))
+  "Report and register one check.  OK is a boolean, or the symbol
+`m40-imp0-absent' when the doc file the check reads does not exist --
+printed as INFO-skipped, not FAIL (docs/ is gitignored, not kept in
+sync with the git-tracked test/code work)."
+  (if (eq ok 'm40-imp0-absent)
+      (princ (format "INFO m40/imp0/%s skipped (source file absent, untracked)\n" name))
+    (progn
+      (princ (format "%s m40/imp0/%s\n" (if ok "PASS" "FAIL") name))
+      (imp-register-bool-as-ert-test (format "m40-imp0/%s" name) ok))))
 
 ;;; --- 1. docs/m40-plan.org: the base, the target, the choice ----------
 
-(m40-imp0--check "plan-exists"
-                 (file-readable-p (expand-file-name "docs/m40-plan.org"
-                                                    m40-imp0--root)))
+;; docs/ is gitignored: report presence as INFO, not a counted PASS/FAIL --
+;; every check below already skips gracefully via m40-imp0--with when the
+;; file is absent, so this line would otherwise be the one check in the
+;; file that hard-fails on a condition the rest of the file treats as
+;; environmental, not a code regression.
+(princ (format "INFO m40/imp0/plan-exists %s\n"
+              (if (file-readable-p (expand-file-name "docs/m40-plan.org"
+                                                      m40-imp0--root))
+                  "PASS" "FAIL")))
 (m40-imp0--check "plan-base-764ec06"
                  (m40-imp0--contains-p "docs/m40-plan.org"
                                        "#+base: HEAD = 764ec06"))

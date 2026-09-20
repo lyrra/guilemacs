@@ -92,19 +92,22 @@
                          (concat "^DEFUN (\"" (regexp-quote name) "\"")))))
 
 ;; The plan must carry the corrected numbers, not the stale ones.
-(m39-imp0--check "plan-has-5462"
-                 (string-match-p "src/process\\.c:5462"
-                                 (mapconcat #'identity
-                                            (m39-imp0--lines "docs/m39-plan.org")
-                                            "\n")))
-(m39-imp0--check "plan-has-no-5329"
-                 (not (string-match-p "process\\.c:5329"
-                                      (mapconcat #'identity
-                                                 (m39-imp0--lines "docs/m39-plan.org")
-                                                 "\n"))))
-(m39-imp0--check "plan-group-counts"
-                 (string-match-p
-                  "A 27 \\+ B 6 \\+ C 19 \\+ D 9 \\+ E 3 = 64"
-                  (mapconcat #'identity
-                             (m39-imp0--lines "docs/m39-plan.org")
-                             "\n")))
+;; docs/ is gitignored, not kept in sync with the git-tracked test/code
+;; work: an unguarded m39-imp0--lines call here used to crash the whole
+;; subprocess with an uncaught "No such file or directory" when the file
+;; was absent (found running a real full suite) -- guard it once, skip
+;; with an INFO line rather than fail, matching every other docs/-reading
+;; corpus in this suite.
+(if (not (file-exists-p (expand-file-name "docs/m39-plan.org" m39-imp0--root)))
+    (princ "INFO m39/imp0/plan-checks skipped (docs/m39-plan.org absent, untracked)\n")
+  (let ((plan-text (mapconcat #'identity
+                              (m39-imp0--lines "docs/m39-plan.org")
+                              "\n")))
+    (m39-imp0--check "plan-has-5462"
+                     (string-match-p "src/process\\.c:5462" plan-text))
+    (m39-imp0--check "plan-has-no-5329"
+                     (not (string-match-p "process\\.c:5329" plan-text)))
+    (m39-imp0--check "plan-group-counts"
+                     (string-match-p
+                      "A 27 \\+ B 6 \\+ C 19 \\+ D 9 \\+ E 3 = 64"
+                      plan-text))))
