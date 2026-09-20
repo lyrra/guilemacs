@@ -758,6 +758,7 @@
            (pass '())
            (skipped 0)
            (tot 0)
+           (ran-summary? #f)
            ;; Match an ERT per-test result line:
            ;;   passed  1/3  allout-test-range-overlaps (0.000 sec)
            ;;   FAILED  3/3  name (0.000 sec)
@@ -773,6 +774,17 @@
          (else
           (format #t "~a:~a >>> ~a~%" (+ (length pass) %total-passed-tests)
                   %total-failed-tests line)
+          ;; ERT's own completion banner, printed once ert-run-tests-
+          ;; batch-and-exit finishes: "Ran N tests, M results as expected,
+          ;; K unexpected (...)", optionally "Aborted: " prefixed.  This
+          ;; substring is distinctive and appears regardless of N, so
+          ;; seeing it at all -- even for N = 0 -- proves the batch runner
+          ;; actually ran to completion; a *test* selected out by tag
+          ;; (:unstable, :expensive-test, :nativecomp) still prints it.
+          ;; Its absence means the subprocess crashed or aborted before
+          ;; getting there (see the TOT == 0 arm below).
+          (if (string-contains line "results as expected,")
+              (set! ran-summary? #t))
           (let ((f (list-matches re line)))
             (unless (null? f)
               (let* ((pos-res (vector-ref (car f) 2))
@@ -792,13 +804,37 @@
       ;; M38 D1).  Keep the ERROR text and record the mismatch in the fail
       ;; list, so the single exit path at the report reaches it.  Do not
       ;; change PASS.
-      (if (not (= (+ (length pass) skipped) tot))
-          (format #t "ERROR: ~a passed, but ~a counted pass.~%" (length pass) tot))
-      (list pass pass
-            (if (= (+ (length pass) skipped) tot)
-                '()
+      ;;
+      ;; A batch that never prints its completion summary at all is its
+      ;; own failure, not a silent pass-through: FILES is never empty here
+      ;; (maybe-run-tests only calls run-tests, and so this function, with
+      ;; a non-empty, already-filtered file list), so the subprocess
+      ;; always loads at least one real test file.  RAN-SUMMARY? staying
+      ;; #f means ert-run-tests-batch-and-exit never finished -- e.g. an
+      ;; uncaught error while loading one of the -l files (a missing
+      ;; docs/ file read unconditionally) crashes the subprocess before
+      ;; ERT gets to run at all.  TOT stays at its initial 0 in this case,
+      ;; which is NOT the same as a group that legitimately selects zero
+      ;; tests (every test in the file tagged out): that case DOES print
+      ;; the completion summary ("Ran 0 tests, 0 results as expected, 0
+      ;; unexpected") and RAN-SUMMARY? distinguishes it from a crash.
+      ;; Without this arm, both cases satisfy (+ (length pass) skipped) =
+      ;; tot vacuously (0 = 0) and the crash case hides the same
+      ;; false-green class M38 D1 was written to catch.
+      (let ((crashed? (not ran-summary?))
+            (mismatch? (not (= (+ (length pass) skipped) tot))))
+        (if (or crashed? mismatch?)
+            (format #t "ERROR: ~a passed, but ~a counted pass~a.~%"
+                    (length pass) tot
+                    (if crashed? " (batch runner never completed)" "")))
+        (list pass pass
+              (cond
+               (crashed?
+                (list "ERT count mismatch: batch runner never completed (subprocess crashed or aborted before any result was reported)"))
+               (mismatch?
                 (list (format #f "ERT count mismatch: ~a passed, but ~a counted pass"
-                              (length pass) tot)))))))
+                              (length pass) tot)))
+               (else '())))))))
 
 (define (run-tests files keys)
   (flush-all-ports)
