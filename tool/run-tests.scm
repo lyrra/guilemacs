@@ -823,13 +823,23 @@
             (format #t "ERROR: ~a passed, but ~a counted pass~a.~%"
                     (length pass) tot
                     (if crashed? " (batch runner never completed)" "")))
+        ;; Name FILES in the mismatch string itself, not just in the
+        ;; "Running test files:" line printed above: that line is easy to
+        ;; find in this group's own raw output, but the mismatch string is
+        ;; also what ends up alone, far from that context, in the final
+        ;; report's summary list (run-tests's caller collects fail lists
+        ;; across every group into one flat accumulator).  Without FILES
+        ;; here, tracing a mismatch back to its group means grepping the
+        ;; full log by hand for the nearest preceding "Running test
+        ;; files:" line.
         (list pass pass
               (cond
                (crashed?
-                (list "ERT count mismatch: batch runner never completed (subprocess crashed or aborted before any result was reported)"))
+                (list (format #f "ERT count mismatch: batch runner never completed (subprocess crashed or aborted before any result was reported) [~a]"
+                              files)))
                (mismatch?
-                (list (format #f "ERT count mismatch: ~a passed, but ~a counted pass"
-                              (length pass) tot)))
+                (list (format #f "ERT count mismatch: ~a passed, but ~a counted pass [~a]"
+                              (length pass) tot files)))
                (else '())))))))
 
 (define (run-tests files keys)
