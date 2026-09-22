@@ -50,7 +50,8 @@
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (send-process-state-decision
-            process-send-region-gap-move?))
+            process-send-region-gap-move?
+            object-enable-multibyte-characters))
 
 ;; Outcome codes of send-process-state-decision.  The C caller
 ;; (src/process.c send_process_state_decision) reads the result with
@@ -87,3 +88,30 @@ dispatcher reads the result with NILP."
   (if (and (< start gpt) (> end gpt))
       #t
       #nil))
+
+;;; ----------------------------------------------------------------
+;;; M40 imp-1: the buffer enable-multibyte-characters read
+;;; ----------------------------------------------------------------
+;;;
+;;; The send_process branch (imp-2) tests
+;;; `BUFFERP (object) && !NILP (BVAR (XBUFFER (object),
+;;; enable_multibyte_characters))'.  The read is on the *object* buffer,
+;;; not on the current buffer, so the helper takes a buffer argument.
+;;; It reuses the existing elisp `buffer-local-value' path (brief.org
+;;; M40 imp-1 §5.2 option 1) and adds no C.  `enable-multibyte-characters'
+;;; is DEFVAR_PER_BUFFER (src/buffer.c:5206); buffer-local-value reads it
+;;; from the per-buffer hash by its Lisp symbol.
+
+(define (object-enable-multibyte-characters object)
+  "Return elisp t when the buffer OBJECT has `enable-multibyte-characters'
+non-nil, else elisp nil (#nil).  The variable is read on OBJECT itself,
+not on the current buffer, because the C branch tests XBUFFER (object).
+A non-buffer OBJECT returns nil.  The result is forced to a boolean so a
+Scheme #f can never leak and read as elisp true."
+  (if (eq? ((symbol-function 'bufferp) object) #nil)
+      #nil
+      (if (eq? ((symbol-function 'buffer-local-value)
+                'enable-multibyte-characters object)
+               #nil)
+          #nil
+          #t)))

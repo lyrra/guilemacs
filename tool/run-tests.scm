@@ -206,6 +206,10 @@
   "test/m39/test-m39-imp4-e2e.el"              ; M39 imp-4 e2e: the moved signal names called live (fboundp, signal-process, the stop/continue gate)
   "test/m39/test-m39-imp5.el"                  ; M39 imp-5 close-out: the surface table, the two line pins (5465, 8278), the M39 state words in the durable record, and this registration (corpus registers ERT tests)
   )
+(group (m40) ; M40 imp-0 audit + imp-1 multibyte predicates (docs/m40-plan.org)
+  "test/m40/test-m40-imp0-audit.el"           ; M40 imp-0 audit: the base re-scan, the send_process line pins, the doc pins
+  "test/m40/test-m40-imp1.el"                 ; M40 imp-1: the multibyte-string-p deviation and the buffer enable-multibyte-characters read
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"

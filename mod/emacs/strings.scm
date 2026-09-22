@@ -26,6 +26,7 @@
     elisp-string-bytes
     elisp-string-width
     elisp-string-to-multibyte
+    elisp-multibyte-string-p
     elisp-string=
     elisp-string<
     elisp-string-equal
@@ -144,9 +145,24 @@ Letter-case is significant, but text properties are ignored."
 ;;;
 
 (define (elisp-multibyte-string-p object)
-  "Return t if OBJECT is a multibyte string.
-Return nil if OBJECT is either a unibyte string, or not a string.
-In Guilemacs, all strings are UTF-8, so this always returns nil."
+  "Return t if OBJECT is a multibyte string, else nil.
+Guilemacs keeps no unibyte string representation, so this always
+returns nil.  That is a recorded deviation, not a faithful port.
+
+Vanilla Emacs calls a string literal multibyte and the ASCII result of
+`make-string' unibyte (doc/lispref/strings.texi:139-144,
+doc/lispref/nonascii.texi:165-169).  Guilemacs cannot tell the two
+apart: `elisp-unibyte-string' and `make-string' both build an ordinary
+UTF-8 string.  A rule keyed on the UTF-8 byte length (byte length
+differs from character length) matches neither case: it calls \"abc\"
+unibyte, and it calls a byte-filled `make-string' result multibyte.
+`bindat-unpack' then signals \"String is multibyte\"
+(lisp/emacs-lisp/bindat.el:296, 578) and
+test/lisp/emacs-lisp/bindat-tests.el bindat-test-unpack fails.
+
+FIX-20260921-guilemacs: nil is a recorded deviation.  It holds the
+bindat guard.  A faithful `multibyte-string-p' needs a unibyte flag on
+strings.  See docs/m40-plan.org."
   #nil)
 
 (define (elisp-stringp object)
