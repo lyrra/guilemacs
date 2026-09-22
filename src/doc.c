@@ -387,13 +387,21 @@ DEFUN ("internal-subr-documentation", Fsubr_documentation, Ssubr_documentation, 
        doc: /* Return the raw documentation info of a C primitive.  */)
   (Lisp_Object function)
 {
+  /* FIX-20260922-guilemacs: reorder the guards so the `else' never
+     dangles.  HAVE_MODULES can be on while HAVE_NATIVE_COMP is off (no
+     libgccjit), and the old form then left a bare `else' right after the
+     `#ifdef HAVE_NATIVE_COMP' block -- gcc rejected it with
+     "'else' without a previous 'if'".  This form compiles for every
+     combination of the two guards.  */
 #ifdef HAVE_NATIVE_COMP
   if (!NILP (Fnative_comp_function_p (function)))
     return native_function_doc (function);
+  else
 #endif
 #ifdef HAVE_MODULES
-  else if (MODULE_FUNCTIONP (function))
+  if (MODULE_FUNCTIONP (function))
     return module_function_documentation (XMODULE_FUNCTION (function));
+  else
 #endif
   return Qt;
 }
