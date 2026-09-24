@@ -215,6 +215,9 @@
   "test/m40/test-m40-imp4b.el"                ; M40 imp-4b: the remaining Group C decisions moved to (emacs process-lifecycle); delete-process / process-send-eof / internal-default-process-filter / internal-default-process-sentinel and the src/process.c wiring
   "test/m40/test-m40-imp5.el"                 ; M40 imp-5 close-out: the re-measured surface table, the src/process.c line pins, and the M40 close-out state words in the durable records (corpus reads files only)
   )
+(group (m41) ; M41 imp-1 audit: the src/xdisp.c DEFUN classification and the caller map (docs/m41-plan.org)
+  "test/m41/test-m41-imp1.el"                 ; M41 imp-1 audit: the base numbers, the 24 DEFUN classification words, the reclaimable/blocked caller map, and the (emacs xdisp) module (corpus reads files only)
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
