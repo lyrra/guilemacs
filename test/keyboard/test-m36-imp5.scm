@@ -294,7 +294,7 @@ is scanned too (cr.org F5): a lone definition does not count as a caller."
            (count-substr kg "\n")))
 (check "m36/imp5/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m36/imp5/count/scm-c-public-ref-sites" 162
+(check "m36/imp5/count/scm-c-public-ref-sites" 172
        (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------

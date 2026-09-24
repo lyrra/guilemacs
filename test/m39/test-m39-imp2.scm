@@ -213,10 +213,12 @@
              (contains? proc-c "DEFUN (\"process-send-region\""))
       (check "m39/imp2/process.c/keeps-defun-string" #t
              (contains? proc-c "DEFUN (\"process-send-string\""))
-      ;; The block-2 multibyte-versus-unibyte encoding branch stays C in
-      ;; this imp.  The deviation is recorded in the module header and in
-      ;; docs/m39-plan.org §"Imp list" (imp-2b).
-      (check "m39/imp2/process.c/keeps-multibyte-branch" #t
+      ;; The block-2 multibyte-versus-unibyte branch moved to (emacs
+      ;; process-io) in M40 imp-2: src/process.c now calls
+      ;; send_process_object_multibyte_decision (object).  M40 imp-2 is
+      ;; the M39 imp-2b open item, so this M39 pin flips: the branch must
+      ;; no longer sit inline in C.
+      (check "m39/imp2/process.c/multibyte-branch-moved" #f
              (contains? proc-c "STRINGP (object) && STRING_MULTIBYTE (object)"))
       ;; Line pins of the imp-2 region.  imp-3 added the process-slot
       ;; bridge above them and retired the Group A accessors: each line
@@ -224,11 +226,24 @@
       ;; imp-4 added the type slot read row to the bridge above them:
       ;; each line drifted by +4 (6811 -> 6815, 7047 -> 7051,
       ;; 7086 -> 7090).
-      (check "m39/imp2/process.c/pin-send-process" 6815
+      ;; M40 imp-2 added the send_process_object_multibyte_decision
+      ;; dispatcher above the region: each line drifted by +19
+      ;; (6815 -> 6834, 7051 -> 7070, 7090 -> 7109).
+      ;; M40 imp-3 added the four process-tty-name read rows and the two
+      ;; bit-field kinds above the region and removed the process-tty-name
+      ;; DEFUN, -4 net: each line drifted by -4 (6834 -> 6830,
+      ;; 7070 -> 7066, 7109 -> 7105).
+      ;; M40 imp-4a added four static dispatchers above the region: each
+      ;; line drifted by +76 (6830 -> 6906, 7066 -> 7142,
+      ;; 7105 -> 7181).
+      ;; M40 imp-4b added five more dispatchers above the region: each
+      ;; line drifted by +86 (6906 -> 6992, 7142 -> 7228,
+      ;; 7181 -> 7267).
+      (check "m39/imp2/process.c/pin-send-process" 6992
              (line-of proc-c "send_process (Lisp_Object proc, const char *buf"))
-      (check "m39/imp2/process.c/pin-send-region" 7051
+      (check "m39/imp2/process.c/pin-send-region" 7228
              (line-of proc-c "DEFUN (\"process-send-region\""))
-      (check "m39/imp2/process.c/pin-send-string" 7090
+      (check "m39/imp2/process.c/pin-send-string" 7267
              (line-of proc-c "DEFUN (\"process-send-string\""))))
 
 ;;; --- 6. Static: the module is registered with the prelude -----------

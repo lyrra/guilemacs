@@ -81,9 +81,11 @@
     ;; e2e is INFO-skipped, never a FAIL: it is an environment gap, not a
     ;; code regression.
     (let* ((cat (executable-find "cat"))
+           (outbuf (and cat (get-buffer-create " *m40-imp2-e2e*")))
            (proc (and cat
                       (condition-case err
                           (make-process :name "m40-imp2-proc" :command (list cat)
+                                        :buffer outbuf
                                         :noquery t)
                         (error nil))))
            (made (processp proc)))
@@ -116,6 +118,32 @@
               (if ascii-ok (setq pass (1+ pass)) (setq fail (1+ fail)))
               (princ (format "%s m40-imp2/e2e/send-ascii-string %S\n"
                              (if ascii-ok "PASS" "FAIL") ascii))))
-          (ignore-errors (delete-process proc)))))
+          ;; F6: check the *result*, not only "no error".  cat echoes its
+          ;; stdin, so the process buffer must hold the bytes sent.  The
+          ;; ASCII string must appear *after* the multibyte output (its
+          ;; match index is > 0), and the buffer must hold more than the
+          ;; 3-char ASCII string.  Both prove the two arms ran through the
+          ;; C -> Scheme dispatcher and the C write loop.  The check does
+          ;; NOT pin the exact tail (the process buffer can carry a
+          ;; trailing newline) and does NOT compare the multibyte bytes:
+          ;; the process coding layer is a separate recorded deviation
+          ;; (docs/kb.org ** M40), out of imp-2's decision scope.
+          (process-send-eof proc)
+          (accept-process-output proc 2)
+          (let* ((out (condition-case nil
+                          (with-current-buffer outbuf (buffer-string))
+                        (error nil)))
+                 (rt (and (stringp out)
+                          (> (length out) 3)
+                          (let ((p (string-match "abc" out)))
+                            ;; p is the match index; the ASCII string must
+                            ;; follow the multibyte output, so p > 0.
+                            (and p (> p 0))))))
+            (imp-register-bool-as-ert-test "m40-imp2/e2e/roundtrip-result" rt)
+            (if rt (setq pass (1+ pass)) (setq fail (1+ fail)))
+            (princ (format "%s m40-imp2/e2e/roundtrip-result %S\n"
+                           (if rt "PASS" "FAIL") out)))
+          (ignore-errors (delete-process proc))
+          (ignore-errors (kill-buffer outbuf)))))
     (princ (format "=== %d passed, %d failed, %d total ===\n"
                    pass fail (+ pass fail)))))

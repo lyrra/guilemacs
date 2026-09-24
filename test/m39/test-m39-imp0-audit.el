@@ -6,12 +6,13 @@
 ;;; fails the run.  It has no C dependency: it only reads files.
 ;;;
 ;;; It covers the review findings (cr.org):
-;;;   D1 -- wait_reading_process_output is defined at src/process.c:5465
-;;;         (5416 at the imp-0 base, +11 after imp-1, +46 after imp-2,
-;;;         +4 after imp-4's type slot row), not 5329, and there is no
+;;;   D1 -- wait_reading_process_output is defined at src/process.c:5614
+;;;         in the live tree (5465 at the M39 close-out; the M40 imps
+;;;         re-drifted it), not 5329, and there is no
 ;;;         #ifndef subprocesses fallback.
-;;;   D2 -- the DEFUN count is 64 and the six regrouped syscall members
-;;;         exist; the plan's group counts are 27/6/19/9/3.
+;;;   D2 -- the live DEFUN count is 50 (64 at the imp-0 base, 52 at the
+;;;         M39 close-out) and the six regrouped syscall members exist;
+;;;         the plan's group counts are 27/6/19/9/3.
 ;;;
 ;;; Each check is printed as an INFO PASS/FAIL line and turned into an
 ;;; ERT test so the harness counts it.  A read error is a real error,
@@ -65,24 +66,39 @@
 ;; also retires the eight signal-family DEFUNs below these lines, so the
 ;; #else line drifts 8341 -> 8271.  The imp-4 review correction swaps the
 ;; --signal-get-process bridge for --signal-resolve-process above these
-;; lines: the #else line drifts 8271 -> 8278.)
-(m39-imp0--check "wait-definition-at-5465"
-                 (eql 5465 (m39-imp0--line-of
+;; lines: the #else line drifts 8271 -> 8278.
+;;
+;; The M39 close-out state above is 5465 / 8278.  The M40 imps then
+;; re-drifted the same tree: M40 imp-2 added the
+;; send_process_object_multibyte_decision dispatcher above the wait line
+;; (+19), and M40 imp-3 added the four process-tty-name read rows and the
+;; two bit-field kinds above the wait line and removed the
+;; process-tty-name DEFUN.  M40 imp-4a added four static dispatchers
+;; above the wait line (+76) and grew the four Group C bodies.  M40 imp-4b
+;; added five more dispatchers above the wait line and grew the
+;; delete-process / process-send-eof bodies, so the live tree now holds
+;; the wait line at 5614 and the #else line at 8465.
+;; These pins track the live tree; the M39 close-out values stay in the
+;; M39 durable record.)
+(m39-imp0--check "wait-definition-at-5614"
+                 (eql 5614 (m39-imp0--line-of
                             "src/process.c"
                             "^wait_reading_process_output (intmax_t")))
 (m39-imp0--check "no-ifndef-subprocesses"
                  (= 0 (m39-imp0--count "src/process.c"
                                        "^(ifndef subprocesses")))
-(m39-imp0--check "else-subprocesses-at-8278"
-                 (eql 8278 (m39-imp0--line-of
+(m39-imp0--check "else-subprocesses-at-8465"
+                 (eql 8465 (m39-imp0--line-of
                             "src/process.c"
                             "^#else  /[*] subprocesses [*]/")))
 
-;; D2: the DEFUN total and the six re-grouped members.  imp-3 retired 12
-;; Group A DEFUNs and the dead #if 0 process-connection DEFUN, and added
-;; the two bridge DEFUNs --process-ref/--process-set!: 64 -> 52.
-(m39-imp0--check "defun-count-52"
-                 (= 52 (m39-imp0--count "src/process.c" "^DEFUN (\"")))
+;; D2: the DEFUN total and the six re-grouped members.  The M39 imps
+;; retired 12 Group A DEFUNs and the dead #if 0 process-connection DEFUN,
+;; and added the two bridge DEFUNs --process-ref/--process-set!: 64 -> 52.
+;; M40 imp-3 then retired the process-tty-name and
+;; process-inherit-coding-system-flag DEFUNs: 52 -> 50.
+(m39-imp0--check "defun-count-50"
+                 (= 50 (m39-imp0--count "src/process.c" "^DEFUN (\"")))
 (dolist (name '("process-running-child-p" "set-network-process-option"
                 "process-datagram-address" "set-process-datagram-address"
                 "set-process-window-size" "set-process-coding-system"))

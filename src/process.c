@@ -1059,6 +1059,133 @@ get_process (register Lisp_Object name)
   return proc;
 }
 
+/* M40 imp-4a: dispatchers into (emacs process-lifecycle).  Static and
+   local to process.c.  Each DEFUN keeps the mechanism (CHECK_PROCESS,
+   the USHRT_MAX clamp and the set_window_size ioctl; the coding-system
+   slot writes and setup_process_coding_systems; wait_for_socket_fds and
+   the sockaddr conversions) and calls the module for the *decision*.
+   See mod/emacs/process-lifecycle.scm and docs/kb.org ** M40.  The
+   module returns elisp t / #nil for a boolean; !NILP is the right read
+   (a Scheme #f would read as true).  */
+
+static bool
+set_process_window_size_decision (Lisp_Object netconn, int infd, bool ioctl_ok)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "set-process-window-size-decision");
+  SCM result = SCM_CALL_3 (proc, netconn, scm_from_int (infd),
+			   ioctl_ok ? Qt : Qnil);
+  return !NILP (result);
+}
+
+static int
+set_process_coding_system_decision (Lisp_Object decoding, Lisp_Object encoding,
+				    int infd, int outfd)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "set-process-coding-system-decision");
+  SCM result = SCM_CALL_4 (proc, decoding, encoding, scm_from_int (infd),
+			   scm_from_int (outfd));
+  return scm_to_int (result);
+}
+
+static bool
+process_datagram_address_decision (Lisp_Object database)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "process-datagram-address-decision");
+  SCM result = SCM_CALL_1 (proc, database);
+  return !NILP (result);
+}
+
+static int
+set_process_datagram_address_decision (Lisp_Object len, Lisp_Object table_len)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "set-process-datagram-address-decision");
+  SCM result = SCM_CALL_2 (proc, len, table_len);
+  return scm_to_int (result);
+}
+
+/* M40 imp-4b: dispatchers into (emacs process-lifecycle) for the four
+   remaining Group C names.  Same shape as the imp-4a block above.  Each
+   DEFUN keeps the mechanism; the C passes the facts the module cannot
+   compute (the NETCONN1_P / SERIALCONN1_P / PIPECONN1_P macros, a C
+   struct read, the fd-keyed datagram_address[] table, and the
+   BUFFER_LIVE_P buffer-struct read).  See
+   mod/emacs/process-lifecycle.scm and docs/kb.org ** M40.  A boolean
+   decision returns elisp t / #nil; !NILP is the right read (a Scheme #f
+   would read as true).  An outcome code returns an integer, read with
+   scm_to_int.  */
+
+static int
+delete_process_decision (bool connection)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "delete-process-decision");
+  SCM result = SCM_CALL_1 (proc, connection ? Qt : Qnil);
+  return scm_to_int (result);
+}
+
+static bool
+process_send_eof_datagram_decision (bool datagram)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "process-send-eof-datagram-decision");
+  SCM result = SCM_CALL_1 (proc, datagram ? Qt : Qnil);
+  return !NILP (result);
+}
+
+static bool
+process_send_eof_alive_decision (Lisp_Object status)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "process-send-eof-alive-decision");
+  SCM result = SCM_CALL_1 (proc, status);
+  return !NILP (result);
+}
+
+static bool
+internal_default_process_filter_decision (bool buffer_non_nil,
+					  bool buffer_live)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "internal-default-process-filter-decision");
+  SCM result = SCM_CALL_2 (proc, buffer_non_nil ? Qt : Qnil,
+			   buffer_live ? Qt : Qnil);
+  return !NILP (result);
+}
+
+static int
+internal_default_process_sentinel_decision (Lisp_Object symbol,
+					    bool buffer_non_nil,
+					    bool buffer_live)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-lifecycle",
+			     "internal-default-process-sentinel-decision");
+  SCM result = SCM_CALL_3 (proc, symbol, buffer_non_nil ? Qt : Qnil,
+			   buffer_live ? Qt : Qnil);
+  return scm_to_int (result);
+}
+
 /* M39 imp-3: table-driven process-slot bridge.  The struct
    Lisp_Process slot stays C; the accessor *decision* moves to
    (emacs process-accessors).  Most rows use a byte offset; the two
@@ -1071,7 +1198,11 @@ enum proc_slot_kind
   PROC_PID,
   PROC_LISP_LIST,
   PROC_BOOL_INHERIT,
-  PROC_BOOL_KILL_QUERY
+  PROC_BOOL_KILL_QUERY,
+  /* M40 imp-3 read rows for process-tty-name: two more bit-field bool
+     slots, read the same way as PROC_BOOL_INHERIT.  No write row.  */
+  PROC_BOOL_PTY_IN,
+  PROC_BOOL_PTY_OUT
 };
 
 struct proc_slot_entry
@@ -1106,6 +1237,15 @@ static const struct proc_slot_entry proc_slot_table[] =
        The kind reads or writes the named field directly.  */
     { "inherit_coding_system_flag", 0, PROC_BOOL_INHERIT },
     { "kill_without_query", 0, PROC_BOOL_KILL_QUERY },
+    /* M40 imp-3 read rows: process-tty-name reads the tty name, the
+       stderr process object, and the two pty bit-fields.  All reads;
+       no write row.  */
+    { "tty_name", offsetof (struct Lisp_Process, tty_name),
+      PROC_LISP_OBJECT },
+    { "stderrproc", offsetof (struct Lisp_Process, stderrproc),
+      PROC_LISP_OBJECT },
+    { "pty_in", 0, PROC_BOOL_PTY_IN },
+    { "pty_out", 0, PROC_BOOL_PTY_OUT },
     /* Write rows.  --set-plist runs CHECK_LIST; the bool rows store
        !NILP (VAL) and the module owns the invert.  */
     { "--set-plist", offsetof (struct Lisp_Process, plist), PROC_LISP_LIST },
@@ -1150,6 +1290,12 @@ DEFUN ("--process-ref", Fprocess_ref, Sprocess_ref, 2, 2, 0,
 
     case PROC_BOOL_KILL_QUERY:
       return p->kill_without_query ? Qt : Qnil;
+
+    case PROC_BOOL_PTY_IN:
+      return p->pty_in ? Qt : Qnil;
+
+    case PROC_BOOL_PTY_OUT:
+      return p->pty_out ? Qt : Qnil;
     }
 
   emacs_abort ();
@@ -1257,7 +1403,13 @@ Interactively, it will kill the current buffer's process.  */)
 #endif
 
   p->raw_status_new = 0;
-  if (NETCONN1_P (p) || SERIALCONN1_P (p) || PIPECONN1_P (p))
+  /* M40 imp-4b: the branch selector NETCONN1_P (p) || SERIALCONN1_P (p)
+     || PIPECONN1_P (p) moved to (emacs process-lifecycle)
+     delete-process-decision.  The three macros stay C (they read the
+     struct); the C passes the result and acts on the outcome code (0 the
+     status branch, 1 the kill branch).  */
+  if (delete_process_decision (NETCONN1_P (p) || SERIALCONN1_P (p)
+			       || PIPECONN1_P (p)) == 0)
     {
       pset_status (p, list2 (Qexit, make_fixnum (0)));
       p->tick = ++process_tick;
@@ -1367,32 +1519,9 @@ possibly modified to make it unique among process names.  */)
 /* M39 imp-3: the `process-command' DEFUN moved to (emacs
    process-accessors).  The command slot stays C.  */
 
-DEFUN ("process-tty-name", Fprocess_tty_name, Sprocess_tty_name, 1, 2, 0,
-       doc: /* Return the name of the terminal PROCESS uses, or nil if none.
-This is the terminal that the process itself reads and writes on,
-not the name of the pty that Emacs uses to talk with that terminal.
-
-If STREAM is nil, return the terminal name if any of PROCESS's
-standard streams use a terminal for communication.  If STREAM is one
-of `stdin', `stdout', or `stderr', return the name of the terminal
-PROCESS uses for that stream specifically, or nil if that stream
-communicates via a pipe.  */)
-  (register Lisp_Object process, Lisp_Object stream)
-{
-  CHECK_PROCESS (process);
-  register struct Lisp_Process *p = XPROCESS (process);
-
-  if (NILP (stream))
-    return p->tty_name;
-  else if (EQ (stream, Qstdin))
-    return p->pty_in ? p->tty_name : Qnil;
-  else if (EQ (stream, Qstdout))
-    return p->pty_out ? p->tty_name : Qnil;
-  else if (EQ (stream, Qstderr))
-    return p->pty_out && NILP (p->stderrproc) ? p->tty_name : Qnil;
-  else
-    signal_error ("Unknown stream", stream);
-}
+/* M40 imp-3: the `process-tty-name' DEFUN moved to (emacs
+   process-accessors).  The tty_name / stderrproc / pty_in / pty_out
+   slots stay C; the module reads them through --process-ref.  */
 
 static void
 update_process_mark (struct Lisp_Process *p)
@@ -1575,12 +1704,19 @@ nil otherwise.  */)
   unsigned short h = check_uinteger_max (height, USHRT_MAX);
   unsigned short w = check_uinteger_max (width, USHRT_MAX);
 
-  if (NETCONN_P (process)
-      || XPROCESS (process)->infd < 0
-      || set_window_size (XPROCESS (process)->infd, h, w) < 0)
-    return Qnil;
-  else
-    return Qt;
+  /* M40 imp-4a: the gate (NETCONN_P, infd < 0, failed ioctl) moved to
+     (emacs process-lifecycle) set-process-window-size-decision.  The C
+     keeps CHECK_PROCESS, the USHRT_MAX clamp, and the ioctl.  */
+  {
+    bool netconn = NETCONN_P (process);
+    int infd = XPROCESS (process)->infd;
+    bool ioctl_ok = false;
+    if (!netconn && infd >= 0)
+      ioctl_ok = set_window_size (infd, h, w) >= 0;
+    return (set_process_window_size_decision (netconn ? Qt : Qnil, infd,
+					      ioctl_ok)
+	    ? Qt : Qnil);
+  }
 }
 
 /* M39 imp-3: the `set-process-inherit-coding-system-flag',
@@ -2831,7 +2967,13 @@ set up yet, this function will block until socket setup has completed.  */)
   if (NETCONN_P (process))
     wait_for_socket_fds (process, "process-datagram-address");
 
-  if (!DATAGRAM_CONN_P (process))
+  /* M40 imp-4a: the DATAGRAM_CONN_P gate and the nil result moved to
+     (emacs process-lifecycle) process-datagram-address-decision.  The
+     gate reads the C fd-keyed datagram_address[] table, so the C
+     computes it and passes the result; the C keeps wait_for_socket_fds
+     and conv_sockaddr_to_lisp.  */
+  if (!process_datagram_address_decision (DATAGRAM_CONN_P (process)
+					  ? Qt : Qnil))
     return Qnil;
 
   channel = XPROCESS (process)->infd;
@@ -2858,14 +3000,21 @@ set up yet, this function will block until socket setup has completed.  */)
   if (NETCONN_P (process))
     wait_for_socket_fds (process, "set-process-datagram-address");
 
-  if (!DATAGRAM_CONN_P (process))
+  /* M40 imp-4a: the DATAGRAM_CONN_P gate and the len == 0 || len !=
+     table-len gate moved to (emacs process-lifecycle)
+     set-process-datagram-address-decision.  The C keeps
+     get_lisp_to_sockaddr_size and conv_lisp_to_sockaddr.  */
+  if (!process_datagram_address_decision (DATAGRAM_CONN_P (process)
+					  ? Qt : Qnil))
     return Qnil;
 
   channel = XPROCESS (process)->infd;
 
   len = get_lisp_to_sockaddr_size (address, &family);
   eassert (0 <= channel && channel < FD_SETSIZE);
-  if (len == 0 || datagram_address[channel].len != len)
+  if (set_process_datagram_address_decision (make_fixnum (len),
+					     make_fixnum (datagram_address[channel].len))
+      == 1)
     return Qnil;
   conv_lisp_to_sockaddr (family, address, datagram_address[channel].sa, len);
   return address;
@@ -6700,7 +6849,16 @@ Otherwise it discards the output.  */)
   p = XPROCESS (proc);
   CHECK_STRING (text);
 
-  if (!NILP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer)))
+  /* M40 imp-4b: the insert-or-discard gate
+     (!NILP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer))) moved to
+     (emacs process-lifecycle) internal-default-process-filter-decision.
+     The C computes the two booleans because BUFFER_LIVE_P reads the C
+     buffer struct; the short-circuit is kept (BUFFER_LIVE_P is only read
+     when the buffer is non-nil).  */
+  bool filter_buffer = !NILP (p->buffer);
+  bool filter_live = filter_buffer && BUFFER_LIVE_P (XBUFFER (p->buffer));
+  if (internal_default_process_filter_decision (filter_buffer,
+						filter_live))
     {
       Lisp_Object old_read_only;
       ptrdiff_t old_begv, old_zv;
@@ -6801,6 +6959,25 @@ write_queue_pop (struct Lisp_Process *p, Lisp_Object *obj,
   return 1;
 }
 
+/* M40 imp-2: dispatcher into (emacs process-io) for the send_process
+   multibyte-versus-unibyte decision.  Static and local to process.c.
+   The module owns the STRING_MULTIBYTE / buffer / Qt predicate; the C
+   keeps the two arms, the coding-system setup, the raw-text fallback,
+   and the byte-position code.  Returns true for the multibyte arm.  The
+   module returns elisp t / #nil; !NILP is the right read (a Scheme #f
+   would read as true).  */
+
+static bool
+send_process_object_multibyte_decision (Lisp_Object object)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-io",
+			     "send-process-object-multibyte?");
+  SCM result = SCM_CALL_1 (proc, object);
+  return !NILP (result);
+}
+
 /* Send some data to process PROC.
    BUF is the beginning of the data; LEN is the number of characters.
    OBJECT is the Lisp object that the data comes from.  If OBJECT is
@@ -6840,10 +7017,10 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
   coding = proc_encode_coding_system[p->outfd];
   Vlast_coding_system_used = CODING_ID_NAME (coding->id);
 
-  if ((STRINGP (object) && STRING_MULTIBYTE (object))
-      || (BUFFERP (object)
-	  && !NILP (BVAR (XBUFFER (object), enable_multibyte_characters)))
-      || EQ (object, Qt))
+  /* M40 imp-2: the multibyte-versus-unibyte decision moved to
+     (emacs process-io) send-process-object-multibyte?.  The C keeps the
+     two arms, the coding-system setup, and the byte-position code.  */
+  if (send_process_object_multibyte_decision (object))
     {
       pset_encode_coding_system
 	(p, complement_process_encoding_system (p->encode_coding_system));
@@ -7483,7 +7660,11 @@ process has been transmitted to the serial port.  */)
   if (NETCONN_P (proc))
     wait_while_connecting (proc);
 
-  if (DATAGRAM_CONN_P (proc))
+  /* M40 imp-4b: the datagram branch moved to (emacs process-lifecycle)
+     process-send-eof-datagram-decision.  DATAGRAM_CONN_P stays C (it
+     reads the fd-keyed datagram_address[] table); the C passes the gate
+     and returns early when the module says so.  */
+  if (process_send_eof_datagram_decision (DATAGRAM_CONN_P (proc)))
     return process;
 
 
@@ -7495,7 +7676,10 @@ process has been transmitted to the serial port.  */)
   /* Make sure the process is really alive.  */
   if (XPROCESS (proc)->raw_status_new)
     update_status (XPROCESS (proc));
-  if (! EQ (XPROCESS (proc)->status, Qrun))
+  /* M40 imp-4b: the alive gate (! EQ (status, Qrun)) moved to
+     (emacs process-lifecycle) process-send-eof-alive-decision.  The C
+     keeps the error text and the name.  */
+  if (!process_send_eof_alive_decision (XPROCESS (proc)->status))
     error ("Process %s not running: %s", SDATA (XPROCESS (proc)->name), SDATA (status_message (XPROCESS (proc))));
 
   if (coding && CODING_REQUIRE_FLUSHING (coding))
@@ -7999,17 +8183,27 @@ This inserts a status message into the process's buffer, if there is one.  */)
   if (CONSP (symbol))
     symbol = XCAR (symbol);
 
-  if (!EQ (symbol, Qrun) && !NILP (buffer))
+  /* M40 imp-4b: the outer gate (!EQ (symbol, Qrun) && !NILP (buffer)) and
+     the inner BUFFER_LIVE_P gate moved to (emacs process-lifecycle)
+     internal-default-process-sentinel-decision.  The C computes the car
+     (a struct read) and the BUFFER_LIVE_P result (a buffer-struct read)
+     and passes them; the C reads the outcome code (0 skip the block, 1 a
+     dead buffer -> return nil, 2 run the insert body).  */
+  bool sentinel_buffer = !NILP (buffer);
+  bool sentinel_live = sentinel_buffer && BUFFER_LIVE_P (XBUFFER (buffer));
+  int sentinel_code = internal_default_process_sentinel_decision
+    (symbol, sentinel_buffer, sentinel_live);
+  if (sentinel_code == 1)
+    return Qnil;
+  if (sentinel_code == 2)
     {
       Lisp_Object tem;
       struct buffer *old = current_buffer;
       ptrdiff_t opoint, opoint_byte;
       ptrdiff_t before, before_byte;
 
-      /* Avoid error if buffer is deleted
-	 (probably that's why the process is dead, too).  */
-      if (!BUFFER_LIVE_P (XBUFFER (buffer)))
-	return Qnil;
+      /* The dead-buffer gate moved to the module (outcome code 1); the
+	 C keeps Fset_buffer and the insert body.  */
       Fset_buffer (buffer);
 
       if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
@@ -8062,15 +8256,21 @@ encode subprocess input. */)
 
   struct Lisp_Process *p = XPROCESS (process);
 
-  Fcheck_coding_system (decoding);
-  Fcheck_coding_system (encoding);
+  /* M40 imp-4a: the Fcheck_coding_system order and the infd/outfd early
+     return moved to (emacs process-lifecycle)
+     set-process-coding-system-decision.  The C keeps the pset_* slot
+     writes, coding_inherit_eol_type, and setup_process_coding_systems.
+     The decision returns an outcome code; the C acts on it after the
+     slot writes, as in the original body.  */
+  int set_code = set_process_coding_system_decision (decoding, encoding,
+						     p->infd, p->outfd);
   encoding = coding_inherit_eol_type (encoding, Qnil);
   pset_decode_coding_system (p, decoding);
   pset_encode_coding_system (p, encoding);
 
   /* If the sockets haven't been set up yet, the final setup part of
      this will be called asynchronously. */
-  if (p->infd < 0 || p->outfd < 0)
+  if (set_code == 1)
     return Qnil;
 
   setup_process_coding_systems (process);
@@ -8239,24 +8439,11 @@ deleted or killed.  */)
   return Qnil;
 }
 
-DEFUN ("process-inherit-coding-system-flag",
-       Fprocess_inherit_coding_system_flag, Sprocess_inherit_coding_system_flag,
-       1, 1, 0,
-       doc: /* Return the value of inherit-coding-system flag for PROCESS.
-If this flag is t, `buffer-file-coding-system' of the buffer
-associated with PROCESS will inherit the coding system used to decode
-the process output.  */)
-  (register Lisp_Object process)
-{
-#ifdef subprocesses
-  CHECK_PROCESS (process);
-  return XPROCESS (process)->inherit_coding_system_flag ? Qt : Qnil;
-#else
-  /* Ignore the argument and return the value of
-     inherit-process-coding-system.  */
-  return inherit_process_coding_system ? Qt : Qnil;
-#endif
-}
+/* M40 imp-3: the `process-inherit-coding-system-flag' DEFUN moved to
+   (emacs process-accessors).  The inherit_coding_system_flag slot stays
+   C; the module reads it through --process-ref.  This is a subprocesses
+   build, so the old #ifdef #else non-subprocesses global fallback is
+   gone: the module owns the decision.  */
 
 /* Kill all processes associated with `buffer'.
    If `buffer' is nil, kill all processes.  */

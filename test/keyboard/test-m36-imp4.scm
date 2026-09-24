@@ -263,7 +263,7 @@ it matches `rg' on source lines that a compiler would see."
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp4/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp4/count/scm-c-public-ref-sites" 162
+(check "m36/imp4/count/scm-c-public-ref-sites" 172
        (src-site-count))
 
 ;;; --- 8. Static: the corpus is registered in the keyboard group ----

@@ -10,10 +10,18 @@
 ;;; It covers:
 ;;;   D1 -- docs/m40-plan.org exists and names the base commit 764ec06
 ;;;         and the target src/process.c.
-;;;   D2 -- the base re-scan is exact: src/process.c is 8,843 lines, 52
-;;;         DEFUNs, and 10 ==--== shims.
+;;;   D2 -- the base re-scan is exact: src/process.c is 9,030 lines, 50
+;;;         DEFUNs, and 10 ==--== shims.  (M40 imp-2 added 19 lines,
+;;;         imp-3 retired two DEFUNs, imp-4a added the four Group C
+;;;         dispatchers, and imp-4b added five more dispatchers and the
+;;;         delete-process / process-send-eof rewrites; the imp-0 base
+;;;         measurement of 8,843 is in docs/m40-plan.org.)
 ;;;   D3 -- docs/m39-plan.org is restored and holds the as-built line.
-;;;   D4 -- the send_process multibyte branch line pins (6815, 6845).
+;;;   D4 -- the send_process multibyte branch line pins (6992, 7010,
+;;;         7040, 7063; the imp-2 drift is +19, the imp-3 drift -4,
+;;;         the imp-4a drift +76 from the four new dispatchers, and the
+;;;         imp-4b drift +103 from the five new dispatchers and the
+;;;         delete-process / process-send-eof body rewrites).
 ;;;   D5 -- the dead pre-rebase hash 24e24e3 no longer appears in the
 ;;;         road map; the current hash 764ec06 does.
 ;;;
@@ -110,11 +118,21 @@ sync with the git-tracked test/code work)."
                                        "Choice: restore =docs/m39-plan.org="))
 
 ;;; --- 2. The base re-scan is exact ------------------------------------
+;;;
+;;; M40 imp-2 landed on src/process.c (the send_process multibyte
+;;; decision moved to (emacs process-io)), so the file grew by 19 lines:
+;;; 8,843 -> 8,862.  M40 imp-3 retired the process-tty-name and
+;;; process-inherit-coding-system-flag DEFUNs (-17 net): 8,862 -> 8,845.
+;;; M40 imp-4a added four Group C dispatchers (+82 net) and imp-4b added
+;;; five more dispatchers and rewrote the delete-process /
+;;; process-send-eof bodies: 8,927 -> 9,030.  The audit pins track the
+;;; tree; the imp-0 base count of 8,843 stays in docs/m40-plan.org as the
+;;; base measurement.
 
-(m40-imp0--check "process.c-lines-8843"
-                 (eql 8843 (m40-imp0--lines "src/process.c")))
-(m40-imp0--check "process.c-defuns-52"
-                 (eql 52 (m40-imp0--count "src/process.c" "^DEFUN (\"")))
+(m40-imp0--check "process.c-lines-9030"
+                 (eql 9030 (m40-imp0--lines "src/process.c")))
+(m40-imp0--check "process.c-defuns-50"
+                 (eql 50 (m40-imp0--count "src/process.c" "^DEFUN (\"")))
 (m40-imp0--check "process.c-shims-10"
                  (eql 10 (m40-imp0--count "src/process.c" "^DEFUN (\"--")))
 
@@ -130,21 +148,29 @@ sync with the git-tracked test/code work)."
                                             "A 27 + B 6 + C 19 + D 9 + E 3 = 64")))
 
 ;;; --- 4. The send_process multibyte branch line pins ------------------
+;;; M40 imp-2 added the send_process_object_multibyte_decision dispatcher
+;;; above the region (+19 lines) and replaced the inline predicate with a
+;;; call.  M40 imp-3 changed the region above by -4 net (four read rows
+;;; and the two bit-field kinds added, the process-tty-name DEFUN
+;;; removed).  M40 imp-4a added four static dispatchers above the
+;;; region, +76 net.  M40 imp-4b added five more dispatchers above the
+;;; region, +103 net.  The pins below track the post-imp-4b tree: 6992,
+;;; 7010, 7040, 7063.
 
-(m40-imp0--check "send-process-at-6815"
-                 (eql 6815 (m40-imp0--line-of
+(m40-imp0--check "send-process-at-6992"
+                 (eql 6992 (m40-imp0--line-of
                             "src/process.c"
                             "^send_process (Lisp_Object proc, const char [*]buf")))
-(m40-imp0--check "state-decision-at-6833"
-                 (eql 6833 (m40-imp0--line-of
+(m40-imp0--check "state-decision-at-7010"
+                 (eql 7010 (m40-imp0--line-of
                             "src/process.c"
                             "send_process_state_decision (p->status, p->outfd)")))
-(m40-imp0--check "src-multibyte-at-6863"
-                 (eql 6863 (m40-imp0--line-of
+(m40-imp0--check "src-multibyte-at-7040"
+                 (eql 7040 (m40-imp0--line-of
                             "src/process.c"
                             "coding->src_multibyte = 1;")))
-(m40-imp0--check "dst-multibyte-at-6886"
-                 (eql 6886 (m40-imp0--line-of
+(m40-imp0--check "dst-multibyte-at-7063"
+                 (eql 7063 (m40-imp0--line-of
                             "src/process.c"
                             "coding->dst_multibyte = 0;")))
 

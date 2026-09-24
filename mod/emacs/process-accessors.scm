@@ -29,6 +29,16 @@
 ;;;
 ;;; And the disabled `process-connection' DEFUN (#if 0, never built).
 ;;;
+;;; M40 imp-3 adds two more: process-tty-name (a multi-slot read of
+;;; tty_name / stderrproc / pty_in / pty_out plus the
+;;; stdin / stdout / stderr stream test) and
+;;; process-inherit-coding-system-flag (a plain read of the
+;;; inherit_coding_system_flag slot).  The struct slots stay C; the
+;;; module reads them through --process-ref.  This build is a
+;;; subprocesses build, so the old #ifdef / #else non-subprocesses
+;;; global fallback of process-inherit-coding-system-flag is gone.
+;;; The durable record is docs/kb.org ** M40.
+;;;
 ;;; Names that stay C in this imp, with the reason (brief.org §6 rule 2
 ;;; allows a not-thin name to leave the batch):
 ;;;
@@ -39,14 +49,9 @@
 ;;;                         list; not a plain slot.
 ;;;   process-name       -- a plain slot, but src/fns.c:2935 calls
 ;;;                         Fprocess_name, so the DEFUN cannot retire.
-;;;   process-tty-name   -- reads four slots (tty_name, pty_in, pty_out,
-;;;                         stderrproc) plus a stream argument.
 ;;;   process-type       -- calls the get_process mechanism.
 ;;;   waiting-for-user-input-p -- reads a C global flag, not a process
 ;;;                         slot.
-;;;   process-inherit-coding-system-flag -- a plain read, but the DEFUN
-;;;                         has an #ifdef subprocesses / #else dual path
-;;;                         with a non-subprocesses global fallback.
 ;;;   set-process-buffer, set-process-filter, set-process-sentinel,
 ;;;   set-process-thread -- each has side work (fd mask, update_process_
 ;;;                         mark, childp plist_put, fd_callback_info,
@@ -71,7 +76,9 @@
             elisp-process-query-on-exit-flag
             elisp-set-process-query-on-exit-flag
             elisp-set-process-inherit-coding-system-flag
-            elisp-set-process-plist))
+            elisp-set-process-plist
+            elisp-process-tty-name
+            elisp-process-inherit-coding-system-flag))
 
 ;; The C bridge.  Each body calls the subr through `symbol-function' (an
 ;; imported binding) so the inlined elisp carries no module-local free
@@ -124,3 +131,49 @@
 (define-elisp-inline (set-process-plist process plist)
   ((symbol-function '--process-set!) process '--set-plist plist)
   plist)
+
+;; M40 imp-3.  process-inherit-coding-system-flag is a plain read of the
+;; inherit_coding_system_flag bit-field slot.  --process-ref returns Qt
+;; or Qnil for it, so the body returns that value unchanged.
+
+(define-elisp-inline (process-inherit-coding-system-flag process)
+  ((symbol-function '--process-ref) process 'inherit_coding_system_flag))
+
+;; M40 imp-3.  process-tty-name takes 1-2 arguments (PROCESS and an
+;; optional STREAM).  define-elisp-inline expands to a plain `define',
+;; which cannot take #:optional, so the body takes a rest list and reads
+;; the optional argument from it; a missing argument is #nil (elisp nil).
+;;
+;; The C branch order: nil -> tty_name; `stdin' -> pty_in then tty_name;
+;; `stdout' -> pty_out then tty_name; `stderr' -> pty_out and no
+;; stderrproc, then tty_name; anything else signals an error.
+;;
+;; The unknown-stream branch reproduces the C signal_error: the C ran
+;; signal_error ("Unknown stream", stream), so the error data is the
+;; list ("Unknown stream" STREAM).  The body reaches the `signal' subr
+;; (an imported binding) and passes `error' plus the two-element list, so
+;; the stream datum stays in the error data.  (`error' would format the
+;; message and drop STREAM, because the message string holds no %-spec.)
+
+(define-elisp-inline (process-tty-name process . rest)
+  (let ((stream (if (null? rest) #nil (car rest))))
+    (cond
+      ((eq? stream #nil)
+       ((symbol-function '--process-ref) process 'tty_name))
+      ((eq? stream 'stdin)
+       (if (eq? ((symbol-function '--process-ref) process 'pty_in) #nil)
+           #nil
+           ((symbol-function '--process-ref) process 'tty_name)))
+      ((eq? stream 'stdout)
+       (if (eq? ((symbol-function '--process-ref) process 'pty_out) #nil)
+           #nil
+           ((symbol-function '--process-ref) process 'tty_name)))
+      ((eq? stream 'stderr)
+       (if (and (not (eq? ((symbol-function '--process-ref) process 'pty_out)
+                          #nil))
+                (eq? ((symbol-function '--process-ref) process 'stderrproc)
+                     #nil))
+           ((symbol-function '--process-ref) process 'tty_name)
+           #nil))
+      (else ((symbol-function 'signal) 'error
+                                    (list "Unknown stream" stream))))))

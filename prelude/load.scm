@@ -174,6 +174,9 @@
 ;; M39 imp-4 — process.c signal family decision path in
 ;; (emacs process-signal).
 (use-modules (emacs process-signal))
+;; M40 imp-4a — process.c Group C small-gate decisions in
+;; (emacs process-lifecycle).
+(use-modules (emacs process-lifecycle))
 ;; M32 imp-4 — eval.c probably_quit decision in (emacs eval-main).
 (use-modules (emacs eval-main))
 ;; M32 imp-5 — sysdep.c emacs_full_write EINTR drain in (emacs sysdep-main).

@@ -19,21 +19,37 @@
 ;;;                                    Fprocess_send_region
 ;;;                                    (src/process.c:7033-7034).
 ;;;
-;;; Deviation from brief.org Step 3: the multibyte-versus-unibyte
-;;; encoding branch of send_process (pre-M39 :6790-6843, the largest
-;;; decision of the region) stays C in this imp.  Its predicate is
+;;; M40 imp-2 moves the multibyte-versus-unibyte *decision* of
+;;; send_process (src/process.c, the previous predicate at :6843-6846)
+;;; into this module as send-process-object-multibyte?.  Its predicate is
 ;;; `(STRINGP (object) && STRING_MULTIBYTE (object))
 ;;;  || (BUFFERP (object) && enable-multibyte-characters) || EQ (object, Qt)'.
-;;; A faithful Scheme port needs a Scheme-side STRING_MULTIBYTE and a
-;;; Scheme-side buffer enable-multibyte-characters read.  In this build
-;;; multibyte-string-p is a stub (mod/emacs/strings.scm elisp-multibyte-
-;;; string-p returns nil always), while the C STRING_MULTIBYTE is a real
-;;; test (src/lisp.h:1199-1206).  Moving the branch now would need a new
-;;; C shim or a behavior change on the send path -- against the "no C
-;;; fallback" rule.  The rule of `:6819` (NETCONN_P -> wait_while_connecting)
-;;; also stays C, because brief.org Step 3 names wait_while_connecting a
-;;; mechanism.  A follow-up imp ports both.  See docs/m39-plan.org
-;;; §"Imp list" (imp-2b) and docs/kb.org ** M39.
+;;; Two imp-2 exports supply the terms:
+;;;
+;;;   process-string-needs-encoding? -- the STRINGP + STRING_MULTIBYTE
+;;;                                     term, under a *process-local*
+;;;                                     name.  It answers the C question
+;;;                                     ("does this string need
+;;;                                     encoding"), not the elisp-visible
+;;;                                     question.  The elisp name
+;;;                                     multibyte-string-p stays nil.
+;;;   send-process-object-multibyte? -- the whole if-condition.  It ORs
+;;;                                     the string term, the imp-1 buffer
+;;;                                     term (object-enable-multibyte-characters),
+;;;                                     and the Qt term.
+;;;
+;;; The string term uses the C STRING_MULTIBYTE rule (src/lisp.h:1196-1207):
+;;; a string is multibyte when its UTF-8 byte length differs from its
+;;; character length.  Guilemacs keeps no unibyte string representation, so
+;;; the elisp multibyte-string-p stays nil and this process-local helper
+;;; mirrors the C byte-length rule instead.  A faithful multibyte-string-p
+;;; needs a shared unibyte flag on strings, a separate candidate task.
+;;; See docs/m40-plan.org §3.1 and docs/kb.org ** M40.
+;;;
+;;; The two arms (the coding-system setup, complement_process_encoding_system,
+;;; the raw-text fallback, the byte-position code) and the rule of
+;;; `:6841-6845` (NETCONN_P -> wait_while_connecting) stay C.  brief.org
+;;; Step 3 names wait_while_connecting a mechanism.
 ;;;
 ;;; The C keeps the mechanism the recipe names: update_status, error,
 ;;; CHAR_TO_BYTE, move_gap_both, BYTE_POS_ADDR, get_process, SSDATA,
@@ -48,9 +64,13 @@
 (define-module (emacs process-io)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
+  #:use-module (rnrs bytevectors)     ; string->utf8, bytevector-length
+  #:use-module (emacs text-properties) ; emacs-string?, emacs-string-content
   #:declarative? #t
   #:export (send-process-state-decision
             process-send-region-gap-move?
+            process-string-needs-encoding?
+            send-process-object-multibyte?
             object-enable-multibyte-characters))
 
 ;; Outcome codes of send-process-state-decision.  The C caller
@@ -115,3 +135,73 @@ Scheme #f can never leak and read as elisp true."
                #nil)
           #nil
           #t)))
+
+;;; ----------------------------------------------------------------
+;;; M40 imp-2: the send_process multibyte-versus-unibyte decision
+;;; ----------------------------------------------------------------
+;;;
+;;; The branch predicate of send_process:
+;;; `(STRINGP (object) && STRING_MULTIBYTE (object))
+;;;  || (BUFFERP (object) && enable-multibyte-characters) || EQ (object, Qt)'.
+;;; The three terms map to: process-string-needs-encoding?,
+;;; object-enable-multibyte-characters (imp-1), and the Qt test.
+
+(define (process-string-needs-encoding? object)
+  "Return elisp t when OBJECT is a string whose C STRING_MULTIBYTE test
+is true, else elisp nil (#nil).  This is the STRINGP + STRING_MULTIBYTE
+term of the send_process decision, under a *process-local* name.
+
+The rule is the C one (src/lisp.h:1196-1207): a string is multibyte when
+its UTF-8 byte length differs from its character length.  A non-string
+OBJECT returns nil, so the caller may pass any object (the C tests
+STRINGP first).
+
+Do NOT confuse this name with the elisp `multibyte-string-p': that name
+stays nil (mod/emacs/strings.scm, FIX-20260921-guilemacs), because a
+faithful answer needs a unibyte flag on strings and the byte-length rule
+breaks bindat-unpack.  This helper answers the process question only.
+See docs/m40-plan.org §3.1.
+
+The STRINGP test accepts both a plain Guile string and an emacs-string
+wrapper (a text-property string).  It does NOT use the elisp `stringp':
+that predicate is broken for text-property strings (see docs/kb.org
+Gotcha stringp-false-for-text-property-strings).  The wrapper content is
+unwrapped before the byte count, so a propertized string reads the same
+as a plain one."
+  (cond
+    ((string? object)
+     (if (not (= (bytevector-length (string->utf8 object))
+                 (string-length object)))
+         #t
+         #nil))
+    ((emacs-string? object)
+     (let ((content (emacs-string-content object)))
+       (if (not (= (bytevector-length (string->utf8 content))
+                   (string-length content)))
+           #t
+           #nil)))
+    (else #nil)))
+
+(define (send-process-object-multibyte? object)
+  "Return elisp t when the send_process multibyte arm runs for OBJECT,
+else elisp nil (#nil).  This is the whole if-condition of the C:
+
+  (STRINGP (object) && STRING_MULTIBYTE (object))
+  || (BUFFERP (object) && enable-multibyte-characters)
+  || EQ (object, Qt)
+
+The three terms: process-string-needs-encoding?, the imp-1 buffer
+predicate object-enable-multibyte-characters, and the Qt test.  The C
+caller (src/process.c send_process_object_multibyte_decision) reads the
+result with !NILP.  The result is forced to a boolean, so a Scheme #f
+can never leak and read as elisp true.
+
+The Qt term mirrors the C EQ (object, Qt).  In this tree Qt is
+SCM_BOOL_T (src/lread.c:2878), so Qt reaches Scheme as #t.  The Guile
+symbol t is NOT Qt: the C EQ (object, Qt) is false for it, so this
+predicate returns #nil for the symbol t (docs/kb.org ** M40)."
+  (if (or (eq? (process-string-needs-encoding? object) #t)
+          (eq? (object-enable-multibyte-characters object) #t)
+          (eq? object #t))
+      #t
+      #nil))

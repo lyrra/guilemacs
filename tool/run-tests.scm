@@ -204,11 +204,15 @@
   "test/m39/test-m39-imp3-e2e.el"              ; M39 imp-3 e2e: the moved accessors called on a live pipe process
   "test/m39/test-m39-imp4.el"                  ; M39 imp-4: the process signal family moved into (emacs process-signal); the retired DEFUNs, the --signal-* bridge, the type slot row, the image.c rewire
   "test/m39/test-m39-imp4-e2e.el"              ; M39 imp-4 e2e: the moved signal names called live (fboundp, signal-process, the stop/continue gate)
-  "test/m39/test-m39-imp5.el"                  ; M39 imp-5 close-out: the surface table, the two line pins (5465, 8278), the M39 state words in the durable record, and this registration (corpus registers ERT tests)
+  "test/m39/test-m39-imp5.el"                  ; M39 imp-5 close-out: the end-to-end process surface (configure, talk, wait, signal), the M39 state words in the durable record, and this registration (corpus registers ERT tests)
   )
-(group (m40) ; M40 imp-0 audit + imp-1 multibyte predicates (docs/m40-plan.org)
-  "test/m40/test-m40-imp0-audit.el"           ; M40 imp-0 audit: the base re-scan, the send_process line pins, the doc pins
+(group (m40) ; M40 imp-0 audit + imp-1 multibyte predicates + imp-2 send_process decision + imp-3 Group A accessors (docs/m40-plan.org)
+  "test/m40/test-m40-imp0-audit.el"           ; M40 imp-0 audit: the base re-scan, the send_process line pins, the doc pins (corpus registers ERT tests)
   "test/m40/test-m40-imp1.el"                 ; M40 imp-1: the multibyte-string-p deviation and the buffer enable-multibyte-characters read
+  "test/m40/test-m40-imp2.el"                 ; M40 imp-2: the send_process multibyte-versus-unibyte decision moved to (emacs process-io); the two predicates and the src/process.c wiring
+  "test/m40/test-m40-imp3.el"                 ; M40 imp-3: process-tty-name and process-inherit-coding-system-flag moved to (emacs process-accessors); the four new table rows and the two removed DEFUNs
+  "test/m40/test-m40-imp4a.el"                ; M40 imp-4a: the Group C small-gate decisions moved to (emacs process-lifecycle); set-process-window-size / set-process-coding-system / process-datagram-address / set-process-datagram-address and the src/process.c wiring
+  "test/m40/test-m40-imp4b.el"                ; M40 imp-4b: the remaining Group C decisions moved to (emacs process-lifecycle); delete-process / process-send-eof / internal-default-process-filter / internal-default-process-sentinel and the src/process.c wiring
   )
 (group
   "test/src/eval-tests.el"
