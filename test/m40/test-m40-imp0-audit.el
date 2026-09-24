@@ -8,8 +8,9 @@
 ;;; files.
 ;;;
 ;;; It covers:
-;;;   D1 -- docs/m40-plan.org exists and names the base commit 764ec06
-;;;         and the target src/process.c.
+;;;   D1 -- docs/m40-plan.org exists and names the base commit 403e316
+;;;         (the imp-5 close-out base; was 764ec06 at imp-0) and the
+;;;         target src/process.c.
 ;;;   D2 -- the base re-scan is exact: src/process.c is 9,030 lines, 50
 ;;;         DEFUNs, and 10 ==--== shims.  (M40 imp-2 added 19 lines,
 ;;;         imp-3 retired two DEFUNs, imp-4a added the four Group C
@@ -64,8 +65,15 @@ whatever this returns, so `m40-imp0-absent' propagates automatically;
       (search-forward needle nil t))))
 
 (defun m40-imp0--lines (rel)
-  "Count the lines of REL the way `wc -l' does (newline count)."
-  (m40-imp0--with rel (lambda () (count-lines (point-min) (point-max)))))
+  "Count the lines of REL the way `wc -l' does (newline count).
+Count newlines, not `count-lines': a file without a final newline
+would otherwise read one line high."
+  (m40-imp0--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (let ((n 0))
+        (while (search-forward "\n" nil t) (setq n (1+ n)))
+        n))))
 
 (defun m40-imp0--count (rel regexp)
   "Count the matches of REGEXP in REL."
@@ -95,6 +103,26 @@ sync with the git-tracked test/code work)."
       (princ (format "%s m40/imp0/%s\n" (if ok "PASS" "FAIL") name))
       (imp-register-bool-as-ert-test (format "m40-imp0/%s" name) ok))))
 
+(defun m40-imp0--doc-check (name rel needle)
+  "Report and register one check on a *non-durable* record.  PASS and
+register an ERT test when REL (repo-root-relative) holds NEEDLE.
+INFO-skip when REL is absent OR present but stale.  docs/ is gitignored
+(.gitignore:31), so no commit can carry it: a stale document is a fact
+of the checkout, not a code regression, and must not turn the gate red
+(cr.org F3).  Use `m40-imp0--check' for a tracked file (src/, test/,
+tool/), where a present-but-stale value stays a real FAIL."
+  (let ((hit (m40-imp0--contains-p rel needle)))
+    ;; `m40-imp0--contains-p' returns the value of `search-forward' -- a
+    ;; position on a hit, nil on no hit, or the symbol `m40-imp0-absent'
+    ;; when the file is absent.  So test truthiness, not `(eq hit t)':
+    ;; `search-forward' never returns t, and `(eq hit t)' was always nil,
+    ;; so this check never reported PASS (cr.org F1).
+    (if (and hit (not (eq hit 'm40-imp0-absent)))
+        (progn (princ (format "PASS m40/imp0/%s\n" name))
+               (imp-register-bool-as-ert-test (format "m40/imp0/%s" name) t))
+      (princ (format "INFO m40/imp0/%s skipped (%s, gitignored record)\n"
+                     name (if (eq hit 'm40-imp0-absent) "absent" "stale"))))))
+
 ;;; --- 1. docs/m40-plan.org: the base, the target, the choice ----------
 
 ;; docs/ is gitignored: report presence as INFO, not a counted PASS/FAIL --
@@ -106,16 +134,19 @@ sync with the git-tracked test/code work)."
               (if (file-readable-p (expand-file-name "docs/m40-plan.org"
                                                       m40-imp0--root))
                   "PASS" "FAIL")))
-(m40-imp0--check "plan-base-764ec06"
-                 (m40-imp0--contains-p "docs/m40-plan.org"
-                                       "#+base: HEAD = 764ec06"))
-(m40-imp0--check "plan-target-process.c"
-                 (m40-imp0--contains-p "docs/m40-plan.org"
-                                       "#+target: src/process.c"))
+;; imp-5 updated the plan header: the base is the M40 re-land commit
+;; 403e316 (the value at the imp-5 close-out), not the M39 close-out
+;; 764ec06 (brief.org §3.5).
+(m40-imp0--doc-check "plan-base-403e316"
+                     "docs/m40-plan.org"
+                     "#+base: HEAD = 403e316")
+(m40-imp0--doc-check "plan-target-process.c"
+                     "docs/m40-plan.org"
+                     "#+target: src/process.c")
 ;; The imp-0 result must record the restored m39 plan file as the choice.
-(m40-imp0--check "plan-records-m39-plan-choice"
-                 (m40-imp0--contains-p "docs/m40-plan.org"
-                                       "Choice: restore =docs/m39-plan.org="))
+(m40-imp0--doc-check "plan-records-m39-plan-choice"
+                     "docs/m40-plan.org"
+                     "Choice: restore =docs/m39-plan.org=")
 
 ;;; --- 2. The base re-scan is exact ------------------------------------
 ;;;
@@ -178,11 +209,13 @@ sync with the git-tracked test/code work)."
 
 ;; cr.org F3: 24e24e3 is the pre-rebase close-out; a rebase rewrote it to
 ;; 764ec06.  The road map must name the reachable commit.
-(m40-imp0--check "overview-has-current-hash"
-                 (m40-imp0--contains-p "docs/milestone-overview.org"
-                                       "imp-5 =764ec06= close-out"))
+(m40-imp0--doc-check "overview-has-current-hash"
+                     "docs/milestone-overview.org"
+                     "imp-5 =764ec06= close-out")
 (m40-imp0--check "overview-has-no-dead-hash"
-                 (not (m40-imp0--contains-p "docs/milestone-overview.org"
-                                            "24e24e3")))
+                 (let ((hit (m40-imp0--contains-p
+                             "docs/milestone-overview.org" "24e24e3")))
+                   (if (eq hit 'm40-imp0-absent) 'm40-imp0-absent
+                     (not hit))))
 
 (princ "=== m40 imp-0 audit suite done ===\n")
