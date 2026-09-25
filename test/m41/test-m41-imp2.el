@@ -95,9 +95,9 @@
           (princ (format "FAIL %s %S\n" name (cdr result)))))))
 
     ;; --- Cross-file number: the tree-wide scm_c_public_ref re-pin ----
-    ;; The two imp-2 sites move the count 172 -> 174 (brief.org 8).
-    (m41-imp2--check "tree-wide-scm-public-ref-174"
-                     (eql 174 (m41-imp2--tree-wide-scm-public-ref)))
+    ;; The imp-2 and imp-3 sites move the count 172 -> 177.
+    (m41-imp2--check "tree-wide-scm-public-ref-177"
+                     (eql 177 (m41-imp2--tree-wide-scm-public-ref)))
 
     ;; --- End-to-end: the live DEFUN through the C boundary (cr.org F6) -
     ;; The .scm corpus checks the module return only.  These calls reach

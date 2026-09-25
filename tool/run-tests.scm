@@ -194,6 +194,7 @@
 (group (m41) ; M41 imp-1 audit: the src/xdisp.c DEFUN classification and the caller map (docs/m41-plan.org)
   "test/m41/test-m41-imp1.el"                 ; M41 imp-1 audit: the base numbers, the 24 DEFUN classification words, the reclaimable/blocked caller map, and the (emacs xdisp) module (corpus reads files only)
   "test/m41/test-m41-imp2.el"                 ; M41 imp-2: the long-line-optimizations-p and invisible-p decisions moved to (emacs xdisp); the two static C dispatchers, the mapping unit checks, and the scm_c_public_ref re-pins (corpus reads files only)
+  "test/m41/test-m41-imp3.el"                 ; M41 imp-3: the set-buffer-redisplay, get-display-property, and lookup-image-map decisions moved to (emacs xdisp); the three static C dispatchers and the scm_c_public_ref re-pins (corpus reads files only)
   )
 (group
   "test/src/eval-tests.el"

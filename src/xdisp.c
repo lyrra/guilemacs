@@ -1044,14 +1044,29 @@ wset_update_mode_line (struct window *w)
   wset_redisplay (w);
 }
 
+/* The Fset_buffer_redisplay write decision (src/xdisp.c 1047 at the
+   imp-3 base a5514e10).  The C keeps the two slot writes.  brief.org
+   4.1.  */
+static Lisp_Object
+set_buffer_redisplay_decision (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp", "xdisp-set-buffer-redisplay");
+  return SCM_CALL_0 (proc);
+}
+
 DEFUN ("set-buffer-redisplay", Fset_buffer_redisplay,
        Sset_buffer_redisplay, 4, 4, 0,
        doc: /* Mark the current buffer for redisplay.
 This function may be passed to `add-variable-watcher'.  */)
   (Lisp_Object symbol, Lisp_Object newval, Lisp_Object op, Lisp_Object where)
 {
-  bset_update_mode_line (current_buffer);
-  current_buffer->prevent_redisplay_optimizations_p = true;
+  if (!NILP (set_buffer_redisplay_decision ()))
+    {
+      bset_update_mode_line (current_buffer);
+      current_buffer->prevent_redisplay_optimizations_p = true;
+    }
   return Qnil;
 }
 
@@ -5976,6 +5991,19 @@ display_min_width (struct it *it, ptrdiff_t charpos,
     }
 }
 
+/* The Fget_display_property source decision (src/xdisp.c 5979 at the
+   imp-3 base a5514e10).  The C keeps Fget_text_property, CHECK_LIST,
+   and find_display_property.  brief.org 4.2.  */
+static Lisp_Object
+get_display_property_decision (Lisp_Object properties)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-get-display-property-use-text-prop-p");
+  return SCM_CALL_1 (proc, properties);
+}
+
 DEFUN ("get-display-property", Fget_display_property,
        Sget_display_property, 2, 4, 0,
        doc: /* Get the value of the `display' property PROP at POSITION.
@@ -5987,7 +6015,7 @@ properties at POSITION.  */)
   (Lisp_Object position, Lisp_Object prop, Lisp_Object object,
    Lisp_Object properties)
 {
-  if (NILP (properties))
+  if (!NILP (get_display_property_decision (properties)))
     properties = Fget_text_property (position, Qdisplay, object);
   else
     CHECK_LIST (properties);
@@ -35761,6 +35789,19 @@ find_hot_spot (Lisp_Object map, int x, int y)
   return Qnil;
 }
 
+/* The Flookup_image_map empty-map decision (src/xdisp.c 35764 at the
+   imp-3 base a5514e10).  The C keeps CHECK_FIXNUM, clip_to_bounds, and
+   find_hot_spot.  brief.org 4.3.  */
+static Lisp_Object
+lookup_image_map_decision (Lisp_Object map)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-lookup-image-map-empty-p");
+  return SCM_CALL_1 (proc, map);
+}
+
 DEFUN ("lookup-image-map", Flookup_image_map, Slookup_image_map,
        3, 3, 0,
        doc: /* Lookup in image map MAP coordinates X and Y.
@@ -35775,7 +35816,7 @@ vector describes one corner in the polygon.
 Returns the alist element for the first matching AREA in MAP.  */)
   (Lisp_Object map, Lisp_Object x, Lisp_Object y)
 {
-  if (NILP (map))
+  if (!NILP (lookup_image_map_decision (map)))
     return Qnil;
 
   CHECK_FIXNUM (x);

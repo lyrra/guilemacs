@@ -164,8 +164,9 @@
 (check "m41/imp2/c/keeps-invisibility-macro" #t
        (contains? xdisp-c "TEXT_PROP_MEANS_INVISIBLE (prop)"))
 
-;; The two imp-2 scm_c_public_ref sites land: xdisp.c count 7 -> 9.
-(check "m41/imp2/c/xdisp-scm-public-ref-9" 9
+;; The imp-2 scm_c_public_ref sites land, plus the three imp-3 sites:
+;; xdisp.c count 7 -> 12.
+(check "m41/imp2/c/xdisp-scm-public-ref-12" 12
        (count-occurrences xdisp-c "scm_c_public_ref"))
 
 ;;; --- 5. Static: the harness registers the new corpus --------------

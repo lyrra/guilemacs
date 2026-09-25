@@ -10,7 +10,7 @@
 ;;; call, the push_kboard / pop_kboard unwind frame, the dynwind blocks,
 ;;; and the NILP test of the S5 reader.  See brief.org 3, 4, 6.
 ;;;
-;;; Eight exported procedures.
+;;; Eleven exported procedures.
 ;;;
 ;;; imp-5 (the part-1 hook callers):
 ;;;
@@ -72,7 +72,10 @@
             xdisp-pop-kboard!
             xdisp-overriding-local-map-menu-flag-p
             xdisp-long-line-optimizations-p
-            xdisp-invisible-p))
+            xdisp-invisible-p
+            xdisp-set-buffer-redisplay
+            xdisp-get-display-property-use-text-prop-p
+            xdisp-lookup-image-map-empty-p))
 
 ;; (emacs command-loop) holds the safe_run_hooks ports.  Resolve each
 ;; lazily, so the module does not eagerly import (emacs command-loop)
@@ -195,3 +198,56 @@
    ((= invis 0) #nil)
    ((= invis 1) #t)
    (else invis)))
+
+;;; --- M41 imp-3: the three thin accessors ---------------------------
+;;; Each name keeps its C DEFUN and its elisp name.  The C computes the
+;;; mechanism facts and calls the module for the *decision* only.  No C
+;;; fallback.  brief.org 3, 4.
+;;;
+;;; NILP width.  The two ported tests below replace a C NILP test.  NILP
+;;; is scm_is_lisp_false (src/lisp.h:342): it is true for #nil, #f, and
+;;; ().  The Scheme test must keep that width, or a Scheme #f (=
+;;; (eval-scheme "#f")) takes the wrong branch (cr.org F1).  %lisp-false?
+;;; mirrors scm_is_lisp_false.  The imp-6 reader above keeps the width
+;;; in the C; here the width is kept in Scheme.
+
+;; Mirror of scm_is_lisp_false: true for elisp nil (#nil), Scheme false
+;; (#f), and the empty list ().  cr.org F1.
+(define (%lisp-false? x)
+  (or (eq? x #nil) (eq? x #f) (null? x)))
+
+;;; --- xdisp-set-buffer-redisplay ------------------------------------
+;;; Port of the Fset_buffer_redisplay write decision (src/xdisp.c 1047
+;;; at the imp-3 base a5514e10):
+;;;   bset_update_mode_line (current_buffer);
+;;;   current_buffer->prevent_redisplay_optimizations_p = true;
+;;; The C keeps the two slot writes (update_mode_line and
+;;; prevent_redisplay_optimizations_p).  The module owns the write
+;;; decision: mark the current buffer for redisplay.  Return elisp t;
+;;; the C keeps the NILP test and runs the writes.  brief.org 4.1.
+(define (xdisp-set-buffer-redisplay) #t)
+
+;;; --- xdisp-get-display-property-use-text-prop-p --------------------
+;;; Port of the Fget_display_property source decision (src/xdisp.c 5979
+;;; at the imp-3 base a5514e10):
+;;;   if (NILP (properties))
+;;;     properties = Fget_text_property (position, Qdisplay, object);
+;;; Return elisp t when the C must read the `display' text property
+;;; (PROPERTIES is nil), else elisp nil.  The nil test is NILP-wide: #nil,
+;;; #f, and () are all elisp nil (cr.org F1).  The C keeps
+;;; Fget_text_property, CHECK_LIST, and the find_display_property scan.
+;;; brief.org 4.2.
+(define (xdisp-get-display-property-use-text-prop-p properties)
+  (if (%lisp-false? properties) #t #nil))
+
+;;; --- xdisp-lookup-image-map-empty-p --------------------------------
+;;; Port of the Flookup_image_map empty-map decision (src/xdisp.c 35764
+;;; at the imp-3 base a5514e10):
+;;;   if (NILP (map))
+;;;     return Qnil;
+;;; Return elisp t when MAP is empty (the C returns nil at once), else
+;;; elisp nil.  The nil test is NILP-wide: #nil, #f, and () are all elisp
+;;; nil (cr.org F1).  The C keeps CHECK_FIXNUM, clip_to_bounds, and the
+;;; find_hot_spot helper.  brief.org 4.3.
+(define (xdisp-lookup-image-map-empty-p map)
+  (if (%lisp-false? map) #t #nil))
