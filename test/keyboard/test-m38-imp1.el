@@ -12,8 +12,7 @@
 ;;; to prove the harness really exits 1 on a live count mismatch.  That
 ;;; nested run-tests.sh-inside-run-tests.sh recursion made every batch
 ;;; that includes this file re-run a chunk of the suite as a subprocess,
-;;; which is slow and, combined with the similar recursion in
-;;; test-m38-imp2/3/4.el, was mistaken for a hang.  Removed; the fixture
+;;; which is slow and was mistaken for a hang.  Removed; the fixture
 ;;; test/m38/test-m38-imp1-fixture.el still exists and can be exercised
 ;;; by hand with GUILEMACS_M38_FIXTURE=middle|last if this needs
 ;;; re-proving.

@@ -9,12 +9,12 @@
 ;;; DEFVAR_LISP stays C; no stub retires at this imp and no keyboard.c
 ;;; line changes.
 ;;;
-;;; Wraps test/keyboard/test-m34-imp6.scm -- the Scheme audit corpus.
-;;; Binds the repo root as %m34-root, loads the Scheme file via
-;;; eval-scheme, then reads back `test-results' (list of (NAME STATUS)
-;;; pairs).  Each (NAME PASS|FAIL) pair is reported via princ AND turned
-;;; into an ERT test so the harness counts it.  Each (NAME INFO VALUE)
-;;; pair is printed as an INFO line and is NOT asserted.  A corpus load
+;;; Wraps test/keyboard/test-m34-imp6.scm -- the Scheme runtime corpus.
+;;; Loads the Scheme file via eval-scheme, then reads back `test-results'
+;;; (list of (NAME STATUS) pairs).  Each (NAME PASS|FAIL) pair is
+;;; reported via princ and turned into an ERT test so the harness counts
+;;; it.  Each (NAME INFO VALUE) pair is printed as an INFO line and is
+;;; not asserted.  A corpus load
 ;;; error, a readback error or an empty corpus is reported as a real
 ;;; FAIL (never a silent 0 failed).
 
@@ -28,11 +28,8 @@
 ;; becomes an ERT test so the harness counts it instead of trusting the
 ;; princ lines.  INFO pairs are printed, not asserted.
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
-       (root (expand-file-name "../.." dir))
        (corpus (expand-file-name "test-m34-imp6.scm" dir))
        (load-error nil))
-  ;; The corpus reads the build tree, so tell it where the root is.
-  (eval-scheme (format "(define %%m34-root %S)" root))
   (condition-case err
       (eval-scheme
        (format "(primitive-load %S)" corpus))

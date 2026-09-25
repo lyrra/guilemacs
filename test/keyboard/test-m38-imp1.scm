@@ -40,9 +40,7 @@
 ;;;       are both in the group list.
 ;;;
 ;;; There is no automated behavior check: it used to shell out to
-;;; tool/run-tests.sh via call-process from the .el wrapper, which is the
-;;; same run-tests.sh-inside-run-tests.sh recursion removed from
-;;; test-m38-imp2/3/4.el (see test-m38-imp1.el's header).  Exercise the
+;;; tool/run-tests.sh via call-process from the .el wrapper.  Exercise the
 ;;; registered fixture by hand instead:
 ;;;   ./tool/run-tests.sh --filter=m38-imp1-fixture                (green)
 ;;;   GUILEMACS_M38_FIXTURE=middle ./tool/run-tests.sh --filter=m38-imp1-fixture  (exit 1)

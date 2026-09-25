@@ -11,7 +11,7 @@
 ;;; (list of (NAME STATUS) pairs).  Each pair is reported via princ AND
 ;;; turned into an ERT test so the harness counts it.  A corpus load
 ;;; error, a readback error or an empty corpus is a real FAIL (never a
-;;; silent 0 failed).  Same shape as test-m29-imp5.el.
+;;; silent 0 failed), using the shared ERT reporting helper.
 
 (princ "=== m30-imp1 (table-driven cell subr) test suite ===\n")
 

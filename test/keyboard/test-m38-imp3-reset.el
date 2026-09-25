@@ -1,4 +1,4 @@
-;;; test-m38-imp3-reset.el --- M38 imp-3 shared input-state reset.
+;;; test-m38-imp3-reset.el --- shared keyboard input-state reset.
 ;;;
 ;;; brief.org (M38 imp-3, defect D3): the keyboard corpora run in ONE
 ;;; emacs process (tool/run-tests.scm:12), so an input-state name a
@@ -12,11 +12,8 @@
 ;;; The writer corpora call it from unwind-protect, so the clear runs
 ;;; on the normal and on the non-local exit path (§8.1).
 ;;;
-;;; The name list is the single source of truth.  test/keyboard/
-;;; test-m38-imp3.scm reads this file and checks each writer restores
-;;; exactly the names of §5.1 (drift guard).  A copied helper cannot
-;;; drift from this list without failing that check (review F2 of
-;;; cr-m38-imp2-response.org).
+;;; The name list is the single source of truth used by the keyboard
+;;; ERT tests that call this helper.
 
 (provide 'm38-imp3-reset)
 

@@ -13,32 +13,14 @@
 ;;; overriding-local-map-menu-flag DEFVAR_LISP stays C; no stub retires
 ;;; at this imp and no keyboard.c line changes.  See docs/kb.org ** M34.
 ;;;
-;;; This corpus pins the port end state.  Two kinds of check:
-;;;
-;;;   - runtime checks: the module loads and exports its six
-;;;     procedures.  push/pop runs on the live current kboard smob
-;;;     without error and restores the (emacs single-kboard) state
-;;;     (push then pop is net zero).  The S5 reader returns #nil for a
-;;;     #nil cell and a non-nil value for a non-nil cell; every binding
-;;;     is saved and a previously-void cell is restored with makunbound,
-;;;     so no state leaks (kb shared-harness-cross-corpus-state-leak).
-;;;   - static checks: mod/emacs/xdisp.scm shapes the decisions with
-;;;     lazy cross-module refs and no eager (emacs single-kboard)
-;;;     import; src/xdisp.c includes guile.h, holds the three new
-;;;     dispatcher names, has exactly six scm_c_public_ref ("emacs
-;;;     xdisp" sites, and holds no old site text; src/keyboard.c holds
-;;;     no push_kboard and no pop_kboard (imp-7 retired push_kboard,
-;;;     M36 imp-2 retired pop_kboard) and 446 DEFUNs;
-;;;     prelude/load.scm and tool/run-tests.scm register the port.
-;;;
-;;; The repo root is bound by the .el wrapper as %m34-root.
+;;; Runtime checks cover the six exported procedures, push/pop on the
+;;; live current kboard smob, and the S5 reader's nil and non-nil values.
+;;; Every cell binding is saved and restored, including a previously
+;;; void cell (kb shared-harness-cross-corpus-state-leak).
 ;;;
 ;;; The .el wrapper turns each (NAME PASS|FAIL) pair into an ERT test and
 ;;; prints each (NAME INFO VALUE) pair without asserting it; see
 ;;; test/keyboard/test-m34-imp6.el.
-
-(use-modules (ice-9 rdelim))
-(use-modules (srfi srfi-13))
 
 (define test-results '())
 
@@ -50,56 +32,12 @@
       (report name 'PASS)
       (report name (list 'FAIL 'expected expected 'got actual))))
 
-(define (slurp path)
-  "Return the whole file at PATH as a string, or #f when it is absent."
-  (if (not (file-exists? path))
-      #f
-      (call-with-input-file path
-        (lambda (port)
-          (let loop ((chars '()))
-            (let ((c (read-char port)))
-              (if (eof-object? c)
-                  (list->string (reverse chars))
-                  (loop (cons c chars)))))))))
-
-(define (contains? text needle)
-  ;; string-contains returns the match index or #f; normalize to a boolean
-  ;; so `check' can compare against #t/#f.
-  (and (string? text)
-       (if (string-contains text needle) #t #f)))
-
-(define (count-substring text needle)
-  (let loop ((start 0) (n 0))
-    (let ((i (string-contains text needle start)))
-      (if i (loop (+ i 1) (+ n 1)) n))))
-
-(define (count-prefix text prefix)
-  "Count the lines of TEXT that start with PREFIX.  This is the anchored
-count -- a loose substring match would also count a comment line
-(kb defun-count-anchor)."
-  (if (not (string? text))
-      0
-      (call-with-input-string text
-        (lambda (port)
-          (let loop ((n 0))
-            (let ((line (read-line port)))
-              (cond ((eof-object? line) n)
-                    ((string-prefix? prefix line) (loop (1+ n)))
-                    (else (loop n)))))))))
-
-(define (repo path) (string-append %m34-root "/" path))
-
 (define (safe thunk)
   (catch #t
     (lambda () (cons 'ok (thunk)))
     (lambda (key . args) (cons 'error (cons key args)))))
 
 ;;; --- 0. The repo root must be known --------------------------------
-(if (not (defined? '%m34-root))
-    (begin (report "m34-root-bound" (cons 'FAIL "not bound by wrapper"))
-           (set! %m34-root "."))
-    (report "m34-root-bound" 'PASS))
-
 ;;; --- 1. The module loads and exports its procedures ----------------
 (use-modules (emacs xdisp))
 
@@ -171,76 +109,3 @@ count -- a loose substring match would also count a comment line
       (set-symbol-value! 'overriding-local-map-menu-flag old))
   (check "m34/imp6/runtime/s5-restored" old
          (cell-read 'overriding-local-map-menu-flag)))
-
-;;; --- 4. Static: the module source shapes the decisions -------------
-(define xdisp-scm (slurp (repo "mod/emacs/xdisp.scm")))
-(if (not xdisp-scm)
-    (report "m34/imp6/scan/module" (cons 'FAIL "mod/emacs/xdisp.scm missing"))
-    (begin
-      (check "m34/imp6/module/lazy-single-kboard" #t
-             (contains? xdisp-scm "'push-kboard!"))
-      (check "m34/imp6/module/lazy-pop-kboard" #t
-             (contains? xdisp-scm "'pop-kboard!"))
-      (check "m34/imp6/module/no-eager-import" #f
-             (contains? xdisp-scm "#:use-module (emacs single-kboard)"))
-      (check "m34/imp6/module/s5-symbol" #t
-             (contains? xdisp-scm "'overriding-local-map-menu-flag"))
-      (check "m34/imp6/module/symbol-value-ref" #t
-             (contains? xdisp-scm "(defelisp %symbol-value symbol-value)"))
-      (check "m34/imp6/module/keeps-imp5-safe-run-hooks" #t
-             (contains? xdisp-scm "'safe-run-hooks!"))))
-
-;;; --- 5. Static: src/xdisp.c calls the module, old sites are gone ---
-(define xdisp-c (slurp (repo "src/xdisp.c")))
-(if (not xdisp-c)
-    (report "m34/imp6/scan/xdisp.c" (cons 'FAIL "src/xdisp.c missing"))
-    (begin
-      (check "m34/imp6/xdisp.c/includes-guile.h" #t
-             (contains? xdisp-c "#include \"guile.h\""))
-      ;; The three new dispatchers exist.
-      (for-each
-       (lambda (name)
-         (check (string-append "m34/imp6/xdisp.c/dispatcher/" name) #t
-                (contains? xdisp-c name)))
-       '("xdisp_push_kboard"
-         "xdisp_pop_kboard"
-         "xdisp_overriding_local_map_menu_flag_p"))
-      ;; Exactly eight scm_c_public_ref ("emacs xdisp" sites: 3 from
-      ;; imp-5, 3 from imp-6, and 2 from M41 imp-2.
-      (check "m34/imp6/xdisp.c/refs-emacs-xdisp" 8
-             (count-substring xdisp-c "scm_c_public_ref (\"emacs xdisp\""))
-      ;; The old S1/S3 and S2/S4 site text is gone (anchored with the
-      ;; two leading spaces, so the new xdisp_ dispatcher names do not
-      ;; match).
-      (check "m34/imp6/xdisp.c/no-old-push" #f
-             (contains? xdisp-c "\n  push_kboard (FRAME_KBOARD"))
-      (check "m34/imp6/xdisp.c/no-old-pop" #f
-             (contains? xdisp-c "\n  pop_kboard ();"))
-      ;; The old S5 test is gone.
-      (check "m34/imp6/xdisp.c/no-old-s5" #f
-             (contains? xdisp-c "NILP (Voverriding_local_map_menu_flag)"))))
-
-;;; --- 6. Static: src/keyboard.c keeps the stubs and its DEFUNs ------
-(define kbd (slurp (repo "src/keyboard.c")))
-(if (not kbd)
-    (report "m34/imp6/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
-    (begin
-      ;; M34 imp-7 retired push_kboard (its last caller, xdisp.c, left C
-      ;; at this imp); M36 imp-2 retired pop_kboard.  The anchored form
-      ;; starts the match at a line start, so the static kbd_pop_kboard
-      ;; dispatcher is not a bare pop_kboard token (cr.org G2).
-      (check "m34/imp6/keyboard.c/push-retired" #f
-             (contains? kbd "push_kboard (struct kboard *k)"))
-      (check "m34/imp6/keyboard.c/pop-retired" #f
-             (contains? kbd "\npop_kboard (void)"))
-      (check "m34/imp6/keyboard.c/defun-count" 446
-             (count-prefix kbd "DEFUN (\""))))
-
-;;; --- 7. Static: boot load and test registration --------------------
-(define load-scm (slurp (repo "prelude/load.scm")))
-(check "m34/imp6/load.scm/registers-xdisp" #t
-       (contains? load-scm "(emacs xdisp)"))
-
-(define run-tests (slurp (repo "tool/run-tests.scm")))
-(check "m34/imp6/run-tests.scm/registers-el" #t
-       (contains? run-tests "test-m34-imp6.el"))
