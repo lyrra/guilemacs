@@ -102,10 +102,10 @@
 (if (not xdisp)
     (report "m41/imp1/xdisp/absent" (cons 'FAIL "src/xdisp.c missing"))
     (begin
-      (check "m41/imp1/xdisp/lines-38916" 38916 (count-lines xdisp))
+      (check "m41/imp1/xdisp/lines-38949" 38949 (count-lines xdisp))
       (check "m41/imp1/xdisp/defuns-24" 24
              (count-lines-starting xdisp "DEFUN (\""))
-      (check "m41/imp1/xdisp/scm-public-ref-7" 7
+      (check "m41/imp1/xdisp/scm-public-ref-9" 9
              (count-occurrences xdisp "scm_c_public_ref"))))
 
 ;;; --- 2. The classification: reclaimable and blocked ----------------

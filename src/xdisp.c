@@ -579,7 +579,7 @@ xdisp_push_kboard (KBOARD *kb)
   SCM_CALL_1 (proc, make_kboard_smob (kb));
 }
 
-/* Sites S2 and S4 (src/xdisp.c:27788, :28574): the pop_kboard
+/* Sites S2 and S4 (src/xdisp.c:27823, :28609): the pop_kboard
    callers.  */
 static void
 xdisp_pop_kboard (void)
@@ -602,6 +602,41 @@ xdisp_overriding_local_map_menu_flag_p (void)
     proc = scm_c_public_ref ("emacs xdisp",
 			     "xdisp-overriding-local-map-menu-flag-p");
   return SCM_CALL_0 (proc);
+}
+
+/* M41 imp-2 — the src/xdisp.c decision-predicate dispatchers into
+   (emacs xdisp).  One static dispatcher per ported name.  Each caches
+   its SCM proc in a static SCM with the SCM_UNBNDP guard, as the M34
+   dispatchers above and src/process.c do.  The C keeps the mechanism:
+   the current_buffer->long_line_optimizations_p read, FIXNATP /
+   MARKERP, Fget_char_property, Qinvisible, and
+   TEXT_PROP_MEANS_INVISIBLE.  The module owns the decision.  Lisp_Object
+   is SCM and FIXNUMP is SCM_I_INUMP, so a Scheme exact integer returns
+   as the elisp fixnum; the module returns elisp t / #nil / a fixnum and
+   the helper returns it directly.  See mod/emacs/xdisp.scm and
+   brief.org 5.  */
+
+/* The Flong_line_optimizations_p decision (src/xdisp.c 20157 at base
+   a923d55).  Pass the buffer bool as Qt / Qnil.  brief.org 5.  */
+static Lisp_Object
+long_line_optimizations_decision (bool llp)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp",
+			     "xdisp-long-line-optimizations-p");
+  return SCM_CALL_1 (proc, llp ? Qt : Qnil);
+}
+
+/* The Finvisible_p decision (src/xdisp.c 29746 at base a923d55).
+   Pass the TEXT_PROP_MEANS_INVISIBLE code as a fixnum.  brief.org 5.  */
+static Lisp_Object
+invisible_p_decision (int invis)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs xdisp", "xdisp-invisible-p");
+  return SCM_CALL_1 (proc, scm_from_int (invis));
 }
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -20161,7 +20196,7 @@ See `long-line-threshold' and `large-hscroll-threshold' for what these
 optimizations mean and when they are in effect.  */)
   (void)
 {
-  return current_buffer->long_line_optimizations_p ? Qt : Qnil;
+  return long_line_optimizations_decision (current_buffer->long_line_optimizations_p);
 }
 
 /* Redisplay leaf window WINDOW.  JUST_THIS_ONE_P means only
@@ -29764,9 +29799,7 @@ display may depend on `buffer-invisibility-spec', which see.  */)
        ? Fget_char_property (pos, Qinvisible, Qnil)
        : pos);
   int invis = TEXT_PROP_MEANS_INVISIBLE (prop);
-  return (invis == 0 ? Qnil
-	  : invis == 1 ? Qt
-	  : make_fixnum (invis));
+  return invisible_p_decision (invis);
 }
 
 /* Calculate a width or height in pixels from a specification using

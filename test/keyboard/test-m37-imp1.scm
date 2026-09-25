@@ -334,7 +334,7 @@ or #f.  A value must sit in the paragraph that names the metric."
     (check "m37/imp1/count/keyboard-globals.c-lines" 490 (count-substr kg "\n")))
 (define combined (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m37/imp1/count/combined-lines" 11711 combined)
-(check "m37/imp1/count/scm-c-public-ref-sites" 172 (src-site-count))
+(check "m37/imp1/count/scm-c-public-ref-sites" 174 (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------
 (check "m37/imp1/budget/under-11960" #t (<= combined 11960))

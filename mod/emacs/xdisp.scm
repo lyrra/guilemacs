@@ -10,7 +10,7 @@
 ;;; call, the push_kboard / pop_kboard unwind frame, the dynwind blocks,
 ;;; and the NILP test of the S5 reader.  See brief.org 3, 4, 6.
 ;;;
-;;; Six exported procedures.
+;;; Eight exported procedures.
 ;;;
 ;;; imp-5 (the part-1 hook callers):
 ;;;
@@ -70,7 +70,9 @@
             xdisp-run-window-scroll-functions!
             xdisp-push-kboard!
             xdisp-pop-kboard!
-            xdisp-overriding-local-map-menu-flag-p))
+            xdisp-overriding-local-map-menu-flag-p
+            xdisp-long-line-optimizations-p
+            xdisp-invisible-p))
 
 ;; (emacs command-loop) holds the safe_run_hooks ports.  Resolve each
 ;; lazily, so the module does not eagerly import (emacs command-loop)
@@ -158,3 +160,38 @@
 (define (xdisp-overriding-local-map-menu-flag-p)
   (if (eq? ((force %symbol-value) 'overriding-local-map-menu-flag) #nil)
       #nil #t))
+
+;;; --- M41 imp-2: the two decision predicates ------------------------
+;;; Each name keeps its C DEFUN and its elisp name.  The C computes the
+;;; facts the module cannot read and calls the module for the *decision*
+;;; only.  No C fallback.  brief.org 3, 4, 5.
+
+;;; --- xdisp-long-line-optimizations-p -------------------------------
+;;; Port of the Flong_line_optimizations_p decision
+;;; (src/xdisp.c 20157 at base a923d55):
+;;;   return current_buffer->long_line_optimizations_p ? Qt : Qnil;
+;;; The C reads the current_buffer field and passes it as elisp t /
+;;; #nil (Qt is SCM_BOOL_T, i.e. the Scheme #t).  The module owns the
+;;; one-bool -> elisp-value map.  Return elisp t or elisp nil (#nil);
+;;; the C returns the value directly (Lisp_Object).  brief.org 5.
+(define (xdisp-long-line-optimizations-p llp)
+  (if (eq? llp #t) #t #nil))
+
+;;; --- xdisp-invisible-p ---------------------------------------------
+;;; Port of the Finvisible_p decision (src/xdisp.c 29746, base a923d55):
+;;;   int invis = TEXT_PROP_MEANS_INVISIBLE (prop);
+;;;   return (invis == 0 ? Qnil
+;;;           : invis == 1 ? Qt
+;;;           : make_fixnum (invis));
+;;; The C computes INVIS (FIXNATP / MARKERP, Fget_char_property,
+;;; Qinvisible, and TEXT_PROP_MEANS_INVISIBLE) and passes it as a
+;;; fixnum.  The module owns the code -> elisp-value map: 0 -> elisp
+;;; nil (#nil), 1 -> elisp t (#t), any other value -> that fixnum.
+;;; Lisp_Object is SCM (src/lisp.h:474) and FIXNUMP is SCM_I_INUMP
+;;; (src/lisp.h:340), so a Scheme exact integer reads back as the
+;;; elisp fixnum; the helper returns the value directly.  brief.org 5.
+(define (xdisp-invisible-p invis)
+  (cond
+   ((= invis 0) #nil)
+   ((= invis 1) #t)
+   (else invis)))

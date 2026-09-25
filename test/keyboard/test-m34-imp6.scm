@@ -205,9 +205,9 @@ count -- a loose substring match would also count a comment line
        '("xdisp_push_kboard"
          "xdisp_pop_kboard"
          "xdisp_overriding_local_map_menu_flag_p"))
-      ;; Exactly six scm_c_public_ref ("emacs xdisp" sites: 3 from imp-5,
-      ;; 3 from imp-6.
-      (check "m34/imp6/xdisp.c/refs-emacs-xdisp" 6
+      ;; Exactly eight scm_c_public_ref ("emacs xdisp" sites: 3 from
+      ;; imp-5, 3 from imp-6, and 2 from M41 imp-2.
+      (check "m34/imp6/xdisp.c/refs-emacs-xdisp" 8
              (count-substring xdisp-c "scm_c_public_ref (\"emacs xdisp\""))
       ;; The old S1/S3 and S2/S4 site text is gone (anchored with the
       ;; two leading spaces, so the new xdisp_ dispatcher names do not

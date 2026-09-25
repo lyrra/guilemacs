@@ -396,7 +396,7 @@ next top-level `(define ' or the end of TEXT.  #f when SIG is absent."
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
 (check "m36/imp1/count/under-budget" #t
        (<= (+ (count-substr kbd "\n") (count-substr kg "\n")) 11960))
-(check "m36/imp1/count/scm-c-public-ref-sites" 172
+(check "m36/imp1/count/scm-c-public-ref-sites" 174
        (src-site-count))
 
 ;;; --- 8. Static: the corpus is registered in the keyboard group ----

@@ -4,8 +4,10 @@
 ;;; changes no code:
 ;;;
 ;;;   - src/xdisp.c:582 -- "(src/xdisp.c:27739, :28525)" became
-;;;     "(src/xdisp.c:27788, :28574)".  The two xdisp_pop_kboard call
-;;;     sites moved in M34 imp-6.
+;;;     "(src/xdisp.c:27788, :28574)" at M35 imp-1.  The two
+;;;     xdisp_pop_kboard call sites moved in M34 imp-6, and moved again
+;;;     in M41 imp-2, so the comment now reads "(src/xdisp.c:27823,
+;;;     :28609)".
 ;;;   - src/keyboard.c:3927 -- "(term.c:3566)" became "(term.c:3595)".
 ;;;     The tty_menu_discard_mouse_events caller moved in M33 imp-1.
 ;;;
@@ -85,12 +87,12 @@ comment mention of the same text is not."
     (begin
       ;; The comment holds the current numbers and no stale number.
       (check "m35/imp1/xdisp.c/comment-pop_kboard" #t
-             (contains? xdisp-c "(src/xdisp.c:27788, :28574)"))
+             (contains? xdisp-c "(src/xdisp.c:27823, :28609)"))
       (check "m35/imp1/xdisp.c/no-stale-pop_kboard" #f
-             (contains? xdisp-c "(src/xdisp.c:27739, :28525)"))
+             (contains? xdisp-c "(src/xdisp.c:27788, :28574)"))
       ;; The numbers are the real call-site lines: there are exactly two
-      ;; bare "  xdisp_pop_kboard ();" call lines, at 27788 and 28574.
-      (check "m35/imp1/xdisp.c/pop-sites" '(27788 28574)
+      ;; bare "  xdisp_pop_kboard ();" call lines, at 27823 and 28609.
+      (check "m35/imp1/xdisp.c/pop-sites" '(27823 28609)
              (all-line-numbers xdisp-c "  xdisp_pop_kboard ();"))))
 
 ;;; --- 2. src/term.c: the discard_mouse_events caller ----------------

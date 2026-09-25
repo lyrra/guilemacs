@@ -294,7 +294,7 @@ is scanned too (cr.org F5): a lone definition does not count as a caller."
            (count-substr kg "\n")))
 (check "m36/imp5/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m36/imp5/count/scm-c-public-ref-sites" 172
+(check "m36/imp5/count/scm-c-public-ref-sites" 174
        (src-site-count))
 
 ;;; --- 2. The budget ------------------------------------------------
@@ -485,6 +485,6 @@ is scanned too (cr.org F5): a lone definition does not count as a caller."
 ;;; The two live cross-reference comment anchors.  Check the live line,
 ;;; not a prose phrase.
 (check "m36/imp5/guard/xdisp.c:582" #t
-       (contains? (line-n xdisp-c 582) "(src/xdisp.c:27788, :28574)"))
+       (contains? (line-n xdisp-c 582) "(src/xdisp.c:27823, :28609)"))
 (check "m36/imp5/guard/keyboard.c:3896" #t
        (contains? (line-n kbd 3896) "(term.c:3595)"))

@@ -316,7 +316,7 @@ holds TOKEN as a whole identifier.  This mirrors the scan
            (count-substr kg "\n")))
 (check "m35/imp3/count/combined-lines" 11711
        (+ (count-substr kbd "\n") (count-substr kg "\n")))
-(check "m35/imp3/count/scm-c-public-ref-sites" 172
+(check "m35/imp3/count/scm-c-public-ref-sites" 174
        (src-site-count))
 ;; A detail check: keyboard.c holds 70 of the sites.  M36 imp-4 retired
 ;; the gen_help_event body, which held one site, so keyboard.c went from
@@ -455,7 +455,7 @@ closing paren, or #f.  The keyboard group is flat, so this is its end."
 ;;; gen_help_event above the anchor, so it moved from :3913 to :3896.
 ;;; Check the live comment line, not a prose phrase.
 (check "m35/imp3/imp1/xdisp.c:582" #t
-       (contains? (line-n xdisp-c 582) "(src/xdisp.c:27788, :28574)"))
+       (contains? (line-n xdisp-c 582) "(src/xdisp.c:27823, :28609)"))
 (check "m35/imp3/imp1/keyboard.c:3896" #t
        (contains? (line-n kbd 3896) "(term.c:3595)"))
 (check "m35/imp3/imp1/corpus-registered" #t

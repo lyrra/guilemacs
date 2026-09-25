@@ -174,7 +174,7 @@
        (count-prefix-lines (repo "src/keyboard.c") "DEFUN (\""))
 (check "m38/imp4/surface/shims" 420
        (count-prefix-lines (repo "src/keyboard.c") "DEFUN (\"--"))
-(check "m38/imp4/surface/public-ref-sites" 172
+(check "m38/imp4/surface/public-ref-sites" 174
        (apply + (map (lambda (p) (count-substr (slurp p) "scm_c_public_ref"))
                      (src-c-h))))
 

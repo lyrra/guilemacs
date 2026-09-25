@@ -1,7 +1,7 @@
 ;;; test-m35-imp1.el --- M35 imp-1 (two reclaimed comment anchors) suite.
 ;;;
 ;;; Pins the M35 imp-1 repair (brief.org): two stale comment line
-;;; numbers in src/xdisp.c (the pop_kboard site lines, now 27788/28574)
+;;; numbers in src/xdisp.c (the pop_kboard site lines, now 27823/28609)
 ;;; and src/keyboard.c (the discard_mouse_events last caller, now
 ;;; term.c:3595) are made current.  imp-1 changes no code and deletes no
 ;;; function.
