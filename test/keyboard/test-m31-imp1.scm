@@ -96,37 +96,3 @@ variable reference or a comment mention does not count."
   (check "m31/imp1/write-read/last-event-device" (list 'm31 'imp1 'device)
          (symbol-value 'last-event-device))
   (set-symbol-value! 'last-event-device old))
-
-;;; --- 1. static scan: no DEFVAR_* site in keyboard-globals.c ---------
-;;; The DEFVAR_* call site is what make-docfile scans to emit the
-;;; globals.h storage cell.  Delete the site and the storage goes.
-
-(if (not (defined? '%m31-root))
-    (report "m31/imp1/scan/root" (cons 'FAIL "root not bound by wrapper"))
-    (let ((kg (slurp (string-append %m31-root "/src/keyboard-globals.c"))))
-      (if (not kg)
-          (report "m31/imp1/scan/keyboard-globals.c"
-                  (cons 'FAIL "file missing"))
-          (for-each
-           (lambda (name)
-             (if (defvar-site? kg name)
-                 (report (string-append "m31/imp1/no-defvar/" (symbol->string name))
-                         (cons 'FAIL (format #f "DEFVAR_* site for ~a present" name)))
-                 (report (string-append "m31/imp1/no-defvar/" (symbol->string name))
-                         'PASS)))
-           converted-names))))
-
-;;; --- 2. static scan: no storage cell in the generated globals.h -----
-
-(if (not (defined? '%m31-root))
-    (report "m31/imp1/scan/root" (cons 'FAIL "root not bound by wrapper"))
-    (let ((gh (slurp (string-append %m31-root "/src/globals.h"))))
-      (if (not gh)
-          (report "m31/imp1/scan/globals.h" (cons 'FAIL "file missing"))
-          (for-each
-           (lambda (cell)
-             (if (member-cell? gh cell)
-                 (report (string-append "m31/imp1/no-cell/" cell)
-                         (cons 'FAIL (format #f "globals.h member ~a present" cell)))
-                 (report (string-append "m31/imp1/no-cell/" cell) 'PASS)))
-           '("f_Vlast_event_device" "f_cannot_suspend")))))

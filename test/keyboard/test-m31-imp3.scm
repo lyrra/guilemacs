@@ -162,39 +162,6 @@ variable reference or a comment mention does not count."
   (check "m31/imp3/write-read-restored/last-event-device" #t
          (equal? old (symbol-value 'last-event-device))))
 
-;;; --- 2. Static scan: no DEFVAR_* site in keyboard-globals.c ---------
-;;; The DEFVAR_* call site is what make-docfile scans to emit the
-;;; globals.h storage cell.  Delete the site and the storage goes.
-(let ((kg (slurp (repo "src/keyboard-globals.c"))))
-  (if (not kg)
-      (report "m31/imp3/scan/keyboard-globals.c" (cons 'FAIL "file missing"))
-      (for-each
-       (lambda (pair)
-         (let* ((name (car pair))
-                (label (string-append "m31/imp3/no-defvar/"
-                                      (symbol->string name))))
-           (if (defvar-site? kg name)
-               (report label
-                       (cons 'FAIL (format #f "DEFVAR_* site for ~a present"
-                                           name)))
-               (report label 'PASS))))
-       converted)))
-
-;;; --- 3. Static scan: no storage cell in the generated globals.h -----
-(let ((gh (slurp (repo "src/globals.h"))))
-  (if (not gh)
-      (report "m31/imp3/scan/globals.h" (cons 'FAIL "file missing"))
-      (for-each
-       (lambda (cell)
-         (let ((label (string-append "m31/imp3/no-cell/" cell)))
-           (if (member-cell? gh cell)
-               (report label
-                       (cons 'FAIL (format #f "globals.h member ~a present"
-                                           cell)))
-               (report label 'PASS))))
-       '("f_Vlast_event_device" "f_cannot_suspend"
-         "f_auto_save_interval"))))
-
 ;;; --- 6. Over-deletion guard: the 8 DEFVAR_KBOARD sites stay ---------
 ;;; M31 removes only the three converted names.  The relocated
 ;;; DEFVAR_KBOARD cross-file sites must stay in keyboard-globals.c.

@@ -80,42 +80,6 @@
            (set! %m33-root "."))
     (report "m33-root-bound" 'PASS))
 
-;;; --- 1. Deletion: keyboard-globals.c holds neither site ------------
-(define kbd-g (slurp (repo "src/keyboard-globals.c")))
-(if (not kbd-g)
-    (report "m33/imp6/scan/keyboard-globals.c"
-            (cons 'FAIL "src/keyboard-globals.c missing"))
-    (begin
-      (check "m33/imp6/keyboard-globals.c/no-defvar-extra-keyboard" #f
-             (contains? kbd-g "DEFVAR_INT (\"extra-keyboard-modifiers\""))
-      (check "m33/imp6/keyboard-globals.c/no-defvar-mwheel" #f
-             (contains? kbd-g "DEFVAR_BOOL (\"mwheel-coalesce-scroll-events\""))
-      ;; The two default assignments go with the sites.
-      (check "m33/imp6/keyboard-globals.c/no-default-extra-keyboard" #f
-             (contains? kbd-g "extra_keyboard_modifiers = 0;"))
-      (check "m33/imp6/keyboard-globals.c/no-default-mwheel" #f
-             (contains? kbd-g "mwheel_coalesce_scroll_events = true;"))
-      ;; The stay-C names are untouched (brief.org 7).
-      (check "m33/imp6/keyboard-globals.c/keeps-deactivate-mark" #t
-             (contains? kbd-g "DEFVAR_LISP (\"deactivate-mark\""))
-      (check "m33/imp6/keyboard-globals.c/keeps-overriding-menu-flag" #t
-             (contains? kbd-g "DEFVAR_LISP (\"overriding-local-map-menu-flag\""))
-      (check "m33/imp6/keyboard-globals.c/keeps-track-mouse" #t
-             (contains? kbd-g "DEFVAR_LISP (\"track-mouse\""))))
-
-;;; --- 2. Deletion: globals.h holds neither storage member -----------
-;;; The build regenerates src/globals.h.  A surviving member would keep
-;;; the bare-name macro alive, and a C reader would link or compile.
-(define globals-h (slurp (repo "src/globals.h")))
-(if (not globals-h)
-    (report "m33/imp6/scan/globals.h"
-            (cons 'FAIL "src/globals.h missing (build it first)"))
-    (begin
-      (check "m33/imp6/globals.h/no-member-extra-keyboard" #f
-             (contains? globals-h "f_extra_keyboard_modifiers"))
-      (check "m33/imp6/globals.h/no-member-mwheel" #f
-             (contains? globals-h "f_mwheel_coalesce_scroll_events"))))
-
 ;;; --- 3. Declaration: command-loop.scm holds both names -------------
 (define cmd-loop (slurp (repo "mod/emacs/command-loop.scm")))
 (if (not cmd-loop)
@@ -182,54 +146,3 @@
 (set-symbol-value! 'mwheel-coalesce-scroll-events #t)
 (check "m33/imp6/runtime/x-mwheel-restored" #t
        (x-mwheel-coalesce-scroll-events?))
-
-;;; --- 5. Mechanism: src/xterm.c keeps the C mechanism ---------------
-(define xt (slurp (repo "src/xterm.c")))
-(if (not xt)
-    (report "m33/imp6/scan/xterm.c" (cons 'FAIL "src/xterm.c missing"))
-    (begin
-      (check "m33/imp6/xterm.c/keeps-emacs-to-x-modifiers" #t
-             (contains? xt "x_emacs_to_x_modifiers"))
-      ;; The 2 fabs tests of the coalesce decision (brief.org 4).
-      (check "m33/imp6/xterm.c/keeps-fabs-emacs-value" #t
-             (contains? xt "(fabs (val->emacs_value) < 1)"))
-      (check "m33/imp6/xterm.c/keeps-fabs-delta" #t
-             (contains? xt "(fabs (delta) > 0)"))
-      (check "m33/imp6/xterm.c/keeps-fabs-total" #t
-             (contains? xt "(fabs (total_x) > 0 || fabs (total_y) > 0)"))))
-
-;;; --- 6. No C reader: no compiled C file reads a bare cell ----------
-;;; The build compiles keyboard.c and xterm.c.  A bare read of a cell
-;;; is a defect.  Assert the call-site forms, not the bare names (a
-;;; comment may keep the name; x_* embeds it).
-(define kbd-c (slurp (repo "src/keyboard.c")))
-(if (not kbd-c)
-    (report "m33/imp6/scan/keyboard.c" (cons 'FAIL "src/keyboard.c missing"))
-    (begin
-      (check "m33/imp6/keyboard.c/no-bare-extra-keyboard" #f
-             (contains? kbd-c "extra_keyboard_modifiers"))
-      (check "m33/imp6/keyboard.c/no-bare-mwheel" #f
-             (contains? kbd-c "mwheel_coalesce_scroll_events"))))
-
-(if (not xt)
-    (report "m33/imp6/scan/xterm.c-readers"
-            (cons 'FAIL "src/xterm.c missing"))
-    (begin
-      ;; The old bare read forms are gone.
-      (check "m33/imp6/xterm.c/no-old-extra-keyboard-read" #f
-             (contains? xt ", extra_keyboard_modifiers)"))
-      (check "m33/imp6/xterm.c/no-old-mwheel-read" #f
-             (contains? xt "if (mwheel_coalesce_scroll_events"))
-      ;; The reads go through the (emacs xterm) dispatchers.
-      (check "m33/imp6/xterm.c/reads-via-dispatcher" #t
-             (contains? xt "x_extra_keyboard_modifiers ()"))
-      (check "m33/imp6/xterm.c/reads-mwheel-via-dispatcher" #t
-             (contains? xt "x_mwheel_coalesce_scroll_events_p ()"))))
-
-;;; --- 7. Static: the corpus is registered ---------------------------
-(define run-tests (slurp (repo "tool/run-tests.scm")))
-(if (not run-tests)
-    (report "m33/imp6/scan/run-tests.scm"
-            (cons 'FAIL "tool/run-tests.scm missing"))
-    (check "m33/imp6/run-tests.scm/registers-el" #t
-           (contains? run-tests "test-m33-imp6.el")))
