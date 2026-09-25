@@ -68,6 +68,7 @@
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
   #:use-module (rnrs bytevectors)     ; bytevector-u8-ref (tty byte decode)
+  #:use-module (system foreign)       ; M42 imp-2: FFI read/ioctl on a raw fd
   #:use-module ((emacs event-modifiers) #:select (meta-modifier))
   #:declarative? #t
   #:export (store-user-signal-events!
@@ -109,20 +110,21 @@
 (defelisp %--ie-kind                     --ie-kind)
 
 ;; imp-4 shims and helpers.  tty-read-avail-input! reads the terminal's
-;; byte source and per-terminal meta/top-frame state through these
-;; single-purpose shims, whose C bodies own the USABLE_FIONREAD sizing,
-;; the nonblocking emacs_read (with its EIO close-terminal arm), and the
-;; raw meta_key / top_frame fields.  --quit-char, --kbd-on-hold-p and
-;; --kbd-buffer-nr-stored are reused (kbd-buffer.scm also defelisp's the
-;; same C primitives under its own local names — the established
-;; pattern).  kbd-buffer-store-event! is the shared M13 store.
+;; byte source (M42 imp-2: through the FFI, not a C read) and its
+;; per-terminal meta/top-frame state through these single-purpose shims.
+;; --quit-char, --kbd-on-hold-p and --kbd-buffer-nr-stored are reused
+;; (kbd-buffer.scm also defelisp's the same C primitives under its own
+;; local names — the established pattern).  kbd-buffer-store-event! is
+;; the shared M13 store.  M42 imp-2 retires --tty-bytes-readable and
+;; --tty-read-nonblocking and replaces them with --tty-fd: the C side
+;; now maps the terminal to a plain int fd only, and Scheme performs the
+;; FIONREAD ioctl and the read on it through (system foreign).
 (defelisp %--kbd-buffer-nr-stored        --kbd-buffer-nr-stored)
 (defelisp %--kbd-on-hold-p               --kbd-on-hold-p)
 (defelisp %--quit-char                   --quit-char)
 (defelisp %--tty-meta-key                --tty-meta-key)
 (defelisp %--tty-top-frame               --tty-top-frame)
-(defelisp %--tty-bytes-readable          --tty-bytes-readable)
-(defelisp %--tty-read-nonblocking        --tty-read-nonblocking)
+(defelisp %--tty-fd                      --tty-fd)
 (defelisp %--ie-ascii-keystroke-event    --ie-ascii-keystroke-event)
 
 ;; event_kind NO_EVENT is the first enum member (termhooks.h), value 0.
@@ -231,21 +233,99 @@ signal-handler-written cell respectively)."
               ;; Hookless terminal: skip without touching it.
               (loop rest total err))))))
 
+;;; ---------------------------------------------------------------------
+;;; M42 imp-2 — the TTY raw-input OS hop.
+;;;
+;;; tty-read-avail-input! reaches the OS with plain values: it calls the
+;;; FFI read() and ioctl(FIONREAD) directly on the plain int fd from
+;;; --tty-fd, through (system foreign) and the embedded libc.  errno is
+;;; read through __errno_location.  The embedded Guile (3.0.10.45) has
+;;; no (ice-9 posix) and no Scheme-level ioctl, so libc is the only
+;;; surface.  libc.so.6 is linked, not libc.so (a linker script, not
+;;; ELF).  See brief.org M42 imp-2 and docs/kb.org tty-os-read-boundary.
+
+(define %libc (dynamic-link "libc.so.6"))
+
+(define (ffi name ret args)
+  "Resolve NAME in %libc as a foreign function of return type RET and
+argument types ARGS."
+  (pointer->procedure ret (dynamic-func name %libc) args))
+
+(define %ioctl (ffi "ioctl" int (list int unsigned-long '*)))
+(define %read  (ffi "read"  int (list int '* size_t)))
+
+;; __errno_location () returns the address of this thread's errno cell.
+;; Capture the pointer once at module load and alias it with a bytevector:
+;; dereferencing it is a pure bytevector read that does not itself call
+;; libc, so it cannot clobber the errno a just-finished FFI call set.  (A
+;; fresh __errno_location call each time is not necessary: the location
+;; is stable.)
+(define %errno-location ((ffi "__errno_location" '* '())))
+(define %errno-cell (pointer->bytevector %errno-location 4))
+
+;; FIONREAD is 0x541B on Linux; EINTR/EIO/EAGAIN are the Linux values
+;; 4/5/11.  Hardcoded with a comment, like +kbd-buffer-size+ below: they
+;; silently diverge only if the build target moves off Linux.
+(define +fionread+ #x541b)
+(define +eintr+    4)
+(define +eio+      5)
+(define +eagain+   11)
+
+(define (%errno)
+  "Read the current errno through the captured __errno_location alias."
+  (bytevector-sint-ref %errno-cell 0 (native-endianness) 4))
+
+(define (%fionread fd)
+  "Return the FIONREAD byte count for FD, or -1 when the ioctl fails
+(errno is then set)."
+  (let ((scratch (make-bytevector 4 0)))
+    (if (< (%ioctl fd +fionread+ (bytevector->pointer scratch)) 0)
+        -1
+        (bytevector-sint-ref scratch 0 (native-endianness) 4))))
+
+(define (%read-nonblocking fd count)
+  "Read up to COUNT bytes from FD into a fresh bytevector without
+blocking.  Return (nread . bv), where nread may be a short count.  Return
+the bare -2 when the read failed with errno == EIO (the close-terminal
+arm).  Retry while nread == -1 and errno == EINTR.  Treat errno == EAGAIN
+as no input (0).  Any other -1 read error is returned as (-1 . bv), so
+the caller's nread <= 0 arm still sees a raw -1."
+  (let ((bv (make-bytevector count 0)))
+    (let loop ()
+      (let ((n (%read fd (bytevector->pointer bv) count)))
+        (if (= n -1)
+            (let ((errno (%errno)))
+              (cond
+               ((= errno +eintr+) (loop))
+               ((= errno +eio+) -2)
+               ((= errno +eagain+) 0)
+               (else (cons -1 bv))))
+            (cons n bv))))))
+
+(define (%nilp x)
+  ;; Recognize all three nil-equivalents that show up in Guile-elisp:
+  ;; the elisp `nil' symbol (#nil), the Scheme empty list ('()), and
+  ;; Scheme #f.  The command-loop.scm:65 idiom.
+  (or (null? x) (not x)))
+
 (define (tty-read-avail-input! terminal)
   "Port of the post-guard body of tty_read_avail_input
 (src/keyboard.c, pre-imp-4 C body): size a nonblocking read of
-TERMINAL's tty, emacs_read the available bytes, then decode each raw
-byte's meta bit into an ASCII_KEYSTROKE_EVENT and store it via
+TERMINAL's tty, read the available bytes, then decode each raw byte's
+meta bit into an ASCII_KEYSTROKE_EVENT and store it via
 kbd-buffer-store-event!, stopping the decode early once a byte equal to
 the (meta-stripped) quit char is seen.
 
 The raw guards — dead terminal, terminal type, term_initted, suspended
 input — already ran in the C entry point tty_read_avail_input before it
 dispatched here, and the GPM drain also stayed in C.  This body runs the
-kbd_on_hold_p / buffer_free guard, FIONREAD sizing, the read, the
-decode and the store.  Returns the full number of bytes read from the
-tty (nread), even when the quit-char batch-break stopped the decode
-early — the return is the read count, not the number of bytes stored.
+kbd_on_hold_p / buffer_free guard, the FIONREAD ioctl, the read, the
+decode and the store.  M42 imp-2: the terminal lookup stays C (--tty-fd
+returns a plain int fd); the FIONREAD ioctl and the read run here, on
+that fd, through the Guile FFI.  Returns the full number of bytes read
+from the tty (nread), even when the quit-char batch-break stopped the
+decode early — the return is the read count, not the number of bytes
+stored.
 
 Per-byte fidelity (must match the C original's order of operations): the
 meta modifier is computed from the ORIGINAL byte's high bit (when
@@ -258,46 +338,58 @@ modifier.  See brief.org M25 imp-4."
     (if (or (not (eq? ((force %--kbd-on-hold-p)) #nil))
             (<= buffer-free 0))
         0
-        (let ((n-avail ((force %--tty-bytes-readable) terminal)))
-          (if (<= n-avail 0)
-              n-avail            ; 0 (nothing) or -2 (FIONREAD error)
-              ;; Don't read more than the kbd_buffer can hold, nor more
-              ;; than the remaining free slots.
-              (let* ((count (min n-avail +cbuf-cap+ buffer-free))
-                     (res ((force %--tty-read-nonblocking) terminal count)))
-                (if (not (pair? res))
-                    res          ; EIO close-terminal arm: bare -2
-                    (let ((nread (car res)))
-                      (if (<= nread 0)
-                          nread  ; 0 or a raw -1 read error
-                          (let ((bv (cdr res))
-                                (meta-key ((force %--tty-meta-key) terminal))
-                                (quit ((force %--quit-char)))
-                                (frame ((force %--tty-top-frame) terminal)))
-                            (let decode ((i 0))
-                              (when (< i nread)
-                                (let* ((b (bytevector-u8-ref bv i))
-                                       ;; Compute modifiers from the
-                                       ;; original byte, strip after.
-                                       (mods (if (and (= meta-key 1)
-                                                      (not (zero? (logand b #x80))))
-                                                 meta-modifier
-                                                 0))
-                                       (code (if (< meta-key 2)
-                                                 (logand b #x7f)
-                                                 b)))
-                                  ((force %kbd-buffer-store-event!)
-                                   ((force %--ie-ascii-keystroke-event)
-                                    code mods frame)
-                                   #f)
-                                  ;; Don't look at input that follows a
-                                  ;; C-g too closely (reduces lossage due
-                                  ;; to autorepeat on C-g).  The matching
-                                  ;; byte is already stored above; bytes
-                                  ;; after it in this batch are dropped.
-                                  (unless (= code quit)
-                                    (decode (+ i 1))))))
-                            ;; Return the read count, not the stored
-                            ;; count — the quit break may have stopped
-                            ;; the decode early.
-                            nread))))))))))
+        (let ((fd ((force %--tty-fd) terminal)))
+          (if (eq? fd #nil)
+              0                  ; non-tty: same as the old shims
+              (let ((n-avail (%fionread fd)))
+                (if (< n-avail 0)
+                    ;; ioctl failed: -2 (close this terminal) when the
+                    ;; build is interactive, else 0.  noninteractive is
+                    ;; elisp nil in an interactive build.
+                    (if (%nilp (symbol-value 'noninteractive)) -2 0)
+                    (if (zero? n-avail)
+                        n-avail  ; 0: nothing available
+                        ;; Don't read more than the kbd_buffer can hold,
+                        ;; nor more than the remaining free slots.
+                        (let* ((count (min n-avail +cbuf-cap+ buffer-free))
+                               (res (%read-nonblocking fd count)))
+                          (if (not (pair? res))
+                              res  ; EIO close-terminal arm: bare -2
+                              (let ((nread (car res)))
+                                (if (<= nread 0)
+                                    nread  ; 0 or a raw -1 read error
+                                    (let ((bv (cdr res))
+                                          (meta-key ((force %--tty-meta-key) terminal))
+                                          (quit ((force %--quit-char)))
+                                          (frame ((force %--tty-top-frame) terminal)))
+                                      (let decode ((i 0))
+                                        (when (< i nread)
+                                          (let* ((b (bytevector-u8-ref bv i))
+                                                 ;; Compute modifiers from
+                                                 ;; the original byte,
+                                                 ;; strip after.
+                                                 (mods (if (and (= meta-key 1)
+                                                                (not (zero? (logand b #x80))))
+                                                           meta-modifier
+                                                           0))
+                                                 (code (if (< meta-key 2)
+                                                           (logand b #x7f)
+                                                           b)))
+                                            ((force %kbd-buffer-store-event!)
+                                             ((force %--ie-ascii-keystroke-event)
+                                              code mods frame)
+                                             #f)
+                                            ;; Don't look at input that
+                                            ;; follows a C-g too closely
+                                            ;; (reduces lossage due to
+                                            ;; autorepeat on C-g).  The
+                                            ;; matching byte is already
+                                            ;; stored above; bytes after
+                                            ;; it in this batch are
+                                            ;; dropped.
+                                            (unless (= code quit)
+                                              (decode (+ i 1))))))
+                                      ;; Return the read count, not the
+                                      ;; stored count — the quit break
+                                      ;; may have stopped the decode.
+                                      nread)))))))))))))

@@ -8,10 +8,11 @@
 ;;;
 ;;; It covers:
 ;;;   S1 -- the surface table.  src/process.c is 9,030 lines, 50 DEFUNs,
-;;;         and 10 ==--== shims; src/keyboard.c is 11,221 lines and
-;;;         src/keyboard-globals.c is 490, a combined 11,711 under the
-;;;         11,960 M31 budget (margin 249); the tree-wide
+;;;         and 10 ==--== shims; src/keyboard.c is 11,176 lines and
+;;;         src/keyboard-globals.c is 490, a combined 11,666 under the
+;;;         11,960 M31 budget (margin 294); the tree-wide
 ;;;         scm_c_public_ref count over src/*.c and src/*.h is 172.
+;;;         (M42 imp-2 moved the keyboard numbers; re-pinned below.)
 ;;;   S2 -- the src/process.c send_process line pins that
 ;;;         test/m40/test-m40-imp0-audit.el holds (6992, 7010, 7040,
 ;;;         7063).
@@ -115,8 +116,9 @@ milestone.org is the untracked live tracker)."
 ;;;
 ;;; The close-out measurement.  Base was 8,843 lines, 52 DEFUNs, 162
 ;;; bridge sites (docs/m40-plan.org).  M40 moved src/process.c to 9,030
-;;; lines and 50 DEFUNs; the keyboard surface held at 11,711 (249 under
-;;; the 11,960 M31 budget); the tree-wide count rose to 172.
+;;; lines and 50 DEFUNs; M42 imp-2 later moved the keyboard surface to
+;;; 11,666 (294 under the 11,960 M31 budget); the tree-wide count rose
+;;; to 172.
 
 (m40-imp5--check "surface/process.c-lines-9030"
                  (eql 9030 (m40-imp5--lines "src/process.c")))
@@ -124,19 +126,20 @@ milestone.org is the untracked live tracker)."
                  (eql 50 (m40-imp5--count "src/process.c" "^DEFUN (\"")))
 (m40-imp5--check "surface/process.c-shims-10"
                  (eql 10 (m40-imp5--count "src/process.c" "^DEFUN (\"--")))
-(m40-imp5--check "surface/keyboard.c-lines-11221"
-                 (eql 11221 (m40-imp5--lines "src/keyboard.c")))
+(m40-imp5--check "surface/keyboard.c-lines-11176"
+                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,176.
+                 (eql 11176 (m40-imp5--lines "src/keyboard.c")))
 (m40-imp5--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m40-imp5--lines "src/keyboard-globals.c")))
-(m40-imp5--check "surface/keyboard-combined-11711"
+(m40-imp5--check "surface/keyboard-combined-11666"
                  (let ((k (m40-imp5--lines "src/keyboard.c"))
                        (kg (m40-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11711 (+ k kg)))))
-(m40-imp5--check "surface/keyboard-margin-249-under-11960"
+                   (and (integerp k) (integerp kg) (eql 11666 (+ k kg)))))
+(m40-imp5--check "surface/keyboard-margin-294-under-11960"
                  (let ((k (m40-imp5--lines "src/keyboard.c"))
                        (kg (m40-imp5--lines "src/keyboard-globals.c")))
                    (and (integerp k) (integerp kg)
-                        (eql 249 (- 11960 (+ k kg))))))
+                        (eql 294 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c and src/*.h, like
 ;; the guard scan in test/m40/test-m40-imp2.scm §8.
 (m40-imp5--check "surface/tree-ref-sites-177"

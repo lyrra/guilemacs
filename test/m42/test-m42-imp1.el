@@ -7,20 +7,21 @@
 ;;; EIO / empty-queue behavior -- and ends with the decision A1.
 ;;;
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the base numbers: src/keyboard.c is 11,221 lines and 446
-;;;         DEFUNs, src/keyboard-globals.c is 490 lines, and the
-;;;         combined keyboard surface is 11,711 (brief.org §3).
-;;;   D2 -- the two OS shims and the Scheme policy body are unchanged
-;;;         (imp-1 changes no C and no Scheme): --tty-bytes-readable at
-;;;         src/keyboard.c:10371, --tty-read-nonblocking at
-;;;         src/keyboard.c:10399, and tty-read-avail-input! at
-;;;         mod/emacs/gobble.scm:234.
+;;;   D1 -- the base numbers.  M42 imp-2 changed src/keyboard.c, so the
+;;;         pins now read: src/keyboard.c is 11,176 lines and 445
+;;;         DEFUNs (base 11,221 / 446; imp-2 retires the two read shims
+;;;         and adds --tty-fd), src/keyboard-globals.c is 490 lines, and
+;;;         the combined keyboard surface is 11,666.
+;;;   D2 -- the shims and the Scheme policy body, re-pinned after imp-2:
+;;;         the two OS shims are gone, --tty-fd is present, and
+;;;         tty-read-avail-input! reaches the OS through the FFI, not
+;;;         the shims.
 ;;;   D3 -- the descriptor facts of brief.org §5 task 2 hold in the
 ;;;         tree: tty->input is a FILE * (src/termchar.h:51), opened by
 ;;;         emacs_fdopen (src/term.c:2461), reuses stdin for the initial
 ;;;         terminal (src/term.c:4522), is closed by delete_tty
-;;;         (src/term.c:4791), and the read bypasses stdio
-;;;         (src/keyboard.c:10419, src/sysdep.c:2713).
+;;;         (src/term.c:4791), and the read bypasses stdio (the FFI read
+;;;         in gobble.scm; src/sysdep.c:2713).
 ;;;   D4 -- the decision words and the imp-1 findings appear in the
 ;;;         gitignored records docs/m42-plan.org and docs/kb.org.  docs/
 ;;;         is gitignored, so a present-but-stale record is an INFO-skip,
@@ -114,42 +115,53 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 ;;; --- D1. The base numbers (brief.org §3) ------------------------------
 
-(m42-imp1--check "keyboard.c-lines-11221"
-                 (eql 11221 (m42-imp1--lines "src/keyboard.c")))
-(m42-imp1--check "keyboard.c-defuns-446"
-                 (eql 446 (m42-imp1--count "src/keyboard.c" "^DEFUN (\"")))
+(m42-imp1--check "keyboard.c-lines-11176"
+                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,176.
+                 (eql 11176 (m42-imp1--lines "src/keyboard.c")))
+(m42-imp1--check "keyboard.c-defuns-445"
+                 ;; M42 imp-2 retires the two TTY read shims (-2) and
+                 ;; adds the --tty-fd accessor (+1): 446 -> 445.
+                 (eql 445 (m42-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m42-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m42-imp1--lines "src/keyboard-globals.c")))
-(m42-imp1--check "combined-keyboard-surface-11711"
-                 ;; Pin the sum that brief.org §3 states (11,711 =
-                 ;; 11,221 + 490), not just the two parts: a drift in
-                 ;; either part is caught against the stated total.
+(m42-imp1--check "combined-keyboard-surface-11666"
+                 ;; M42 imp-2 moved the sum 11,711 -> 11,666
+                 ;; (11,176 + 490).  Pin the sum, not just the parts.
                  (let ((kb (m42-imp1--lines "src/keyboard.c"))
                        (kg (m42-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11221 kb)
+                   (and (eql 11176 kb)
                         (eql 490 kg)
-                        (eql 11711 (+ kb kg)))))
+                        (eql 11666 (+ kb kg)))))
 
-;;; --- D2. imp-1 changes no C and no Scheme ------------------------------
+;;; --- D2. The shims and the Scheme policy body (re-pinned after imp-2) --
 ;;;
-;;; The two OS shims and the Scheme policy body stay at their pinned
-;;; lines.  A moved shim means the imp touched C, which imp-1 must not.
+;;; imp-1 pinned the two OS shims and the Scheme policy body as the base
+;;; state ("imp-1 changes no C and no Scheme").  M42 imp-2 then retired
+;;; both shims and moved the OS hop into Scheme, so these pins now assert
+;;; the post-imp-2 reality: the shims are absent, --tty-fd is present,
+;;; and gobble reaches the OS through the FFI, not the shims.
 
-(m42-imp1--check "shim-bytes-readable-at-10371"
-                 (eql 10371 (m42-imp1--line-of
-                             "src/keyboard.c" "--tty-bytes-readable\"")))
-(m42-imp1--check "shim-read-nonblocking-at-10399"
-                 (eql 10399 (m42-imp1--line-of
-                             "src/keyboard.c" "--tty-read-nonblocking\"")))
-(m42-imp1--check "gobble-policy-at-234"
-                 (eql 234 (m42-imp1--line-of
-                           "mod/emacs/gobble.scm"
-                           "(define (tty-read-avail-input!")))
-(m42-imp1--check "gobble-still-calls-both-shims"
-                 (and (m42-imp1--contains-p "mod/emacs/gobble.scm"
-                                            "%--tty-bytes-readable")
+(m42-imp1--check "shims-reclaimed"
+                 (and (not (m42-imp1--contains-p
+                            "src/keyboard.c"
+                            "DEFUN (\"--tty-bytes-readable\""))
+                      (not (m42-imp1--contains-p
+                            "src/keyboard.c"
+                            "DEFUN (\"--tty-read-nonblocking\""))))
+(m42-imp1--check "tty-fd-present"
+                 (m42-imp1--contains-p "src/keyboard.c" "DEFUN (\"--tty-fd\""))
+(m42-imp1--check "gobble-policy-still-defined"
+                 (m42-imp1--contains-p "mod/emacs/gobble.scm"
+                                       "(define (tty-read-avail-input!"))
+(m42-imp1--check "gobble-calls-ffi-not-shims"
+                 (and (not (m42-imp1--contains-p "mod/emacs/gobble.scm"
+                                                 "%--tty-bytes-readable"))
+                      (not (m42-imp1--contains-p "mod/emacs/gobble.scm"
+                                                 "%--tty-read-nonblocking"))
                       (m42-imp1--contains-p "mod/emacs/gobble.scm"
-                                            "%--tty-read-nonblocking")))
+                                            "%--tty-fd")
+                      (m42-imp1--contains-p "mod/emacs/gobble.scm"
+                                            "(system foreign)")))
 
 ;;; --- D3. The descriptor facts (brief.org §5 task 2) -------------------
 ;;;
@@ -166,10 +178,13 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 (m42-imp1--check "delete-tty-fcloses-input-at-4791"
                  (eql 4791 (m42-imp1--line-of "src/term.c"
                                               "emacs_fclose (tty->input);")))
-(m42-imp1--check "read-bypasses-stdio-at-10419"
-                 (eql 10419 (m42-imp1--line-of
-                             "src/keyboard.c"
-                             "emacs_read (fileno (tty->input)")))
+(m42-imp1--check "read-bypasses-stdio-via-ffi"
+                 ;; M42 imp-2 moved the raw-fd read from the retired
+                 ;; --tty-read-nonblocking C shim into Scheme; gobble now
+                 ;; reads through the FFI read() on the plain fd.
+                 (m42-imp1--contains-p
+                  "mod/emacs/gobble.scm"
+                  "(bytevector->pointer bv) count"))
 (m42-imp1--check "emacs_read-at-2713"
                  (eql 2713 (m42-imp1--line-of "src/sysdep.c"
                                               "emacs_read (int fd")))

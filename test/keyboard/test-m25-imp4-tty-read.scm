@@ -4,16 +4,16 @@
 ;;; src/keyboard.c tty_read_avail_input moved into (emacs gobble) as
 ;;; tty-read-avail-input!.  tty_read_avail_input is now a thin dispatcher
 ;;; that keeps the raw dead-terminal / terminal-type / term_initted /
-;;; suspended-terminal guards and the GPM drain in C; four new
-;;; single-purpose C shims serve the Scheme body: --tty-bytes-readable,
-;;; --tty-read-nonblocking, --tty-top-frame, and
-;;; --ie-ascii-keystroke-event.  This corpus exercises the moved
-;;; guard/decode logic with the shims stubbed:
+;;; suspended-terminal guards and the GPM drain in C.  M42 imp-2 retired
+;;; the two OS shims --tty-bytes-readable and --tty-read-nonblocking:
+;;; the decode path now calls --tty-fd for the plain fd, then the private
+;;; FFI helpers %fionread and %read-nonblocking.  This corpus exercises
+;;; the moved guard/decode logic with those bindings stubbed:
 ;;;
 ;;;   - guard chain: a held buffer, a full buffer, no readable bytes, a
-;;;     FIONREAD error, a zero/error(-1)/EIO(-2) read all return the
-;;;     right value and never reach the decode step;
-;;;   - short read: when emacs_read returns fewer bytes than requested,
+;;;     FIONREAD error, a non-tty fd, a zero/error(-1)/EIO(-2) read all
+;;;     return the right value and never reach the decode step;
+;;;   - short read: when the read returns fewer bytes than requested,
 ;;;     exactly that many bytes are decoded and the short count is the
 ;;;     return value;
 ;;;   - byte-decode fidelity: every meta-key / code / modifiers vector
@@ -24,11 +24,11 @@
 ;;;   - cutover: tty-read-avail-input! is an exported procedure.
 ;;;
 ;;; gobble.scm references its C primitives through defelisp delays
-;;; ((force %--...)), so these tests stub those delays by replacing them
-;;; inside the (emacs gobble) module (module-set!), restoring after —
-;;; the same stub mechanism test-m25-imp3-gobble-input.scm uses.  Every
-;;; stub is restored in a dynamic-wind unwind, so nothing leaks into
-;;; later corpora.
+;;; ((force %--...)) and its FFI helpers as plain procedures.  These
+;;; tests stub both by replacing the bindings inside the (emacs gobble)
+;;; module (module-set!), restoring in a dynamic-wind unwind — the same
+;;; stub mechanism test-m25-imp3-gobble-input.scm uses.  Nothing leaks
+;;; into later corpora.
 ;;;
 ;;; Sourced by test/keyboard/test-m25-imp4-tty-read.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback from
@@ -54,20 +54,22 @@
 
 (define gobble-mod (resolve-module '(emacs gobble)))
 
-;; Replace the defelisp delay NAME in (emacs gobble) so that
-;; (force NAME) yields PROC, restoring the original delay after THUNK.
-(define (with-gobble-delay! name proc thunk)
+;; Bind the module-level NAME in (emacs gobble) to VAL -- a delay for a
+;; defelisp shim (gobble calls (force NAME)), or a procedure for an FFI
+;; helper (gobble calls (NAME ...)) -- restoring the original binding
+;; after THUNK.
+(define (with-gobble-value! name val thunk)
   (let ((old (module-ref gobble-mod name)))
     (dynamic-wind
-      (lambda () (module-set! gobble-mod name (delay proc)))
+      (lambda () (module-set! gobble-mod name val))
       thunk
       (lambda () (module-set! gobble-mod name old)))))
 
-(define (with-many-delays! pairs thunk)
+(define (with-many-values! pairs thunk)
   (if (null? pairs)
       (thunk)
-      (with-gobble-delay! (caar pairs) (cadar pairs)
-        (lambda () (with-many-delays! (cdr pairs) thunk)))))
+      (with-gobble-value! (caar pairs) (cdar pairs)
+        (lambda () (with-many-values! (cdr pairs) thunk)))))
 
 (define order '())
 (define (record! x) (set! order (append order (list x))))
@@ -83,17 +85,29 @@
 ;; an OVR alist of overrides (see run-read!):
 ;;   nr-stored    --kbd-buffer-nr-stored result (default 0)
 ;;   on-hold      --kbd-on-hold-p result (default #nil)
-;;   avail        --tty-bytes-readable result (default = length of bytes)
-;;   bytes        list of raw bytes the nonblocking read returns
-;;   read-result  full result from --tty-read-nonblocking; defaults to
+;;   fd           --tty-fd result (default 7); #nil = a non-tty decode
+;;   avail        %fionread result (default = length of bytes); -1 = the
+;;                ioctl failed
+;;   bytes        list of raw bytes %read-nonblocking returns
+;;   read-result  full result from %read-nonblocking; defaults to
 ;;                (nread . bytevector-of-bytes)
 ;;   meta-key     --tty-meta-key result (default 0)
 ;;   quit         --quit-char result (default 7)
 ;; Each --ie-ascii-keystroke-event call records (event code mods); each
 ;; store records 'store.  run-read! returns (values return-value order).
+;; M42 imp-2: the two C shims --tty-bytes-readable / --tty-read-nonblocking
+;; are gone.  The decode path now calls --tty-fd (a defelisp delay) to get
+;; the plain fd, then the private FFI helpers %fionread and
+;; %read-nonblocking (plain procedures) directly.
 (define (assq-ref ovr key)
   (let ((hit (assq key ovr)))
     (if hit (cdr hit) #f)))
+
+;; The fd override reads by presence, not truthiness: #nil is a valid fd
+;; value (the non-tty arm) and must not fall back to the default.
+(define (get-fd ovr)
+  (let ((hit (assq 'fd ovr)))
+    (if hit (cdr hit) 7)))
 
 (define (run-read! ovr)
   (define (get key default)
@@ -103,31 +117,33 @@
          (avail (get 'avail (length read-bytes))))
     (reset-order!)
     (let ((return-value
-           (with-many-delays!
+           (with-many-values!
             (list
-             (list '%--kbd-buffer-nr-stored
-                   (lambda () (get 'nr-stored 0)))
-             (list '%--kbd-on-hold-p
-                   (lambda () (get 'on-hold #nil)))
-             (list '%--tty-bytes-readable
-                   (lambda (term) avail))
-             (list '%--tty-read-nonblocking
-                   (lambda (term n)
+             (cons '%--kbd-buffer-nr-stored
+                   (delay (lambda () (get 'nr-stored 0))))
+             (cons '%--kbd-on-hold-p
+                   (delay (lambda () (get 'on-hold #nil))))
+             (cons '%--tty-fd
+                   (delay (lambda (term) (get-fd ovr))))
+             (cons '%fionread
+                   (lambda (fd) avail))
+             (cons '%read-nonblocking
+                   (lambda (fd n)
                      (record! (list 'read n))
                      (get 'read-result
                           (cons (length read-bytes)
                                 (u8-list->bytevector read-bytes)))))
-             (list '%--tty-meta-key
-                   (lambda (term) (get 'meta-key 0)))
-             (list '%--quit-char
-                   (lambda () (get 'quit 7)))
-             (list '%--tty-top-frame
-                   (lambda (term) 'the-frame))
-             (list '%--ie-ascii-keystroke-event
-                   (lambda (code mods frame)
-                     (record! (list 'event code mods)) 'ie))
-             (list '%kbd-buffer-store-event!
-                   (lambda (ie hold) (record! 'store) #nil)))
+             (cons '%--tty-meta-key
+                   (delay (lambda (term) (get 'meta-key 0))))
+             (cons '%--quit-char
+                   (delay (lambda () (get 'quit 7))))
+             (cons '%--tty-top-frame
+                   (delay (lambda (term) 'the-frame)))
+             (cons '%--ie-ascii-keystroke-event
+                   (delay (lambda (code mods frame)
+                            (record! (list 'event code mods)) 'ie)))
+             (cons '%kbd-buffer-store-event!
+                   (delay (lambda (ie hold) (record! 'store) #nil))))
             (lambda ()
               (tty-read-avail-input! 'some-terminal)))))
       (values return-value order))))
@@ -152,10 +168,30 @@
   (check "tty-read/no-bytes-returns-0" 0 ret)
   (check "tty-read/no-bytes-no-read-or-store" '() ord))
 
-;; 1d: FIONREAD error (--tty-bytes-readable -2) → -2, no read.
-(let-values (((ret ord) (run-read! '((avail . -2)))))
-  (check "tty-read/fionread-error-returns--2" -2 ret)
-  (check "tty-read/fionread-error-no-read-or-store" '() ord))
+;; 1d: FIONREAD error (the ioctl fails, %fionread → -1) → -2 when the
+;; build is interactive, 0 in batch.  M42 imp-2: the interactive test is
+;; Scheme-side now (noninteractive is elisp nil in an interactive build).
+(let ((nv (symbol-value 'noninteractive)))
+  (dynamic-wind
+    (lambda () (set-symbol-value! 'noninteractive #nil))
+    (lambda ()
+      (let-values (((ret ord) (run-read! '((avail . -1)))))
+        (check "tty-read/fionread-error-returns--2" -2 ret)
+        (check "tty-read/fionread-error-no-read-or-store" '() ord)))
+    (lambda () (set-symbol-value! 'noninteractive nv))))
+(let ((nv (symbol-value 'noninteractive)))
+  (dynamic-wind
+    (lambda () (set-symbol-value! 'noninteractive #t))
+    (lambda ()
+      (let-values (((ret ord) (run-read! '((avail . -1)))))
+        (check "tty-read/fionread-error-batch-returns-0" 0 ret)
+        (check "tty-read/fionread-error-batch-no-read-or-store" '() ord)))
+    (lambda () (set-symbol-value! 'noninteractive nv))))
+
+;; 1d2: a non-tty decode (--tty-fd nil) → 0, nothing read/stored.
+(let-values (((ret ord) (run-read! '((fd . #nil) (avail . 3) (bytes . (65))))))
+  (check "tty-read/non-tty-returns-0" 0 ret)
+  (check "tty-read/non-tty-no-read-or-store" '() ord))
 
 ;; 1e: a zero-length read (nread 0) → 0, no decode.
 (let-values (((ret ord) (run-read! '((avail . 3) (bytes . ())

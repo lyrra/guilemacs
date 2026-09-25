@@ -10362,70 +10362,25 @@ no-op if TERMINAL does not decode to a tty.  */)
   return Qnil;
 }
 
-/* M25 imp-4 — TTY read-path shims for (emacs gobble) tty-read-avail-input!.
-   The dispatcher tty_read_avail_input already ran the raw guards (live,
-   tty-typed, initted, non-suspended terminal) before calling Scheme, so
-   these assume a live terminal; m22_tty_of_terminal returns NULL only for
-   a non-tty decode and the shims defensively return a neutral value then.  */
+/* M42 imp-2 — retire the two M25 imp-4 TTY read-path shims
+   (--tty-bytes-readable, --tty-read-nonblocking).  (emacs gobble)
+   tty-read-avail-input! now performs the FIONREAD ioctl and the read
+   directly on a raw fd through the Guile FFI ((system foreign) + the
+   embedded libc), so the C side keeps only the terminal lookup.  The
+   dispatcher tty_read_avail_input already ran the raw guards (live,
+   tty-typed, initted, non-suspended terminal) before calling Scheme.  */
 
-DEFUN ("--tty-bytes-readable", Fc_tty_bytes_readable,
-       Sc_tty_bytes_readable, 1, 1, 0,
-       doc: /* FIX-20260901-guilemacs: Internal: how many bytes are
-available on TERMINAL's tty, via the USABLE_FIONREAD ioctl only.  Caller
-must have confirmed --decode-tty-terminal-p first (the raw guards already
-ran in C).  Returns 0 for nothing available, the ioctl byte count for
-some available, or -2 when the ioctl fails and !noninteractive (matching
-the original C return -2 / close-terminal arm); when noninteractive and
-the ioctl fails, returns 0.  Returns 0 if TERMINAL does not decode to a
-tty.  */)
+DEFUN ("--tty-fd", Fc_tty_fd, Sc_tty_fd, 1, 1, 0,
+       doc: /* FIX-20260925-guilemacs: Internal: return the plain file
+descriptor (an integer) of TERMINAL's tty->input, or nil when TERMINAL
+does not decode to a tty (or has no input stream).  The dispatcher
+tty_read_avail_input already rejects a suspended terminal, so this
+guard is defensive.  The caller reads/FIONREADs this fd via the FFI
+and must NOT close it (delete_tty closes it).  */)
   (Lisp_Object terminal)
 {
   struct tty_display_info *tty = m22_tty_of_terminal (terminal);
-  int n_to_read = 0;
-
-  if (!tty)
-    return make_fixnum (0);
-
-  if (ioctl (fileno (tty->input), FIONREAD, &n_to_read) < 0)
-    {
-      if (!noninteractive)
-        return make_fixnum (-2); /* Close this terminal.  */
-      else
-        n_to_read = 0;
-    }
-  return make_fixnum (n_to_read);
-}
-
-DEFUN ("--tty-read-nonblocking", Fc_tty_read_nonblocking,
-       Sc_tty_read_nonblocking, 2, 2, 0,
-       doc: /* FIX-20260901-guilemacs: Internal: emacs_read up to N bytes
-from TERMINAL's tty into a fresh N-byte bytevector without blocking.
-Returns (nread . bytevector), where nread may be less than N.  Returns
-the bare fixnum -2 when the read failed with errno==EIO (matching the
-original C close-terminal arm).  Otherwise the raw emacs_read result is
-the pair's car (0, a short count, or a bare -1 — never swallowed here);
-the caller decides what to do with a negative count.  Returns (0 . empty)
-if TERMINAL does not decode to a tty.  */)
-  (Lisp_Object terminal, Lisp_Object n)
-{
-  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
-  int nbytes = XFIXNUM (n);
-  Lisp_Object bv = scm_c_make_bytevector (nbytes);
-  int nread;
-
-  if (!tty)
-    return scm_cons (make_fixnum (0), bv);
-
-  nread = emacs_read (fileno (tty->input), SCM_BYTEVECTOR_CONTENTS (bv),
-                      nbytes);
-  /* POSIX infers that processes which are not in the session leader's
-     process group won't get SIGHUPs at logout time.  BSDI adheres to
-     this part standard and returns -1 from read (0) with errno==EIO
-     when the control tty is taken away.
-     Jeffrey Honig <jch@bsdi.com> says this is generally safe.  */
-  if (nread == -1 && errno == EIO)
-    return make_fixnum (-2);  /* Close this terminal.  */
-  return scm_cons (make_fixnum (nread), bv);
+  return (tty && tty->input) ? make_fixnum (fileno (tty->input)) : Qnil;
 }
 
 DEFUN ("--tty-top-frame", Fc_tty_top_frame, Sc_tty_top_frame, 1, 1, 0,
