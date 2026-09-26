@@ -11,9 +11,9 @@
 ;;;         and 12 scm_c_public_ref sites; the (emacs xdisp) module
 ;;;         exports 11 procedures; the tree-wide scm_c_public_ref count
 ;;;         over src/*.[chm] is 177; src/process.c is 9,030 lines and
-;;;         50 DEFUNs; src/keyboard.c is 11,176 lines and
-;;;         src/keyboard-globals.c is 490, a combined 11,666 under the
-;;;         11,960 M31 budget (margin 294).  M42 imp-2 moved the
+;;;         50 DEFUNs; src/keyboard.c is 11,221 lines and
+;;;         src/keyboard-globals.c is 490, a combined 11,711 under the
+;;;         11,960 M31 budget (margin 249).  M42 imp-2 moved the
 ;;;         keyboard numbers; the values below are re-pinned.
 ;;;   S2 -- the 24 src/xdisp.c DEFUN line pins.
 ;;;   S3 -- the M41 close-out state words in the durable records
@@ -120,7 +120,7 @@ printed as INFO-skipped, not FAIL."
 ;;; scm_c_public_ref sites (docs/m41-plan.org).  imp-2 and imp-3 moved
 ;;; src/xdisp.c to 38,990 lines and 12 scm_c_public_ref sites; the
 ;;; (emacs xdisp) module grew to 11 exports; the tree-wide count rose
-;;; to 177.  M42 imp-2 then moved the keyboard surface to 11,666 (294
+;;; to 177.  The restored keyboard surface is 11,711 (249
 ;;; under the 11,960 M31 budget).
 
 (m41-imp4--check "surface/xdisp-lines-38990"
@@ -135,20 +135,20 @@ printed as INFO-skipped, not FAIL."
                  (eql 9030 (m41-imp4--lines "src/process.c")))
 (m41-imp4--check "surface/process.c-defuns-50"
                  (eql 50 (m41-imp4--count "src/process.c" "^DEFUN (\"")))
-(m41-imp4--check "surface/keyboard.c-lines-11176"
-                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,176.
-                 (eql 11176 (m41-imp4--lines "src/keyboard.c")))
+(m41-imp4--check "surface/keyboard.c-lines-11221"
+                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,221.
+                 (eql 11221 (m41-imp4--lines "src/keyboard.c")))
 (m41-imp4--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m41-imp4--lines "src/keyboard-globals.c")))
-(m41-imp4--check "surface/keyboard-combined-11666"
+(m41-imp4--check "surface/keyboard-combined-11711"
                  (let ((k (m41-imp4--lines "src/keyboard.c"))
                        (kg (m41-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11666 (+ k kg)))))
-(m41-imp4--check "surface/keyboard-margin-294-under-11960"
+                   (and (integerp k) (integerp kg) (eql 11711 (+ k kg)))))
+(m41-imp4--check "surface/keyboard-margin-249-under-11960"
                  (let ((k (m41-imp4--lines "src/keyboard.c"))
                        (kg (m41-imp4--lines "src/keyboard-globals.c")))
                    (and (integerp k) (integerp kg)
-                        (eql 294 (- 11960 (+ k kg))))))
+                        (eql 249 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
 ;; src/*.m, like the measurement in brief.org §3.1.
 (m41-imp4--check "surface/tree-ref-sites-177"

@@ -145,7 +145,7 @@
     (report "imp5/f4/module/kbd-buffer/loadable"
             (list 'FAIL 'not-loadable '(emacs kbd-buffer))))
 
-;;; --- 4. All 29 stay-C shims still register --------------------------
+;;; --- 4. All 30 stay-C shims still register --------------------------
 ;;; A stay-C DEFUN stays registered, so symbol-function is non-nil.
 (define %stay-c
   '("--read-key-sequence"
@@ -170,7 +170,8 @@
     "--tty-flow-control-set!"
     "--tty-meta-key"
     "--tty-meta-key-set!"
-    "--tty-fd"
+    "--tty-bytes-readable"
+    "--tty-read-nonblocking"
     "--tty-top-frame"
     "--reset-sys-modes"
     "--reset-all-sys-modes"

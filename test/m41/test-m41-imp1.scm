@@ -9,7 +9,7 @@
 ;;;
 ;;;   - the base numbers (src/xdisp.c 38,916 lines, 24 DEFUNs, 7
 ;;;     scm_c_public_ref sites; src/process.c 9,030 lines, 50 DEFUNs;
-;;;     the combined keyboard surface 11,666, after M42 imp-2).
+;;;     the combined keyboard surface 11,711, after the M42 imp-2 redo).
 ;;;   - the classification: the five reclaimable names and the three
 ;;;     blocked names.  A name that moves between the two sets fails.
 ;;;   - the static wiring: (emacs xdisp) exists, and run-tests.scm

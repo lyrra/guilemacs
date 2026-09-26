@@ -1,12 +1,8 @@
-;;; test-m42-imp2.el --- M42 imp-2 (the TTY raw-input OS hop) suite.
+;;; test-m42-imp2.el --- M42 imp-2 (the TTY raw-input read path) suite.
 ;;;
-;;; Pins the M42 imp-2 port (brief.org): (emacs gobble)
-;;; tty-read-avail-input! reaches the OS with plain values.  The Scheme
-;;; body calls the FFI read() and ioctl(FIONREAD) directly on a plain
-;;; int fd (from the new C accessor --tty-fd) through (system foreign)
-;;; and libc.so.6.  errno is read through __errno_location.  The two
-;;; terminal-taking C shims --tty-bytes-readable and
-;;; --tty-read-nonblocking are retired.  No C fallback.
+;;; The FFI implementation landed in f2ea65bf and was retired. The two
+;;; portable C syscall leaves are restored; Scheme keeps the read policy,
+;;; decoding, quit handling, and event storage.
 ;;;
 ;;; Wraps test/m42/test-m42-imp2.scm -- the Scheme corpus.  Binds the
 ;;; repo root as %m42-root, loads the Scheme file via eval-scheme, then
@@ -16,12 +12,11 @@
 ;;; error or an empty corpus is reported as a real FAIL (never a silent
 ;;; 0 failed).
 ;;;
-;;; The corpus runs the FFI probes on a pipe (real pipe(2) / write(2) /
-;;; ioctl(FIONREAD) / read(2) / fcntl(2) calls: the success probe and a
-;;; nonblocking EAGAIN errno probe) and static scans of
-;;; mod/emacs/gobble.scm, src/keyboard.c, and tool/run-tests.scm.
+;;; The corpus probes the real C leaves' non-TTY behavior and exercises
+;;; the Scheme policy with those leaves stubbed. It also checks the
+;;; retirement pins in mod/emacs/gobble.scm and src/keyboard.c.
 
-(princ "=== m42 imp-2 (the TTY raw-input OS hop) test suite ===\n")
+(princ "=== m42 imp-2 (the TTY raw-input read path) test suite ===\n")
 
 (require 'imp-ert-report)
 

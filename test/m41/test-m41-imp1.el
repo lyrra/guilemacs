@@ -107,9 +107,9 @@
                      (eql 9030 (m41-imp1--lines "src/process.c")))
     (m41-imp1--check "process.c-defuns-50"
                      (eql 50 (m41-imp1--count "src/process.c" "^DEFUN (\"")))
-    (m41-imp1--check "keyboard.c-lines-11176"
-                     ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,176.
-                     (eql 11176 (m41-imp1--lines "src/keyboard.c")))
+    (m41-imp1--check "keyboard.c-lines-11221"
+                     ;; The M42 FFI attempt was retired; baseline restored.
+                     (eql 11221 (m41-imp1--lines "src/keyboard.c")))
     (m41-imp1--check "keyboard-globals.c-lines-490"
                      (eql 490 (m41-imp1--lines "src/keyboard-globals.c")))
     (m41-imp1--check "tree-wide-scm-public-ref-177"

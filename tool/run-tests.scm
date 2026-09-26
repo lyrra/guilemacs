@@ -197,9 +197,9 @@
   "test/m41/test-m41-imp3.el"                 ; M41 imp-3: the set-buffer-redisplay, get-display-property, and lookup-image-map decisions moved to (emacs xdisp); the three static C dispatchers and the scm_c_public_ref re-pins (corpus reads files only)
   "test/m41/test-m41-imp4.el"                 ; M41 imp-4 close-out: the re-measured surface table, the 24 src/xdisp.c DEFUN line pins, and the M41 close-out state words in the durable records (corpus reads files only)
   )
-(group (m42) ; M42 imp-1 audit + imp-2 OS read leaf: the TTY raw-input OS hop -- the Guile FFI/port surface, the tty->input descriptor, and the decision A1 (docs/m42-plan.org)
+(group (m42) ; M42 imp-1 API audit + imp-2 Scheme policy with C syscall leaves
   "test/m42/test-m42-imp1.el"                 ; M42 imp-1 audit: the base numbers, the two OS shims and the Scheme policy body (imp-1 changes no C/Scheme), the descriptor source facts, and the A1 decision words (corpus reads files only)
-  "test/m42/test-m42-imp2.el"                 ; M42 imp-2: (emacs gobble) tty-read-avail-input! reaches the OS with the FFI read()/ioctl(FIONREAD) on a plain int fd; the --tty-fd accessor retires --tty-bytes-readable and --tty-read-nonblocking; the FFI probe on a pipe and the static pins
+  "test/m42/test-m42-imp2.el"                 ; M42 imp-2 redo: C retains read/ioctl leaves; Scheme policy tests, non-TTY leaf probes, and direction pins
   )
 (group
   "test/src/eval-tests.el"
