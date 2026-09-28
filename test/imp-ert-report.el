@@ -69,6 +69,30 @@ NAME is a string, interned once."
                 (make-ert-test :name (intern name)
                                :body (lambda () (should value)))))
 
+;; A corpus case that cannot run on this host (a missing pty, no built
+;; src/emacs) is an environment gap, not a code regression.  It must
+;; not count as a PASS and must not count as a FAIL.  Registering it as
+;; a real ERT test whose body calls `ert-skip' makes ERT report a
+;; controlled skip ("skipped N/M name" in batch mode); tool/run-tests.scm
+;; parses that line into its own skip count, so the group's accounting
+;; `pass + skipped = tot' stays green (brief.org section 4, M42 imp-3).
+;;
+;; Building the test object is split from registering it, so a caller --
+;; including a self-check -- can exercise the skip body without
+;; injecting a stray test into the global ERT test table (cr.org F3).
+(defun imp-skip-ert-test (name reason)
+  "Return a new ERT test for NAME whose body reports a controlled skip.
+REASON is a string describing why the case cannot run on this host.
+This builds the test object but does not register it.  Pass the result
+to `ert-set-test', or use `imp-register-skip-as-ert-test'."
+  (make-ert-test :name (intern name)
+                 :body (lambda () (ert-skip reason))))
+
+(defun imp-register-skip-as-ert-test (name reason)
+  "Register NAME as a real ERT test that reports a controlled skip.
+REASON is a string describing why the case cannot run on this host."
+  (ert-set-test (intern name) (imp-skip-ert-test name reason)))
+
 (provide 'imp-ert-report)
 
 ;;; imp-ert-report.el ends here

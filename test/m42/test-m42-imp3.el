@@ -25,9 +25,11 @@
 ;;;
 ;;; The skip path (brief.org D3): a host that refuses a pty
 ;;; (/dev/ptmx EACCES, errno 13) or holds no built src/emacs prints one
-;;; INFO line per case.  An INFO case is never registered as an ERT
-;;; test, so it is neither a PASS nor a FAIL -- it stays visible as a
-;;; skip.  This is the case on the imp-3 host (brief.org section 8).
+;;; INFO line per case.  Each INFO case is registered as a real ERT test
+;;; whose body calls `ert-skip', so ERT reports it as a controlled skip
+;;; -- neither a PASS nor a FAIL -- and tool/run-tests.scm counts it as
+;;; skipped (pass + skipped = tot).  This is the case on the imp-3 host
+;;; (brief.org section 8).
 
 (princ "=== m42 imp-3 (the pty harness, cases 1-2) test suite ===\n")
 
@@ -59,7 +61,12 @@
         (setq pass (1+ pass))
         (princ (format "PASS %s\n" name)))
        ((and (consp status) (eq (car status) 'INFO))
-        ;; Environment gap, not a code regression.  Do not FAIL.
+        ;; Environment gap, not a code regression.  Do not FAIL, and do
+        ;; not silently count it either: register it as a real ERT test
+        ;; that reports a controlled skip, so tool/run-tests.scm sees
+        ;; "skipped N/M name" and keeps pass + skipped = tot (brief.org
+        ;; section 4.2).  The princ'd INFO line stays for the human log.
+        (imp-register-skip-as-ert-test name (cadr status))
         (setq info (1+ info))
         (princ (format "INFO %s %s\n" name (cadr status))))
        (t
@@ -110,6 +117,49 @@
   (dolist (pair (m42-imp3--skip "no pty"))
     (should (eq (car (cdr pair)) 'INFO))
     (should-not (equal (cdr pair) 'PASS))))
+
+(ert-deftest m42-imp3/info-case-yields-a-controlled-skip ()
+  ;; brief.org section 4.2: an INFO case must become a real ERT test whose
+  ;; body calls `ert-skip'.  ERT then prints "skipped N/M name", which
+  ;; tool/run-tests.scm counts as a skip, so the group's
+  ;; pass + skipped = tot accounting stays green instead of failing on a
+  ;; "counted pass" mismatch.  A skip is neither a pass nor a FAIL.
+  ;;
+  ;; Build and run the test object locally (cr.org finding F3): the
+  ;; self-check must not inject a stray test into the global ERT test
+  ;; table, so it calls `imp-skip-ert-test' and never `ert-set-test'.
+  (let* ((name "m42-imp3/skip-probe")
+         (reason "probe: no pty")
+         (sym (intern name))
+         (test (imp-skip-ert-test name reason))
+         (result (ert-run-test test)))
+    (should-not (ert-test-boundp sym))
+    (should (ert-test-skipped-p result))
+    (should-not (ert-test-passed-p result))
+    (should (ert-test-result-expected-p test result))
+    (should (string-match-p (regexp-quote reason)
+                            (ert-reason-for-test-result result)))))
+
+(ert-deftest m42-imp3/skip-registration-leaves-no-stray-test ()
+  ;; cr.org finding F3: the harness must be able to register an INFO case
+  ;; through `imp-register-skip-as-ert-test', but a self-check must not
+  ;; leave its probe behind in the global ERT test table.  Restore the
+  ;; table with `ert-make-test-unbound' so the fixed run selector and any
+  ;; later batch see no new test.
+  (let* ((name "m42-imp3/skip-probe-registered")
+         (reason "probe: registered skip")
+         (sym (intern name)))
+    (unwind-protect
+        (progn
+          (imp-register-skip-as-ert-test name reason)
+          (should (ert-test-boundp sym))
+          (let* ((test (ert-get-test sym))
+                 (result (ert-run-test test)))
+            (should (ert-test-skipped-p result))
+            (should (string-match-p (regexp-quote reason)
+                                    (ert-reason-for-test-result result)))))
+      (ert-make-test-unbound sym))
+    (should-not (ert-test-boundp sym))))
 
 (ert-deftest m42-imp3/runner-returns-both-case-names ()
   ;; The runner always yields one pair per case: the driver's real report,
