@@ -38147,6 +38147,9 @@ to control which program to use when looking for matches.
 
 ;;; Generated autoloads from xt-mouse.el
 
+(defvar xterm-mouse-mode-called nil "\
+If `xterm-mouse-mode' has been called already.
+This can be used to detect if xterm-mouse-mode was explicitly set.")
 (defvar xterm-mouse-mode nil "\
 Non-nil if Xterm-Mouse mode is enabled.
 See the `xterm-mouse-mode' command
