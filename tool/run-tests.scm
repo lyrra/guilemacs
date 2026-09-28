@@ -505,6 +505,8 @@
 ;;;  )
    (group "test/lisp/progmodes/sql-tests.el") ; fails
 
+   (group "test/lisp/xt-mouse-tests.el")
+
 ;; M38 imp-1: the count-mismatch fixture.  Normally green, so it never
 ;; reddens a run; the m38-imp1 corpus runs it stressed
 ;; (GUILEMACS_M38_FIXTURE=1) to prove the harness exits non-zero on a
