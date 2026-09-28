@@ -1,8 +1,7 @@
 ;;; test-m42-imp4.el --- M42 imp-4 (pty cases 3-6) suite.
 ;;;
 ;;; imp-4 extends the imp-3 pty harness (test/m42/pty-driver.py and
-;;; test/m42/pty-runner.el) with four behaviour cases (brief.org
-;;; section 5.3):
+;;; test/m42/pty-runner.el) with four behaviour cases (brief.org):
 ;;;
 ;;;   case-3/meta-key-*      the meta decode, one sub-case per
 ;;;                          %--tty-meta-key value (1 strips and sets the
@@ -10,15 +9,16 @@
 ;;;   case-4/quit-byte       the quit-char batch break: bytes after the
 ;;;                          quit byte in the same batch are dropped, but
 ;;;                          the path still returns the read count.  The
-;;;                          child binds `inhibit-quit' so the stored C-g
-;;;                          cannot abort the report (brief.org section
-;;;                          4.1).
+;;;                          driver clears ISIG on the pty first, so the
+;;;                          kernel delivers the raw quit byte; the child
+;;;                          binds `inhibit-quit' so the stored C-g cannot
+;;;                          abort the report (brief.org).
 ;;;   case-4/meta-quit-guard the strip/compute order: a meta quit byte
 ;;;                          (0x87) breaks the batch as code 7 mods meta.
 ;;;   case-5/terminal-loss   the measured terminal-loss case: the child
 ;;;                          ignores SIGHUP and the driver closes the pty
 ;;;                          master, so the slave read fails with EIO and
-;;;                          the path returns -2 (brief.org section 4.2).
+;;;                          the path returns -2 (brief.org).
 ;;;                          A host that cannot give EIO reports an
 ;;;                          environment-gated INFO skip, never PASS/FAIL.
 ;;;   case-6/continuation    a second call on the same terminal; the child
@@ -36,7 +36,7 @@
 ;;; INFO line per case.  Each INFO case becomes a real ERT test whose
 ;;; body calls `ert-skip', so ERT reports a controlled skip -- neither a
 ;;; PASS nor a FAIL -- and tool/run-tests.scm keeps pass + skipped = tot.
-;;; This is the case on this host (brief.org section 8).
+;;; This is the case on this host (brief.org).
 
 (princ "=== m42 imp-4 (pty cases 3-6) test suite ===\n")
 
@@ -85,7 +85,7 @@
 
 ;;; --------------------------------------------------------------------
 ;;; Harness self-checks.  These need no pty and no child process, so they
-;;; run on this host too (brief.org section 5.4).  They pin the new
+;;; run on this host too (brief.org).  They pin the new
 ;;; report shapes -- the code:mods order string, the two-call shape and
 ;;; the -2 return -- and the runner's skip path.
 
@@ -139,7 +139,7 @@
 
 (ert-deftest m42-imp4/driver-regex-accepts-two-calls ()
   ;; REPORT_RE must accept the single-call shape and the extra-call
-  ;; fields (brief.org section 5.1.3).
+  ;; fields (brief.org).
   (let ((src (m42-imp4--driver-source)))
     (should (string-match-p "REPORT_RE" src))
     (should (string-match-p "no-terminal|-?" src))))
@@ -148,7 +148,7 @@
   (should (string-match-p "--group" (m42-imp4--driver-source))))
 
 (ert-deftest m42-imp4/case-5-measures-terminal-loss ()
-  ;; brief.org section 4.2: case 5 measures the -2 (EIO) arm.  The child
+  ;; brief.org: case 5 measures the -2 (EIO) arm.  The child
   ;; ignores SIGHUP before the read and the driver closes the pty master,
   ;; so the slave read fails with EIO -> the close-terminal result -2.  A
   ;; host that cannot give EIO reports an environment-gated INFO skip.
@@ -165,11 +165,39 @@
     (should-not (string-match-p "\"skip\":" entry))))
 
 (ert-deftest m42-imp4/child-binds-inhibit-quit ()
-  ;; brief.org section 4.1: a stored quit byte (cases 4 and 6) sets
+  ;; brief.org: a stored quit byte (cases 4 and 6) sets
   ;; quit-flag and the next maybe_quit aborts the probe, so the child
   ;; must bind inhibit-quit; otherwise those cases time out.
   (should (string-match-p "(let ((inhibit-quit t))"
                           (m42-imp4--driver-source))))
+
+(ert-deftest m42-imp4/driver-delivers-the-quit-byte-raw ()
+  ;; brief.org: the raw quit byte must reach the read path.
+  ;; Emacs arms the tty with ISIG and c_cc[VQUIT] = quit_char
+  ;; (src/sysdep.c, init_sys_modes), so the line discipline reads a written
+  ;; 0x07 as VQUIT: it flushes the input queue and raises SIGQUIT.  The
+  ;; failing full run then measured only the bytes after the quit byte --
+  ;; case 4 gave (2, 2, [(67 0) (68 0)]) instead of (5, 3, [(65 0) (66 0)
+  ;; (7 0)]), and case 6 gave (1, 1, [(66 0)]) instead of (3, 2, [(65 0)
+  ;; (7 0)]).  The driver must clear ISIG before it writes the case bytes
+  ;; (FIX-20260928-guilemacs), read the attributes back to confirm the
+  ;; clear took effect, and route a failed clear to an INFO skip rather
+  ;; than a product FAIL (brief.org).
+  (let ((src (m42-imp4--driver-source)))
+    (should (string-match-p "~termios.ISIG" src))
+    (should (string-match-p "deliver_raw(master)" src))
+    ;; The read-back is the behavioural guard a pty host exercises; the
+    ;; text pin alone only proves the clear line is present.
+    (should (string-match-p "did not take effect" src))
+    ;; A failed clear is a harness gap, so run_case must route it to an
+    ;; INFO skip, never let it become a FAIL.
+    (should (string-match-p "ISIG clear on the pty failed" src))
+    ;; F1: deliver_raw must catch termios.error, the type termios actually
+    ;; raises.  termios.error is not an OSError subclass, so an `except
+    ;; OSError' guard is dead code and would let the failure escape as a
+    ;; traceback on a pty host.
+    (should (string-match-p "(OSError, termios.error)" src))
+    (should (string-match-p "termios.error" src))))
 
 (ert-deftest m42-imp4/driver-selftest ()
   ;; --selftest exercises the parser (single-call, code:mods, two-call and
