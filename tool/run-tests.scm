@@ -202,6 +202,7 @@
   "test/m42/test-m42-imp2.el"                 ; M42 imp-2 redo: C retains read/ioctl leaves; Scheme policy tests, non-TTY leaf probes, and direction pins
   "test/m42/test-m42-imp3.el"                 ; M42 imp-3: the pty harness and cases 1-2 (no input, short read); INFO-skip when no pty or no built src/emacs
   "test/m42/test-m42-imp4.el"                 ; M42 imp-4: pty cases 3-6 (meta decode, quit byte, terminal loss, continuation); INFO-skip when no pty or no built src/emacs
+  "test/m42/test-m42-imp5.el"                 ; M42 imp-5 close-out: the end surface, the two C leaf pins, the tracked close-out record, and the gate state
   )
 (group
   "test/src/eval-tests.el"

@@ -125,7 +125,7 @@
   ;; pass + skipped = tot accounting stays green instead of failing on a
   ;; "counted pass" mismatch.  A skip is neither a pass nor a FAIL.
   ;;
-  ;; Build and run the test object locally (cr.org finding F3): the
+  ;; Build and run the test object locally (brief.org §4.2): the
   ;; self-check must not inject a stray test into the global ERT test
   ;; table, so it calls `imp-skip-ert-test' and never `ert-set-test'.
   (let* ((name "m42-imp3/skip-probe")
@@ -141,7 +141,7 @@
                             (ert-reason-for-test-result result)))))
 
 (ert-deftest m42-imp3/skip-registration-leaves-no-stray-test ()
-  ;; cr.org finding F3: the harness must be able to register an INFO case
+  ;; brief.org §4.2: the harness must be able to register an INFO case
   ;; through `imp-register-skip-as-ert-test', but a self-check must not
   ;; leave its probe behind in the global ERT test table.  Restore the
   ;; table with `ert-make-test-unbound' so the fixed run selector and any
