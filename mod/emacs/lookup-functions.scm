@@ -1122,36 +1122,41 @@ This provides complete replacement for C number parsing."
         (lambda (key . args) #f))))
 
 ;; String concatenation operations for SSDATA migration
-;; These functions replace SSDATA usage in concat family functions
+;; These functions replace SSDATA usage in concat family functions.
+
+(define (elisp-string-fragment object)
+  "Return OBJECT as a string fragment for the concat family.
+Elisp nil contributes no characters; other non-strings retain the
+existing object->string conversion."
+  (cond
+   ((or (eq? object #nil) (null? object)) "")
+   ((string? object) object)
+   (else (object->string object))))
 
 ;; Simple string concatenation for two strings
 (define (string-concat-2 s1 s2)
   "Concatenate two strings S1 and S2.
 This replaces SSDATA usage in concat2 function.
-Handles non-string arguments by converting them to strings."
-  (let ((str1 (if (string? s1) s1 (object->string s1)))
-        (str2 (if (string? s2) s2 (object->string s2))))
-    (string-append str1 str2)))
+Elisp nil contributes no characters; other non-strings are converted."
+  (string-append (elisp-string-fragment s1)
+                 (elisp-string-fragment s2)))
 
 ;; String concatenation for three strings
 (define (string-concat-3 s1 s2 s3)
   "Concatenate three strings S1, S2, and S3.
 This replaces SSDATA usage in concat3 function.
-Handles non-string arguments by converting them to strings."
-  (let ((str1 (if (string? s1) s1 (object->string s1)))
-        (str2 (if (string? s2) s2 (object->string s2)))
-        (str3 (if (string? s3) s3 (object->string s3))))
-    (string-append str1 str2 str3)))
+Elisp nil contributes no characters; other non-strings are converted."
+  (string-append (elisp-string-fragment s1)
+                 (elisp-string-fragment s2)
+                 (elisp-string-fragment s3)))
 
 ;; Multi-string concatenation
 (define (string-concat-multi strings)
   "Concatenate a list of STRINGS.
 This replaces SSDATA usage in concat_to_string function.
-Handles non-string arguments by converting them to strings."
+Elisp nil contributes no characters; other non-strings are converted."
   (apply string-append
-         (map (lambda (s)
-                (if (string? s) s (object->string s)))
-              strings)))
+         (map elisp-string-fragment strings)))
 
 ;; String operations without properties for SSDATA migration
 ;; Pure substring operation that replaces SSDATA usage in substring-no-properties

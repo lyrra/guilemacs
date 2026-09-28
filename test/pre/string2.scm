@@ -3,6 +3,18 @@
   (el-expr `(let ((x "\"cba\""))
               (print (reverse x)))))
 
+;; Elisp nil is an empty fragment in string concatenation.
+(deftest concat-nil-string-fragments ("left-right")
+  (el-expr `(print (concat nil "\"left\"" nil "\"-\""
+                           "\"right\"" nil))))
+
+;; replace-match builds its result with concat2/concat3.  In particular,
+;; \& at the start of NEWTEXT must not expose nil as literal text.
+(deftest replace-match-nil-concat-fragments ("S-down-mouse-2")
+  (el-expr `(let ((str "\"S-mouse-2\""))
+              (string-match "\"\\\\`S-\"" str)
+              (print (replace-match "\"\\\\&down-\"" t nil str)))))
+
 (let ((emit-test (lambda (name t1 t2 ignore-case e)
                    (match (list t1 t2)
                      (((str1 start1 end1) (str2 start2 end2))
