@@ -9,12 +9,20 @@
 ;;;                          meta modifier, 2 does neither, 0 strips only).
 ;;;   case-4/quit-byte       the quit-char batch break: bytes after the
 ;;;                          quit byte in the same batch are dropped, but
-;;;                          the path still returns the read count.
+;;;                          the path still returns the read count.  The
+;;;                          child binds `inhibit-quit' so the stored C-g
+;;;                          cannot abort the report (brief.org section
+;;;                          4.1).
 ;;;   case-4/meta-quit-guard the strip/compute order: a meta quit byte
 ;;;                          (0x87) breaks the batch as code 7 mods meta.
-;;;   case-5/terminal-loss   closing the pty master makes the slave read
-;;;                          return the close-terminal result -2.
-;;;   case-6/continuation    a second call on the same terminal.
+;;;   case-5/terminal-loss   the measured terminal-loss case: the child
+;;;                          ignores SIGHUP and the driver closes the pty
+;;;                          master, so the slave read fails with EIO and
+;;;                          the path returns -2 (brief.org section 4.2).
+;;;                          A host that cannot give EIO reports an
+;;;                          environment-gated INFO skip, never PASS/FAIL.
+;;;   case-6/continuation    a second call on the same terminal; the child
+;;;                          binds `inhibit-quit' as in case 4.
 ;;;
 ;;; The pty driver owns the pty pair and the emacs under test; the
 ;;; runner starts it and parses its report into (NAME STATUS) pairs.
@@ -23,7 +31,7 @@
 ;;; `imp-register-skip-as-ert-test' (INFO), so the harness counts it and
 ;;; the exit code reflects it.
 ;;;
-;;; The skip path (brief.org D3): a host that refuses a pty
+;;; The skip path: a host that refuses a pty
 ;;; (/dev/ptmx EACCES, errno 13) or holds no built src/emacs prints one
 ;;; INFO line per case.  Each INFO case becomes a real ERT test whose
 ;;; body calls `ert-skip', so ERT reports a controlled skip -- neither a
@@ -139,6 +147,30 @@
 (ert-deftest m42-imp4/driver-has-group-selector ()
   (should (string-match-p "--group" (m42-imp4--driver-source))))
 
+(ert-deftest m42-imp4/case-5-measures-terminal-loss ()
+  ;; brief.org section 4.2: case 5 measures the -2 (EIO) arm.  The child
+  ;; ignores SIGHUP before the read and the driver closes the pty master,
+  ;; so the slave read fails with EIO -> the close-terminal result -2.  A
+  ;; host that cannot give EIO reports an environment-gated INFO skip.
+  ;; The case must be a measured case, not an unconditional `skip`.  Check
+  ;; the case entry itself -- a positive check on the case table, not a
+  ;; whole-file negative match that an unrelated `skip` key would break.
+  (let* ((src (m42-imp4--driver-source))
+         (entry (and (string-match "m42-imp4/case-5-terminal-loss[^}]*}" src)
+                     (match-string 0 src))))
+    (should entry)
+    (should (string-match-p "close_master" entry))
+    (should (string-match-p "env_gate" entry))
+    (should (string-match-p "\"expect_return\": -2" entry))
+    (should-not (string-match-p "\"skip\":" entry))))
+
+(ert-deftest m42-imp4/child-binds-inhibit-quit ()
+  ;; brief.org section 4.1: a stored quit byte (cases 4 and 6) sets
+  ;; quit-flag and the next maybe_quit aborts the probe, so the child
+  ;; must bind inhibit-quit; otherwise those cases time out.
+  (should (string-match-p "(let ((inhibit-quit t))"
+                          (m42-imp4--driver-source))))
+
 (ert-deftest m42-imp4/driver-selftest ()
   ;; --selftest exercises the parser (single-call, code:mods, two-call and
   ;; the -2 terminal-loss return) and the child-source builder.
@@ -151,7 +183,7 @@
 
 (ert-deftest m42-imp4/skip-probe-leaves-no-stray-test ()
   ;; A self-check must be able to build an INFO skip test without
-  ;; injecting a stray test into the global ERT table (cr.org F3).
+  ;; injecting a stray test into the global ERT table.
   (let* ((name "m42-imp4/skip-probe")
          (reason "probe: no pty")
          (sym (intern name))
