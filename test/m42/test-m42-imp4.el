@@ -176,13 +176,16 @@
   ;; Emacs arms the tty with ISIG and c_cc[VQUIT] = quit_char
   ;; (src/sysdep.c, init_sys_modes), so the line discipline reads a written
   ;; 0x07 as VQUIT: it flushes the input queue and raises SIGQUIT.  The
-  ;; failing full run then measured only the bytes after the quit byte --
-  ;; case 4 gave (2, 2, [(67 0) (68 0)]) instead of (5, 3, [(65 0) (66 0)
-  ;; (7 0)]), and case 6 gave (1, 1, [(66 0)]) instead of (3, 2, [(65 0)
+  ;; earlier full run then measured only the bytes after the quit byte --
+  ;; case 4 gave (2, 2, [(67 0) (68 0)]) instead of (5, 2, [(65 0) (66 0)
+  ;; (7 0)]), and case 6 gave (1, 1, [(66 0)]) instead of (3, 1, [(65 0)
   ;; (7 0)]).  The driver must clear ISIG before it writes the case bytes
   ;; (FIX-20260928-guilemacs), read the attributes back to confirm the
   ;; clear took effect, and route a failed clear to an INFO skip rather
-  ;; than a product FAIL (brief.org).
+  ;; than a product FAIL (brief.org).  FIX-20260928-guilemacs: the stored
+  ;; counts are 2 and 1, not 3 and 2, because the raw C-g takes the
+  ;; quit-char branch and is not ring-appended; run.old measured exactly
+  ;; that after the clear landed.
   (let ((src (m42-imp4--driver-source)))
     (should (string-match-p "~termios.ISIG" src))
     (should (string-match-p "deliver_raw(master)" src))

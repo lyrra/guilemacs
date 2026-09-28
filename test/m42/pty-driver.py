@@ -103,8 +103,24 @@ IMP3_CASES = (
 #   meta key 2 -- no strip, no modifier (code 0x81/0xe1, mods 0).
 #   meta key 0 -- no modifier, byte still stripped (code 0x01/0x61, mods 0).
 # Case 4: the quit-char batch break.  Five bytes, quit char 7: the path
-#   stores 65, 66 and 7, then drops 67 and 68, but returns the read
-#   count (5), not the stored count.  The guard case proves the
+#   decodes 65, 66 and 7, then drops 67 and 68, but returns the read
+#   count (5), not the stored count.
+#   FIX-20260928-guilemacs: the decode of the raw C-g does reach
+#   kbd-buffer-store-event!, but its folded code (7) equals quit_char, so
+#   the quit-char branch handles that event and never ring-appends it
+#   (mod/emacs/kbd-buffer.scm, "C 4623-4676 ... never ring-appends").
+#   Only 65 and 66 enter kbd_buffer, so the stored count is 2, not 3.
+#   Measured after deliver_raw landed (run.old, the failing full run):
+#   case 4 gave (5, 2, [(65 0) (66 0) (7 0)]).  The case pins three
+#   facts: read count 5, the 2 bytes in kbd_buffer, the 3 decoded
+#   keystrokes.
+#   FIX-20260928-guilemacs: the rejected option is that a raw C-g must
+#   occupy one kbd_buffer slot.  Evidence against it: the
+#   kbd-buffer.scm docstring says the quit-char branch never
+#   ring-appends, and the passing case-4-meta-quit-guard case agrees --
+#   its meta byte folds to code 7 with the meta modifier, which is not
+#   equal to quit_char, so it IS stored.  Vanilla C also diverts the
+#   quit char to the quit machinery.  The guard case proves the
 #   strip/compute order: with meta key 1, byte 0x87 stores code 7 with
 #   mods meta and breaks the batch (a backward order gives code 7 mods 0).
 #   The driver clears ISIG on the pty before it writes the bytes
@@ -132,6 +148,14 @@ IMP3_CASES = (
 # dropped, so call 2 reads 0.  The case now pins the code's real model
 # (call 2: return 0, stored 0, no events); the product is not changed
 # (brief.org).  See brief.org.
+#
+# FIX-20260928-guilemacs: the same treatment applies to the stored count
+# of the first call.  Cases 4 and 6 first expected 3 and 2 stored events,
+# but the raw C-g that breaks the decode is handled by the quit-char
+# branch and is not ring-appended, so the real model stores 2 and 1.  The
+# failing full run (run.old) measured exactly that: case 4
+# (5, 2, [(65 0) (66 0) (7 0)]) and case 6 call 1 (3, 1, [(65 0) (7 0)]).
+# The product is not changed.
 IMP4_CASES = (
     {
         "name": "m42-imp4/case-3-meta-key-1",
@@ -162,7 +186,10 @@ IMP4_CASES = (
         "bytes": b"AB\x07CD",
         "quit_char": 7,
         "expect_return": 5,
-        "expect_stored": 3,
+        # FIX-20260928-guilemacs: 65 and 66 enter kbd_buffer; the raw C-g
+        # is decoded but takes the quit-char branch, so it is not
+        # ring-appended (see the case-4 comment block above).
+        "expect_stored": 2,
         "expect_order": [(0x41, 0), (0x42, 0), (0x07, 0)],
     },
     {
@@ -194,7 +221,11 @@ IMP4_CASES = (
         "quit_char": 7,
         "calls": 2,
         "expect_calls": [
-            {"return": 3, "stored": 2, "order": [(0x41, 0), (0x07, 0)]},
+            # FIX-20260928-guilemacs: call 1 reads all 3 bytes and decodes
+            # 65 and 7, but only 65 enters kbd_buffer -- the raw C-g takes
+            # the quit-char branch (see the case-4 comment block).  Call 2
+            # finds an empty tty, because that one read consumed B.
+            {"return": 3, "stored": 1, "order": [(0x41, 0), (0x07, 0)]},
             {"return": 0, "stored": 0, "order": []},
         ],
     },
@@ -388,11 +419,17 @@ def deliver_raw(fd):
     bytes up to and including the quit byte never arrive, and the child can
     be signalled into a quit.
 
-    Measured evidence, from the failing full run: case 4 gave
-    (2, 2, [0x43, 0x44]) instead of (5, 3, [0x41, 0x42, 0x07]), and case 6
-    gave (1, 1, [0x42]) instead of (3, 2, [0x41, 0x07]).  Each measured
-    order holds exactly the bytes that follow the quit byte, so the queue
-    was flushed at the 0x07.
+    Measured evidence, from the earlier failing run (before this clear):
+    case 4 gave (2, 2, [0x43, 0x44]) instead of (5, 3, [0x41, 0x42,
+    0x07]), and case 6 gave (1, 1, [0x42]) instead of (3, 2, [0x41,
+    0x07]).  Each measured order holds exactly the bytes that follow the
+    quit byte, so the queue was flushed at the 0x07.
+
+    With the clear in place, run.old measured case 4 as (5, 2, [0x41,
+    0x42, 0x07]) and case 6 call 1 as (3, 1, [0x41, 0x07]): the whole
+    batch arrives and only the bytes before the C-g enter kbd_buffer.  The
+    case tables pin those stored counts (2 and 1); see the case-4 comment
+    block.
 
     Clear ISIG, so the kernel delivers every case byte unchanged, then read
     the attributes back and confirm the clear took effect.  The child also
@@ -546,7 +583,28 @@ def selftest():
                 if c["name"] == "m42-imp4/case-6-continuation")
     check("case-6-continuation-model",
           [(e["return"], e["stored"], e["order"]) for e in cont["expect_calls"]],
-          [(3, 2, [(0x41, 0), (0x07, 0)]), (0, 0, [])])
+          [(3, 1, [(0x41, 0), (0x07, 0)]), (0, 0, [])])
+
+    # FIX-20260928-guilemacs: Work item B (brief.org section 4).  The
+    # chosen model: a raw C-g is decoded but its folded code (7) equals
+    # quit_char, so the quit-char branch handles it and never ring-appends
+    # it.  The rejected option is that a raw C-g must occupy one
+    # kbd_buffer slot.  The passing case-4-meta-quit-guard case
+    # corroborates the chosen model: its meta byte folds to code 7 with
+    # the meta modifier, which is not equal to quit_char, so it IS stored.
+    # Pin both the guard and the case-4 stored counts, so a regression in
+    # either is a SELFTEST FAIL on any host (no pty needed).
+    guard = next(c for c in IMP4_CASES
+                 if c["name"] == "m42-imp4/case-4-meta-quit-guard")
+    check("case-4-meta-quit-guard-model",
+          (guard["expect_return"], guard["expect_stored"], guard["expect_order"]),
+          (2, 2, [(0x41, 0), (0x07, META)]))
+    quitcase = next(c for c in IMP4_CASES
+                    if c["name"] == "m42-imp4/case-4-quit-byte")
+    check("case-4-quit-byte-stored-model",
+          (quitcase["expect_return"], quitcase["expect_stored"],
+           quitcase["expect_order"]),
+          (5, 2, [(0x41, 0), (0x42, 0), (0x07, 0)]))
 
     # The probe must reach tty-read-avail-input! through module-ref: a bare
     # call is an unbound variable in the eval-scheme module.
