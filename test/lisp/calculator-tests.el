@@ -27,7 +27,11 @@
                ("-"         0.0)
                ("."         0.0)
                ("+."        0.0)
-               ("-."        0.0) ; FIX-20260321-guilemacs: -0.1
+               ;; "-." becomes "-.0" in `calculator-string-to-number'.
+               ;; -0.0 is correct and matches vanilla Emacs: src/lread.c
+               ;; `string_to_number' applies the "-" sign to atof (".0"),
+               ;; and `equal' tells -0.0 from 0.0 (doc/lispref/numbers.texi).
+               ("-."       -0.0)
                (".-"        0.0)
                ("--."       0.0)
                ("-0.0e"    -0.0)

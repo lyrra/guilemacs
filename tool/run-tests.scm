@@ -201,6 +201,7 @@
   "test/m42/test-m42-imp1.el"                 ; M42 imp-1 audit: the base numbers, the two OS shims and the Scheme policy body (imp-1 changes no C/Scheme), the descriptor source facts, and the A1 decision words (corpus reads files only)
   "test/m42/test-m42-imp2.el"                 ; M42 imp-2 redo: C retains read/ioctl leaves; Scheme policy tests, non-TTY leaf probes, and direction pins
   "test/m42/test-m42-imp3.el"                 ; M42 imp-3: the pty harness and cases 1-2 (no input, short read); INFO-skip when no pty or no built src/emacs
+  "test/m42/test-m42-imp4.el"                 ; M42 imp-4: pty cases 3-6 (meta decode, quit byte, terminal loss, continuation); INFO-skip when no pty or no built src/emacs
   )
 (group
   "test/src/eval-tests.el"
