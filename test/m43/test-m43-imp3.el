@@ -183,10 +183,10 @@ pass)."
 
 ;;; --- P5. The re-measured surface (brief.org section 2) ---------------
 
-(m43-imp3--check "surface/sysdep.c-lines-4889"
-                 (eql 4889 (m43-imp3--lines "src/sysdep.c")))
-(m43-imp3--check "surface/sysdep.c-defuns-5"
-                 (eql 5 (m43-imp3--count "src/sysdep.c" "^DEFUN (\"")))
+(m43-imp3--check "surface/sysdep.c-lines-4950"
+                 (eql 4950 (m43-imp3--lines "src/sysdep.c")))
+(m43-imp3--check "surface/sysdep.c-defuns-7"
+                 (eql 7 (m43-imp3--count "src/sysdep.c" "^DEFUN (\"")))
 (m43-imp3--check "surface/keyboard.c-lines-11233"
                  (eql 11233 (m43-imp3--lines "src/keyboard.c")))
 (m43-imp3--check "surface/keyboard-globals.c-lines-490"

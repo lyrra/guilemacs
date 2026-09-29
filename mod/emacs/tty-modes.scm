@@ -46,7 +46,8 @@
   #:export (tty-fd tty-get-mode tty-set-mode
             tty-mode-constants tty-mode-wanted init-tty-mode
             tty-mode-restore tty-mode-no-echo
-            reset-tty-mode suppress-echo-tty unlock-tty-flow))
+            reset-tty-mode suppress-echo-tty unlock-tty-flow
+            tty-size-wanted tty-size set-tty-size))
 
 ;; The C leaves (src/keyboard.c and src/sysdep.c).
 (defelisp %--tty-fd       --tty-fd)
@@ -54,6 +55,8 @@
 (defelisp %--tty-set-mode --tty-set-mode)
 (defelisp %--tty-mode-constants --tty-mode-constants)
 (defelisp %--tty-flow-unlock --tty-flow-unlock)
+(defelisp %--tty-get-size --tty-get-size)
+(defelisp %--tty-set-size --tty-set-size)
 
 ;; Map a terminal object to its plain int input descriptor, or -1 when
 ;; it does not decode to a tty.
@@ -268,3 +271,43 @@
   (if flow?
       #f
       ((force %--tty-flow-unlock) fd)))
+
+;;; --- The tty-size policy (brief.org M43 imp-5 section 5) ------------
+
+;; A size is usable when it is a pair of numbers and both dimensions are
+;; > 0.  A non-positive dimension is not a valid size, so it must not
+;; win.  A pair of non-numbers is not a size either: test number? first,
+;; so the rule stays total on junk input (cr.org F2).
+(define (usable-size? size)
+  (and (pair? size)
+       (number? (car size))
+       (number? (cdr size))
+       (> (car size) 0)
+       (> (cdr size) 0)))
+
+;; Compute the wanted terminal size as a plain (width . height) pair.
+;; PROBE is the (width . height) pair from the --tty-get-size leaf, or
+;; #f.  FALLBACK is a (width . height) pair, or #f.  A usable PROBE
+;; wins; else a usable FALLBACK; else (0 . 0).  The rule is total and
+;; PURE: it runs no syscall, so a table test proves it on every host
+;; (brief.org M43 imp-5 section 5).  Return a *fresh* pair; never return
+;; the caller's pair.
+(define (tty-size-wanted probe fallback)
+  (cond
+   ((usable-size? probe) (cons (car probe) (cdr probe)))
+   ((usable-size? fallback) (cons (car fallback) (cdr fallback)))
+   (else (cons 0 0))))
+
+;;; --- The tty-size entry points (brief.org M43 imp-5 section 8) ------
+
+;; Read the terminal size on FD through the --tty-get-size leaf, then
+;; apply the pure size rule with no fallback.  A failed probe yields
+;; (0 . 0), so the get_tty_size contract holds.
+(define (tty-size fd)
+  (tty-size-wanted ((force %--tty-get-size) fd) #f))
+
+;; Set the logical window size of FD to HEIGHT rows and WIDTH columns
+;; through the --tty-set-size leaf.  Return the leaf status (0 on
+;; success, else the negated errno).
+(define (set-tty-size fd height width)
+  ((force %--tty-set-size) fd height width))

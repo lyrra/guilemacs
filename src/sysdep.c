@@ -1284,94 +1284,78 @@ suppress_echo_on_tty (int fd)
   suppress_echo_tty (fd);
 }
 
+/* M43 imp-5: dispatch into (emacs tty-modes) `tty-size'.  Only the plain
+   int FD crosses the layer.  Scheme returns a plain (width . height)
+   pair and runs the size rule; the ioctl mechanism stays in the
+   --tty-get-size leaf.  See brief.org M43 imp-5 section 7.  */
+
+static void
+get_tty_size_policy (int fd, int *widthp, int *heightp)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM pair;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "tty-size");
+  pair = SCM_CALL_1 (proc, make_fixnum (fd));
+
+  /* A bad shape is a programming error; abort, as reset_tty_mode does.
+     A silent return would hide the error (brief.org M43 imp-5 section
+     7).  */
+  if (!scm_is_pair (pair)
+      || !scm_is_integer (scm_car (pair))
+      || !scm_is_integer (scm_cdr (pair)))
+    emacs_abort ();
+
+  *widthp = scm_to_int (scm_car (pair));
+  *heightp = scm_to_int (scm_cdr (pair));
+}
+
+/* M43 imp-5: dispatch into (emacs tty-modes) `set-tty-size'.  Only the
+   plain int FD, HEIGHT, and WIDTH cross the layer.  Scheme returns the
+   leaf status (0 on success, else the negated errno).  Return 0 on
+   success and -1 on failure: the only live caller (process.c) tests
+   `>= 0'.  See brief.org M43 imp-5 section 7.  */
+
+static int
+set_window_size_policy (int fd, int height, int width)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM status;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "set-tty-size");
+  status = SCM_CALL_3 (proc, make_fixnum (fd), make_fixnum (height),
+                       make_fixnum (width));
+  return scm_is_integer (status) && scm_to_int (status) >= 0 ? 0 : -1;
+}
+
 /* Get terminal size from system.
    Store number of lines into *HEIGHTP and width into *WIDTHP.
-   We store 0 if there's no valid information.  */
+   We store 0 if there's no valid information.
+   M43 imp-5: the probe moved to (emacs tty-modes) `tty-size' over the
+   --tty-get-size leaf; the dropped-platform arms (WINDOWSNT, MSDOS) are
+   deleted (the roadmap rule).  The 0 / 0 contract holds: a failed probe
+   yields (0 . 0) (brief.org M43 imp-5 section 4.4, 8).  */
 
 void
 get_tty_size (int fd, int *widthp, int *heightp)
 {
-#if defined TIOCGWINSZ
-
-  /* BSD-style.  */
-  struct winsize size;
-
-  if (ioctl (fd, TIOCGWINSZ, &size) == -1)
-    *widthp = *heightp = 0;
-  else
-    {
-      *widthp = size.ws_col;
-      *heightp = size.ws_row;
-    }
-
-#elif defined TIOCGSIZE
-
-  /* SunOS - style.  */
-  struct ttysize size;
-
-  if (ioctl (fd, TIOCGSIZE, &size) == -1)
-    *widthp = *heightp = 0;
-  else
-    {
-      *widthp = size.ts_cols;
-      *heightp = size.ts_lines;
-    }
-
-#elif defined WINDOWSNT
-
-  CONSOLE_SCREEN_BUFFER_INFO info;
-  if (GetConsoleScreenBufferInfo (GetStdHandle (STD_OUTPUT_HANDLE), &info))
-    {
-      *widthp = info.srWindow.Right - info.srWindow.Left + 1;
-      *heightp = info.srWindow.Bottom - info.srWindow.Top + 1;
-    }
-  else
-    *widthp = *heightp = 0;
-
-#elif defined MSDOS
-
-  *widthp = ScreenCols ();
-  *heightp = ScreenRows ();
-
-#else /* system doesn't know size */
-
-  *widthp = 0;
-  *heightp = 0;
-
-#endif
+  get_tty_size_policy (fd, widthp, heightp);
 }
 
 /* Set the logical window size associated with descriptor FD
    to HEIGHT and WIDTH.  This is used mainly with ptys.
-   Return a negative value on failure.  */
+   Return a negative value on failure.
+   M43 imp-5: the TIOCSWINSZ arm moved to (emacs tty-modes)
+   `set-tty-size' over the --tty-set-size leaf; the dropped-platform
+   TIOCSSIZE arm is deleted, and the upstream SunOS typo is not
+   reproduced (brief.org M43 imp-5 section 4.4, 6).  */
 
 int
 set_window_size (int fd, int height, int width)
 {
-#ifdef TIOCSWINSZ
-
-  /* BSD-style.  */
-  struct winsize size;
-  memset (&size, 0, sizeof (size));
-  size.ws_row = height;
-  size.ws_col = width;
-
-  return ioctl (fd, TIOCSWINSZ, &size);
-
-#else
-#ifdef TIOCSSIZE
-
-  /* SunOS - style.  */
-  struct ttysize size;
-  memset (&size, 0, sizeof (size));
-  size.ts_lines = height;
-  size.ts_cols = width;
-
-  return ioctl (fd, TIOCGSIZE, &size);
-#else
-  return -1;
-#endif /* not SunOS-style */
-#endif /* not BSD-style */
+  return set_window_size_policy (fd, height, width);
 }
 
 
@@ -4780,6 +4764,83 @@ section 7.  */)
     return make_fixnum (-saved);
 #endif /* ! DOS_NT */
   return make_fixnum (0);
+}
+
+/* M43 imp-5: the tty-size leaves.  The probe and the set are OS
+   operations; only the size rule moved to Scheme ((emacs tty-modes)
+   `tty-size-wanted').  Only plain values cross the layer.  The
+   --tty-get-size leaf holds the compile-time probe arms in order:
+   TIOCGWINSZ, then TIOCGSIZE, else 0 / 0.  The dropped-platform arms
+   (WINDOWSNT, MSDOS) are deleted (brief.org M43 imp-5 section 4.4,
+   6).  */
+
+DEFUN ("--tty-get-size", Fc_tty_get_size, Sc_tty_get_size, 1, 1, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: read the terminal size on
+the plain int fd FD.  Return a plain (WIDTH . HEIGHT) pair of fixnums;
+a failed probe yields (0 . 0).  The leaf holds the compile-time probe
+arms of this build.  M43 imp-5, brief.org section 6.  */)
+  (Lisp_Object fd)
+{
+  int ifd = XFIXNUM (fd);
+  int width = 0, height = 0;
+
+#ifndef DOS_NT
+#if defined TIOCGWINSZ
+  {
+    /* BSD-style.  */
+    struct winsize size;
+    if (ioctl (ifd, TIOCGWINSZ, &size) != -1)
+      {
+        width = size.ws_col;
+        height = size.ws_row;
+      }
+  }
+#elif defined TIOCGSIZE
+  {
+    /* SunOS - style.  */
+    struct ttysize size;
+    if (ioctl (ifd, TIOCGSIZE, &size) != -1)
+      {
+        width = size.ts_cols;
+        height = size.ts_lines;
+      }
+  }
+#endif /* TIOCGWINSZ */
+#endif /* ! DOS_NT */
+  return Fcons (make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("--tty-set-size", Fc_tty_set_size, Sc_tty_set_size, 3, 3, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: set the logical window
+size of the plain int fd FD to HEIGHT rows and WIDTH columns.  Return
+the fixnum 0 on success, or a negative fixnum holding the negated errno
+on failure.  The leaf holds the TIOCSWINSZ arm of this build; without
+it the status is -1 (the shape of --tty-flow-unlock).  M43 imp-5,
+brief.org section 6.  */)
+  (Lisp_Object fd, Lisp_Object height, Lisp_Object width)
+{
+  int ifd = XFIXNUM (fd);
+  int h = XFIXNUM (height);
+  int w = XFIXNUM (width);
+
+#ifndef DOS_NT
+#ifdef TIOCSWINSZ
+  {
+    /* BSD-style.  */
+    struct winsize size;
+    memset (&size, 0, sizeof (size));
+    size.ws_row = h;
+    size.ws_col = w;
+    if (ioctl (ifd, TIOCSWINSZ, &size) != 0)
+      return make_fixnum (-errno);
+    return make_fixnum (0);
+  }
+#else
+  return make_fixnum (-1);
+#endif /* TIOCSWINSZ */
+#else /* DOS_NT */
+  return make_fixnum (-1);
+#endif
 }
 
 /* M43 imp-3: the build constant table.  The termios flag names and the

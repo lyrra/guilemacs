@@ -236,10 +236,10 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
 
 ;;; --- P6. The re-measured surface (brief.org section 2) ---------------
 
-(m43-imp4--check "surface/sysdep.c-lines-4889"
-                 (eql 4889 (m43-imp4--lines "src/sysdep.c")))
-(m43-imp4--check "surface/sysdep.c-defuns-5"
-                 (eql 5 (m43-imp4--count "src/sysdep.c" "^DEFUN (\"")))
+(m43-imp4--check "surface/sysdep.c-lines-4950"
+                 (eql 4950 (m43-imp4--lines "src/sysdep.c")))
+(m43-imp4--check "surface/sysdep.c-defuns-7"
+                 (eql 7 (m43-imp4--count "src/sysdep.c" "^DEFUN (\"")))
 (m43-imp4--check "surface/keyboard.c-lines-11233"
                  (eql 11233 (m43-imp4--lines "src/keyboard.c")))
 (m43-imp4--check "surface/keyboard-globals.c-lines-490"
@@ -251,8 +251,8 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
                         (eql 490 kg)
                         (eql 11723 (+ k kg))
                         (<= (+ k kg) 11960))))
-(m43-imp4--check "surface/scm-c-public-ref-181"
-                 (eql 181 (m43-imp4--count-scm-ref)))
+(m43-imp4--check "surface/scm-c-public-ref-183"
+                 (eql 183 (m43-imp4--count-scm-ref)))
 
 ;;; --- P7. The pure policy corpus (brief.org section 11) ---------------
 ;;;

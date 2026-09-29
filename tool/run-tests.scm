@@ -204,11 +204,12 @@
   "test/m42/test-m42-imp4.el"                 ; M42 imp-4: pty cases 3-6 (meta decode, quit byte, terminal loss, continuation); INFO-skip when no pty or no built src/emacs
   "test/m42/test-m42-imp5.el"                 ; M42 imp-5 close-out: the end surface, the two C leaf pins, the tracked close-out record, and the gate state
   )
-(group (m43) ; M43 imp-1 audit + imp-2 the typed C termios leaves + imp-3 the init_sys_modes policy + imp-4 the reset/restore policy (docs/m43-plan.org)
+(group (m43) ; M43 imp-1 audit + imp-2 the typed C termios leaves + imp-3 the init_sys_modes policy + imp-4 the reset/restore policy + imp-5 the tty-size policy (docs/m43-plan.org)
   "test/m43/test-m43-imp1.el"                 ; M43 imp-1 audit: the base re-scan, the src/sysdep.c function map, the termios leaf sites, and the A1/A2 decision words (corpus reads files only)
   "test/m43/test-m43-imp2.el"                 ; M43 imp-2: the two typed C termios leaves (--tty-get-mode, --tty-set-mode), the --tty-fd accessor, (emacs tty-modes), and the re-measured surface (corpus reads files only)
   "test/m43/test-m43-imp3.el"                 ; M43 imp-3: the init_sys_modes policy in (emacs tty-modes) (tty-mode-wanted, init-tty-mode, --tty-mode-constants), the C dispatcher, the deleted flag block, and the re-measured surface; the pure policy table test and the gated pty behaviour check (pty-driver-imp3.py) (corpus reads files and loads the .scm)
   "test/m43/test-m43-imp4.el"                 ; M43 imp-4: the reset/restore policy in (emacs tty-modes) (tty-mode-restore, tty-mode-no-echo, reset-tty-mode, suppress-echo-tty, unlock-tty-flow), the three C dispatchers, the --tty-flow-unlock leaf, the rewired reset_sys_modes / suppress_echo_on_tty / init_sys_modes, and the re-measured surface; the pure policy table test and the gated pty restore check (pty-driver-imp4.py) (corpus reads files and loads the .scm)
+  "test/m43/test-m43-imp5.el"                 ; M43 imp-5: the tty-size policy in (emacs tty-modes) (tty-size-wanted, tty-size, set-tty-size), the --tty-get-size / --tty-set-size leaves, the get_tty_size_policy / set_window_size_policy dispatchers, the rewired get_tty_size / set_window_size, the deleted WINDOWSNT / MSDOS / TIOCSSIZE arms, and the re-measured surface; the pure size-policy table test and the gated pty size check (pty-driver-imp5.py) (corpus reads files and loads the .scm)
   )
 (group
   "test/src/eval-tests.el"
