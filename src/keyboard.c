@@ -10428,6 +10428,18 @@ if TERMINAL does not decode to a tty.  */)
   return scm_cons (make_fixnum (nread), bv);
 }
 
+DEFUN ("--tty-fd", Fc_tty_fd, Sc_tty_fd, 1, 1, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: return TERMINAL's tty
+input descriptor as a plain fixnum (the fileno of tty->input), or -1
+when TERMINAL does not decode to a tty.  The caller passes the fixnum to
+the termios leaves --tty-get-mode and --tty-set-mode.  M43 imp-2,
+brief.org section 5.1.  */)
+  (Lisp_Object terminal)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  return make_fixnum (tty ? fileno (tty->input) : -1);
+}
+
 DEFUN ("--tty-top-frame", Fc_tty_top_frame, Sc_tty_top_frame, 1, 1, 0,
        doc: /* FIX-20260901-guilemacs: Internal: return the top_frame of
 TERMINAL's tty — the frame_or_window used for each keystroke event from

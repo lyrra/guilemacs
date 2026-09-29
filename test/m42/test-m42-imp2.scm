@@ -141,10 +141,10 @@
        (count-lines-starting kb "DEFUN (\"--tty-bytes-readable\""))
 (check "m42/imp2/c/read-defun" 1
        (count-lines-starting kb "DEFUN (\"--tty-read-nonblocking\""))
-(check "m42/imp2/c/no-fd-defun" 0
+(check "m42/imp2/c/fd-defun-1" 1
        (count-lines-starting kb "DEFUN (\"--tty-fd\""))
-(check "m42/imp2/c/defuns-446" 446 (count-lines-starting kb "DEFUN (\""))
-(check "m42/imp2/c/combined-surface-11711" 11711
+(check "m42/imp2/c/defuns-447" 447 (count-lines-starting kb "DEFUN (\""))
+(check "m42/imp2/c/combined-surface-11723" 11723
        (+ (line-count kb) (line-count kg)))
 (bool "m42/imp2/harness-registered"
       (contains? rt "test/m42/test-m42-imp2.el"))

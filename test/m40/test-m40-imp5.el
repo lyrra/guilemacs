@@ -126,20 +126,20 @@ milestone.org is the untracked live tracker)."
                  (eql 50 (m40-imp5--count "src/process.c" "^DEFUN (\"")))
 (m40-imp5--check "surface/process.c-shims-10"
                  (eql 10 (m40-imp5--count "src/process.c" "^DEFUN (\"--")))
-(m40-imp5--check "surface/keyboard.c-lines-11221"
-                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,221.
-                 (eql 11221 (m40-imp5--lines "src/keyboard.c")))
+(m40-imp5--check "surface/keyboard.c-lines-11233"
+                 ;; M43 imp-2 added the --tty-fd accessor: 11,221 -> 11,233.
+                 (eql 11233 (m40-imp5--lines "src/keyboard.c")))
 (m40-imp5--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m40-imp5--lines "src/keyboard-globals.c")))
-(m40-imp5--check "surface/keyboard-combined-11711"
+(m40-imp5--check "surface/keyboard-combined-11723"
                  (let ((k (m40-imp5--lines "src/keyboard.c"))
                        (kg (m40-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11711 (+ k kg)))))
-(m40-imp5--check "surface/keyboard-margin-249-under-11960"
+                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
+(m40-imp5--check "surface/keyboard-margin-237-under-11960"
                  (let ((k (m40-imp5--lines "src/keyboard.c"))
                        (kg (m40-imp5--lines "src/keyboard-globals.c")))
                    (and (integerp k) (integerp kg)
-                        (eql 249 (- 11960 (+ k kg))))))
+                        (eql 237 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c and src/*.h, like
 ;; the guard scan in test/m40/test-m40-imp2.scm §8.
 (m40-imp5--check "surface/tree-ref-sites-177"

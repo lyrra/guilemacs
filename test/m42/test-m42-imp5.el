@@ -8,16 +8,17 @@
 ;;; every host.
 ;;;
 ;;; It covers:
-;;;   S1 -- the surface table.  src/keyboard.c is 11,221 lines, 446
+;;;   S1 -- the surface table.  src/keyboard.c is 11,233 lines, 447
 ;;;         DEFUNs; src/keyboard-globals.c is 490 lines, a combined
-;;;         11,711 under the 11,960 M31 budget (margin 249);
+;;;         11,723 under the 11,960 M31 budget (margin 237);
 ;;;         src/process.c is 9,030 lines, 50 DEFUNs; src/xdisp.c is
 ;;;         38,990 lines, 24 DEFUNs; tree-wide scm_c_public_ref over
 ;;;         src/*.[chm] is 177; mod/emacs/gobble.scm is 303 lines.
 ;;;         M42 moved no C line; the M42 net delta is 0.
 ;;;   S2 -- the two C leaf pins: --tty-bytes-readable (src/keyboard.c
 ;;;         line 10371) and --tty-read-nonblocking (src/keyboard.c line
-;;;         10399).  The planned --tty-fd accessor is absent.
+;;;         10399).  M43 imp-2 re-added the --tty-fd accessor (line
+;;;         10431); it now sits below the two leaves.
 ;;;   S3 -- the direction pins in mod/emacs/gobble.scm: no (system
 ;;;         foreign), no libc.so.6, and tty-read-avail-input! present.
 ;;;   S4 -- the five registered test files of the (m42) group in
@@ -106,21 +107,21 @@ corpus pins is tracked, so an absent one means a broken checkout."
 ;;; keyboard surface did not change in M42: imp-2 restored the C leaves
 ;;; and retired the FFI direction, so the M42 net delta is 0 C lines.
 
-(m42-imp5--check "surface/keyboard.c-lines-11221"
-                 (eql 11221 (m42-imp5--lines "src/keyboard.c")))
-(m42-imp5--check "surface/keyboard.c-defuns-446"
-                 (eql 446 (m42-imp5--count "src/keyboard.c" "^DEFUN (\"")))
+(m42-imp5--check "surface/keyboard.c-lines-11233"
+                 (eql 11233 (m42-imp5--lines "src/keyboard.c")))
+(m42-imp5--check "surface/keyboard.c-defuns-447"
+                 (eql 447 (m42-imp5--count "src/keyboard.c" "^DEFUN (\"")))
 (m42-imp5--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m42-imp5--lines "src/keyboard-globals.c")))
-(m42-imp5--check "surface/keyboard-combined-11711"
+(m42-imp5--check "surface/keyboard-combined-11723"
                  (let ((k (m42-imp5--lines "src/keyboard.c"))
                        (kg (m42-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11711 (+ k kg)))))
-(m42-imp5--check "surface/keyboard-margin-249-under-11960"
+                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
+(m42-imp5--check "surface/keyboard-margin-237-under-11960"
                  (let ((k (m42-imp5--lines "src/keyboard.c"))
                        (kg (m42-imp5--lines "src/keyboard-globals.c")))
                    (and (integerp k) (integerp kg)
-                        (eql 249 (- 11960 (+ k kg))))))
+                        (eql 237 (- 11960 (+ k kg))))))
 (m42-imp5--check "surface/process.c-lines-9030"
                  (eql 9030 (m42-imp5--lines "src/process.c")))
 (m42-imp5--check "surface/process.c-defuns-50"
@@ -149,8 +150,8 @@ corpus pins is tracked, so an absent one means a broken checkout."
 
 ;;; --- S2. The two C leaf pins -----------------------------------------
 ;;; The OS hop stays in the two typed C leaves.  Pin the name and the
-;;; line number of each DEFUN line.  The planned --tty-fd accessor is
-;;; gone.
+;;; line number of each DEFUN line.  (M43 imp-2 added the --tty-fd
+;;; accessor below the two leaves; the leaf lines above did not move.)
 
 (m42-imp5--check "pin/leaf/tty-bytes-readable-10371"
                  (eql 10371 (m42-imp5--defun-line "src/keyboard.c"
@@ -158,8 +159,10 @@ corpus pins is tracked, so an absent one means a broken checkout."
 (m42-imp5--check "pin/leaf/tty-read-nonblocking-10399"
                  (eql 10399 (m42-imp5--defun-line "src/keyboard.c"
                                                   "--tty-read-nonblocking")))
-(m42-imp5--check "absence/tty-fd-in-keyboard.c"
-                 (eql 0 (m42-imp5--count "src/keyboard.c" "tty-fd")))
+(m42-imp5--check "presence/tty-fd-in-keyboard.c-after-m43-imp2"
+                 (let ((n (m42-imp5--count "src/keyboard.c"
+                                           "DEFUN (\"--tty-fd\"")))
+                   (and (integerp n) (eql n 1))))
 
 ;;; --- S3. The direction pins in (emacs gobble) ------------------------
 ;;; Scheme owns the read policy.  The FFI direction is retired: no
@@ -205,13 +208,13 @@ NEEDLE.  Unlike an INFO-skip path, an absent file is NOT forgiven."
 (m42-imp5--check "closeout/words/imp-5-close-out"
                  (m42-imp5--tracked-has "imp-5 (close-out)"))
 (m42-imp5--check "closeout/words/keyboard-lines"
-                 (m42-imp5--tracked-has "11,221 lines"))
+                 (m42-imp5--tracked-has "11,233 lines"))
 (m42-imp5--check "closeout/words/keyboard-defuns"
-                 (m42-imp5--tracked-has "446 DEFUNs"))
+                 (m42-imp5--tracked-has "447 DEFUNs"))
 (m42-imp5--check "closeout/words/combined"
-                 (m42-imp5--tracked-has "11,711"))
+                 (m42-imp5--tracked-has "11,723"))
 (m42-imp5--check "closeout/words/margin"
-                 (m42-imp5--tracked-has "249"))
+                 (m42-imp5--tracked-has "237"))
 
 ;; The gate record of brief.org section 4.2: each of the four gate names
 ;; with an exit status and a pass/fail count.

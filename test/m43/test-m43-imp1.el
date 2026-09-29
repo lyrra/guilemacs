@@ -8,12 +8,14 @@
 ;;; apply it (the leaves are in imp-2).
 ;;;
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the base numbers: src/sysdep.c is 4,711 lines and 1 DEFUN;
-;;;         src/keyboard.c is 11,221 lines and 446 DEFUNs;
-;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
-;;;         surface is 11,711; src/process.c is 9,030 lines and 50
-;;;         DEFUNs; src/xdisp.c is 38,990 lines and 24 DEFUNs;
-;;;         scm_c_public_ref over src/*.[chm] is 177; and
+;;;   D1 -- the base numbers, re-measured at M43 imp-2: src/sysdep.c is
+;;;         4,803 lines and 3 DEFUNs (the two termios leaves were added
+;;;         at the file end, so the function map below did not move);
+;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs (the --tty-fd
+;;;         accessor was added); src/keyboard-globals.c is 490 lines;
+;;;         the combined keyboard surface is 11,723; src/process.c is
+;;;         9,030 lines and 50 DEFUNs; src/xdisp.c is 38,990 lines and
+;;;         24 DEFUNs; scm_c_public_ref over src/*.[chm] is 177; and
 ;;;         mod/emacs/gobble.scm is 303 lines.
 ;;;   D2 -- the src/sysdep.c function map and the termios / ioctl sites.
 ;;;         These are facts in a tracked file, so a drift is a real FAIL.
@@ -122,22 +124,22 @@ clone this is advisory only -- an absent record registers no ERT test."
 
 ;;; --- D1. The base numbers (brief.org §3) ------------------------------
 
-(m43-imp1--check "sysdep.c-lines-4711"
-                 (eql 4711 (m43-imp1--lines "src/sysdep.c")))
-(m43-imp1--check "sysdep.c-defuns-1"
-                 (eql 1 (m43-imp1--count "src/sysdep.c" "^DEFUN (\"")))
-(m43-imp1--check "keyboard.c-lines-11221"
-                 (eql 11221 (m43-imp1--lines "src/keyboard.c")))
-(m43-imp1--check "keyboard.c-defuns-446"
-                 (eql 446 (m43-imp1--count "src/keyboard.c" "^DEFUN (\"")))
+(m43-imp1--check "sysdep.c-lines-4803"
+                 (eql 4803 (m43-imp1--lines "src/sysdep.c")))
+(m43-imp1--check "sysdep.c-defuns-3"
+                 (eql 3 (m43-imp1--count "src/sysdep.c" "^DEFUN (\"")))
+(m43-imp1--check "keyboard.c-lines-11233"
+                 (eql 11233 (m43-imp1--lines "src/keyboard.c")))
+(m43-imp1--check "keyboard.c-defuns-447"
+                 (eql 447 (m43-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m43-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m43-imp1--lines "src/keyboard-globals.c")))
-(m43-imp1--check "combined-keyboard-surface-11711"
+(m43-imp1--check "combined-keyboard-surface-11723"
                  (let ((kb (m43-imp1--lines "src/keyboard.c"))
                        (kg (m43-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11221 kb)
+                   (and (eql 11233 kb)
                         (eql 490 kg)
-                        (eql 11711 (+ kb kg)))))
+                        (eql 11723 (+ kb kg)))))
 (m43-imp1--check "process.c-lines-9030"
                  (eql 9030 (m43-imp1--lines "src/process.c")))
 (m43-imp1--check "process.c-defuns-50"

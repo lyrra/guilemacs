@@ -135,20 +135,20 @@ printed as INFO-skipped, not FAIL."
                  (eql 9030 (m41-imp4--lines "src/process.c")))
 (m41-imp4--check "surface/process.c-defuns-50"
                  (eql 50 (m41-imp4--count "src/process.c" "^DEFUN (\"")))
-(m41-imp4--check "surface/keyboard.c-lines-11221"
-                 ;; M42 imp-2 changed src/keyboard.c: 11,221 -> 11,221.
-                 (eql 11221 (m41-imp4--lines "src/keyboard.c")))
+(m41-imp4--check "surface/keyboard.c-lines-11233"
+                 ;; M43 imp-2 added the --tty-fd accessor: 11,221 -> 11,233.
+                 (eql 11233 (m41-imp4--lines "src/keyboard.c")))
 (m41-imp4--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m41-imp4--lines "src/keyboard-globals.c")))
-(m41-imp4--check "surface/keyboard-combined-11711"
+(m41-imp4--check "surface/keyboard-combined-11723"
                  (let ((k (m41-imp4--lines "src/keyboard.c"))
                        (kg (m41-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11711 (+ k kg)))))
-(m41-imp4--check "surface/keyboard-margin-249-under-11960"
+                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
+(m41-imp4--check "surface/keyboard-margin-237-under-11960"
                  (let ((k (m41-imp4--lines "src/keyboard.c"))
                        (kg (m41-imp4--lines "src/keyboard-globals.c")))
                    (and (integerp k) (integerp kg)
-                        (eql 249 (- 11960 (+ k kg))))))
+                        (eql 237 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
 ;; src/*.m, like the measurement in brief.org §3.1.
 (m41-imp4--check "surface/tree-ref-sites-177"

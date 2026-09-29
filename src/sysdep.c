@@ -4688,6 +4688,98 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
 }
 #endif	/* WINDOWSNT */
 
+/* M43 imp-2: the two typed C termios leaves over a plain int fd.
+   Scheme (emacs tty-modes) reads and writes the terminal mode as plain
+   values.  C keeps the syscall mechanism.  The leaves reuse emacs_get_tty
+   and emacs_set_tty, so the retry loop, the EINTR retry, the
+   TCSAFLUSH / TCSADRAIN choice, the FLUSHP arm, the read-back compare,
+   and the POSIX error mapping stay in C (brief.org M43 imp-2).  No
+   struct, no FILE *, and no Lisp_Object crosses this layer: fd is a
+   plain int and the mode is a plain value list.  */
+
+DEFUN ("--tty-get-mode", Fc_tty_get_mode, Sc_tty_get_mode, 1, 1, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: read the TTY terminal
+mode on the plain int fd FD as a 5-element list (iflag oflag cflag lflag
+c_cc).  IFLAG, OFLAG, CFLAG, and LFLAG are the four flag words as
+fixnums.  C_CC is the control-character array as a bytevector of NCCS
+bytes.  Returns nil (#f) when the read fails.  The list has the exact
+shape that --tty-set-mode accepts, so a value from here round-trips.
+M43 imp-2, brief.org section 5.2 / 5.4.  */)
+  (Lisp_Object fd)
+{
+  int ifd = XFIXNUM (fd);
+  struct emacs_tty et;
+
+  if (emacs_get_tty (ifd, &et) != 0)
+    return Qnil;
+
+#ifndef DOS_NT
+  {
+    Lisp_Object c_cc = scm_c_make_bytevector (NCCS);
+    memcpy (SCM_BYTEVECTOR_CONTENTS (c_cc), et.main.c_cc, NCCS);
+    return list5 (make_fixnum (et.main.c_iflag),
+                  make_fixnum (et.main.c_oflag),
+                  make_fixnum (et.main.c_cflag),
+                  make_fixnum (et.main.c_lflag),
+                  c_cc);
+  }
+#else	/* DOS_NT: no termios, so a successful read looks like failure.  */
+  return Qnil;
+#endif
+}
+
+DEFUN ("--tty-set-mode", Fc_tty_set_mode, Sc_tty_set_mode, 3, 3, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: write the TTY terminal
+mode MODE on the plain int fd FD.  FLUSH non-nil means discard pending
+input (the TCSAFLUSH / TCSADRAIN choice in emacs_set_tty).  MODE is the
+5-element list from --tty-get-mode.  Return the fixnum 0 on success, or
+a negative fixnum holding the negated errno on a hard failure.  M43
+imp-2, brief.org section 5.3.  */)
+  (Lisp_Object fd, Lisp_Object mode, Lisp_Object flush)
+{
+  int ifd = XFIXNUM (fd);
+  bool flushp = !NILP (flush);
+  struct emacs_tty et;
+
+  memset (&et.main, 0, sizeof (et.main));
+
+#ifndef DOS_NT
+  {
+    Lisp_Object iflag, oflag, cflag, lflag, c_cc;
+
+    if (!CONSP (mode)) return make_fixnum (-EINVAL);
+    iflag = XCAR (mode); mode = XCDR (mode);
+    if (!CONSP (mode)) return make_fixnum (-EINVAL);
+    oflag = XCAR (mode); mode = XCDR (mode);
+    if (!CONSP (mode)) return make_fixnum (-EINVAL);
+    cflag = XCAR (mode); mode = XCDR (mode);
+    if (!CONSP (mode)) return make_fixnum (-EINVAL);
+    lflag = XCAR (mode); mode = XCDR (mode);
+    if (!CONSP (mode)) return make_fixnum (-EINVAL);
+    c_cc = XCAR (mode);
+    if (!scm_is_bytevector (c_cc)
+        || scm_c_bytevector_length (c_cc) != NCCS)
+      return make_fixnum (-EINVAL);
+    /* Reject a non-fixnum flag field before XFIXNUM, which would abort
+       Emacs on a wrong type.  The length is guarded above; guard the
+       field type here too (brief.org section 5.4).  */
+    if (!FIXNUMP (iflag) || !FIXNUMP (oflag) || !FIXNUMP (cflag)
+        || !FIXNUMP (lflag))
+      return make_fixnum (-EINVAL);
+
+    et.main.c_iflag = XFIXNUM (iflag);
+    et.main.c_oflag = XFIXNUM (oflag);
+    et.main.c_cflag = XFIXNUM (cflag);
+    et.main.c_lflag = XFIXNUM (lflag);
+    memcpy (et.main.c_cc, SCM_BYTEVECTOR_CONTENTS (c_cc), NCCS);
+  }
+#endif
+
+  if (emacs_set_tty (ifd, &et, flushp) != 0)
+    return make_fixnum (-errno);
+  return make_fixnum (0);
+}
+
 void
 syms_of_sysdep (void)
 {

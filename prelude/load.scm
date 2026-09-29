@@ -200,6 +200,8 @@
 (use-modules (emacs minibuf))
 ;; M34 imp-5 — xdisp.c part-1 hook callers.
 (use-modules (emacs xdisp))
+;; M43 imp-2 — sysdep.c terminal-mode leaves in (emacs tty-modes).
+(use-modules (emacs tty-modes))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

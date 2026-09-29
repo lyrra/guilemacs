@@ -8,9 +8,10 @@
 ;;; which later M42 work superseded.
 ;;;
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the baseline numbers: src/keyboard.c is 11,221 lines and
-;;;         446 DEFUNs, src/keyboard-globals.c is 490 lines, and the
-;;;         combined keyboard surface is 11,711.
+;;;   D1 -- the baseline numbers: src/keyboard.c is 11,233 lines and
+;;;         447 DEFUNs, src/keyboard-globals.c is 490 lines, and the
+;;;         combined keyboard surface is 11,723.  (M43 imp-2 added the
+;;;         --tty-fd accessor, so the M42 numbers moved; D2 follows.)
 ;;;   D2 -- the two portable C read leaves remain, and
 ;;;         tty-read-avail-input! uses them while Scheme owns the policy.
 ;;;   D3 -- the descriptor facts of brief.org §5 task 2 hold in the
@@ -112,26 +113,26 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 ;;; --- D1. The base numbers (brief.org §3) ------------------------------
 
-(m42-imp1--check "keyboard.c-lines-11221"
-                 (eql 11221 (m42-imp1--lines "src/keyboard.c")))
-(m42-imp1--check "keyboard.c-defuns-446"
-                 (eql 446 (m42-imp1--count "src/keyboard.c" "^DEFUN (\"")))
+(m42-imp1--check "keyboard.c-lines-11233"
+                 (eql 11233 (m42-imp1--lines "src/keyboard.c")))
+(m42-imp1--check "keyboard.c-defuns-447"
+                 (eql 447 (m42-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m42-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m42-imp1--lines "src/keyboard-globals.c")))
-(m42-imp1--check "combined-keyboard-surface-11711"
+(m42-imp1--check "combined-keyboard-surface-11723"
                  (let ((kb (m42-imp1--lines "src/keyboard.c"))
                        (kg (m42-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11221 kb)
+                   (and (eql 11233 kb)
                         (eql 490 kg)
-                        (eql 11711 (+ kb kg)))))
+                        (eql 11723 (+ kb kg)))))
 
 (m42-imp1--check "read-shims-retained"
                  (and (m42-imp1--contains-p
                        "src/keyboard.c" "DEFUN (\"--tty-bytes-readable\"")
                       (m42-imp1--contains-p
                        "src/keyboard.c" "DEFUN (\"--tty-read-nonblocking\"")))
-(m42-imp1--check "tty-fd-absent"
-                 (not (m42-imp1--contains-p "src/keyboard.c" "DEFUN (\"--tty-fd\"")))
+(m42-imp1--check "tty-fd-present-after-m43-imp2"
+                 (m42-imp1--contains-p "src/keyboard.c" "DEFUN (\"--tty-fd\""))
 (m42-imp1--check "gobble-policy-still-defined"
                  (m42-imp1--contains-p "mod/emacs/gobble.scm"
                                        "(define (tty-read-avail-input!"))
