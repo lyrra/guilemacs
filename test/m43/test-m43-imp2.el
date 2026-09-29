@@ -24,7 +24,7 @@
 ;;;         wrappers, does not reuse (emacs terminal), and holds no FFI
 ;;;         call and no raw ioctl.
 ;;;   P5 -- the loader and the (m43) group carry the new module and file.
-;;;   P6 -- the base numbers hold: src/sysdep.c is 4,803 lines and 3
+;;;   P6 -- the base numbers hold: src/sysdep.c is 4,797 lines and 4
 ;;;         DEFUNs; src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723, under the 11,960 M31 budget (margin 237).
@@ -224,10 +224,10 @@ error, not a pass)."
 
 ;;; --- P6. The re-measured surface (brief.org section 9) ---------------
 
-(m43-imp2--check "surface/sysdep.c-lines-4803"
-                 (eql 4803 (m43-imp2--lines "src/sysdep.c")))
-(m43-imp2--check "surface/sysdep.c-defuns-3"
-                 (eql 3 (m43-imp2--count "src/sysdep.c" "^DEFUN (\"")))
+(m43-imp2--check "surface/sysdep.c-lines-4889"
+                 (eql 4889 (m43-imp2--lines "src/sysdep.c")))
+(m43-imp2--check "surface/sysdep.c-defuns-5"
+                 (eql 5 (m43-imp2--count "src/sysdep.c" "^DEFUN (\"")))
 (m43-imp2--check "surface/keyboard.c-lines-11233"
                  (eql 11233 (m43-imp2--lines "src/keyboard.c")))
 (m43-imp2--check "surface/keyboard.c-defuns-447"

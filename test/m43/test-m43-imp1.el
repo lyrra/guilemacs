@@ -8,15 +8,18 @@
 ;;; apply it (the leaves are in imp-2).
 ;;;
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the base numbers, re-measured at M43 imp-2: src/sysdep.c is
-;;;         4,803 lines and 3 DEFUNs (the two termios leaves were added
-;;;         at the file end, so the function map below did not move);
+;;;   D1 -- the base numbers, re-measured at M43 imp-3 (this corpus tracks
+;;;         the current tree surface across the imps): src/sysdep.c is
+;;;         4,797 lines and 4 DEFUNs (imp-2 added the two termios leaves;
+;;;         imp-3 added the --tty-mode-constants DEFUN and the
+;;;         init_tty_mode dispatcher, which moved the function map below);
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs (the --tty-fd
 ;;;         accessor was added); src/keyboard-globals.c is 490 lines;
 ;;;         the combined keyboard surface is 11,723; src/process.c is
 ;;;         9,030 lines and 50 DEFUNs; src/xdisp.c is 38,990 lines and
-;;;         24 DEFUNs; scm_c_public_ref over src/*.[chm] is 177; and
-;;;         mod/emacs/gobble.scm is 303 lines.
+;;;         24 DEFUNs; scm_c_public_ref over src/*.[chm] is 181 (imp-3
+;;;         added one site; imp-4 added three); and mod/emacs/gobble.scm
+;;;         is 303 lines.
 ;;;   D2 -- the src/sysdep.c function map and the termios / ioctl sites.
 ;;;         These are facts in a tracked file, so a drift is a real FAIL.
 ;;;   D3 -- the imp-2 leaf shape words in docs/m43-plan.org.
@@ -124,10 +127,10 @@ clone this is advisory only -- an absent record registers no ERT test."
 
 ;;; --- D1. The base numbers (brief.org §3) ------------------------------
 
-(m43-imp1--check "sysdep.c-lines-4803"
-                 (eql 4803 (m43-imp1--lines "src/sysdep.c")))
-(m43-imp1--check "sysdep.c-defuns-3"
-                 (eql 3 (m43-imp1--count "src/sysdep.c" "^DEFUN (\"")))
+(m43-imp1--check "sysdep.c-lines-4889"
+                 (eql 4889 (m43-imp1--lines "src/sysdep.c")))
+(m43-imp1--check "sysdep.c-defuns-5"
+                 (eql 5 (m43-imp1--count "src/sysdep.c" "^DEFUN (\"")))
 (m43-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m43-imp1--lines "src/keyboard.c")))
 (m43-imp1--check "keyboard.c-defuns-447"
@@ -148,8 +151,8 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 38990 (m43-imp1--lines "src/xdisp.c")))
 (m43-imp1--check "xdisp.c-defuns-24"
                  (eql 24 (m43-imp1--count "src/xdisp.c" "^DEFUN (\"")))
-(m43-imp1--check "scm-c-public-ref-177"
-                 (eql 177 (m43-imp1--count-scm-ref)))
+(m43-imp1--check "scm-c-public-ref-181"
+                 (eql 181 (m43-imp1--count-scm-ref)))
 (m43-imp1--check "gobble.scm-lines-303"
                  (eql 303 (m43-imp1--lines "mod/emacs/gobble.scm")))
 
@@ -169,33 +172,33 @@ clone this is advisory only -- an absent record registers no ERT test."
 (m43-imp1--check "init_all_sys_modes-at-1060"
                  (eql 1060 (m43-imp1--line-of
                             "src/sysdep.c" "init_all_sys_modes (void)")))
-(m43-imp1--check "init_sys_modes-at-1070"
-                 (eql 1070 (m43-imp1--line-of
+(m43-imp1--check "init_sys_modes-at-1114"
+                 (eql 1114 (m43-imp1--line-of
                             "src/sysdep.c"
                             "init_sys_modes (struct tty_display_info *tty_out)")))
-(m43-imp1--check "tabs_safe_p-at-1328"
-                 (eql 1328 (m43-imp1--line-of
+(m43-imp1--check "tabs_safe_p-at-1244"
+                 (eql 1244 (m43-imp1--line-of
                             "src/sysdep.c" "tabs_safe_p (int fd)")))
-(m43-imp1--check "suppress_echo_on_tty-at-1347"
-                 (eql 1347 (m43-imp1--line-of
+(m43-imp1--check "suppress_echo_on_tty-at-1282"
+                 (eql 1282 (m43-imp1--line-of
                             "src/sysdep.c" "suppress_echo_on_tty (int fd)")))
-(m43-imp1--check "get_tty_size-at-1367"
-                 (eql 1367 (m43-imp1--line-of
+(m43-imp1--check "get_tty_size-at-1292"
+                 (eql 1292 (m43-imp1--line-of
                             "src/sysdep.c"
                             "get_tty_size (int fd, int *widthp, int *heightp)")))
-(m43-imp1--check "set_window_size-at-1424"
-                 (eql 1424 (m43-imp1--line-of
+(m43-imp1--check "set_window_size-at-1349"
+                 (eql 1349 (m43-imp1--line-of
                             "src/sysdep.c"
                             "set_window_size (int fd, int height, int width)")))
-(m43-imp1--check "reset_all_sys_modes-at-1457"
-                 (eql 1457 (m43-imp1--line-of
+(m43-imp1--check "reset_all_sys_modes-at-1382"
+                 (eql 1382 (m43-imp1--line-of
                             "src/sysdep.c" "reset_all_sys_modes (void)")))
-(m43-imp1--check "reset_sys_modes-at-1468"
-                 (eql 1468 (m43-imp1--line-of
+(m43-imp1--check "reset_sys_modes-at-1420"
+                 (eql 1420 (m43-imp1--line-of
                             "src/sysdep.c"
                             "reset_sys_modes (struct tty_display_info *tty_out)")))
-(m43-imp1--check "setup_pty-at-1541"
-                 (eql 1541 (m43-imp1--line-of
+(m43-imp1--check "setup_pty-at-1508"
+                 (eql 1508 (m43-imp1--line-of
                             "src/sysdep.c" "setup_pty (int fd)")))
 
 (m43-imp1--check "tcgetattr-site-978"
@@ -206,22 +209,22 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 1017 (m43-imp1--line-of
                             "src/sysdep.c"
                             "if (tcsetattr (fd, flushp ? TCSAFLUSH")))
-(m43-imp1--check "tcxonc-arm-1251"
-                 (eql 1251 (m43-imp1--line-of
+(m43-imp1--check "tcxonc-arm-4768"
+                 (eql 4768 (m43-imp1--line-of
                             "src/sysdep.c"
-                            "ioctl (fileno (tty_out->input), TCXONC")))
-(m43-imp1--check "tiocstart-arm-1255"
-                 (eql 1255 (m43-imp1--line-of
+                            "ioctl (ifd, TCXONC, 1)")))
+(m43-imp1--check "tiocstart-arm-4772"
+                 (eql 4772 (m43-imp1--line-of
                             "src/sysdep.c"
-                            "ioctl (fileno (tty_out->input), TIOCSTART")))
-(m43-imp1--check "tiocgwinsz-site-1374"
-                 (eql 1374 (m43-imp1--line-of
+                            "ioctl (ifd, TIOCSTART, 0)")))
+(m43-imp1--check "tiocgwinsz-site-1299"
+                 (eql 1299 (m43-imp1--line-of
                             "src/sysdep.c" "ioctl (fd, TIOCGWINSZ")))
-(m43-imp1--check "tiocgsize-site-1387"
-                 (eql 1387 (m43-imp1--line-of
+(m43-imp1--check "tiocgsize-site-1312"
+                 (eql 1312 (m43-imp1--line-of
                             "src/sysdep.c" "ioctl (fd, TIOCGSIZE")))
-(m43-imp1--check "tiocswinsz-site-1434"
-                 (eql 1434 (m43-imp1--line-of
+(m43-imp1--check "tiocswinsz-site-1359"
+                 (eql 1359 (m43-imp1--line-of
                             "src/sysdep.c" "ioctl (fd, TIOCSWINSZ")))
 (m43-imp1--check "systty-emacs-tty-struct-75"
                  (eql 75 (m43-imp1--line-of

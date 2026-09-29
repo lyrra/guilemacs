@@ -19,7 +19,7 @@
 ;;;         emacs_fdopen (src/term.c:2461), reuses stdin for the initial
 ;;;         terminal (src/term.c:4522), is closed by delete_tty
 ;;;         (src/term.c:4791), and the read bypasses stdio through
-;;;         emacs_read (src/sysdep.c:2713).
+;;;         emacs_read (src/sysdep.c:2680).
 ;;;   D4 -- the decision words and the imp-1 findings appear in the
 ;;;         gitignored records docs/m42-plan.org and docs/kb.org.  docs/
 ;;;         is gitignored, so a present-but-stale record is an INFO-skip,
@@ -162,8 +162,8 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 (m42-imp1--check "read-bypasses-stdio-via-emacs-read"
                  (m42-imp1--contains-p "src/keyboard.c"
                                        "nread = emacs_read (fileno (tty->input)"))
-(m42-imp1--check "emacs_read-at-2713"
-                 (eql 2713 (m42-imp1--line-of "src/sysdep.c"
+(m42-imp1--check "emacs_read-at-2680"
+                 (eql 2680 (m42-imp1--line-of "src/sysdep.c"
                                               "emacs_read (int fd")))
 (m42-imp1--check "emacs-read-retries-eintr"
                  (m42-imp1--contains-p "src/sysdep.c"

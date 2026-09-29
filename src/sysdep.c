@@ -1064,15 +1064,57 @@ init_all_sys_modes (void)
     init_sys_modes (tty);
 }
 
+/* M43 imp-3: dispatch into (emacs tty-modes) `init-tty-mode'.  Only C
+   values cross the layer: the plain int FD, the saved base mode as a
+   plain 5-element list, and the plain inputs as a key/value list.  See
+   brief.org M43 imp-3 section 9 step 4.  */
+
+static void
+init_tty_mode (int fd, Lisp_Object base, Lisp_Object flags)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  /* BASE must be a proper 5-element list whose fifth element is a
+     bytevector of NCCS bytes.  A bad shape is a programming error.  The
+     old C always set the mode; a silent return here would leave the
+     terminal in its previous state and report nothing, which is hard to
+     diagnose.  Abort instead: a read error must be a real error, never a
+     silent pass (brief.org section 11).  */
+  if (!CONSP (base)
+      || !CONSP (XCDR (base))
+      || !CONSP (XCDR (XCDR (base)))
+      || !CONSP (XCDR (XCDR (XCDR (base))))
+      || !CONSP (XCDR (XCDR (XCDR (XCDR (base)))))
+      || !scm_is_bytevector (XCAR (XCDR (XCDR (XCDR (XCDR (base)))))))
+    emacs_abort ();
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "init-tty-mode");
+  SCM_CALL_3 (proc, make_fixnum (fd), base, flags);
+}
+
+/* M43 imp-4: dispatch into (emacs tty-modes) `unlock-tty-flow'.  Only C
+   values cross the layer: the plain int FD and the plain bool FLOW.  The
+   ioctl / tcflow mechanism stays in the --tty-flow-unlock leaf.  See
+   brief.org M43 imp-4 section 8.  */
+
+static void
+unlock_tty_flow (int fd, bool flow)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "unlock-tty-flow");
+  SCM_CALL_2 (proc, make_fixnum (fd), flow ? Qt : Qnil);
+}
+
 /* Initialize the terminal mode on the given tty device. */
 
 void
 init_sys_modes (struct tty_display_info *tty_out)
 {
   struct emacs_tty tty;
-#ifndef DOS_NT
   Lisp_Object terminal;
-#endif
 
   /* M32 imp-5: tty-erase-char left C for a Scheme declaration (see
      (emacs command-loop) init-command-loop-registrations).  Write it
@@ -1095,171 +1137,43 @@ init_sys_modes (struct tty_display_info *tty_out)
 
   tty = *tty_out->old_tty;
 
-#if !defined (DOS_NT)
   /* M32 imp-5: write tty-erase-char through the elisp runtime.  */
   Fset (Qtty_erase_char, make_fixnum (tty.main.c_cc[VERASE]));
 
-  tty.main.c_iflag |= (IGNBRK);	/* Ignore break condition */
-  tty.main.c_iflag &= ~ICRNL;	/* Disable map of CR to NL on input */
-#ifdef INLCR  /* I'm just being cautious,
-		 since I can't check how widespread INLCR is--rms.  */
-  tty.main.c_iflag &= ~INLCR;	/* Disable map of NL to CR on input */
-#endif
-#ifdef ISTRIP
-  tty.main.c_iflag &= ~ISTRIP;	/* don't strip 8th bit on input */
-#endif
-  tty.main.c_lflag &= ~ECHO;	/* Disable echo */
-  tty.main.c_lflag &= ~ICANON;	/* Disable erase/kill processing */
-#ifdef IEXTEN
-  tty.main.c_lflag &= ~IEXTEN;	/* Disable other editing characters.  */
-#endif
-  tty.main.c_lflag |= ISIG;	/* Enable signals */
-  if (tty_out->flow_control)
-    {
-      tty.main.c_iflag |= IXON;	/* Enable start/stop output control */
-#ifdef IXANY
-      tty.main.c_iflag &= ~IXANY;
-#endif /* IXANY */
-    }
-  else
-    tty.main.c_iflag &= ~IXON;	/* Disable start/stop output control */
-  tty.main.c_oflag &= ~ONLCR;	/* Disable map of NL to CR-NL
-                                   on output */
-  tty.main.c_oflag &= ~TAB3;	/* Disable tab expansion */
-#ifdef CS8
-  if (tty_out->meta_key)
-    {
-      tty.main.c_cflag |= CS8;	/* allow 8th bit on input */
-      tty.main.c_cflag &= ~PARENB;/* Don't check parity */
-    }
-#endif
+  /* M43 imp-3: the flag policy moved to (emacs tty-modes)
+     `init-tty-mode'.  C passes the saved base mode as a plain list and
+     the plain inputs as a key/value list; Scheme applies the wanted
+     mode.  The dropped-platform arms (AIX, MSDOS, HAIKU, DOS_NT) are
+     deleted (the roadmap rule).  C keeps the guards and the post-set
+     work.  */
+  {
+    Lisp_Object c_cc = scm_c_make_bytevector (NCCS);
+    Lisp_Object base, flags;
+    memcpy (SCM_BYTEVECTOR_CONTENTS (c_cc), tty.main.c_cc, NCCS);
+    base = list5 (make_fixnum (tty.main.c_iflag),
+                  make_fixnum (tty.main.c_oflag),
+                  make_fixnum (tty.main.c_cflag),
+                  make_fixnum (tty.main.c_lflag),
+                  c_cc);
+    XSETTERMINAL (terminal, tty_out->terminal);
+    flags = listn (8,
+                   intern_c_string ("flow-control?"),
+                   tty_out->flow_control ? Qt : Qnil,
+                   intern_c_string ("meta-key?"),
+                   tty_out->meta_key ? Qt : Qnil,
+                   intern_c_string ("controlling-tty?"),
+                   !NILP (Fcontrolling_tty_p (terminal)) ? Qt : Qnil,
+                   intern_c_string ("quit-char"),
+                   make_fixnum (quit_char));
+    init_tty_mode (fileno (tty_out->input), base, flags);
+  }
 
-  XSETTERMINAL(terminal, tty_out->terminal);
-  if (!NILP (Fcontrolling_tty_p (terminal)))
-    {
-      tty.main.c_cc[VINTR] = quit_char;	/* C-g (usually) gives SIGINT */
-      /* Set up C-g for both SIGQUIT and SIGINT.
-         We don't know which we will get, but we handle both alike
-         so which one it really gives us does not matter.  */
-      tty.main.c_cc[VQUIT] = quit_char;
-    }
-  else
-    {
-      /* We normally don't get interrupt or quit signals from tty
-         devices other than our controlling terminal; therefore,
-         we must handle C-g as normal input.  Unfortunately, this
-         means that the interrupt and quit feature must be
-         disabled on secondary ttys, or we would not even see the
-         keypress.
-
-         Note that even though emacsclient could have special code
-         to pass SIGINT to Emacs, we should _not_ enable
-         interrupt/quit keys for emacsclient frames.  This means
-         that we can't break out of loops in C code from a
-         secondary tty frame, but we can always decide what
-         display the C-g came from, which is more important from a
-         usability point of view.  (Consider the case when two
-         people work together using the same Emacs instance.)  */
-      tty.main.c_cc[VINTR] = CDISABLE;
-      tty.main.c_cc[VQUIT] = CDISABLE;
-    }
-  tty.main.c_cc[VMIN] = 1;	/* Input should wait for at least 1 char */
-  tty.main.c_cc[VTIME] = 0;	/* no matter how long that takes.  */
-#ifdef VSWTCH
-  tty.main.c_cc[VSWTCH] = CDISABLE;	/* Turn off shell layering use
-					   of C-z */
-#endif /* VSWTCH */
-
-#ifdef VSUSP
-  tty.main.c_cc[VSUSP] = CDISABLE;	/* Turn off handling of C-z.  */
-#endif /* VSUSP */
-#ifdef V_DSUSP
-  tty.main.c_cc[V_DSUSP] = CDISABLE; /* Turn off handling of C-y.  */
-#endif /* V_DSUSP */
-#ifdef VDSUSP /* Some systems have VDSUSP, some have V_DSUSP.  */
-  tty.main.c_cc[VDSUSP] = CDISABLE;
-#endif /* VDSUSP */
-#ifdef VLNEXT
-  tty.main.c_cc[VLNEXT] = CDISABLE;
-#endif /* VLNEXT */
-#ifdef VREPRINT
-  tty.main.c_cc[VREPRINT] = CDISABLE;
-#endif /* VREPRINT */
-#ifdef VWERASE
-  tty.main.c_cc[VWERASE] = CDISABLE;
-#endif /* VWERASE */
-#ifdef VDISCARD
-  tty.main.c_cc[VDISCARD] = CDISABLE;
-#endif /* VDISCARD */
-
-  if (tty_out->flow_control)
-    {
-#ifdef VSTART
-      tty.main.c_cc[VSTART] = '\021';
-#endif /* VSTART */
-#ifdef VSTOP
-      tty.main.c_cc[VSTOP] = '\023';
-#endif /* VSTOP */
-    }
-  else
-    {
-#ifdef VSTART
-      tty.main.c_cc[VSTART] = CDISABLE;
-#endif /* VSTART */
-#ifdef VSTOP
-      tty.main.c_cc[VSTOP] = CDISABLE;
-#endif /* VSTOP */
-    }
-
-#ifdef AIX
-  tty.main.c_cc[VSTRT] = CDISABLE;
-  tty.main.c_cc[VSTOP] = CDISABLE;
-  tty.main.c_cc[VSUSP] = CDISABLE;
-  tty.main.c_cc[VDSUSP] = CDISABLE;
-  if (tty_out->flow_control)
-    {
-#ifdef VSTART
-      tty.main.c_cc[VSTART] = '\021';
-#endif /* VSTART */
-#ifdef VSTOP
-      tty.main.c_cc[VSTOP] = '\023';
-#endif /* VSTOP */
-    }
-  /* Also, PTY overloads NUL and BREAK.
-     don't ignore break, but don't signal either, so it looks like NUL.
-     This really serves a purpose only if running in an XTERM window
-     or via TELNET or the like, but does no harm elsewhere.  */
-  tty.main.c_iflag &= ~IGNBRK;
-  tty.main.c_iflag &= ~BRKINT;
-#endif
-#endif /* not DOS_NT */
-
-#ifdef MSDOS	/* Demacs 1.1.2 91/10/20 Manabu Higashida, MW Aug 1993 */
-  if (!tty_out->term_initted)
-    internal_terminal_init ();
-  dos_ttraw (tty_out);
-#endif
-
-  emacs_set_tty (fileno (tty_out->input), &tty, 0);
-
-  /* This code added to insure that, if flow-control is not to be used,
-     we have an unlocked terminal at the start. */
-
-#ifndef HAIKU /* On Haiku, TCXONC is a no-op and causes spurious
-		 compiler warnings. */
-#ifdef TCXONC
-  if (!tty_out->flow_control) ioctl (fileno (tty_out->input), TCXONC, 1);
-#endif
-#endif /* HAIKU */
-#ifdef TIOCSTART
-  if (!tty_out->flow_control) ioctl (fileno (tty_out->input), TIOCSTART, 0);
-#endif
-
-#if !defined (DOS_NT)
-#ifdef TCOON
-  if (!tty_out->flow_control) tcflow (fileno (tty_out->input), TCOON);
-#endif
-#endif
+  /* M43 imp-4: the flow-control unlock decision moved to (emacs
+     tty-modes) `unlock-tty-flow'.  The TCXONC / TIOCSTART / TCOON arms
+     live in the --tty-flow-unlock leaf; the policy is (not flow?).  This
+     insures that, if flow-control is not to be used, we have an unlocked
+     terminal at the start.  */
+  unlock_tty_flow (fileno (tty_out->input), tty_out->flow_control);
 
 #ifdef F_GETOWN
   if (interrupt_input)
@@ -1322,7 +1236,9 @@ init_sys_modes (struct tty_display_info *tty_out)
 }
 
 /* Return true if safe to use tabs in output.
-   At the time this is called, init_sys_modes has not been done yet.  */
+   At the time this is called, init_sys_modes has not been done yet.
+   M43 imp-3 verdict: stays a C query (it runs before init_sys_modes); do
+   not move it without a separate decision (brief.org section 10).  */
 
 bool
 tabs_safe_p (int fd)
@@ -1341,22 +1257,31 @@ tabs_safe_p (int fd)
 #endif /* DOS_NT */
 }
 
-/* Discard echoing.  */
+/* M43 imp-4: dispatch into (emacs tty-modes) `suppress-echo-tty'.  Only
+   the plain int FD crosses the layer.  See brief.org M43 imp-4 section
+   8.  */
+
+static void
+suppress_echo_tty (int fd)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "suppress-echo-tty");
+  SCM_CALL_1 (proc, make_fixnum (fd));
+}
+
+/* Discard echoing.
+   M43 imp-4 verdict: the flag decision moved to (emacs tty-modes)
+   `suppress-echo-tty'; this C entry keeps the declaration in
+   src/systty.h and the caller in src/minibuf.c (brief.org section 10).
+   The dropped-platform DOS_NT arm (set the whole mode to zero) is
+   deleted.  */
 
 void
 suppress_echo_on_tty (int fd)
 {
-  struct emacs_tty etty;
-
-  emacs_get_tty (fd, &etty);
-#ifdef DOS_NT
-  /* Set raw input mode.  */
-  etty.main = 0;
-#else
-  etty.main.c_lflag &= ~ICANON;	/* Disable buffering */
-  etty.main.c_lflag &= ~ECHO;	/* Disable echoing */
-#endif /* ! WINDOWSNT */
-  emacs_set_tty (fd, &etty, 0);
+  suppress_echo_tty (fd);
 }
 
 /* Get terminal size from system.
@@ -1461,6 +1386,33 @@ reset_all_sys_modes (void)
     reset_sys_modes (tty);
 }
 
+/* M43 imp-4: dispatch into (emacs tty-modes) `reset-tty-mode'.  Only C
+   values cross the layer: the plain int FD and the saved base mode as a
+   plain 5-element list, or Qnil when there is no saved mode.  The retry
+   loop stays in emacs_set_tty.  See brief.org M43 imp-4 section 8.  */
+
+static void
+reset_tty_mode (int fd, Lisp_Object base)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  /* A non-nil BASE must be a proper 5-element list whose fifth element
+     is a bytevector of NCCS bytes.  A bad shape is a programming error;
+     abort, as init_tty_mode does.  */
+  if (!NILP (base)
+      && (!CONSP (base)
+          || !CONSP (XCDR (base))
+          || !CONSP (XCDR (XCDR (base)))
+          || !CONSP (XCDR (XCDR (XCDR (base))))
+          || !CONSP (XCDR (XCDR (XCDR (XCDR (base)))))
+          || !scm_is_bytevector (XCAR (XCDR (XCDR (XCDR (XCDR (base))))))))
+    emacs_abort ();
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-modes", "reset-tty-mode");
+  SCM_CALL_2 (proc, make_fixnum (fd), base);
+}
+
 /* Prepare the terminal for closing it; move the cursor to the
    bottom of the frame, turn off interrupt-driven I/O, etc.  */
 
@@ -1520,10 +1472,25 @@ reset_sys_modes (struct tty_display_info *tty_out)
          fcntl (fileno (tty_out->input), F_GETFL, 0) & ~O_NONBLOCK);
 #endif
 
-  if (tty_out->old_tty)
-    while (emacs_set_tty (fileno (tty_out->input),
-                          tty_out->old_tty, 0) < 0 && errno == EINTR)
-      ;
+  /* M43 imp-4: the restore decision moved to (emacs tty-modes)
+     `reset-tty-mode'.  Build the saved mode as a plain 5-element list
+     and dispatch; the whole saved mode returns, so no flag is computed.
+     The retry loop stays in the C leaf (emacs_set_tty).  */
+  {
+    Lisp_Object base = Qnil;
+    if (tty_out->old_tty)
+      {
+        Lisp_Object c_cc = scm_c_make_bytevector (NCCS);
+        memcpy (SCM_BYTEVECTOR_CONTENTS (c_cc),
+                tty_out->old_tty->main.c_cc, NCCS);
+        base = list5 (make_fixnum (tty_out->old_tty->main.c_iflag),
+                      make_fixnum (tty_out->old_tty->main.c_oflag),
+                      make_fixnum (tty_out->old_tty->main.c_cflag),
+                      make_fixnum (tty_out->old_tty->main.c_lflag),
+                      c_cc);
+      }
+    reset_tty_mode (fileno (tty_out->input), base);
+  }
 
 #ifdef MSDOS	/* Demacs 1.1.2 91/10/20 Manabu Higashida */
   dos_ttcooked ();
@@ -4778,6 +4745,125 @@ imp-2, brief.org section 5.3.  */)
   if (emacs_set_tty (ifd, &et, flushp) != 0)
     return make_fixnum (-errno);
   return make_fixnum (0);
+}
+
+/* M43 imp-4: the flow-control unlock leaf.  The TCXONC / TIOCSTART /
+   TCOON arms are OS operations; only the decision moved to Scheme
+   ((emacs tty-modes) `unlock-tty-flow').  The leaf holds the #ifdef arms
+   in this order.  An absent name is absent at build time, so the leaf is
+   a build fact.  See brief.org M43 imp-4 section 7.  */
+
+DEFUN ("--tty-flow-unlock", Fc_tty_flow_unlock, Sc_tty_flow_unlock, 1, 1, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: unlock the terminal flow
+control on the plain int fd FD.  Return the fixnum 0 on success, or a
+negative fixnum holding the negated errno on failure.  The leaf holds the
+TCXONC / TIOCSTART / TCOON arms of this build.  M43 imp-4, brief.org
+section 7.  */)
+  (Lisp_Object fd)
+{
+  int ifd = XFIXNUM (fd);
+#ifndef DOS_NT
+  int saved = 0;
+#ifdef TCXONC
+  if (ioctl (ifd, TCXONC, 1) != 0)
+    saved = errno;
+#endif
+#ifdef TIOCSTART
+  if (ioctl (ifd, TIOCSTART, 0) != 0)
+    saved = errno;
+#endif
+#ifdef TCOON
+  if (tcflow (ifd, TCOON) != 0)
+    saved = errno;
+#endif
+  if (saved != 0)
+    return make_fixnum (-saved);
+#endif /* ! DOS_NT */
+  return make_fixnum (0);
+}
+
+/* M43 imp-3: the build constant table.  The termios flag names and the
+   c_cc indexes are platform data, so Scheme must not hardcode them.
+   This leaf answers for this build as a plain key/value list NAME VALUE
+   ... (an absent #ifdef name is absent).  See brief.org section 8.  */
+
+DEFUN ("--tty-mode-constants", Fc_tty_mode_constants, Sc_tty_mode_constants,
+       0, 0, 0,
+       doc: /* FIX-20260929-guilemacs: Internal: the termios flag names and
+c_cc indexes this build has, as a plain key/value list NAME VALUE ...
+The list holds the always-present names plus the #ifdef-optional names
+of this build.  An absent name is absent from the list.  M43 imp-3,
+brief.org section 8.  */)
+  (void)
+{
+#ifndef DOS_NT
+  Lisp_Object list = Qnil;
+  /* Build NAME VALUE front to back, then reverse once.  Each TTY_CONST
+     prepends VALUE then NAME, so Fnreverse yields NAME VALUE pairs.  */
+#define TTY_CONST(name) \
+  list = Fcons (make_fixnum (name), Fcons (intern_c_string (#name), list))
+
+  /* The flags of the init_sys_modes policy (brief.org section 5).  */
+  TTY_CONST (IGNBRK); TTY_CONST (ICRNL);
+#ifdef INLCR
+  TTY_CONST (INLCR);
+#endif
+#ifdef ISTRIP
+  TTY_CONST (ISTRIP);
+#endif
+  TTY_CONST (ECHO); TTY_CONST (ICANON);
+#ifdef IEXTEN
+  TTY_CONST (IEXTEN);
+#endif
+  TTY_CONST (ISIG); TTY_CONST (IXON);
+#ifdef IXANY
+  TTY_CONST (IXANY);
+#endif
+  TTY_CONST (ONLCR); TTY_CONST (TAB3);
+#ifdef CS8
+  TTY_CONST (CS8); TTY_CONST (PARENB);
+#endif
+
+  /* The c_cc indexes and the value CDISABLE.  */
+  TTY_CONST (CDISABLE); TTY_CONST (VMIN); TTY_CONST (VTIME);
+  TTY_CONST (VINTR); TTY_CONST (VQUIT);
+#ifdef VSWTCH
+  TTY_CONST (VSWTCH);
+#endif
+#ifdef VSUSP
+  TTY_CONST (VSUSP);
+#endif
+#ifdef V_DSUSP
+  TTY_CONST (V_DSUSP);
+#endif
+#ifdef VDSUSP
+  TTY_CONST (VDSUSP);
+#endif
+#ifdef VLNEXT
+  TTY_CONST (VLNEXT);
+#endif
+#ifdef VREPRINT
+  TTY_CONST (VREPRINT);
+#endif
+#ifdef VWERASE
+  TTY_CONST (VWERASE);
+#endif
+#ifdef VDISCARD
+  TTY_CONST (VDISCARD);
+#endif
+#ifdef VSTART
+  TTY_CONST (VSTART);
+#endif
+#ifdef VSTOP
+  TTY_CONST (VSTOP);
+#endif
+
+#undef TTY_CONST
+
+  return Fnreverse (list);
+#else	/* DOS_NT: no termios, so the table is empty.  */
+  return Qnil;
+#endif
 }
 
 void
