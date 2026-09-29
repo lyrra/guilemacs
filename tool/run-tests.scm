@@ -204,6 +204,9 @@
   "test/m42/test-m42-imp4.el"                 ; M42 imp-4: pty cases 3-6 (meta decode, quit byte, terminal loss, continuation); INFO-skip when no pty or no built src/emacs
   "test/m42/test-m42-imp5.el"                 ; M42 imp-5 close-out: the end surface, the two C leaf pins, the tracked close-out record, and the gate state
   )
+(group (m43) ; M43 imp-1 audit: the src/sysdep.c terminal-mode classification (docs/m43-plan.org)
+  "test/m43/test-m43-imp1.el"                 ; M43 imp-1 audit: the base re-scan, the src/sysdep.c function map, the termios leaf sites, and the A1/A2 decision words (corpus reads files only)
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
