@@ -216,8 +216,9 @@
 (group (m44) ; M44 imp-1 audit: the src/sysdep.c signal / suspend-resume boundary (docs/m44-plan.org)
   "test/m44/test-m44-imp1.el"                 ; M44 imp-1 audit: the base re-scan, the signal / suspend line map, the four handler definition pins, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
   )
-(group (m45) ; M45 imp-1 audit: the src/callproc.c OS boundary (docs/m45-plan.org)
+(group (m45) ; M45 imp-1 audit + imp-2 the typed C callproc.c leaves (docs/m45-plan.org)
   "test/m45/test-m45-imp1.el"                 ; M45 imp-1 audit: the base re-scan, the block line map, the three DEFUN pins, the two file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
+  "test/m45/test-m45-imp2.el"                 ; M45 imp-2: the four typed C leaves (--callproc-argv, --callproc-env, --callproc-resolve-program, --callproc-temp-name), (emacs process-create), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

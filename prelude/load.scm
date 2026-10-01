@@ -202,6 +202,9 @@
 (use-modules (emacs xdisp))
 ;; M43 imp-2 — sysdep.c terminal-mode leaves in (emacs tty-modes).
 (use-modules (emacs tty-modes))
+;; M45 imp-2 — callproc.c parent-side process leaves in
+;; (emacs process-create).
+(use-modules (emacs process-create))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

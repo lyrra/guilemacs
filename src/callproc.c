@@ -33,6 +33,7 @@ extern char **environ;
 #include <fcntl.h>
 
 #include "lisp.h"
+#include "guile.h"
 
 #ifdef SETUP_SLAVE_PTY
 # include <sys/stream.h>
@@ -2013,6 +2014,335 @@ set_initial_environment (void)
   /* Ideally, the `copy' shouldn't be necessary, but it seems it's frequent
      to use `delete' and friends on process-environment.  */
   Vinitial_environment = Fcopy_sequence (Vprocess_environment);
+}
+
+/* M45 imp-2: the four typed C leaves over plain values for the
+   parent-side process policy of this file.  Scheme (emacs
+   process-create) calls them through thin wrappers; C keeps the whole
+   mechanism (fork, exec, posix_spawn, pipe, fcntl, dup2, mkostemp, and
+   every char ** block).  Each leaf reads C-owned state or runs one C
+   mechanism and returns a *plain value only*: a list of strings, a list
+   of "NAME=VALUE" strings, a string, or nil.  No char **, no FILE *, no
+   struct posix_spawn_*, and no Lisp_Object crosses this layer
+   (brief.org M45 imp-2 section 5).  imp-2 moves no policy; imp-3 moves
+   the parent-side policy.  */
+
+/* True when STR duplicates an entry already in the plain env LIST, in
+   the sense of add_env (src/callproc.c): both match up to an '=' in STR.
+   A lone name in STR (no '=') never conflicts; it is a placeholder that
+   the final lone-name removal drops.  This is the plain-value form of
+   add_env's dedup rule.  */
+static bool
+callproc_env_conflict_p (Lisp_Object str, Lisp_Object list)
+{
+  const char *q = SSDATA (str);
+
+  for (; CONSP (list); list = XCDR (list))
+    {
+      const char *p = SSDATA (XCAR (list));
+      const char *pp = p, *qq = q;
+
+      while (*qq)
+	{
+	  if (*pp == 0)
+	    {
+	      /* P ended.  STR only names a variable that P already
+		 names as a lone name.  add_env reports a conflict when
+		 STR reaches '='; else the lone name is a placeholder
+		 and does not conflict.  */
+	      if (*qq == '=')
+		return true;
+	      break;
+	    }
+	  if (*pp != *qq)
+	    break;
+	  if (*qq == '=')
+	    return true;	/* Same name, defined; keep the first.  */
+	  pp++, qq++;
+	}
+    }
+  return false;
+}
+
+/* Append STR to the plain env LIST, keeping the C order.  *TAIL is the
+   last cons cell of LIST, or nil when LIST is empty.  Return the new
+   head.  */
+static Lisp_Object
+callproc_env_append (Lisp_Object list, Lisp_Object *tail, Lisp_Object str)
+{
+  Lisp_Object cell = Fcons (str, Qnil);
+
+  if (NILP (list))
+    list = cell;
+  else
+    XSETCDR (*tail, cell);
+  *tail = cell;
+  return list;
+}
+
+DEFUN ("--callproc-argv", Fc_callproc_argv, Sc_callproc_argv, 2, 2, 0,
+       doc: /* FIX-20261001-guilemacs: Internal: return the argv of a
+subprocess as a *plain list of strings*, with the resolved program X at
+the head.  X is the string from --callproc-resolve-program.  Y is the
+plain list of the Elisp argument strings.  C keeps the argument-coding
+step (setup_coding_system / encode_coding_string) and the char ** build;
+this leaf returns the encoded strings only.  Return nil when X is not a
+string, when Y is not a proper list, or when any element of Y is not a
+string (a real error, not a silent pass).  M45 imp-2, brief.org section
+6.1.  */)
+  (Lisp_Object x, Lisp_Object y)
+{
+  struct coding_system argument_coding;
+  Lisp_Object val, head, tail;
+
+  if (!STRINGP (x))
+    return Qnil;
+
+  /* The argument-coding decision of call_process (the must_encode test
+     there is disabled, so the rule is: Vcoding_system_for_write when
+     set, else raw-text).  This leaf keeps that rule in C.  */
+  if (!NILP (Vcoding_system_for_write))
+    val = Vcoding_system_for_write;
+  else
+    val = Qraw_text;
+  val = complement_process_encoding_system (val);
+  setup_coding_system (Fcheck_coding_system (val), &argument_coding);
+  {
+    /* An ASCII-incompatible coding system cannot encode an argv, so
+       call_process falls back to raw-text.  Keep that rule.  */
+    Lisp_Object coding_attrs = CODING_ID_ATTRS (argument_coding.id);
+
+    if (NILP (CODING_ATTR_ASCII_COMPAT (coding_attrs)))
+      {
+	val = raw_text_coding_system (val);
+	setup_coding_system (val, &argument_coding);
+      }
+  }
+  argument_coding.dst_multibyte = 0;
+
+  /* The resolved program goes at the head of the plain list.  */
+  head = tail = Fcons (x, Qnil);
+
+  for (; CONSP (y); y = XCDR (y))
+    {
+      Lisp_Object arg = XCAR (y);
+
+      if (!STRINGP (arg))
+	return Qnil;
+      argument_coding.src_multibyte = 1;
+      if (CODING_REQUIRE_ENCODING (&argument_coding))
+	arg = encode_coding_string (&argument_coding, arg, 1);
+      {
+	Lisp_Object cell = Fcons (arg, Qnil);
+	XSETCDR (tail, cell);
+	tail = cell;
+      }
+    }
+  /* A dotted tail is not a proper list; reject it.  */
+  if (!NILP (y))
+    return Qnil;
+  return head;
+}
+
+DEFUN ("--callproc-resolve-program", Fc_callproc_resolve_program,
+       Sc_callproc_resolve_program, 1, 1, 0,
+       doc: /* FIX-20261001-guilemacs: Internal: search for the program
+PROGRAM over `exec-path' and `exec-suffixes' and return the resolved
+absolute path as a *string*, or nil when the search fails.  The result
+is remove_slash_colon then ENCODE_FILE, the same path that call_process
+passes as argv[0].  This leaf does NOT report a file error; the caller
+decides.  M45 imp-2, brief.org section 6.3.  */)
+  (Lisp_Object program)
+{
+  Lisp_Object path;
+  int ok;
+
+  if (!STRINGP (program))
+    return Qnil;
+
+  ok = openp (Vexec_path, program, Vexec_suffixes, &path,
+	      make_fixnum (X_OK), false, false, NULL);
+  if (ok < 0)
+    return Qnil;
+
+  path = remove_slash_colon (path);
+  return ENCODE_FILE (path);
+}
+
+DEFUN ("--callproc-temp-name", Fc_callproc_temp_name, Sc_callproc_temp_name,
+       0, 0, 0,
+       doc: /* FIX-20261001-guilemacs: Internal: return a *plain list*
+\(TEMP-DIR PATTERN) of two strings for the call-process-region temporary
+file.  TEMP-DIR is `temporary-file-directory' when set, else TMPDIR, else
+\"/tmp/\".  PATTERN is the expanded `temporary-file-name-pattern'.  The
+mkostemp call and the O_CLOEXEC flag stay C; the caller opens the file.
+M45 imp-2, brief.org section 6.4.  */)
+  (void)
+{
+  Lisp_Object tmpdir, pattern;
+
+  if (STRINGP (Vtemporary_file_directory))
+    tmpdir = Vtemporary_file_directory;
+  else
+    {
+      char *outf;
+#ifndef DOS_NT
+      outf = getenv ("TMPDIR");
+      tmpdir = build_string (outf ? outf : "/tmp/");
+#else /* DOS_NT */
+      if ((outf = egetenv ("TMPDIR"))
+	  || (outf = egetenv ("TMP"))
+	  || (outf = egetenv ("TEMP")))
+	tmpdir = build_string (outf);
+      else
+	tmpdir = Ffile_name_as_directory (build_string ("c:/temp"));
+#endif
+    }
+
+  pattern = Fexpand_file_name (Vtemp_file_name_pattern, tmpdir);
+
+  /* Imp-3 note (cr.org F3): create_temp_file applies
+     Fcopy_sequence (ENCODE_FILE (pattern)) before mkostemp.  This leaf
+     returns the plain Fexpand_file_name result, so the C mechanism
+     must still apply ENCODE_FILE and the copy before it opens the
+     file.  The gap is deliberate; do not lose it.  */
+
+#ifdef WINDOWSNT
+  /* Cannot use the result of Fexpand_file_name, because it downcases the
+     XXXXXX part of the pattern, and mktemp then does not recognize it.
+     (create_temp_file holds the same arm.)  */
+  if (!NILP (Vw32_downcase_file_names))
+    {
+      Lisp_Object dirname = Ffile_name_directory (pattern);
+
+      if (NILP (dirname))
+	pattern = Vtemp_file_name_pattern;
+      else
+	pattern = concat2 (dirname, Vtemp_file_name_pattern);
+    }
+#endif
+
+  return list2 (tmpdir, pattern);
+}
+
+DEFUN ("--callproc-env", Fc_callproc_env, Sc_callproc_env, 1, 1, 0,
+       doc: /* FIX-20261001-guilemacs: Internal: return the child
+environment as a *plain list of "NAME=VALUE" strings*, in the same order
+that make_environment_block builds it.  CURRENT-DIR is a plain string;
+the leaf injects the corrected PWD, searches DISPLAY, applies the
+`process-environment' overrides, keeps the first definition of a
+variable, and drops the lone-name placeholders.  C still builds the
+char ** block from this list.  Return nil when CURRENT-DIR is not a
+string.  M45 imp-2, brief.org section 6.2.  */)
+  (Lisp_Object current_dir)
+{
+  Lisp_Object env = Qnil, tail = Qnil;
+  Lisp_Object tem;
+#ifndef HAVE_ANDROID
+  Lisp_Object display = Qnil;
+#endif
+
+  if (!STRINGP (current_dir))
+    return Qnil;
+
+  /* The corrected PWD, when the parent has one.  The trailing slashes
+     are stripped, but "/" and "//" stay (make_environment_block).  */
+  if (egetenv ("PWD"))
+    {
+      ptrdiff_t i = SBYTES (current_dir);
+      char *pwd_var = xmalloc (i + 5);
+      char *temp = pwd_var + 4;
+
+      memcpy (pwd_var, "PWD=", 4);
+      lispstpcpy (temp, current_dir);
+#ifdef DOS_NT
+      /* Get past the drive letter, so that d:/ is left alone.  */
+      if (i > 2 && IS_DEVICE_SEP (temp[1]) && IS_DIRECTORY_SEP (temp[2]))
+	{
+	  temp += 2;
+	  i -= 2;
+	}
+#endif
+      while (i > 2 && IS_DIRECTORY_SEP (temp[i - 1]))
+	temp[--i] = 0;
+
+      {
+	Lisp_Object pwd = build_string (pwd_var);
+	xfree (pwd_var);
+	env = tail = Fcons (pwd, Qnil);
+      }
+    }
+
+#ifndef HAVE_ANDROID
+  /* If DISPLAY is specified in process-environment, do not override it.  */
+  for (tem = Vprocess_environment;
+       CONSP (tem) && STRINGP (XCAR (tem));
+       tem = XCDR (tem))
+    {
+      Lisp_Object e = XCAR (tem);
+
+      if (SBYTES (e) >= 7 && memcmp (SDATA (e), "DISPLAY", 7) == 0
+	  && (SBYTES (e) == 7 || SREF (e, 7) == '='))
+	display = Qt;
+    }
+
+  /* If not provided yet, use the frame's DISPLAY.  */
+  if (NILP (display))
+    {
+      Lisp_Object tmp = Fframe_parameter (selected_frame, Qdisplay);
+
+#ifdef HAVE_PGTK
+      /* The only time GDK returns correct information is under X
+	 Windows.  DISPLAY must not name a Wayland display either.  */
+      if (FRAME_WINDOW_P (SELECTED_FRAME ())
+	  && strcmp (G_OBJECT_TYPE_NAME (FRAME_X_DISPLAY (SELECTED_FRAME ())),
+		     "GdkX11Display"))
+	tmp = Qnil;
+#endif
+
+      if (!STRINGP (tmp) && CONSP (Vinitial_environment))
+	tmp = Fgetenv_internal (build_string ("DISPLAY"),
+				Vinitial_environment);
+      if (STRINGP (tmp))
+	display = tmp;
+    }
+
+  if (STRINGP (display))
+    {
+      Lisp_Object vdata = concat2 (build_string ("DISPLAY="), display);
+
+      if (!callproc_env_conflict_p (vdata, env))
+	env = callproc_env_append (env, &tail, vdata);
+    }
+#endif /* !HAVE_ANDROID */
+
+  /* The process-environment overrides, in the C order.  */
+  for (tem = Vprocess_environment;
+       CONSP (tem) && STRINGP (XCAR (tem));
+       tem = XCDR (tem))
+    {
+      Lisp_Object s = XCAR (tem);
+
+      if (!callproc_env_conflict_p (s, env))
+	env = callproc_env_append (env, &tail, s);
+    }
+
+  /* Remove the variable names without a value (the lone-name
+     placeholders).  */
+  {
+    Lisp_Object kept = Qnil, ktail = Qnil;
+
+    for (tem = env; CONSP (tem); tem = XCDR (tem))
+      {
+	Lisp_Object s = XCAR (tem);
+
+	if (strchr (SSDATA (s), '=') != NULL)
+	  kept = callproc_env_append (kept, &ktail, s);
+      }
+    env = kept;
+  }
+
+  return env;
 }
 
 void
