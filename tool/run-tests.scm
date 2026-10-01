@@ -213,6 +213,9 @@
   "test/m43/test-m43-imp6.el"                 ; M43 imp-6 close-out: the re-measured surface, the line map, and the (m43) group line (corpus reads files only)
   "test/m43/test-m43-imp6-docs.el"            ; M43 imp-6 close-out docs guard: the three durable records are CLOSED (kb.org, m43-plan.org, milestone-overview.org) and milestone.org holds the next-milestone question; guarded INFO-skip on a fresh clone (corpus reads files only)
   )
+(group (m44) ; M44 imp-1 audit: the src/sysdep.c signal / suspend-resume boundary (docs/m44-plan.org)
+  "test/m44/test-m44-imp1.el"                 ; M44 imp-1 audit: the base re-scan, the signal / suspend line map, the four handler definition pins, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
