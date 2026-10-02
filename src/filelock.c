@@ -42,6 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
+#include "guile.h"	/* FIX-20261002-guilemacs: M46 imp-2 lockfile leaves.  */
 #include "buffer.h"
 #include "coding.h"
 #ifdef WINDOWSNT
@@ -656,6 +657,346 @@ unlock_file_handle_error (Lisp_Object err)
 }
 
 #endif	/* MSDOS */
+
+/* FIX-20261002-guilemacs: M46 imp-2 — the typed C leaves over plain
+   values for the lockfile boundary.  Each leaf returns one plain value
+   (a string, an integer, a boolean, or nil) and holds a copy of one
+   policy part; the caller passes plain values in.  The mechanism
+   (the char buffers, struct lock_info_type, and the syscalls) stays in
+   C.  imp-2 moves no policy.  imp-3 rewires the hubs onto these leaves
+   and deletes the inline policy.
+
+   Each DEFUN sits after the #ifndef MSDOS guard so the build tools name
+   its symbol on every platform; the leaf body is guarded with
+   #ifndef MSDOS, so an MSDOS build returns the default.  */
+
+DEFUN ("--filelock-boot-sec", Fc_filelock_boot_sec, Sc_filelock_boot_sec,
+       0, 0, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return the time of the
+last system boot as a *plain integer*, or 0 when the time is not
+available.  M46 imp-2, brief.org section 3.  */)
+  (void)
+{
+#ifndef MSDOS
+  return make_int (get_boot_sec ());
+#else
+  return make_int (0);
+#endif
+}
+
+DEFUN ("--filelock-within-one-second", Fc_filelock_within_one_second,
+       Sc_filelock_within_one_second, 2, 2, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return a *plain boolean*:
+t when the plain integers A and B are no more than one second apart, else
+nil.  The compare is `within_one_second'.  M46 imp-2, brief.org section
+3.  */)
+  (Lisp_Object a, Lisp_Object b)
+{
+#ifndef MSDOS
+  if (!FIXNUMP (a) || !FIXNUMP (b))
+    return Qnil;
+  return within_one_second (XFIXNUM (a), XFIXNUM (b)) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-integer-prefixed", Fc_filelock_integer_prefixed,
+       Sc_filelock_integer_prefixed, 1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return a *plain boolean*:
+t when the string S starts with a decimal integer (optionally negative),
+else nil.  The parse is `integer_prefixed'.  M46 imp-2, brief.org section
+3.  */)
+  (Lisp_Object s)
+{
+#ifndef MSDOS
+  if (!STRINGP (s))
+    return Qnil;
+  return integer_prefixed (SSDATA (s)) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-lock-file-name", Fc_filelock_lock_file_name,
+       Sc_filelock_lock_file_name, 1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return the encoded name
+of the lock file for FN as a *plain string*, or nil when FN has no lock
+file.  The name policy is `make_lock_file_name'.  M46 imp-2, brief.org
+section 3.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object lock_file_name;
+#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
+  char *name;
+#endif
+
+  if (!STRINGP (fn))
+    return Qnil;
+
+  fn = Fexpand_file_name (fn, Qnil);
+
+#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
+  /* Files in /assets and /contents can't have lock files on Android
+     as these directories are fabrications of android.c, and backed by
+     read only data.  */
+  name = SSDATA (fn);
+
+  if (android_is_special_directory (name, "/assets")
+      || android_is_special_directory (name, "/content"))
+  return Qnil;
+#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
+
+  lock_file_name = call1 (Qmake_lock_file_name, fn);
+
+  return !NILP (lock_file_name) ? ENCODE_FILE (lock_file_name) : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-lock-info", Fc_filelock_lock_info, Sc_filelock_lock_info,
+       1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return the lock-info
+line of the lock file as a *plain string* (USER@HOST.PID:BOOT).  BOOT is
+the boot time as a plain integer; the caller passes the result of
+`--filelock-boot-sec', or a zero.  This leaf holds the lock-info
+composition of `lock_file_1'; C builds the lock and the create
+mechanism.  Return nil when BOOT is not an integer, or when the
+composition overflows the lock-info buffer.  M46 imp-2, brief.org section
+3.  */)
+  (Lisp_Object boot)
+{
+#ifndef MSDOS
+  if (!FIXNUMP (boot))
+    return Qnil;
+  {
+    intmax_t boot_sec = XFIXNUM (boot);
+    Lisp_Object luser_name = Fuser_login_name (Qnil);
+    Lisp_Object lhost_name = Fsystem_name ();
+    char const *user_name = STRINGP (luser_name) ? SSDATA (luser_name) : "";
+    char const *host_name = STRINGP (lhost_name) ? SSDATA (lhost_name) : "";
+    char lock_info_str[MAX_LFINFO + 1];
+    intmax_t pid = getpid ();
+
+    int room = sizeof lock_info_str;
+    int len = snprintf (lock_info_str, room, "%s@", user_name);
+    if (! (0 <= len && len < sizeof lock_info_str))
+      return Qnil;
+    /* Protect against the extremely unlikely case of the host name
+       containing an @ character.  */
+    for (; *host_name; len++, host_name++)
+      {
+	if (! (len < sizeof lock_info_str - 1))
+	  return Qnil;
+	lock_info_str[len] = *host_name == '@' ? '-' : *host_name;
+      }
+    char const *lock_info_fmt = boot_sec ? ".%"PRIdMAX":%"PRIdMAX : ".%"PRIdMAX;
+    room = sizeof lock_info_str - len;
+    int suffixlen = snprintf (lock_info_str + len, room,
+			      lock_info_fmt, pid, boot_sec);
+    if (! (0 <= suffixlen && suffixlen < room))
+      return Qnil;
+    return build_string (lock_info_str);
+  }
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-lock-owner", Fc_filelock_lock_owner,
+       Sc_filelock_lock_owner, 1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: report the owner kind
+of the lock file LFNAME with plain values.  Return t when this process
+owns it, a *plain integer* pid when another process owns it, or nil
+when the lock is free, stale, or unreadable.  The caller compares the
+pid with its own pid.  The parse is `current_lock_owner'; C keeps
+`read_lock_data' and `kill (pid, 0)'.  M46 imp-2, brief.org section
+3.  */)
+  (Lisp_Object lfname)
+{
+#ifndef MSDOS
+  char lfinfo[MAX_LFINFO + 1];
+  ptrdiff_t lfinfolen;
+  intmax_t pid, boot_time;
+  char *at, *dot, *colon, *boot, *lfinfo_end;
+  Lisp_Object system_name;
+  bool on_current_host;
+
+  if (!STRINGP (lfname))
+    return Qnil;
+
+  lfinfolen = read_lock_data (SSDATA (lfname), lfinfo);
+  if (lfinfolen <= 0 || MAX_LFINFO < lfinfolen)
+    return Qnil;
+  lfinfo[lfinfolen] = 0;
+
+  /* Parse USER@HOST.PID:BOOT_TIME.  If can't parse, return nil.  */
+  /* The USER is everything before the last @.  */
+  at = memrchr (lfinfo, '@', lfinfolen);
+  if (!at)
+    return Qnil;
+  dot = strrchr (at, '.');
+  if (!dot)
+    return Qnil;
+
+  /* The PID is everything from the last '.' to the ':' or equivalent.  */
+  if (! integer_prefixed (dot + 1))
+    return Qnil;
+  errno = 0;
+  pid = strtoimax (dot + 1, &colon, 10);
+  if (errno == ERANGE)
+    pid = -1;
+
+  /* After the ':' or equivalent, if there is one, comes the boot time.  */
+  boot = colon + 1;
+  switch (colon[0])
+    {
+    case 0:
+      boot_time = 0;
+      lfinfo_end = colon;
+      break;
+
+    case '\357':
+      /* Treat "\357\200\242" (U+F022 in UTF-8) like ":" (Bug#24656).  */
+      if (! (boot[0] == '\200' && boot[1] == '\242'))
+	return Qnil;
+      boot += 2;
+      FALLTHROUGH;
+    case ':':
+      if (! integer_prefixed (boot))
+	return Qnil;
+      boot_time = strtoimax (boot, &lfinfo_end, 10);
+      break;
+
+    default:
+      return Qnil;
+    }
+  if (lfinfo_end != lfinfo + lfinfolen)
+    return Qnil;
+
+  /* The host: a lock on another host has no live local pid, but it is
+     still an owner, so return the parsed pid.  */
+  {
+    char *linkhost = at + 1;
+    ptrdiff_t linkhostlen = dot - linkhost;
+    system_name = Fsystem_name ();
+    if (NILP (system_name))
+      on_current_host = linkhostlen == 0;
+    else
+      {
+	on_current_host = linkhostlen == SBYTES (system_name);
+	if (on_current_host)
+	  {
+	    char *sysname = SSDATA (system_name);
+	    for (ptrdiff_t i = 0; i < linkhostlen; i++)
+	      if (linkhost[i] != (sysname[i] == '@' ? '-' : sysname[i]))
+		{
+		  on_current_host = false;
+		  break;
+		}
+	  }
+      }
+  }
+  if (!on_current_host)
+    return make_int (pid);
+
+  /* A live owner on the current host.  cr.org F3: report this process
+     with t, so the caller keeps the I_OWN_IT / ANOTHER_OWNS_IT split.
+     The leaf does not zap a stale lock; the caller decides.  */
+  if (pid == getpid ())
+    return Qt;
+
+  if (VALID_PROCESS_ID (pid)
+      && ! (kill (pid, 0) < 0 && errno != EPERM)
+      && (boot_time == 0
+	  || within_one_second (boot_time, get_boot_sec ())))
+    return make_int (pid);
+
+  return Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-lock-free-p", Fc_filelock_lock_free_p,
+       Sc_filelock_lock_free_p, 1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: test the lock named
+LFNAME with plain values.  Return t when the lock is free or was
+zapped and is now ours; return a *plain integer* (the owner pid) when
+another process owns it; return nil on an error.  The clash loop is
+`lock_if_free'; cr.org F2 keeps the ANOTHER_OWNS_IT signal.  M46 imp-2,
+brief.org section 3.  */)
+  (Lisp_Object lfname)
+{
+#ifndef MSDOS
+  lock_info_type clasher;
+  int err;
+
+  if (!STRINGP (lfname))
+    return Qnil;
+
+  while ((err = lock_file_1 (lfname, false)) == EEXIST)
+    {
+      err = current_lock_owner (&clasher, lfname);
+
+      /* Return if we locked it, or another process owns it, or it is
+	 a strange error.  */
+      if (err == I_OWN_IT)
+	return Qt;
+      if (err == ANOTHER_OWNS_IT)
+	{
+	  /* Report the live owner's pid as a number.  The pid is
+	     between the last '.' and the ':' (or the end).  */
+	  intmax_t owner_pid = strtoimax (clasher.dot + 1, NULL, 10);
+	  return make_int (owner_pid);
+	}
+      if (err != 0)
+	return Qnil;
+
+      /* We deleted a stale lock or some other process deleted the lock;
+	 try again to lock the file.  */
+    }
+
+  return err == 0 ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--filelock-unlock", Fc_filelock_unlock, Sc_filelock_unlock,
+       1, 1, 0,
+       doc: /* FIX-20261002-guilemacs: Internal: return a *plain boolean*:
+t when the lock for FN was removed or was not ours, else nil when nothing
+was done.  This leaf holds the unlock policy of `unlock_file' and does
+NOT report a file error; the caller keeps the error report.  M46 imp-2,
+brief.org section 3.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object lfname;
+  int err;
+
+  if (!STRINGP (fn))
+    return Qnil;
+
+  lfname = make_lock_file_name (fn);
+  if (NILP (lfname))
+    return Qnil;
+
+  err = current_lock_owner (NULL, lfname);
+  if (err == 0 || err == ANOTHER_OWNS_IT)
+    return Qt;
+  if (err == I_OWN_IT
+      && (emacs_unlink (SSDATA (lfname)) == 0 || errno == ENOENT))
+    return Qt;
+
+  return Qnil;
+#else
+  return Qnil;
+#endif
+}
 
 void
 unlock_all_files (void)

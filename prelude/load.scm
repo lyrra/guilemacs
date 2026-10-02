@@ -205,6 +205,8 @@
 ;; M45 imp-2 — callproc.c parent-side process leaves in
 ;; (emacs process-create).
 (use-modules (emacs process-create))
+;; M46 imp-2 — the src/filelock.c lockfile leaves in (emacs filelock).
+(use-modules (emacs filelock))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
