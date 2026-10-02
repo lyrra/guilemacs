@@ -257,6 +257,76 @@ create_lock_file (char *lfname, char *lock_info_str, bool force)
   return err;
 }
 
+/* FIX-20261002-guilemacs: M46 imp-3 -- the six C dispatch helpers
+   over the imp-2 leaves of (emacs filelock).  Each helper gets its
+   module procedure with the Guile public lookup one time and calls it
+   through the M39 / M40 bridge.  Each returns a plain Lisp_Object: a
+   string, an integer, a boolean, or nil.  The lockfile policy lives in
+   the module; C keeps the mechanism.  Define these before lock_file_1
+   (the first hub; the corpus pins the position).  brief.org section
+   4.  cr.org F2: within-one-second and integer-prefixed stay
+   leaf-internal C statics (brief.org section 7), so no hub dispatches
+   to them and no helper exists for them.  */
+
+static Lisp_Object
+filelock_boot_sec (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-boot-sec");
+  return SCM_CALL_0 (proc);
+}
+
+static Lisp_Object
+filelock_lock_info (Lisp_Object boot)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-lock-info");
+  return SCM_CALL_1 (proc, boot);
+}
+
+/* No hub calls these two: the within-one-second and integer-prefixed
+   policy stays leaf-internal (brief.org section 7).  cr.org F2 deletes
+   the two dispatch helpers that used to exist only to reach a surface
+   count.  */
+
+static Lisp_Object
+filelock_lock_file_name (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-lock-file-name");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+filelock_lock_owner (Lisp_Object lfname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-lock-owner");
+  return SCM_CALL_1 (proc, lfname);
+}
+
+static Lisp_Object
+filelock_lock_free_p (Lisp_Object lfname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-lock-free-p");
+  return SCM_CALL_1 (proc, lfname);
+}
+
+static Lisp_Object
+filelock_unlock (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs filelock", "filelock-unlock");
+  return SCM_CALL_1 (proc, fn);
+}
+
 /* Lock the lock file named LFNAME.
    If FORCE, do so even if it is already locked.
    Return 0 if successful, an error number on failure.  */
@@ -264,33 +334,10 @@ create_lock_file (char *lfname, char *lock_info_str, bool force)
 static int
 lock_file_1 (Lisp_Object lfname, bool force)
 {
-  intmax_t boot = get_boot_sec ();
-  Lisp_Object luser_name = Fuser_login_name (Qnil);
-  Lisp_Object lhost_name = Fsystem_name ();
-  char const *user_name = STRINGP (luser_name) ? SSDATA (luser_name) : "";
-  char const *host_name = STRINGP (lhost_name) ? SSDATA (lhost_name) : "";
-  char lock_info_str[MAX_LFINFO + 1];
-  intmax_t pid = getpid ();
-
-  int room = sizeof lock_info_str;
-  int len = snprintf (lock_info_str, room, "%s@", user_name);
-  if (! (0 <= len && len < sizeof lock_info_str))
+  Lisp_Object info = filelock_lock_info (filelock_boot_sec ());
+  if (NILP (info))
     return ENAMETOOLONG;
-  /* Protect against the extremely unlikely case of the host name
-     containing an @ character.  */
-  for (; *host_name; len++, host_name++)
-    {
-      if (! (len < sizeof lock_info_str - 1))
-	return ENAMETOOLONG;
-      lock_info_str[len] = *host_name == '@' ? '-' : *host_name;
-    }
-  char const *lock_info_fmt = boot ? ".%"PRIdMAX":%"PRIdMAX : ".%"PRIdMAX;
-  room = sizeof lock_info_str - len;
-  int suffixlen = snprintf (lock_info_str + len, room,
-			    lock_info_fmt, pid, boot);
-  if (! (0 <= suffixlen && suffixlen < room))
-    return ENAMETOOLONG;
-  return create_lock_file (SSDATA (lfname), lock_info_str, force);
+  return create_lock_file (SSDATA (lfname), SSDATA (info), force);
 }
 
 /* Return true if times A and B are no more than one second apart.  */
@@ -501,32 +548,6 @@ current_lock_owner (lock_info_type *owner, Lisp_Object lfname)
 }
 
 
-/* Lock the lock named LFNAME if possible.
-   Return 0 in that case.
-   Return ANOTHER_OWNS_IT if some other process owns the lock, and info about
-     that process in CLASHER.
-   Return errno value if cannot lock for any other reason.  */
-
-static int
-lock_if_free (lock_info_type *clasher, Lisp_Object lfname)
-{
-  int err;
-  while ((err = lock_file_1 (lfname, 0)) == EEXIST)
-    {
-      err = current_lock_owner (clasher, lfname);
-
-      /* Return if we locked it, or another process owns it, or it is
-	 a strange error.  */
-      if (err != 0)
-	return err == I_OWN_IT ? 0 : err;
-
-      /* We deleted a stale lock or some other process deleted the lock;
-	 try again to lock the file.  */
-    }
-
-  return err;
-}
-
 /* Return the encoded name of the lock file for FN, or nil if none.  */
 
 static Lisp_Object
@@ -556,6 +577,52 @@ make_lock_file_name (Lisp_Object fn)
   return !NILP (lock_file_name) ? ENCODE_FILE (lock_file_name) : Qnil;
 }
 
+/* Build the clash message for the owner line OWNER_LINE, the raw lock
+   contents USER@HOST.PID:BOOT.  Return the form USER@HOST (pid PID)
+   that ask-user-about-lock shows, or nil when OWNER_LINE has no owner
+   shape.  The step is the old inline memmove of `lock_file', moved out
+   of the hub (brief.org section 6).  */
+
+static Lisp_Object
+filelock_clash_owner (Lisp_Object owner_line)
+{
+  char owner[MAX_LFINFO + 1 + sizeof " (pid )" - sizeof "."];
+  char *at, *dot, *colon;
+  ptrdiff_t len;
+
+  if (!STRINGP (owner_line))
+    return Qnil;
+  len = SBYTES (owner_line);
+  if (len < 0 || MAX_LFINFO < len)
+    return Qnil;
+  memcpy (owner, SSDATA (owner_line), len);
+  owner[len] = 0;
+
+  at = memrchr (owner, '@', len);
+  if (!at)
+    return Qnil;
+  dot = strrchr (at, '.');
+  if (!dot)
+    return Qnil;
+  /* The pid field must start with a decimal integer; the base parser
+     rejected a malformed field (cr.org F6).  */
+  if (! integer_prefixed (dot + 1))
+    return Qnil;
+  errno = 0;
+  (void) strtoimax (dot + 1, &colon, 10);
+
+  {
+    ptrdiff_t pidlen = colon - (dot + 1);
+    static char const replacement[] = " (pid ";
+    int replacementlen = sizeof replacement - 1;
+    memmove (dot + replacementlen, dot + 1, pidlen);
+    strcpy (dot + replacementlen + pidlen, ")");
+    memcpy (dot, replacement, replacementlen);
+  }
+
+  return build_string (owner);
+}
+
 /* lock_file locks file FN,
    meaning it serves notice on the world that you intend to edit that file.
    This should be done only when about to modify a file-visiting
@@ -577,13 +644,11 @@ make_lock_file_name (Lisp_Object fn)
 static Lisp_Object
 lock_file (Lisp_Object fn)
 {
-  lock_info_type lock_info;
-
   Lisp_Object lfname = Qnil;
   if (create_lockfiles)
     {
       /* Create the name of the lock-file for file fn */
-      lfname = make_lock_file_name (fn);
+      lfname = filelock_lock_file_name (fn);
       if (NILP (lfname))
 	return Qnil;
     }
@@ -603,30 +668,29 @@ lock_file (Lisp_Object fn)
   if (!NILP (subject_buf)
       && NILP (Fverify_visited_file_modtime (subject_buf))
       && !NILP (Ffile_exists_p (fn))
-      && !(!NILP (lfname) && current_lock_owner (NULL, lfname) == I_OWN_IT))
+      && !(!NILP (lfname) && EQ (filelock_lock_owner (lfname), Qt)))
     call1 (intern ("userlock--ask-user-about-supersession-threat"), fn);
 
   /* Don't do locking if the user has opted out.  */
   if (!NILP (lfname))
     {
-      /* Try to lock the lock.  FIXME: This ignores errors when
-	 lock_if_free returns an errno value.  */
-      if (lock_if_free (&lock_info, lfname) == ANOTHER_OWNS_IT)
+      /* Try to lock the lock.  FIXME: This ignores an error result
+	 (a nil clash) when the leaf cannot test the lock.  */
+      Lisp_Object clash = filelock_lock_free_p (lfname);
+      if (INTEGERP (clash))
 	{
-	  /* Someone else has the lock.  Consider breaking it.  */
-	  Lisp_Object attack;
-	  char *dot = lock_info.dot;
-	  ptrdiff_t pidlen = lock_info.colon - (dot + 1);
-	  static char const replacement[] = " (pid ";
-	  int replacementlen = sizeof replacement - 1;
-	  memmove (dot + replacementlen, dot + 1, pidlen);
-	  strcpy (dot + replacementlen + pidlen, ")");
-	  memcpy (dot, replacement, replacementlen);
-	  attack = call2 (intern ("ask-user-about-lock"), fn,
-			  build_string (lock_info.user));
-	  /* Take the lock if the user said so.  */
-	  if (!NILP (attack))
-	    lock_file_1 (lfname, 1);
+	  /* Someone else has the lock.  Consider breaking it.  The
+	     second read may miss the owner (it may have released the
+	     lock); ask only for a real owner line (cr.org F5).  */
+	  Lisp_Object owner = filelock_clash_owner (filelock_lock_owner (lfname));
+	  if (STRINGP (owner))
+	    {
+	      Lisp_Object attack = call2 (intern ("ask-user-about-lock"), fn,
+					  owner);
+	      /* Take the lock if the user said so.  */
+	      if (!NILP (attack))
+		lock_file_1 (lfname, 1);
+	    }
 	}
     }
   return Qnil;
@@ -635,16 +699,8 @@ lock_file (Lisp_Object fn)
 static Lisp_Object
 unlock_file (Lisp_Object fn)
 {
-  Lisp_Object lfname = make_lock_file_name (fn);
-  if (NILP (lfname))
-    return Qnil;
-
-  int err = current_lock_owner (0, lfname);
-  if (! (err == 0 || err == ANOTHER_OWNS_IT
-	 || (err == I_OWN_IT
-	     && (emacs_unlink (SSDATA (lfname)) == 0
-		 || (err = errno) == ENOENT))))
-    report_file_errno ("Unlocking file", fn, err);
+  if (NILP (filelock_unlock (fn)))
+    report_file_errno ("Unlocking file", fn, errno);
 
   return Qnil;
 }
@@ -727,30 +783,11 @@ section 3.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object lock_file_name;
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  char *name;
-#endif
-
   if (!STRINGP (fn))
     return Qnil;
-
-  fn = Fexpand_file_name (fn, Qnil);
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Files in /assets and /contents can't have lock files on Android
-     as these directories are fabrications of android.c, and backed by
-     read only data.  */
-  name = SSDATA (fn);
-
-  if (android_is_special_directory (name, "/assets")
-      || android_is_special_directory (name, "/content"))
-  return Qnil;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
-
-  lock_file_name = call1 (Qmake_lock_file_name, fn);
-
-  return !NILP (lock_file_name) ? ENCODE_FILE (lock_file_name) : Qnil;
+  /* One copy of the name policy stands, in the `make_lock_file_name'
+     static (brief.org section 5).  The leaf calls it.  */
+  return make_lock_file_name (fn);
 #else
   return Qnil;
 #endif
@@ -809,11 +846,12 @@ DEFUN ("--filelock-lock-owner", Fc_filelock_lock_owner,
        Sc_filelock_lock_owner, 1, 1, 0,
        doc: /* FIX-20261002-guilemacs: Internal: report the owner kind
 of the lock file LFNAME with plain values.  Return t when this process
-owns it, a *plain integer* pid when another process owns it, or nil
-when the lock is free, stale, or unreadable.  The caller compares the
-pid with its own pid.  The parse is `current_lock_owner'; C keeps
-`read_lock_data' and `kill (pid, 0)'.  M46 imp-2, brief.org section
-3.  */)
+owns it, the raw owner line (USER@HOST.PID:BOOT) as a *plain string*
+when another process owns it, or nil when the lock is free, stale, or
+unreadable.  The caller derives its own string: the user prefix for
+`file-locked-p', or the clash message for `lock_file'.  The parse is
+`current_lock_owner'; C keeps `read_lock_data' and `kill (pid, 0)'.
+M46 imp-2, brief.org section 3 and section 6.  */)
   (Lisp_Object lfname)
 {
 #ifndef MSDOS
@@ -877,7 +915,7 @@ pid with its own pid.  The parse is `current_lock_owner'; C keeps
     return Qnil;
 
   /* The host: a lock on another host has no live local pid, but it is
-     still an owner, so return the parsed pid.  */
+     still an owner, so return the raw owner line.  */
   {
     char *linkhost = at + 1;
     ptrdiff_t linkhostlen = dot - linkhost;
@@ -900,7 +938,7 @@ pid with its own pid.  The parse is `current_lock_owner'; C keeps
       }
   }
   if (!on_current_host)
-    return make_int (pid);
+    return build_string (lfinfo);
 
   /* A live owner on the current host.  cr.org F3: report this process
      with t, so the caller keeps the I_OWN_IT / ANOTHER_OWNS_IT split.
@@ -912,7 +950,7 @@ pid with its own pid.  The parse is `current_lock_owner'; C keeps
       && ! (kill (pid, 0) < 0 && errno != EPERM)
       && (boot_time == 0
 	  || within_one_second (boot_time, get_boot_sec ())))
-    return make_int (pid);
+    return build_string (lfinfo);
 
   return Qnil;
 #else
@@ -925,8 +963,8 @@ DEFUN ("--filelock-lock-free-p", Fc_filelock_lock_free_p,
        doc: /* FIX-20261002-guilemacs: Internal: test the lock named
 LFNAME with plain values.  Return t when the lock is free or was
 zapped and is now ours; return a *plain integer* (the owner pid) when
-another process owns it; return nil on an error.  The clash loop is
-`lock_if_free'; cr.org F2 keeps the ANOTHER_OWNS_IT signal.  M46 imp-2,
+another process owns it; return nil on an error.  The clash loop
+keeps the ANOTHER_OWNS_IT signal; cr.org F2 records it.  M46 imp-2,
 brief.org section 3.  */)
   (Lisp_Object lfname)
 {
@@ -968,10 +1006,12 @@ brief.org section 3.  */)
 DEFUN ("--filelock-unlock", Fc_filelock_unlock, Sc_filelock_unlock,
        1, 1, 0,
        doc: /* FIX-20261002-guilemacs: Internal: return a *plain boolean*:
-t when the lock for FN was removed or was not ours, else nil when nothing
-was done.  This leaf holds the unlock policy of `unlock_file' and does
-NOT report a file error; the caller keeps the error report.  M46 imp-2,
-brief.org section 3.  */)
+t when the lock for FN was removed, was not ours, or FN has no lock
+file; nil only on a real file error.  This leaf holds the unlock policy
+of `unlock_file' and does NOT report a file error; the caller keeps the
+error report.  cr.org F1: the no-lock-name case is a no-op, not an
+error, so the caller must not report it.  M46 imp-2, brief.org section
+3.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
@@ -979,11 +1019,11 @@ brief.org section 3.  */)
   int err;
 
   if (!STRINGP (fn))
-    return Qnil;
+    return Qt;
 
   lfname = make_lock_file_name (fn);
   if (NILP (lfname))
-    return Qnil;
+    return Qt;			/* FN has no lock file: a no-op, not an error */
 
   err = current_lock_owner (NULL, lfname);
   if (err == 0 || err == ANOTHER_OWNS_IT)
@@ -992,6 +1032,10 @@ brief.org section 3.  */)
       && (emacs_unlink (SSDATA (lfname)) == 0 || errno == ENOENT))
     return Qt;
 
+  /* A real error.  Restore the errno for the caller's report when the
+     error came from the parse, not from `emacs_unlink' (cr.org F1).  */
+  if (err != I_OWN_IT)
+    errno = err;
   return Qnil;
 #else
   return Qnil;
@@ -1115,9 +1159,7 @@ t if it is locked by you, else a string saying which user has locked it.  */)
 #ifdef MSDOS
   return Qnil;
 #else
-  Lisp_Object ret;
-  int owner;
-  lock_info_type locker;
+  Lisp_Object ret, owner;
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
@@ -1128,20 +1170,23 @@ t if it is locked by you, else a string saying which user has locked it.  */)
       return call2 (handler, Qfile_locked_p, filename);
     }
 
-  Lisp_Object lfname = make_lock_file_name (filename);
+  Lisp_Object lfname = filelock_lock_file_name (filename);
   if (NILP (lfname))
     return Qnil;
 
-  owner = current_lock_owner (&locker, lfname);
-  switch (owner)
+  owner = filelock_lock_owner (lfname);
+  if (EQ (owner, Qt))
+    ret = Qt;
+  else if (STRINGP (owner))
     {
-    case I_OWN_IT: ret = Qt; break;
-    case ANOTHER_OWNS_IT:
-      ret = make_string (locker.user, locker.at - locker.user);
-      break;
-    case  0: ret = Qnil; break;
-    default: report_file_errno ("Testing file lock", filename, owner);
+      /* The value is the user prefix: the bytes before the last '@'
+	 of the raw owner line USER@HOST.PID:BOOT.  */
+      char const *line = SSDATA (owner);
+      char *at = memrchr (line, '@', SBYTES (owner));
+      ret = at ? make_string (line, at - line) : owner;
     }
+  else
+    ret = Qnil;
 
   return ret;
 #endif

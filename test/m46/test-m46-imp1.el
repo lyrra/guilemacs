@@ -11,15 +11,16 @@
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget);
-;;;         scm_c_public_ref over src/*.[chm] is 187;
+;;;         scm_c_public_ref over src/*.[chm] is 193;
 ;;;         mod/emacs/tty-modes.scm is 313 lines; src/callproc.c is
-;;;         2,387 lines and 7 DEFUNs; and src/filelock.c is 1,171 lines
+;;;         2,387 lines and 7 DEFUNs; and src/filelock.c is 1,216 lines
 ;;;         and 13 DEFUNs.  imp-2 added the eight lockfile leaves and the
-;;;         guile.h include, so the file moved from 830 lines / 5 DEFUNs.
+;;;         guile.h include; imp-3 added the six dispatch helpers, so
+;;;         the file moved from 1,171 lines / 13 DEFUNs.
 ;;;   D2 -- the block line facts of brief.org section 3 and the five
 ;;;         DEFUN lines.  These are facts in a tracked file, so a drift
 ;;;         is a real FAIL.  The corpus also pins the two file facts:
-;;;         0 scm_c_public_ref sites and the guile.h include.
+;;;         6 scm_c_public_ref sites and the guile.h include.
 ;;;   D3 -- the leaf-shape words of brief.org section 5 in
 ;;;         docs/m46-plan.org.
 ;;;   D4 -- the decision words in the gitignored records
@@ -197,8 +198,8 @@ draft hash)."
                        (kg (m46-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m46-imp1--check "scm-c-public-ref-187"
-                 (eql 187 (m46-imp1--count-scm-ref)))
+(m46-imp1--check "scm-c-public-ref-193"
+                 (eql 193 (m46-imp1--count-scm-ref)))
 (m46-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m46-imp1--lines "mod/emacs/tty-modes.scm")))
 (m46-imp1--check "callproc.c-lines-2387"
@@ -207,16 +208,17 @@ draft hash)."
                  (eql 7 (m46-imp1--count "src/callproc.c" "^DEFUN (\"")))
 (m46-imp1--check "callproc.c-scm-ref-4"
                  (eql 4 (m46-imp1--count "src/callproc.c" "scm_c_public_ref")))
-(m46-imp1--check "filelock.c-lines-1171"
-                 (eql 1171 (m46-imp1--lines "src/filelock.c")))
+(m46-imp1--check "filelock.c-lines-1216"
+                 (eql 1216 (m46-imp1--lines "src/filelock.c")))
 (m46-imp1--check "filelock.c-defuns-13"
                  (eql 13 (m46-imp1--count "src/filelock.c" "^DEFUN (\"")))
 
 ;;; --- D2. The block line facts (brief.org section 3) ------------------
 ;;
 ;; The "guile.h" include (imp-2) moves every line below it by one; the
-;; eight new leaves move the blocks below them by more.  Re-measured at
-;; imp-2.
+;; eight new leaves move the blocks below them by more.  imp-3 adds the
+;; six dispatch helpers above lock_file_1 and deletes the lock_if_free
+;; policy, so the map is not a uniform shift.  Re-measured at imp-3.
 
 (setq m46-imp1--group 'd2)
 
@@ -232,79 +234,80 @@ draft hash)."
                  (eql 198 (m46-imp1--line-of
                            "src/filelock.c"
                            "create_lock_file (char *lfname, char *lock_info_str, bool force)")))
-(m46-imp1--check "lock_file_1-def-265"
-                 (eql 265 (m46-imp1--line-of
+(m46-imp1--check "filelock_boot_sec-def-272"
+                 (eql 272 (m46-imp1--line-of
+                           "src/filelock.c"
+                           "filelock_boot_sec (void)")))
+(m46-imp1--check "lock_file_1-def-335"
+                 (eql 335 (m46-imp1--line-of
                            "src/filelock.c"
                            "lock_file_1 (Lisp_Object lfname, bool force)")))
-(m46-imp1--check "within_one_second-def-299"
-                 (eql 299 (m46-imp1--line-of
+(m46-imp1--check "within_one_second-def-346"
+                 (eql 346 (m46-imp1--line-of
                            "src/filelock.c"
                            "within_one_second (intmax_t a, time_t b)")))
-(m46-imp1--check "read_lock_data-def-315"
-                 (eql 315 (m46-imp1--line-of
+(m46-imp1--check "read_lock_data-def-362"
+                 (eql 362 (m46-imp1--line-of
                            "src/filelock.c"
                            "read_lock_data (char *lfname, char lfinfo[MAX_LFINFO + 1])")))
-(m46-imp1--check "integer_prefixed-def-348"
-                 (eql 348 (m46-imp1--line-of
+(m46-imp1--check "integer_prefixed-def-395"
+                 (eql 395 (m46-imp1--line-of
                            "src/filelock.c"
                            "integer_prefixed (char const *s)")))
-(m46-imp1--check "current_lock_owner-def-382"
-                 (eql 382 (m46-imp1--line-of
+(m46-imp1--check "current_lock_owner-def-429"
+                 (eql 429 (m46-imp1--line-of
                            "src/filelock.c"
                            "current_lock_owner (lock_info_type *owner, Lisp_Object lfname)")))
-(m46-imp1--check "lock_if_free-def-511"
-                 (eql 511 (m46-imp1--line-of
-                           "src/filelock.c"
-                           "lock_if_free (lock_info_type *clasher, Lisp_Object lfname)")))
-(m46-imp1--check "make_lock_file_name-def-533"
-                 (eql 533 (m46-imp1--line-of
+(m46-imp1--check "make_lock_file_name-def-554"
+                 (eql 554 (m46-imp1--line-of
                            "src/filelock.c"
                            "make_lock_file_name (Lisp_Object fn)")))
-(m46-imp1--check "lock_file-def-578"
-                 (eql 578 (m46-imp1--line-of
+(m46-imp1--check "lock_file-def-645"
+                 (eql 645 (m46-imp1--line-of
                            "src/filelock.c"
                            "lock_file (Lisp_Object fn)")))
-(m46-imp1--check "unlock_file-def-636"
-                 (eql 636 (m46-imp1--line-of
+(m46-imp1--check "unlock_file-def-700"
+                 (eql 700 (m46-imp1--line-of
                            "src/filelock.c"
                            "unlock_file (Lisp_Object fn)")))
-(m46-imp1--check "unlock_file_handle_error-def-653"
-                 (eql 653 (m46-imp1--line-of
+(m46-imp1--check "unlock_file_handle_error-def-709"
+                 (eql 709 (m46-imp1--line-of
                            "src/filelock.c"
                            "unlock_file_handle_error (Lisp_Object err)")))
-(m46-imp1--check "unlock_all_files-def-1002"
-                 (eql 1002 (m46-imp1--line-of
+(m46-imp1--check "unlock_all_files-def-1046"
+                 (eql 1046 (m46-imp1--line-of
                            "src/filelock.c"
                            "unlock_all_files (void)")))
-(m46-imp1--check "unlock_buffer-def-1102"
-                 (eql 1102 (m46-imp1--line-of
+(m46-imp1--check "unlock_buffer-def-1146"
+                 (eql 1146 (m46-imp1--line-of
                            "src/filelock.c"
                            "unlock_buffer (struct buffer *buffer)")))
-(m46-imp1--check "syms_of_filelock-def-1151"
-                 (eql 1151 (m46-imp1--line-of
+(m46-imp1--check "syms_of_filelock-def-1196"
+                 (eql 1196 (m46-imp1--line-of
                            "src/filelock.c"
                            "syms_of_filelock (void)")))
 
 ;; the five DEFUNs
-(m46-imp1--check "defun-lock-file-1016"
-                 (eql 1016 (m46-imp1--line-of
+(m46-imp1--check "defun-lock-file-1060"
+                 (eql 1060 (m46-imp1--line-of
                            "src/filelock.c" "DEFUN (\"lock-file\"")))
-(m46-imp1--check "defun-unlock-file-1039"
-                 (eql 1039 (m46-imp1--line-of
-                           "src/filelock.c" "DEFUN (\"unlock-file\"")))
-(m46-imp1--check "defun-lock-buffer-1064"
-                 (eql 1064 (m46-imp1--line-of
-                           "src/filelock.c" "DEFUN (\"lock-buffer\"")))
-(m46-imp1--check "defun-unlock-buffer-1083"
+(m46-imp1--check "defun-unlock-file-1083"
                  (eql 1083 (m46-imp1--line-of
+                           "src/filelock.c" "DEFUN (\"unlock-file\"")))
+(m46-imp1--check "defun-lock-buffer-1108"
+                 (eql 1108 (m46-imp1--line-of
+                           "src/filelock.c" "DEFUN (\"lock-buffer\"")))
+(m46-imp1--check "defun-unlock-buffer-1127"
+                 (eql 1127 (m46-imp1--line-of
                            "src/filelock.c" "DEFUN (\"unlock-buffer\"")))
-(m46-imp1--check "defun-file-locked-p-1109"
-                 (eql 1109 (m46-imp1--line-of
+(m46-imp1--check "defun-file-locked-p-1153"
+                 (eql 1153 (m46-imp1--line-of
                            "src/filelock.c" "DEFUN (\"file-locked-p\"")))
 
-;; the two file facts: 0 scm_c_public_ref sites and the guile.h include
-(m46-imp1--check "filelock.c-scm-ref-0"
-                 (eql 0 (m46-imp1--count "src/filelock.c" "scm_c_public_ref")))
+;; the two file facts: eight scm_c_public_ref sites (imp-3) and the
+;; guile.h include
+(m46-imp1--check "filelock.c-scm-ref-6"
+                 (eql 6 (m46-imp1--count "src/filelock.c" "scm_c_public_ref")))
 (m46-imp1--check "filelock.c-has-guile.h"
                  (m46-imp1--contains-p "src/filelock.c" "#include \"guile.h\""))
 

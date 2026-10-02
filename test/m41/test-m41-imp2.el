@@ -96,8 +96,8 @@
 
     ;; --- Cross-file number: the tree-wide scm_c_public_ref re-pin ----
     ;; The imp-2 and imp-3 sites move the count 172 -> 177.
-    (m41-imp2--check "tree-wide-scm-public-ref-187"
-                     (eql 187 (m41-imp2--tree-wide-scm-public-ref)))
+    (m41-imp2--check "tree-wide-scm-public-ref-193"
+                     (eql 193 (m41-imp2--tree-wide-scm-public-ref)))
 
     ;; --- End-to-end: the live DEFUN through the C boundary (cr.org F6) -
     ;; The .scm corpus checks the module return only.  These calls reach

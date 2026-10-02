@@ -15,9 +15,11 @@
 ;;;   (filelock-within-one-second a b) -> a plain boolean.
 ;;;   (filelock-integer-prefixed s)  -> a plain boolean.
 ;;;   (filelock-lock-owner lfname)   -> t when this process owns the
-;;;                                     lock, a plain integer pid when
-;;;                                     another process owns it, or #f
-;;;                                     (free / stale / unreadable).
+;;;                                     lock, the raw owner line
+;;;                                     USER@HOST.PID:BOOT as a plain
+;;;                                     string when another process
+;;;                                     owns it, or #f (free / stale /
+;;;                                     unreadable).
 ;;;   (filelock-lock-free-p lfname)  -> t (free or ours), a plain
 ;;;                                     integer owner pid (another
 ;;;                                     process), or #f on an error.
@@ -83,9 +85,9 @@
 (define (filelock-integer-prefixed s)
   ((force %--filelock-integer-prefixed) s))
 
-;; Return t when this process owns the lock file LFNAME, a plain integer
-;; pid when another process owns it, or #f for "free", "stale", and
-;; "unreadable".
+;; Return t when this process owns the lock file LFNAME, the raw owner
+;; line USER@HOST.PID:BOOT as a plain string when another process owns
+;; it, or #f for "free", "stale", and "unreadable".
 (define (filelock-lock-owner lfname)
   ((force %--filelock-lock-owner) lfname))
 
@@ -95,7 +97,8 @@
 (define (filelock-lock-free-p lfname)
   ((force %--filelock-lock-free-p) lfname))
 
-;; Return t when the lock for FN was removed or was not ours, else #f
-;; when nothing was done.  The leaf does not report a file error.
+;; Return t when the lock for FN was removed, was not ours, or FN has
+;; no lock file, else #f on a real error.  The leaf does not report a
+;; file error.
 (define (filelock-unlock fn)
   ((force %--filelock-unlock) fn))

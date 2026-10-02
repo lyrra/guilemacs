@@ -13,7 +13,7 @@
 ;;;         11,723 under the 11,960 M31 budget (margin 237);
 ;;;         src/process.c is 9,030 lines, 50 DEFUNs; src/xdisp.c is
 ;;;         38,990 lines, 24 DEFUNs; tree-wide scm_c_public_ref over
-;;;         src/*.[chm] is 187; mod/emacs/gobble.scm is 303 lines.
+;;;         src/*.[chm] is 193; mod/emacs/gobble.scm is 303 lines.
 ;;;         M42 moved no C line; the M42 net delta is 0.
 ;;;   S2 -- the two C leaf pins: --tty-bytes-readable (src/keyboard.c
 ;;;         line 10371) and --tty-read-nonblocking (src/keyboard.c line
@@ -132,11 +132,11 @@ corpus pins is tracked, so an absent one means a broken checkout."
                  (eql 24 (m42-imp5--count "src/xdisp.c" "^DEFUN (\"")))
 ;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
 ;; src/*.m, like the measurement in brief.org section 7.1.
-(m42-imp5--check "surface/tree-ref-sites-187"
+(m42-imp5--check "surface/tree-ref-sites-193"
                  (let ((files (directory-files (expand-file-name "src" m42-imp5--root)
                                                t "\\.\\(c\\|h\\|m\\)\\'")))
                    (and (consp files)
-                        (eql 187
+                        (eql 193
                              (let ((n 0))
                                (dolist (f files)
                                  (with-temp-buffer

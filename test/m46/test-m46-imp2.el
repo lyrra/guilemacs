@@ -12,7 +12,7 @@
 ;;;   E1 -- the eight leaf DEFUNs exist in src/filelock.c with the exact
 ;;;         names of brief.org section 3; the ^DEFUN count is 13; the
 ;;;         file holds "guile.h"; the line count is the re-measured
-;;;         value 1171.
+;;;         value 1216 (imp-3).
 ;;;   E2 -- the plain-value shape (brief.org section 3): each leaf doc
 ;;;         string holds "plain" and the shape word ("string",
 ;;;         "integer", or "boolean").  No leaf names FILE * in a return.
@@ -160,8 +160,8 @@ real error, not a pass."
                  (eql 8 (m46-imp2--count "src/filelock.c" "^DEFUN (\"--filelock-")))
 (m46-imp2--check "defun-count-13"
                  (eql 13 (m46-imp2--count "src/filelock.c" "^DEFUN (\"")))
-(m46-imp2--check "filelock.c-lines-1171"
-                 (eql 1171 (m46-imp2--lines "src/filelock.c")))
+(m46-imp2--check "filelock.c-lines-1216"
+                 (eql 1216 (m46-imp2--lines "src/filelock.c")))
 (m46-imp2--check "filelock.c-has-guile.h"
                  (m46-imp2--contains-p "src/filelock.c" "#include \"guile.h\""))
 
@@ -169,14 +169,15 @@ real error, not a pass."
 
 (setq m46-imp2--group 'e2)
 
-;; Each leaf doc string holds the shape word.  The counts are stable:
-;; "plain string" 2 (lock-file-name, lock-info); "plain integer" 5
-;; (boot-sec, lock-info, within-one-second, lock-owner, lock-free-p);
-;; "plain boolean" 3 (within-one-second, integer-prefixed, unlock).
-(m46-imp2--check "doc-plain-string-2"
-                 (eql 2 (m46-imp2--count "src/filelock.c" "plain string")))
-(m46-imp2--check "doc-plain-integer-5"
-                 (eql 5 (m46-imp2--count "src/filelock.c" "plain integer")))
+;; Each leaf doc string holds the shape word.  The counts are stable
+;; after the imp-3 section-6 re-pin: "plain string" 3 (lock-file-name,
+;; lock-info, lock-owner); "plain integer" 4 (boot-sec, lock-info,
+;; within-one-second, lock-free-p); "plain boolean" 3 (within-one-second,
+;; integer-prefixed, unlock).
+(m46-imp2--check "doc-plain-string-3"
+                 (eql 3 (m46-imp2--count "src/filelock.c" "plain string")))
+(m46-imp2--check "doc-plain-integer-4"
+                 (eql 4 (m46-imp2--count "src/filelock.c" "plain integer")))
 (m46-imp2--check "doc-plain-boolean-3"
                  (eql 3 (m46-imp2--count "src/filelock.c" "plain boolean")))
 ;; Each leaf doc string holds the brief.org marker and the section note.
@@ -242,8 +243,10 @@ real error, not a pass."
                  (m46-imp2--contains-p "src/filelock.c" "kill ("))
 (m46-imp2--check "mech-readlinkat"
                  (m46-imp2--contains-p "src/filelock.c" "readlinkat"))
-(m46-imp2--check "scm-ref-0"
-                 (eql 0 (m46-imp2--count "src/filelock.c" "scm_c_public_ref")))
+;; imp-3 adds the six dispatch helpers, so the file holds six
+;; scm_c_public_ref sites now (was 0 at imp-2).
+(m46-imp2--check "scm-ref-6"
+                 (eql 6 (m46-imp2--count "src/filelock.c" "scm_c_public_ref")))
 
 ;;; --- E5. The group and the guards (cr.org F3) ------------------------
 

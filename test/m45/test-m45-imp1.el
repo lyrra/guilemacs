@@ -11,7 +11,7 @@
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget);
-;;;         scm_c_public_ref over src/*.[chm] is 187;
+;;;         scm_c_public_ref over src/*.[chm] is 193;
 ;;;         mod/emacs/tty-modes.scm is 313 lines; and src/callproc.c is
 ;;;         2,387 lines and 7 DEFUNs (imp-2 added the four leaves and
 ;;;         the guile.h include, so the block map below moved by one
@@ -199,8 +199,8 @@ regression, and must not turn the gate red."
                        (kg (m45-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m45-imp1--check "scm-c-public-ref-187"
-                 (eql 187 (m45-imp1--count-scm-ref)))
+(m45-imp1--check "scm-c-public-ref-193"
+                 (eql 193 (m45-imp1--count-scm-ref)))
 (m45-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp1--lines "mod/emacs/tty-modes.scm")))
 (m45-imp1--check "callproc.c-lines-2387"
