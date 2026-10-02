@@ -123,6 +123,63 @@ static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int *, Lisp_Object *)
 static CHILD_SETUP_TYPE child_setup (int, int, int, char **, char **,
 				     const char *);
 
+/* M45 imp-3: the four C dispatch helpers over the imp-2 leaves of
+   (emacs process-create).  Each helper gets the module procedure with
+   the Guile public lookup and calls it through the M39 / M40 call
+   bridge.  Each returns a plain Lisp_Object: a list of strings, a
+   string, or nil.  The parent-side policy lives in the module; C keeps
+   the mechanism.  Define these before call_process (the corpus pins
+   the position).  */
+
+static Lisp_Object
+callproc_resolve_program (Lisp_Object program)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-create",
+			     "callproc-resolve-program");
+  return SCM_CALL_1 (proc, program);
+}
+
+static Lisp_Object
+callproc_argv (Lisp_Object program, Lisp_Object args)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-create", "callproc-argv");
+  return SCM_CALL_2 (proc, program, args);
+}
+
+static Lisp_Object
+callproc_temp_name (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-create", "callproc-temp-name");
+  return SCM_CALL_0 (proc);
+}
+
+static Lisp_Object
+callproc_env (Lisp_Object current_dir)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs process-create", "callproc-env");
+  return SCM_CALL_1 (proc, current_dir);
+}
+
+/* M45 imp-3: one shared unwinder.  A char ** block points into the
+   strings of a plain list; a collected list would leave the block
+   dangling.  Root each list with scm_gc_protect_object beside its
+   char ** block and release each root with record_unwind_protect on
+   this helper after emacs_spawn.  */
+
+static void
+unprotect_guile_object (Lisp_Object list)
+{
+  scm_gc_unprotect_object (list);
+}
+
 /* Return the current buffer's working directory, or the home
    directory if it's unreachable.  If ENCODE is true, return as a string
    suitable for a system call; otherwise, return a string in its
@@ -342,7 +399,7 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
 static Lisp_Object
 call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *tempfile_ptr)
 {
-  Lisp_Object buffer, current_dir, path;
+  Lisp_Object buffer, current_dir, path, argv_list;
   bool display_p;
   int fd0;
   int callproc_fd[CALLPROC_FDS];
@@ -364,7 +421,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   int child_errno;
   int fd_output, fd_error;
   struct coding_system process_coding; /* coding-system of process output */
-  struct coding_system argument_coding;	/* coding-system of arguments */
   /* Set to the return value of Ffind_operation_coding_system.  */
   Lisp_Object coding_systems;
   bool discard_output;
@@ -387,47 +443,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
       && (FIXNUMP (CONSP (args[2]) ? XCAR (args[2]) : args[2])))
     error ("Operating system cannot handle asynchronous subprocesses");
 #endif /* subprocesses */
-
-  /* Decide the coding-system for giving arguments.  */
-  {
-    Lisp_Object val, *args2;
-
-    /* If arguments are supplied, we may have to encode them.  */
-    if (nargs >= 5)
-      {
-	bool must_encode = 0;
-	Lisp_Object coding_attrs;
-
-	for (i = 4; i < nargs; i++)
-	  CHECK_STRING (args[i]);
-
-	//for (i = 4; i < nargs; i++)
-	  //if (STRING_MULTIBYTE (args[i]))
-	    //must_encode = 1;
-
-	if (!NILP (Vcoding_system_for_write))
-	  val = Vcoding_system_for_write;
-	else if (! must_encode)
-	  val = Qraw_text;
-	else
-	  {
-	    SAFE_NALLOCA (args2, 1, nargs + 1);
-	    args2[0] = Qcall_process;
-	    for (i = 0; i < nargs; i++) args2[i + 1] = args[i];
-	    coding_systems = Ffind_operation_coding_system (nargs + 1, args2);
-	    val = CONSP (coding_systems) ? XCDR (coding_systems) : Qnil;
-	  }
-	val = complement_process_encoding_system (val);
-	setup_coding_system (Fcheck_coding_system (val), &argument_coding);
-	coding_attrs = CODING_ID_ATTRS (argument_coding.id);
-	if (NILP (CODING_ATTR_ASCII_COMPAT (coding_attrs)))
-	  {
-	    /* We should not use an ASCII incompatible coding system.  */
-	    val = raw_text_coding_system (val);
-	    setup_coding_system (val, &argument_coding);
-	  }
-      }
-  }
 
   if (nargs < 3)
     buffer = Qnil;
@@ -504,41 +519,52 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 #endif
   record_unwind_protect_ptr (call_process_kill, callproc_fd);
 
-  /* Search for program; barf if not found.  */
+  /* Search for program; barf if not found.  The exec-path search and
+     the resolve / encode step live in (emacs process-create)
+     `callproc-resolve-program'.  */
+  path = callproc_resolve_program (args[0]);
+  if (NILP (path))
+    report_file_error ("Searching for program", args[0]);
+
+  /* The resolve / encode step (remove_slash_colon then ENCODE_FILE) runs
+     once, in the leaf --callproc-resolve-program above.  */
+
+  /* The plain argument list: the Elisp ARGS after the fixed four, the
+     resolved program at the head.  The argument coding lives in the
+     leaf.  */
   {
-    int ok;
+    Lisp_Object arg_list = Qnil;
+    ptrdiff_t i;
 
-    ok = openp (Vexec_path, args[0], Vexec_suffixes, &path,
-		make_fixnum (X_OK), false, false, NULL);
-    if (ok < 0)
-      report_file_error ("Searching for program", args[0]);
+    for (i = nargs - 1; i >= 4; i--)
+      arg_list = Fcons (args[i], arg_list);
+
+    argv_list = callproc_argv (path, arg_list);
   }
+  if (NILP (argv_list))
+    error ("Invalid argument list for call-process");
 
-  /* Remove "/:" from PATH.  */
-  path = remove_slash_colon (path);
+  /* The char ** block points into the strings of the plain list.  Root
+     the list beside the block, so a collection cannot free them.  */
+  scm_gc_protect_object (argv_list);
+  record_unwind_protect (unprotect_guile_object, argv_list);
 
   SAFE_NALLOCA (new_argv, 1, nargs < 4 ? 2 : nargs - 2);
+  {
+    Lisp_Object tem;
+    ptrdiff_t i = 0;
+    ptrdiff_t limit = nargs < 4 ? 2 : nargs - 2;
 
-  if (nargs > 4)
-    {
-      ptrdiff_t i;
-
-      argument_coding.dst_multibyte = 0;
-      for (i = 4; i < nargs; i++)
-	{
-	  argument_coding.src_multibyte = 1; /* All strings are UTF-8/multibyte now */
-	  if (CODING_REQUIRE_ENCODING (&argument_coding))
-	    /* We must encode this argument.  */
-	    args[i] = encode_coding_string (&argument_coding, args[i], 1);
-	}
-      for (i = 4; i < nargs; i++)
-	new_argv[i - 3] = SSDATA (args[i]);
-      new_argv[i - 3] = 0;
-    }
-  else
-    new_argv[1] = 0;
-  path = ENCODE_FILE (path);
-  new_argv[0] = SSDATA (path);
+    /* The leaf list is trusted, but bound it: a list longer than the
+       block would overrun it.  Reserve the last slot for the NULL.  */
+    for (tem = argv_list; CONSP (tem); tem = XCDR (tem))
+      {
+	if (i + 1 >= limit)
+	  error ("Invalid argument list for call-process");
+	new_argv[i++] = SSDATA (XCAR (tem));
+      }
+    new_argv[i] = 0;
+  }
 
   discard_output = FIXNUMP (buffer) || (NILP (buffer) && NILP (output_file));
 
@@ -958,47 +984,19 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
   int fd;
   Lisp_Object filename_string;
   Lisp_Object val, start, end;
-  Lisp_Object tmpdir;
 
-  if (STRINGP (Vtemporary_file_directory))
-    tmpdir = Vtemporary_file_directory;
-  else
-    {
-      char *outf;
-#ifndef DOS_NT
-      outf = getenv ("TMPDIR");
-      tmpdir = build_string (outf ? outf : "/tmp/");
-#else /* DOS_NT */
-      if ((outf = egetenv ("TMPDIR"))
-	  || (outf = egetenv ("TMP"))
-	  || (outf = egetenv ("TEMP")))
-	tmpdir = build_string (outf);
-      else
-	tmpdir = Ffile_name_as_directory (build_string ("c:/temp"));
-#endif
-    }
+  /* M45 imp-3: the temp-dir / pattern policy (and the WINDOWSNT
+     downcase fix) lives in (emacs process-create)
+     `callproc-temp-name'.  The leaf returns the plain
+     Fexpand_file_name result.  */
+  Lisp_Object temp_name = callproc_temp_name ();
+  Lisp_Object pattern = Fcar (Fcdr (temp_name));
 
+  /* The gap: C still applies Fcopy_sequence (ENCODE_FILE (pattern))
+     before mkostemp, then opens the file.  */
+  filename_string = Fcopy_sequence (ENCODE_FILE (pattern));
   {
-    Lisp_Object pattern = Fexpand_file_name (Vtemp_file_name_pattern, tmpdir);
-    char *tempfile;
-
-#ifdef WINDOWSNT
-    /* Cannot use the result of Fexpand_file_name, because it
-       downcases the XXXXXX part of the pattern, and mktemp then
-       doesn't recognize it.  */
-    if (!NILP (Vw32_downcase_file_names))
-      {
-	Lisp_Object dirname = Ffile_name_directory (pattern);
-
-	if (NILP (dirname))
-	  pattern = Vtemp_file_name_pattern;
-	else
-	  pattern = concat2 (dirname, Vtemp_file_name_pattern);
-      }
-#endif
-
-    filename_string = Fcopy_sequence (ENCODE_FILE (pattern));
-    tempfile = SSDATA (filename_string);
+    char *tempfile = SSDATA (filename_string);
 
     fd = mkostemp (tempfile, O_BINARY | O_CLOEXEC);
     if (fd < 0)
@@ -1151,40 +1149,6 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
   return val;
 }
 
-static char **
-add_env (char **env, char **new_env, char *string)
-{
-  char **ep;
-  bool ok = 1;
-  if (string == NULL)
-    return new_env;
-
-  /* See if this string duplicates any string already in the env.
-     If so, don't put it in.
-     When an env var has multiple definitions,
-     we keep the definition that comes first in process-environment.  */
-  for (ep = env; ok && ep != new_env; ep++)
-    {
-      char *p = *ep, *q = string;
-      while (ok)
-	{
-	  if (*p && *q != *p)
-	    break;
-	  if (*q == 0)
-	    /* The string is a lone variable name; keep it for now, we
-	       will remove it later.  It is a placeholder for a
-	       variable that is not to be included in the environment.  */
-	    break;
-	  if (*q == '=')
-	    ok = 0;
-	  p++, q++;
-	}
-    }
-  if (ok)
-    *new_env++ = string;
-  return new_env;
-}
-
 #ifndef DOS_NT
 
 /* 'exec' failed inside a child running NAME, with error number ERR.
@@ -1749,134 +1713,43 @@ egetenv_internal (const char *var, ptrdiff_t len)
 /* Create a new environment block.  You can pass the returned pointer
    to `execve'.  Add unwind protections for all newly-allocated
    objects.  Don't call any Lisp code or the garbage collector while
-   the block is active.  */
+   the block is active.
+
+   M45 imp-3: the policy (the PWD fix-up, the DISPLAY search, the
+   `process-environment' overrides, the first-definition rule, and the
+   lone-name drop) lives in (emacs process-create) `callproc-env'.  This
+   C hub only builds the char ** block from the plain list and roots the
+   list for the lifetime of the block.  */
 
 char **
 make_environment_block (Lisp_Object current_dir)
 {
-  char **env;
-  char *pwd_var;
+  char **env, **p;
+  Lisp_Object env_list;
+  Lisp_Object tem;
+
+  env_list = callproc_env (current_dir);
+  if (NILP (env_list))
+    error ("Invalid current directory for environment block");
+
+  /* The char ** block points into the strings of the plain list.  Root
+     the list beside the block, so a collection cannot free them.  */
+  scm_gc_protect_object (env_list);
+  record_unwind_protect (unprotect_guile_object, env_list);
 
   {
-    char *temp;
-    ptrdiff_t i;
+    ptrdiff_t n = 0;
 
-    i = SBYTES (current_dir);
-    pwd_var = xmalloc (i + 5);
-    record_unwind_protect_ptr (xfree, pwd_var);
-    temp = pwd_var + 4;
-    memcpy (pwd_var, "PWD=", 4);
-    lispstpcpy (temp, current_dir);
+    for (tem = env_list; CONSP (tem); tem = XCDR (tem))
+      n++;
 
-#ifdef DOS_NT
-    /* Get past the drive letter, so that d:/ is left alone.  */
-    if (i > 2 && IS_DEVICE_SEP (temp[1]) && IS_DIRECTORY_SEP (temp[2]))
-      {
-	temp += 2;
-	i -= 2;
-      }
-#endif /* DOS_NT */
-
-    /* Strip trailing slashes for PWD, but leave "/" and "//" alone.  */
-    while (i > 2 && IS_DIRECTORY_SEP (temp[i - 1]))
-      temp[--i] = 0;
-  }
-
-  /* Set `env' to a vector of the strings in the environment.  */
-
-  {
-    register Lisp_Object tem;
-    register char **new_env;
-    char **p, **q;
-    register int new_length;
-#ifndef HAVE_ANDROID
-    Lisp_Object display = Qnil;
-#endif /* !HAVE_ANDROID */
-
-    new_length = 0;
-
-    for (tem = Vprocess_environment;
-	 CONSP (tem) && STRINGP (XCAR (tem));
-	 tem = XCDR (tem))
-      {
-#ifndef HAVE_ANDROID
-	if (scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("DISPLAY"), unwrap_emacs_string (XCAR (tem)), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
-	    && (SDATA (XCAR (tem)) [7] == '\0'
-		|| SDATA (XCAR (tem)) [7] == '='))
-	  /* DISPLAY is specified in process-environment.  */
-	  display = Qt;
-#endif /* !HAVE_ANDROID */
-	new_length++;
-      }
-
-    /* Setting DISPLAY under Android hinders attempts to display other
-       programs within X servers that are available for Android.  */
-
-#ifndef HAVE_ANDROID
-    /* If not provided yet, use the frame's DISPLAY.  */
-    if (NILP (display))
-      {
-	Lisp_Object tmp = Fframe_parameter (selected_frame, Qdisplay);
-
-#ifdef HAVE_PGTK
-	/* The only time GDK actually returns correct information is
-	   when it's running under X Windows.  DISPLAY shouldn't be
-	   set to a Wayland display either, since that's an X specific
-	   variable.  */
-	if (FRAME_WINDOW_P (SELECTED_FRAME ())
-	    && strcmp (G_OBJECT_TYPE_NAME (FRAME_X_DISPLAY (SELECTED_FRAME ())),
-		       "GdkX11Display"))
-	  tmp = Qnil;
-#endif /* HAVE_PGTK */
-
-	if (!STRINGP (tmp) && CONSP (Vinitial_environment))
-	  /* If still not found, Look for DISPLAY in Vinitial_environment.  */
-	  tmp = Fgetenv_internal (build_string ("DISPLAY"),
-				  Vinitial_environment);
-	if (STRINGP (tmp))
-	  {
-	    display = tmp;
-	    new_length++;
-	  }
-      }
-#endif /* !HAVE_ANDROID */
-
-    /* new_length + 2 to include PWD and terminating 0.  */
-    env = new_env = xnmalloc (new_length + 2, sizeof *env);
+    /* n + 1 to include the terminating 0.  */
+    env = xnmalloc (n + 1, sizeof *env);
     record_unwind_protect_ptr (xfree, env);
-    /* If we have a PWD envvar, pass one down,
-       but with corrected value.  */
-    if (egetenv ("PWD"))
-      *new_env++ = pwd_var;
-
-#ifndef HAVE_ANDROID
-    if (STRINGP (display))
-      {
-	char *vdata = xmalloc (sizeof "DISPLAY=" + SBYTES (display));
-	record_unwind_protect_ptr (xfree, vdata);
-	lispstpcpy (stpcpy (vdata, "DISPLAY="), display);
-	new_env = add_env (env, new_env, vdata);
-      }
-#endif /* !HAVE_ANDROID */
-
-    /* Overrides.  */
-    for (tem = Vprocess_environment;
-	 CONSP (tem) && STRINGP (XCAR (tem));
-	 tem = XCDR (tem))
-      new_env = add_env (env, new_env, SSDATA (XCAR (tem)));
-
-    *new_env = 0;
-
-    /* Remove variable names without values.  */
-    p = q = env;
-    while (*p != 0)
-      {
-	while (*q != 0 && strchr (*q, '=') == NULL)
-	  q++;
-	*p = *q++;
-	if (*p != 0)
-	  p++;
-      }
+    p = env;
+    for (tem = env_list; CONSP (tem); tem = XCDR (tem))
+      *p++ = SSDATA (XCAR (tem));
+    *p = 0;
   }
 
   return env;
@@ -2084,9 +1957,9 @@ DEFUN ("--callproc-argv", Fc_callproc_argv, Sc_callproc_argv, 2, 2, 0,
        doc: /* FIX-20261001-guilemacs: Internal: return the argv of a
 subprocess as a *plain list of strings*, with the resolved program X at
 the head.  X is the string from --callproc-resolve-program.  Y is the
-plain list of the Elisp argument strings.  C keeps the argument-coding
-step (setup_coding_system / encode_coding_string) and the char ** build;
-this leaf returns the encoded strings only.  Return nil when X is not a
+plain list of the Elisp argument strings.  This leaf performs the
+argument-coding step (setup_coding_system / encode_coding_string) and
+returns the encoded strings only; C builds the char ** block.  Return nil when X is not a
 string, when Y is not a proper list, or when any element of Y is not a
 string (a real error, not a silent pass).  M45 imp-2, brief.org section
 6.1.  */)

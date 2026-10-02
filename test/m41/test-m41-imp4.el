@@ -151,11 +151,11 @@ printed as INFO-skipped, not FAIL."
                         (eql 237 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
 ;; src/*.m, like the measurement in brief.org §3.1.
-(m41-imp4--check "surface/tree-ref-sites-183"
+(m41-imp4--check "surface/tree-ref-sites-187"
                  (let ((files (directory-files (expand-file-name "src" m41-imp4--root)
                                                t "\\.\\(c\\|h\\|m\\)\\'")))
                    (and (consp files)
-                        (eql 183
+                        (eql 187
                              (let ((n 0))
                                (dolist (f files)
                                  (with-temp-buffer

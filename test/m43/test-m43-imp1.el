@@ -21,7 +21,7 @@
 ;;;         accessor was added); src/keyboard-globals.c is 490 lines;
 ;;;         the combined keyboard surface is 11,723; src/process.c is
 ;;;         9,030 lines and 50 DEFUNs; src/xdisp.c is 38,990 lines and
-;;;         24 DEFUNs; scm_c_public_ref over src/*.[chm] is 183 (imp-3
+;;;         24 DEFUNs; scm_c_public_ref over src/*.[chm] is 187 (imp-3
 ;;;         added one site; imp-4 added three; imp-5 added two); and
 ;;;         mod/emacs/gobble.scm is 303 lines.
 ;;;   D2 -- the src/sysdep.c function map and the termios / ioctl sites.
@@ -155,8 +155,8 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 38990 (m43-imp1--lines "src/xdisp.c")))
 (m43-imp1--check "xdisp.c-defuns-24"
                  (eql 24 (m43-imp1--count "src/xdisp.c" "^DEFUN (\"")))
-(m43-imp1--check "scm-c-public-ref-183"
-                 (eql 183 (m43-imp1--count-scm-ref)))
+(m43-imp1--check "scm-c-public-ref-187"
+                 (eql 187 (m43-imp1--count-scm-ref)))
 (m43-imp1--check "gobble.scm-lines-303"
                  (eql 303 (m43-imp1--lines "mod/emacs/gobble.scm")))
 

@@ -219,6 +219,7 @@
 (group (m45) ; M45 imp-1 audit + imp-2 the typed C callproc.c leaves (docs/m45-plan.org)
   "test/m45/test-m45-imp1.el"                 ; M45 imp-1 audit: the base re-scan, the block line map, the three DEFUN pins, the two file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
   "test/m45/test-m45-imp2.el"                 ; M45 imp-2: the four typed C leaves (--callproc-argv, --callproc-env, --callproc-resolve-program, --callproc-temp-name), (emacs process-create), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
+  "test/m45/test-m45-imp3.el"                 ; M45 imp-3: the four C dispatch helpers and the unwinder, the rewired call_process / create_temp_file / make_environment_block hubs, the deleted inline policy, the two nil guards, the re-pinned tree-wide ref count, and the re-measured surface (corpus reads files, and runs the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

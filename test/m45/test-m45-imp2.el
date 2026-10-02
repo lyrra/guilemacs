@@ -293,13 +293,14 @@ real error, not a pass."
                        (kg (m45-imp2--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m45-imp2--check "scm-c-public-ref-183"
-                 (eql 183 (m45-imp2--count-scm-ref)))
+(m45-imp2--check "scm-c-public-ref-187"
+                 (eql 187 (m45-imp2--count-scm-ref)))
 (m45-imp2--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp2--lines "mod/emacs/tty-modes.scm")))
-;; src/callproc.c grows: 2,184 -> 2,514 lines and 3 -> 7 DEFUNs.
-(m45-imp2--check "callproc.c-lines-grew"
-                 (eql 2514 (m45-imp2--lines "src/callproc.c")))
+;; src/callproc.c: 2,184 (imp-1 base) -> 2,514 (imp-2) -> 2,380 (imp-3,
+;; which deletes the inline parent-side policy).
+(m45-imp2--check "callproc.c-lines-2387"
+                 (eql 2387 (m45-imp2--lines "src/callproc.c")))
 (m45-imp2--check "callproc.c-defuns-grew"
                  (eql 7 (m45-imp2--count "src/callproc.c" "^DEFUN (\"")))
 

@@ -12,7 +12,7 @@
 ;;;         lines / 7 DEFUNs; src/keyboard.c is 11,233 / 447;
 ;;;         src/keyboard-globals.c is 490; the combined keyboard surface
 ;;;         is 11,723, margin 237 under the 11,960 M31 budget; tree-wide
-;;;         scm_c_public_ref over src/*.[chm] is 183; mod/emacs/tty-modes.scm
+;;;         scm_c_public_ref over src/*.[chm] is 187; mod/emacs/tty-modes.scm
 ;;;         is 313.
 ;;;   S2 -- the line map of brief.org section 4, pinned with grep.
 ;;;   S3' -- the tracked close-out record test/m43/test-m43-imp6-closeout.org
@@ -125,8 +125,8 @@ the symbol `m43-imp6-absent' when REL does not exist."
                    (and (integerp k) (integerp kg)
                         (eql 11723 (+ k kg))
                         (eql 237 (- 11960 (+ k kg))))))
-(m43-imp6--check "surface/scm-c-public-ref-183"
-                 (eql 183 (m43-imp6--count-scm-ref)))
+(m43-imp6--check "surface/scm-c-public-ref-187"
+                 (eql 187 (m43-imp6--count-scm-ref)))
 (m43-imp6--check "surface/tty-modes.scm-lines-313"
                  (eql 313 (m43-imp6--lines "mod/emacs/tty-modes.scm")))
 

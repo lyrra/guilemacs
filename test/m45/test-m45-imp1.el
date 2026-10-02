@@ -11,9 +11,9 @@
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget);
-;;;         scm_c_public_ref over src/*.[chm] is 183;
+;;;         scm_c_public_ref over src/*.[chm] is 187;
 ;;;         mod/emacs/tty-modes.scm is 313 lines; and src/callproc.c is
-;;;         2,514 lines and 7 DEFUNs (imp-2 added the four leaves and
+;;;         2,387 lines and 7 DEFUNs (imp-2 added the four leaves and
 ;;;         the guile.h include, so the block map below moved by one
 ;;;         line and the two callproc numbers grew; the imp-2 review
 ;;;         fixes for F1, F2 and F3 moved the line count again).
@@ -22,15 +22,15 @@
 ;;;         tracked file, so a drift is a real FAIL.  The corpus records
 ;;;         the milestone.org correction: the definition range starts at
 ;;;         getenv_internal_1 (:1620) and ends at
-;;;         make_environment_block (:1755), not the milestone.org range
+;;;         make_environment_block (:1725), not the milestone.org range
 ;;;         ":1620 ... :1754".  The corpus also pins the section 3.1 note
 ;;;         column: the forward declarations (call_process :115,
-;;;         child_setup :123) and the call sites (create_temp_file :1113,
-;;;         add_env :1858 and :1866, exec_failed :1284, child_setup :617,
-;;;         :1595 and :1597, emacs_spawn :666, make_environment_block
-;;;         :614, block_child_signal :663).  It also pins the two file
-;;;         facts: 0 scm_c_public_ref sites and 1 guile.h include (the
-;;;         include that imp-2 adds).
+;;;         child_setup :123) and the call sites (create_temp_file :1111,
+;;;         exec_failed :1248, child_setup :643, :1559 and :1561,
+;;;         emacs_spawn :692, make_environment_block :640,
+;;;         block_child_signal :689).  It also pins the two file
+;;;         facts: 4 scm_c_public_ref sites and 1 guile.h include (the
+;;;         include that imp-2 adds; imp-3 adds the four dispatch helpers).
 ;;;   D3 -- the leaf-shape words of brief.org section 6 in
 ;;;         docs/m45-plan.org.
 ;;;   D4 -- the decision words in the gitignored records
@@ -199,12 +199,12 @@ regression, and must not turn the gate red."
                        (kg (m45-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m45-imp1--check "scm-c-public-ref-183"
-                 (eql 183 (m45-imp1--count-scm-ref)))
+(m45-imp1--check "scm-c-public-ref-187"
+                 (eql 187 (m45-imp1--count-scm-ref)))
 (m45-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp1--lines "mod/emacs/tty-modes.scm")))
-(m45-imp1--check "callproc.c-lines-2514"
-                 (eql 2514 (m45-imp1--lines "src/callproc.c")))
+(m45-imp1--check "callproc.c-lines-2387"
+                 (eql 2387 (m45-imp1--lines "src/callproc.c")))
 (m45-imp1--check "callproc.c-defuns-7"
                  (eql 7 (m45-imp1--count "src/callproc.c" "^DEFUN (\"")))
 
@@ -213,56 +213,56 @@ regression, and must not turn the gate red."
 (setq m45-imp1--group 'd2)
 
 ;; the parent-side policy and the mechanism blocks
-(m45-imp1--check "call_process-def-343"
-                 (eql 343 (m45-imp1--line-of
+(m45-imp1--check "call_process-def-400"
+                 (eql 400 (m45-imp1--line-of
                            "src/callproc.c"
                            "call_process (ptrdiff_t nargs, Lisp_Object *args,")))
-(m45-imp1--check "create_temp_file-def-955"
-                 (eql 955 (m45-imp1--line-of
+(m45-imp1--check "create_temp_file-def-981"
+                 (eql 981 (m45-imp1--line-of
                            "src/callproc.c"
                            "create_temp_file (ptrdiff_t nargs, Lisp_Object *args,")))
-(m45-imp1--check "add_env-def-1155"
-                 (eql 1155 (m45-imp1--line-of
-                            "src/callproc.c"
-                            "add_env (char **env, char **new_env, char *string)")))
-(m45-imp1--check "exec_failed-def-1197"
-                 (eql 1197 (m45-imp1--line-of
+(m45-imp1--check "add_env-removed"
+                 (eql 0 (m45-imp1--count
+                         "src/callproc.c"
+                         "add_env (char **env, char **new_env, char *string)")))
+(m45-imp1--check "exec_failed-def-1161"
+                 (eql 1161 (m45-imp1--line-of
                             "src/callproc.c"
                             "exec_failed (char const *name, int err)")))
-(m45-imp1--check "child_setup-def-1227"
-                 (eql 1227 (m45-imp1--line-of
+(m45-imp1--check "child_setup-def-1191"
+                 (eql 1191 (m45-imp1--line-of
                             "src/callproc.c"
                             "child_setup (int in, int out, int err, char **new_argv, char **env,")))
-(m45-imp1--check "emacs_posix_spawn_init_actions-def-1319"
-                 (eql 1319 (m45-imp1--line-of
+(m45-imp1--check "emacs_posix_spawn_init_actions-def-1283"
+                 (eql 1283 (m45-imp1--line-of
                             "src/callproc.c"
                             "emacs_posix_spawn_init_actions (posix_spawn_file_actions_t *actions,")))
-(m45-imp1--check "emacs_posix_spawn_init_attributes-def-1361"
-                 (eql 1361 (m45-imp1--line-of
+(m45-imp1--check "emacs_posix_spawn_init_attributes-def-1325"
+                 (eql 1325 (m45-imp1--line-of
                             "src/callproc.c"
                             "emacs_posix_spawn_init_attributes (posix_spawnattr_t *attributes,")))
-(m45-imp1--check "emacs_spawn-def-1432"
-                 (eql 1432 (m45-imp1--line-of
+(m45-imp1--check "emacs_spawn-def-1396"
+                 (eql 1396 (m45-imp1--line-of
                             "src/callproc.c"
                             "emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,")))
-(m45-imp1--check "getenv_internal_1-def-1620"
-                 (eql 1620 (m45-imp1--line-of
+(m45-imp1--check "getenv_internal_1-def-1584"
+                 (eql 1584 (m45-imp1--line-of
                             "src/callproc.c"
                             "getenv_internal_1 (const char *var")))
-(m45-imp1--check "getenv_internal-def-1655"
-                 (eql 1655 (m45-imp1--line-of
+(m45-imp1--check "getenv_internal-def-1619"
+                 (eql 1619 (m45-imp1--line-of
                             "src/callproc.c"
                             "getenv_internal (const char *var")))
-(m45-imp1--check "egetenv_internal-def-1738"
-                 (eql 1738 (m45-imp1--line-of
+(m45-imp1--check "egetenv_internal-def-1702"
+                 (eql 1702 (m45-imp1--line-of
                             "src/callproc.c"
                             "egetenv_internal (const char *var, ptrdiff_t len)")))
-(m45-imp1--check "make_environment_block-def-1755"
-                 (eql 1755 (m45-imp1--line-of
+(m45-imp1--check "make_environment_block-def-1725"
+                 (eql 1725 (m45-imp1--line-of
                             "src/callproc.c"
                             "make_environment_block (Lisp_Object current_dir)")))
-(m45-imp1--check "init_callproc-def-1908"
-                 (eql 1908 (m45-imp1--line-of
+(m45-imp1--check "init_callproc-def-1781"
+                 (eql 1781 (m45-imp1--line-of
                             "src/callproc.c"
                             "init_callproc (void)")))
 
@@ -279,64 +279,65 @@ regression, and must not turn the gate red."
 ;; child_setup is called from both the posix_spawn path (:616) and the
 ;; vfork path (:1594, :1596); block_child_signal is called at :178 and
 ;; the parent-side :662, so the second match is pinned by index.
-(m45-imp1--check "create_temp_file-call-1113"
-                 (eql 1113 (m45-imp1--line-of
+(m45-imp1--check "create_temp_file-call-1111"
+                 (eql 1111 (m45-imp1--line-of
                             "src/callproc.c"
                             "create_temp_file (nargs, args, &infile, &fd);")))
-(m45-imp1--check "add_env-call-1858"
-                 (eql 1858 (m45-imp1--line-of
+(m45-imp1--check "callproc-resolve-program-def-135"
+                 (eql 135 (m45-imp1--line-of
+                           "src/callproc.c"
+                           "callproc_resolve_program (Lisp_Object program)")))
+(m45-imp1--check "callproc-env-called-1731"
+                 (eql 1731 (m45-imp1--line-of
                             "src/callproc.c"
-                            "add_env (env, new_env, vdata);")))
-(m45-imp1--check "add_env-call-1866"
-                 (eql 1866 (m45-imp1--line-of
-                            "src/callproc.c"
-                            "add_env (env, new_env, SSDATA (XCAR (tem)));")))
-(m45-imp1--check "exec_failed-call-1284"
-                 (eql 1284 (m45-imp1--line-of
+                            "env_list = callproc_env (current_dir);")))
+(m45-imp1--check "exec_failed-call-1248"
+                 (eql 1248 (m45-imp1--line-of
                             "src/callproc.c"
                             "exec_failed (new_argv[0], errnum);")))
-(m45-imp1--check "child_setup-call-617"
-                 (eql 617 (m45-imp1--line-of
+(m45-imp1--check "child_setup-call-643"
+                 (eql 643 (m45-imp1--line-of
                            "src/callproc.c"
                            "child_setup (*filefd, fd_output, fd_error, new_argv, env,")))
-(m45-imp1--check "child_setup-call-1595"
-                 (eql 1595 (m45-imp1--line-of
+(m45-imp1--check "child_setup-call-1559"
+                 (eql 1559 (m45-imp1--line-of
                             "src/callproc.c"
                             "pid = child_setup (std_in, std_out, std_err, argv, envp, cwd);")))
-(m45-imp1--check "child_setup-call-1597"
-                 (eql 1597 (m45-imp1--line-of-nth
+(m45-imp1--check "child_setup-call-1561"
+                 (eql 1561 (m45-imp1--line-of-nth
                             "src/callproc.c"
                             "child_setup (std_in, std_out, std_err, argv, envp, cwd);" 2)))
-(m45-imp1--check "emacs_spawn-call-666"
-                 (eql 666 (m45-imp1--line-of
+(m45-imp1--check "emacs_spawn-call-692"
+                 (eql 692 (m45-imp1--line-of
                            "src/callproc.c"
                            "emacs_spawn (&pid, filefd, fd_output, fd_error, new_argv, env,")))
-(m45-imp1--check "make_environment_block-call-614"
-                 (eql 614 (m45-imp1--line-of
+(m45-imp1--check "make_environment_block-call-640"
+                 (eql 640 (m45-imp1--line-of
                            "src/callproc.c"
                            "make_environment_block (current_dir)")))
-(m45-imp1--check "block_child_signal-call-663"
+(m45-imp1--check "block_child_signal-call-689"
                  ;; anchor the match: "unblock_child_signal" holds the
                  ;; same substring, so an unanchored search would hit it.
-                 (eql 663 (m45-imp1--line-of-nth
+                 (eql 689 (m45-imp1--line-of-nth
                            "src/callproc.c"
                            "^[ \t]*block_child_signal (&oldset);" 2)))
 
 ;; the three DEFUNs
-(m45-imp1--check "defun-call-process-259"
-                 (eql 259 (m45-imp1--line-of
+(m45-imp1--check "defun-call-process-316"
+                 (eql 316 (m45-imp1--line-of
                            "src/callproc.c" "DEFUN (\"call-process\"")))
-(m45-imp1--check "defun-call-process-region-1054"
-                 (eql 1054 (m45-imp1--line-of
+(m45-imp1--check "defun-call-process-region-1052"
+                 (eql 1052 (m45-imp1--line-of
                             "src/callproc.c" "DEFUN (\"call-process-region\"")))
-(m45-imp1--check "defun-getenv-internal-1704"
-                 (eql 1704 (m45-imp1--line-of
+(m45-imp1--check "defun-getenv-internal-1668"
+                 (eql 1668 (m45-imp1--line-of
                             "src/callproc.c" "DEFUN (\"getenv-internal\"")))
 
-;; the two file facts: 0 scm_c_public_ref sites and 1 guile.h include
-;; (imp-2 added the include, so the imp-1 no-guile.h pin is now positive)
-(m45-imp1--check "callproc.c-scm-ref-0"
-                 (eql 0 (m45-imp1--count "src/callproc.c" "scm_c_public_ref")))
+;; the two file facts: 4 scm_c_public_ref sites and 1 guile.h include
+;; (imp-2 added the include, so the imp-1 no-guile.h pin is now positive;
+;; imp-3 adds the four dispatch helpers)
+(m45-imp1--check "callproc.c-scm-ref-4"
+                 (eql 4 (m45-imp1--count "src/callproc.c" "scm_c_public_ref")))
 (m45-imp1--check "callproc.c-has-guile.h"
                  (let ((n (m45-imp1--count "src/callproc.c" "guile.h")))
                    (and (integerp n) (eql 1 n))))
