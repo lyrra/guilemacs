@@ -1,0 +1,294 @@
+;;; test-m46-imp4.el --- M46 imp-4 close-out corpus (re-measure and record).
+;;;
+;;; M46 imp-4 is the close-out (brief.org section 1).  It changes no C
+;;; and no Scheme.  It re-measures the surface, runs the gates, and
+;;; records.  This corpus pins the end state against the tree, so a
+;;; stale number or a missing record fails the run.
+;;;
+;;; It pins:
+;;;   S1 -- the surface of brief.org section 6, re-measured at HEAD:
+;;;         src/filelock.c (1,216 lines, 13 DEFUNs, 6 scm_c_public_ref
+;;;         sites, the guile.h include); mod/emacs/filelock.scm (104);
+;;;         tree-wide scm_c_public_ref over src/*.[chm] is 193;
+;;;         src/callproc.c (2,387 / 7 / 4); src/sysdep.c (4,950 / 7);
+;;;         src/keyboard.c (11,233 / 447); src/keyboard-globals.c (490);
+;;;         the combined keyboard surface (11,723); the margin (237
+;;;         under the 11,960 M31 budget); and mod/emacs/tty-modes.scm
+;;;         (313).  The M31 keyboard surface did not move in M46.
+;;;   S2 -- the close-out words in the gitignored/untracked records
+;;;         (docs/m46-plan.org section 8, docs/kb.org ** M46,
+;;;         milestone.org).  The milestone.org needles include the
+;;;         landed imp-4 headline and the imp-4 commit hash, so the
+;;;         stale "(the next work)" headline or a missing hash is
+;;;         caught.  docs/ is gitignored and milestone.org is untracked,
+;;;         so a present-but-stale or absent record is an INFO-skip,
+;;;         never a FAIL.  These checks register no ERT test, so the m46
+;;;         gate total does not depend on docs/.
+;;;   S3 -- the gated gate check: run the m46 gate on the built
+;;;         src/emacs and check exit 0 and the pass total (brief.org
+;;;         section 5 T3).  INFO-skip when src/emacs is absent.  The
+;;;         check sets GUILEMACS_M46_GATE=1; the nested run reads that
+;;;         from the environment and INFO-skips this same check, so the
+;;;         nesting is exactly one level (the m38-imp1 recursion lesson).
+;;;   S5 -- the corpus is registered in the (m46) group of
+;;;         tool/run-tests.scm (brief.org section 5 T5).
+;;;   S6 -- the per-group min-count guard (brief.org section 5 T4).
+;;;         Pin each group's count apart from the total, so a truncated
+;;;         corpus cannot pass the gate with no real checks.
+;;;
+;;; A read error is a real error, never a silent pass.  An absent src/
+;;; file is a real error.
+
+(princ "=== m46 imp-4 close-out suite ===\n")
+
+(require 'imp-ert-report)
+
+(defvar m46-imp4--root
+  (file-name-as-directory
+   (expand-file-name "../.." (file-name-directory (or load-file-name
+                                                       default-directory)))))
+
+(defvar m46-imp4--registered 0
+  "Total number of tracked-file checks this corpus has registered.")
+
+(defvar m46-imp4--group nil
+  "The group that `m46-imp4--check' counts into: `s1', `s5', or nil.")
+
+(defvar m46-imp4--counts nil
+  "Alist of (GROUP . COUNT) for the registered tracked-file checks.")
+
+(defun m46-imp4--group-count (group)
+  "Number of tracked-file checks registered so far in GROUP."
+  (or (cdr (assq group m46-imp4--counts)) 0))
+
+(defun m46-imp4--with (rel fn)
+  "Call FN in a temp buffer holding REL (repo-root-relative), or return
+the symbol `m46-imp4-absent' when REL does not exist.  docs/ is
+gitignored, so a checkout without it must not crash the subprocess: an
+unguarded `insert-file-contents' on an absent file would kill the
+subprocess before ERT ever ran."
+  (let ((path (expand-file-name rel m46-imp4--root)))
+    (if (not (file-exists-p path))
+        'm46-imp4-absent
+      (with-temp-buffer
+        (insert-file-contents path)
+        (funcall fn)))))
+
+(defun m46-imp4--contains-p (rel needle)
+  "Non-nil when REL (repo-root-relative) contains NEEDLE."
+  (m46-imp4--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (search-forward needle nil t))))
+
+(defun m46-imp4--lines (rel)
+  "Count the newlines of REL the way `wc -l' does."
+  (m46-imp4--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (let ((n 0))
+        (while (search-forward "\n" nil t) (setq n (1+ n)))
+        n))))
+
+(defun m46-imp4--count (rel regexp)
+  "Count the matches of REGEXP in REL."
+  (m46-imp4--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (let ((n 0))
+        (while (re-search-forward regexp nil t) (setq n (1+ n)))
+        n))))
+
+(defun m46-imp4--count-scm-ref ()
+  "Count scm_c_public_ref over src/*.[chm] (the brief.org section 6 measure)."
+  (let ((total 0)
+        (dir (expand-file-name "src" m46-imp4--root)))
+    (dolist (f (directory-files dir t "\\.[chm]\\'"))
+      (setq total (+ total (or (m46-imp4--count f "scm_c_public_ref") 0))))
+    total))
+
+(defun m46-imp4--check (name ok)
+  "Report and register one check on a TRACKED file.  OK is a boolean.
+An absent src/ file makes the reader return the symbol
+`m46-imp4-absent', so an `eql' check yields nil and prints FAIL -- an
+absent src/ file is a real error, not a pass."
+  (if (eq ok 'm46-imp4-absent)
+      (princ (format "FAIL m46/imp4/%s (source file absent)\n" name))
+    (progn
+      (princ (format "%s m46/imp4/%s\n" (if ok "PASS" "FAIL") name))
+      (setq m46-imp4--registered (1+ m46-imp4--registered))
+      (when m46-imp4--group
+        (let ((cell (assq m46-imp4--group m46-imp4--counts)))
+          (if cell
+              (setcdr cell (1+ (cdr cell)))
+            (push (cons m46-imp4--group 1) m46-imp4--counts))))
+      (imp-register-bool-as-ert-test (format "m46-imp4/%s" name) (and ok t)))))
+
+(defun m46-imp4--doc-check (name rel needle)
+  "Report one check on a NON-durable record.  Print PASS when REL holds
+NEEDLE; print an INFO-skip when REL is absent OR present but stale
+(brief.org section 5 T2).  docs/ is gitignored and milestone.org is
+untracked, so no commit can carry them: a stale document is a fact of
+the checkout, not a code regression, and must not turn the gate red.
+This helper registers NO ERT test, so the m46 gate total is independent
+of the presence of docs/."
+  (let ((hit (m46-imp4--contains-p rel needle)))
+    (if (and hit (not (eq hit 'm46-imp4-absent)))
+        (princ (format "PASS m46/imp4/%s\n" name))
+      (princ (format "INFO m46/imp4/%s skipped (%s, gitignored record)\n"
+                     name (if (eq hit 'm46-imp4-absent) "absent" "stale"))))))
+
+;;; --- S1. The surface (brief.org section 6) --------------------------
+
+(setq m46-imp4--group 's1)
+
+(m46-imp4--check "filelock.c-lines-1216"
+                 (eql 1216 (m46-imp4--lines "src/filelock.c")))
+(m46-imp4--check "filelock.c-defuns-13"
+                 (eql 13 (m46-imp4--count "src/filelock.c" "^DEFUN (\"")))
+(m46-imp4--check "filelock.c-scm-ref-6"
+                 (eql 6 (m46-imp4--count "src/filelock.c" "scm_c_public_ref")))
+(m46-imp4--check "filelock.c-has-guile-h"
+                 (m46-imp4--contains-p "src/filelock.c" "#include \"guile.h\""))
+(m46-imp4--check "filelock.scm-lines-104"
+                 (eql 104 (m46-imp4--lines "mod/emacs/filelock.scm")))
+(m46-imp4--check "scm-c-public-ref-193"
+                 (eql 193 (m46-imp4--count-scm-ref)))
+(m46-imp4--check "callproc.c-lines-2387"
+                 (eql 2387 (m46-imp4--lines "src/callproc.c")))
+(m46-imp4--check "callproc.c-defuns-7"
+                 (eql 7 (m46-imp4--count "src/callproc.c" "^DEFUN (\"")))
+(m46-imp4--check "callproc.c-scm-ref-4"
+                 (eql 4 (m46-imp4--count "src/callproc.c" "scm_c_public_ref")))
+(m46-imp4--check "sysdep.c-lines-4950"
+                 (eql 4950 (m46-imp4--lines "src/sysdep.c")))
+(m46-imp4--check "sysdep.c-defuns-7"
+                 (eql 7 (m46-imp4--count "src/sysdep.c" "^DEFUN (\"")))
+(m46-imp4--check "keyboard.c-lines-11233"
+                 (eql 11233 (m46-imp4--lines "src/keyboard.c")))
+(m46-imp4--check "keyboard.c-defuns-447"
+                 (eql 447 (m46-imp4--count "src/keyboard.c" "^DEFUN (\"")))
+(m46-imp4--check "keyboard-globals.c-lines-490"
+                 (eql 490 (m46-imp4--lines "src/keyboard-globals.c")))
+(m46-imp4--check "combined-keyboard-surface-11723"
+                 (let ((kb (m46-imp4--lines "src/keyboard.c"))
+                       (kg (m46-imp4--lines "src/keyboard-globals.c")))
+                   (and (integerp kb) (integerp kg)
+                        (eql 11723 (+ kb kg)))))
+(m46-imp4--check "margin-under-budget-237"
+                 (let ((kb (m46-imp4--lines "src/keyboard.c"))
+                       (kg (m46-imp4--lines "src/keyboard-globals.c")))
+                   (and (integerp kb) (integerp kg)
+                        (eql 237 (- 11960 (+ kb kg))))))
+(m46-imp4--check "tty-modes.scm-lines-313"
+                 (eql 313 (m46-imp4--lines "mod/emacs/tty-modes.scm")))
+
+;;; --- S5. The corpus is registered (brief.org section 5 T5) ----------
+
+(setq m46-imp4--group 's5)
+
+(m46-imp4--check "run-tests-m46-imp4"
+                 (m46-imp4--contains-p "tool/run-tests.scm"
+                                       "test/m46/test-m46-imp4.el"))
+(m46-imp4--check "run-tests-m46-group-comment"
+                 (m46-imp4--contains-p "tool/run-tests.scm"
+                                       "M46 imp-1 audit + imp-2 the typed C filelock.c leaves + imp-3 the parent-side rewire + imp-4 the close-out"))
+
+;;; --- S6. The per-group min-count guard (brief.org section 5 T4) ----
+
+;; An --filter that matches no group already reports exit 0 with 0
+;; tests, so a green m46 gate proves nothing until the corpus exists and
+;; its checks really register.  These guards fail when the corpus body
+;; is truncated or its core checks do not run.  The bound is per group,
+;; and the counts are stable because every check is registered at load
+;; time.  S1 holds 17 checks; S5 holds 2.
+
+(setq m46-imp4--group nil)
+
+(m46-imp4--check "reg/min-s1-checks-17"
+                 (>= (m46-imp4--group-count 's1) 17))
+(m46-imp4--check "reg/min-s5-checks-2"
+                 (>= (m46-imp4--group-count 's5) 2))
+(m46-imp4--check "reg/min-total-19"
+                 (>= m46-imp4--registered 19))
+
+;;; --- S3. The gated gate check (brief.org section 5 T3) --------------
+
+;; The gate needs the built src/emacs (the ERT batch runner).  Run the
+;; m46 gate as a subprocess and read its pass total.  The subprocess is
+;; given GUILEMACS_M46_GATE=1; the nested load of this corpus sees that
+;; variable and INFO-skips this check, so the nesting is exactly one
+;; level.  Without the guard the m46 gate would re-run itself without
+;; bound (the m38-imp1 recursion lesson).
+;;
+;; The pinned total is the *nested* total: the m46 group holds imp-1 40,
+;; imp-2 42, imp-3 59 and imp-4 22 (S1 17 + S5 2 + this check skipped +
+;; S6 3).  141 + 22 = 163.  The bound is a minimum, so it fails only when
+;; the m46 total drops.  The S2 checks register no ERT test, so the m46
+;; total does not depend on docs/; the surface pins of S1 are the hard
+;; checks.
+
+(defvar m46-imp4--emacs
+  (expand-file-name "src/emacs" m46-imp4--root))
+
+(defvar m46-imp4--min-gate-total 163
+  "The minimum m46 pass total at imp-4 (the nested run).")
+
+(defun m46-imp4--gate-run ()
+  "Run the m46 gate on the built src/emacs.  Return (STATUS . OUTPUT),
+or nil when src/emacs is absent.  Set GUILEMACS_M46_GATE=1 so the
+nested imp-4 gate check skips itself (no recursion)."
+  (when (file-executable-p m46-imp4--emacs)
+    (let* ((script (expand-file-name "tool/run-tests.sh" m46-imp4--root))
+           (default-directory m46-imp4--root))
+      (with-temp-buffer
+        (let ((status
+               (call-process
+                "/bin/sh" nil (current-buffer) nil "-c"
+                (format "GUILEMACS_M46_GATE=1 %s --filter=m46" script))))
+          (cons status (buffer-string)))))))
+
+(defun m46-imp4--gate-total (output)
+  "Parse the passed count from the harness OUTPUT, or nil."
+  (when (string-match ", \\([0-9]+\\) passed, \\([0-9]+\\) failed" output)
+    (string-to-number (match-string 1 output))))
+
+(if (getenv "GUILEMACS_M46_GATE")
+    (princ "INFO m46/imp4/gate/m46-exit0-total skipped (nested gate run)\n")
+  (let ((run (m46-imp4--gate-run)))
+    (if (null run)
+        (princ "INFO m46/imp4/gate/m46-exit0-total skipped (no runnable built src/emacs)\n")
+      (let* ((status (car run))
+             (total (m46-imp4--gate-total (cdr run))))
+        (m46-imp4--check "gate/m46-exit0-total"
+                         (and (integerp status) (eql 0 status)
+                              (integerp total)
+                              (>= total m46-imp4--min-gate-total)))))))
+
+;;; --- S2. The close-out records (brief.org section 5 T2) -------------
+;;;
+;;; These pin the close-out words in the gitignored / untracked records.
+;;; An absent or stale record is an INFO-skip, so a fresh clone stays
+;;; green.  These checks register no ERT test.
+
+(m46-imp4--doc-check "plan/imp-4-record"
+                     "docs/m46-plan.org" "8. Imp-4 record")
+(m46-imp4--doc-check "plan/m46-closed"
+                     "docs/m46-plan.org" "M46 is CLOSED")
+(m46-imp4--doc-check "kb/m46-imp-4-landed"
+                     "docs/kb.org" "IMP-4 (CLOSE-OUT) LANDED")
+(m46-imp4--doc-check "kb/m46-closed"
+                     "docs/kb.org" "M46 CLOSED")
+(m46-imp4--doc-check "tracker/m46-closed"
+                     "milestone.org" "M46 is *CLOSED*")
+(m46-imp4--doc-check "tracker/imp-4-done"
+                     "milestone.org" "DONE — the close-out")
+(m46-imp4--doc-check "tracker/imp-4-headline-landed"
+                     "milestone.org" "imp-4 — the close-out (landed")
+(m46-imp4--doc-check "tracker/imp-4-hash"
+                     "milestone.org" "161ad3a47")
+
+(princ (format "=== m46 imp-4 close-out suite done (%d tracked checks; s1 %d, s5 %d) ===\n"
+               m46-imp4--registered
+               (m46-imp4--group-count 's1)
+               (m46-imp4--group-count 's5)))

@@ -222,10 +222,11 @@
   "test/m45/test-m45-imp3.el"                 ; M45 imp-3: the four C dispatch helpers and the unwinder, the rewired call_process / create_temp_file / make_environment_block hubs, the deleted inline policy, the two nil guards, the re-pinned tree-wide ref count, and the re-measured surface (corpus reads files, and runs the built src/emacs)
   "test/m45/test-m45-imp4.el"                 ; M45 imp-4 close-out: the re-measured surface, the (m45) group line, the per-group min-count guard, the close-out words in the gitignored records, and the env-guarded nested m45 gate check (corpus reads files, and runs ./tool/run-tests.sh --filter=m45)
   )
-(group (m46) ; M46 imp-1 audit + imp-2 the typed C filelock.c leaves + imp-3 the parent-side rewire (docs/m46-plan.org)
+(group (m46) ; M46 imp-1 audit + imp-2 the typed C filelock.c leaves + imp-3 the parent-side rewire + imp-4 the close-out (docs/m46-plan.org)
   "test/m46/test-m46-imp1.el"                 ; M46 imp-1 audit: the base re-scan, the block line map, the five DEFUN pins, the two file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
   "test/m46/test-m46-imp2.el"                 ; M46 imp-2: the eight typed C leaves (--filelock-boot-sec, --filelock-lock-info, ...), (emacs filelock), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   "test/m46/test-m46-imp3.el"                 ; M46 imp-3: the eight C dispatch helpers and the clash static, the rewired lock_file_1 / lock_file / unlock_file / file-locked-p hubs, the deleted lock_if_free inline policy, the raw-owner-line shape, the re-pinned tree-wide ref count, and the re-measured surface (corpus reads files, and runs the built src/emacs)
+  "test/m46/test-m46-imp4.el"                 ; M46 imp-4 close-out: the re-measured surface, the (m46) group line, the per-group min-count guard, the close-out words in the gitignored records, and the env-guarded nested m46 gate check (corpus reads files, and runs ./tool/run-tests.sh --filter=m46)
   )
 (group
   "test/src/eval-tests.el"
