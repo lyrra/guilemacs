@@ -228,8 +228,9 @@
   "test/m46/test-m46-imp3.el"                 ; M46 imp-3: the eight C dispatch helpers and the clash static, the rewired lock_file_1 / lock_file / unlock_file / file-locked-p hubs, the deleted lock_if_free inline policy, the raw-owner-line shape, the re-pinned tree-wide ref count, and the re-measured surface (corpus reads files, and runs the built src/emacs)
   "test/m46/test-m46-imp4.el"                 ; M46 imp-4 close-out: the re-measured surface, the (m46) group line, the per-group min-count guard, the close-out words in the gitignored records, and the env-guarded nested m46 gate check (corpus reads files, and runs ./tool/run-tests.sh --filter=m46)
   )
-(group (m47) ; M47 imp-1 audit: the src/fileio.c file-I/O boundary, the block map, the MOVES / STAYS C class table, the module name and the leaf shape, and the A1 / A2 decision (docs/m47-plan.org)
+(group (m47) ; M47 imp-1 audit + imp-2 the typed C fileio.c leaves (docs/m47-plan.org)
   "test/m47/test-m47-imp1.el"                 ; M47 imp-1 audit: the base re-scan, the block line map (the 32 block definitions + the ref site), the file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
+  "test/m47/test-m47-imp2.el"                 ; M47 imp-2: the 26 typed C leaves (--fileio-file-name-directory, --fileio-expand-file-name, ...), (emacs fileio), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

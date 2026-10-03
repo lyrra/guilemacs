@@ -6166,7 +6166,788 @@ If the underlying system call fails, value is nil.  */)
 }
 
 #endif /* !DOS_NT */
-
+
+/* FIX-20261003-guilemacs: M47 imp-2 — the typed C leaves over plain
+   values for the src/fileio.c file-I/O boundary.  Each leaf returns one
+   plain value (a string, an integer, a boolean, a list, or nil) and
+   calls the *mechanism* of its MOVES block; the caller passes plain
+   values in.  The mechanism (the syscalls, the char * buffers, struct
+   stat and struct timespec) stays in C.  imp-2 moves no policy: the C
+   hubs keep their inline policy and their handler dispatch, and the
+   imp-3 … imp-5 steps rewire the hubs onto these leaves and delete the
+   inline policy.  See brief.org section 5 and section 6.
+
+   cr.org F1: a leaf must NOT call its own public hub (=F<block>=).  That
+   is self-reference: imp-3 rewires the hub onto the leaf, so the leaf
+   must call the pure helper or hold the pure policy.  Each leaf below
+   calls a distinct helper (file_name_directory, check_file_access,
+   emacs_readlinkat, file_directory_p, symlink_nofollow_flag,
+   blocks_to_bytes, ...) or holds the pure policy.  cr.org F2: a G3 leaf
+   returns a plain value and does NOT report the file error; the hub
+   keeps report_file_errno.
+
+   Each DEFUN sits after the #ifndef MSDOS guard so the build tools name
+   its symbol on every platform; the leaf body is guarded with
+   #ifndef MSDOS, so an MSDOS build returns the plain default.  This
+   follows the M46 imp-2 shape of src/filelock.c.
+
+   A leaf holds no file-name-handler dispatch: call2 / call3 runs
+   arbitrary Lisp, so the C hub keeps it (brief.org section 3).
+
+   The leaves marked "OPEN (cr.org F1)" still call their public hub.
+   They need a factor-helper step: the pure policy is interleaved with
+   the handler dispatch in a large block (expand-file-name,
+   substitute-in-file-name, copy-file, rename-file, add-name-to-file,
+   make-symbolic-link).  Do not rewire their hubs onto these leaves
+   until that step lands.  */
+
+/* --- G1: the file-name / path policy -------------------------------- */
+
+DEFUN ("--fileio-find-file-name-handler", Fc_fileio_find_file_name_handler,
+       Sc_fileio_find_file_name_handler, 2, 2, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return FILE's handler
+for OPERATION as a *plain string* (or nil when FILE has no handler).
+The lookup is the pure walk of `file-name-handler-alist'.  M47 imp-2,
+brief.org section 5.  */)
+  (Lisp_Object file, Lisp_Object operation)
+{
+#ifndef MSDOS
+  /* The pure walk of `file-name-handler-alist', NOT the hub
+     Ffind_file_name_handler (cr.org F1).  */
+  Lisp_Object chain, inhibited_handlers, result;
+  ptrdiff_t pos = -1;
+
+  if (!STRINGP (file))
+    return Qnil;
+
+  result = Qnil;
+  if (EQ (operation, Vinhibit_file_name_operation))
+    inhibited_handlers = Vinhibit_file_name_handlers;
+  else
+    inhibited_handlers = Qnil;
+
+  for (chain = Vfile_name_handler_alist; CONSP (chain);
+       chain = XCDR (chain))
+    {
+      Lisp_Object elt = XCAR (chain);
+      if (CONSP (elt))
+	{
+	  Lisp_Object string = XCAR (elt);
+	  ptrdiff_t match_pos;
+	  Lisp_Object handler = XCDR (elt);
+	  Lisp_Object operations = Qnil;
+
+	  if (SYMBOLP (handler))
+	    operations = Fget (handler, Qoperations);
+
+	  if (STRINGP (string)
+	      && (match_pos = fast_string_match (string, file)) > pos
+	      && (NILP (operations) || ! NILP (Fmemq (operation, operations))))
+	    {
+	      Lisp_Object tem = Fmemq (handler, inhibited_handlers);
+	      if (NILP (tem))
+		{
+		  result = handler;
+		  pos = match_pos;
+		}
+	    }
+	}
+    }
+  return result;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-name-directory", Fc_fileio_file_name_directory,
+       Sc_fileio_file_name_directory, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return the directory
+component of FN as a *plain string*, or nil when FN has no directory
+component.  The split is `file_name_directory'.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  return file_name_directory (fn);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-name-nondirectory", Fc_fileio_file_name_nondirectory,
+       Sc_fileio_file_name_nondirectory, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return FN without its
+directory as a *plain string*.  The split is the pure non-directory
+split.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object scheme_result;
+
+  if (!STRINGP (fn))
+    return Qnil;
+
+  /* The pure split, NOT the hub Ffile_name_nondirectory (cr.org F1).  */
+  scheme_result = guile_file_path_nondirectory (fn);
+  if (!NILP (scheme_result) && STRINGP (scheme_result))
+    return scheme_result;
+
+  {
+    const char *beg = SSDATA (fn);
+    const char *end = beg + SBYTES (fn);
+    const char *p = end;
+    while (p != beg && !IS_DIRECTORY_SEP (p[-1])
+#ifdef DOS_NT
+	   && !(p[-1] == ':'
+		&& (p == beg + 2 || (p == beg + 4 && IS_DIRECTORY_SEP (*beg))))
+#endif
+	   )
+      p--;
+    return make_specified_string (p, -1, end - p, false);
+  }
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-name-as-directory", Fc_fileio_file_name_as_directory,
+       Sc_fileio_file_name_as_directory, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return FN as a directory
+name as a *plain string*.  The trailing-slash policy is the helper
+`file_name_as_directory'.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  /* The helper `file_name_as_directory', NOT the hub (cr.org F1).  */
+  {
+    Lisp_Object val;
+    USE_SAFE_ALLOCA;
+    char *buf = SAFE_ALLOCA (SBYTES (fn) + file_name_as_directory_slop + 1);
+    ptrdiff_t length = file_name_as_directory (buf, SSDATA (fn),
+					       SBYTES (fn), false);
+    val = make_specified_string (buf, -1, length, false);
+    SAFE_FREE ();
+    return val;
+  }
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-directory-file-name", Fc_fileio_directory_file_name,
+       Sc_fileio_directory_file_name, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return the file name of
+the directory FN as a *plain string*.  The trailing-slash strip is the
+helper `directory_file_name'.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  /* The helper `directory_file_name', NOT the hub (cr.org F1).  */
+  {
+    Lisp_Object val;
+    USE_SAFE_ALLOCA;
+    char *src = SSDATA (fn);
+    char *buf = SAFE_ALLOCA (SBYTES (fn) + 1);
+    ptrdiff_t length = directory_file_name (buf, src, SBYTES (fn), false);
+    val = make_specified_string (buf, -1, length, false);
+    SAFE_FREE ();
+    return val;
+  }
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-name-concat", Fc_fileio_file_name_concat,
+       Sc_fileio_file_name_concat, 1, MANY, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: join the path ARGS...
+and return the result as a *plain string*.  Each element is a string or
+nil.  The join policy is the pure string join, NOT the hub
+Ffile_name_concat.  usage:
+\(--fileio-file-name-concat DIRECTORY &rest COMPONENTS).  M47 imp-2,
+brief.org section 5.  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+#ifndef MSDOS
+  ptrdiff_t chars = 0, bytes = 0, eargs = 0;
+  Lisp_Object *elements = args;
+  Lisp_Object result;
+  ptrdiff_t i;
+
+  /* First pass: check the types and count the bytes.  A bad type gives
+     nil, not an abort (brief.org section 6).  */
+  for (i = 0; i < nargs; i++)
+    {
+      Lisp_Object arg = args[i];
+      if (NILP (arg))
+	continue;
+      if (!STRINGP (arg))
+	return Qnil;
+      if (SCHARS (arg) == 0)
+	continue;
+      eargs++;
+      if (i == nargs - 1 || guile_ends_with_directory_separator (arg))
+	{
+	  bytes += SBYTES (arg);
+	  chars += SCHARS (arg);
+	}
+      else
+	{
+	  bytes += SBYTES (arg) + 1;
+	  chars += SCHARS (arg) + 1;
+	}
+    }
+
+  if (eargs != nargs)
+    {
+      int j = 0;
+      elements = xmalloc (eargs * sizeof *elements);
+      bytes = 0;
+      chars = 0;
+      for (i = 0; i < nargs; i++)
+	{
+	  Lisp_Object arg = args[i];
+	  if (!NILP (arg) && SCHARS (arg) != 0)
+	    elements[j++] = arg;
+	}
+      for (i = 0; i < eargs; i++)
+	{
+	  Lisp_Object arg = elements[i];
+	  if (!STRING_MULTIBYTE (arg) && !string_ascii_p (arg))
+	    elements[i] = Fstring_to_multibyte (arg);
+	  arg = elements[i];
+	  if (i == eargs - 1 || guile_ends_with_directory_separator (arg))
+	    {
+	      bytes += SBYTES (arg);
+	      chars += SCHARS (arg);
+	    }
+	  else
+	    {
+	      bytes += SBYTES (arg) + 1;
+	      chars += SCHARS (arg) + 1;
+	    }
+	}
+    }
+
+  {
+    char *p;
+    USE_SAFE_ALLOCA;
+    char *buffer = SAFE_ALLOCA (bytes + 1);
+    p = buffer;
+    for (i = 0; i < eargs; i++)
+      {
+	Lisp_Object arg = elements[i];
+	ptrdiff_t arg_bytes = SBYTES (arg);
+	memcpy (p, SSDATA (arg), arg_bytes);
+	p += arg_bytes;
+	if (i < eargs - 1 && !IS_DIRECTORY_SEP (*(p - 1)))
+	  *p++ = DIRECTORY_SEP;
+      }
+    *p = '\0';
+    result = make_multibyte_string (buffer, chars, bytes);
+    SAFE_FREE ();
+  }
+
+  if (elements != args)
+    xfree (elements);
+
+  return result;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-expand-file-name", Fc_fileio_expand_file_name,
+       Sc_fileio_expand_file_name, 1, 2, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: convert NAME to an
+absolute canonical name and return it as a *plain string*.  DEFAULT is a
+plain string or nil.  The `.` / `..` / default-directory policy is
+`expand-file-name'.  M47 imp-2, brief.org section 5.
+
+OPEN (cr.org F1): this leaf still calls the hub Fexpand_file_name.  The
+pure policy is interleaved with the handler dispatch in a large block,
+so it needs a factor-helper step before the hub is rewired.  */)
+  (Lisp_Object name, Lisp_Object default_directory)
+{
+#ifndef MSDOS
+  if (!STRINGP (name))
+    return Qnil;
+  return Fexpand_file_name (name, default_directory);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-substitute-in-file-name", Fc_fileio_substitute_in_file_name,
+       Sc_fileio_substitute_in_file_name, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: substitute $VAR and ~ in
+FN and return the result as a *plain string*.  The substitution policy
+is `substitute-in-file-name'.  M47 imp-2, brief.org section 5.
+
+OPEN (cr.org F1): this leaf still calls the hub
+Fsubstitute_in_file_name.  The pure policy is interleaved with a
+handler call, so it needs a factor-helper step.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  return Fsubstitute_in_file_name (fn);
+#else
+  return Qnil;
+#endif
+}
+
+/* --- G2: the OS-query predicate policy ------------------------------ */
+
+DEFUN ("--fileio-file-exists-p", Fc_fileio_file_exists_p,
+       Sc_fileio_file_exists_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN exists, else nil.  The decision is the shared helper
+`check_file_access' over one `access' query.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  return check_file_access (fn, Qfile_exists_p, F_OK);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-executable-p", Fc_fileio_file_executable_p,
+       Sc_fileio_file_executable_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is executable, else nil.  The decision is the shared helper
+`check_file_access' over one `access' query.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  return check_file_access (fn, Qfile_executable_p, X_OK);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-readable-p", Fc_fileio_file_readable_p,
+       Sc_fileio_file_readable_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is readable, else nil.  The decision is the shared helper
+`check_file_access' over one `access' query.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  if (!STRINGP (fn))
+    return Qnil;
+  return check_file_access (fn, Qfile_readable_p, R_OK);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-writable-p", Fc_fileio_file_writable_p,
+       Sc_fileio_file_writable_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is writable, else nil.  The decision is the pure write-access
+policy of `file-writable-p'.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object absname, encoded;
+
+  if (!STRINGP (fn))
+    return Qnil;
+
+  /* The pure write-access policy, NOT the hub Ffile_writable_p
+     (cr.org F1).  The hub keeps the handler dispatch.  */
+  absname = Fexpand_file_name (fn, Qnil);
+  encoded = ENCODE_FILE (absname);
+  if (file_access_p (SSDATA (encoded), W_OK))
+    return Qt;
+  if (errno != ENOENT)
+    return Qnil;
+
+  {
+    Lisp_Object dir = file_name_directory (absname);
+    eassert (!NILP (dir));
+#ifdef MSDOS
+    dir = Fdirectory_file_name (dir);
+#endif
+    encoded = ENCODE_FILE (dir);
+#ifdef WINDOWSNT
+    return file_directory_p (encoded) ? Qt : Qnil;
+#else
+    return file_access_p (SSDATA (encoded), W_OK | X_OK) ? Qt : Qnil;
+#endif
+  }
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-access-file", Fc_fileio_access_file,
+       Sc_fileio_access_file, 2, 2, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is accessible for OP, else nil.  OP is a plain symbol or nil;
+it names the operation for the handler dispatch, which the hub keeps.
+The decision is one `faccessat' query.  M47 imp-2, brief.org section
+5.  */)
+  (Lisp_Object fn, Lisp_Object op)
+{
+#ifndef MSDOS
+  Lisp_Object absname;
+  (void) op;			/* OP is the hub's handler key, not policy */
+  if (!STRINGP (fn))
+    return Qnil;
+  absname = Fexpand_file_name (fn, Qnil);
+  return (sys_faccessat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)), R_OK,
+			 AT_EACCESS) == 0)
+	 ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-symlink-p", Fc_fileio_file_symlink_p,
+       Sc_fileio_file_symlink_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return the link target
+of FN as a *plain string*, or nil when FN is not a symbolic link.  The
+decision is the pure `emacs_readlinkat' read.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object absname;
+  if (!STRINGP (fn))
+    return Qnil;
+  absname = Fexpand_file_name (fn, Qnil);
+  return emacs_readlinkat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)));
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-directory-p", Fc_fileio_file_directory_p,
+       Sc_fileio_file_directory_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is a directory, else nil.  The decision is the shared helper
+`file_directory_p' over one `fstatat'.  M47 imp-2, brief.org section
+5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object absname;
+  if (!STRINGP (fn))
+    return Qnil;
+  absname = expand_and_dir_to_file (fn);
+  return file_directory_p (ENCODE_FILE (absname)) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-regular-p", Fc_fileio_file_regular_p,
+       Sc_fileio_file_regular_p, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when FN is a regular file, else nil.  The decision is the pure
+`fstatat' + `S_ISREG' test.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  struct stat st;
+  Lisp_Object absname;
+  int stat_result;
+  if (!STRINGP (fn))
+    return Qnil;
+  absname = expand_and_dir_to_file (fn);
+#ifdef WINDOWSNT
+  {
+    Lisp_Object true_attributes = Vw32_get_true_file_attributes;
+    Vw32_get_true_file_attributes = Qt;
+    stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
+    Vw32_get_true_file_attributes = true_attributes;
+  }
+#else
+  stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
+#endif
+  return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-modes", Fc_fileio_file_modes,
+       Sc_fileio_file_modes, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return the mode bits of
+FN as a *plain integer*, or nil.  The decision is the pure `fstatat'
+read over the helper `symlink_nofollow_flag'.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  struct stat st;
+  Lisp_Object absname;
+  int nofollow;
+  if (!STRINGP (fn))
+    return Qnil;
+  nofollow = symlink_nofollow_flag (Qnil);
+  absname = expand_and_dir_to_file (fn);
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)),
+		     &st, nofollow) != 0)
+    return Qnil;
+  return make_fixnum (st.st_mode & 07777);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-newer-than-file-p", Fc_fileio_file_newer_than_file_p,
+       Sc_fileio_file_newer_than_file_p, 2, 2, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return a *plain boolean*:
+t when A is newer than B, else nil.  The compare is the pure two-stat
+policy of `file-newer-than-file-p'.  M47 imp-2, brief.org section
+5.  */)
+  (Lisp_Object a, Lisp_Object b)
+{
+#ifndef MSDOS
+  struct stat st1, st2;
+  Lisp_Object absname1, absname2;
+  int err1;
+
+  if (!STRINGP (a) || !STRINGP (b))
+    return Qnil;
+
+  absname1 = expand_and_dir_to_file (a);
+  absname2 = expand_and_dir_to_file (b);
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname1)),
+		     &st1, 0) == 0)
+    err1 = 0;
+  else
+    {
+      err1 = errno;
+      if (err1 != EOVERFLOW)
+	return Qnil;
+    }
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname2)),
+		     &st2, 0) != 0)
+    return Qt;
+  if (err1)
+    return Qnil;
+  return timespec_cmp (get_stat_mtime (&st2),
+		       get_stat_mtime (&st1)) < 0 ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-file-system-info", Fc_fileio_file_system_info,
+       Sc_fileio_file_system_info, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: return the storage
+information of the file system of FN as a *plain list* (TOTAL FREE
+AVAIL) of integers, or nil.  The decision is the pure `statvfs' query
+over the helper `blocks_to_bytes'.  M47 imp-2, brief.org section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object filename;
+  const char *name;
+  if (!STRINGP (fn))
+    return Qnil;
+  filename = Fexpand_file_name (fn, Qnil);
+  name = SSDATA (ENCODE_FILE (filename));
+
+#if defined STAT_STATFS2_BSIZE || defined STAT_STATFS2_FRSIZE	\
+  || defined STAT_STATFS2_FSIZE || defined STAT_STATFS3_OSF1	\
+  || defined STAT_STATFS4 || defined STAT_STATVFS		\
+  || defined STAT_STATVFS64
+  {
+    struct fs_usage u;
+#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
+    if (android_is_special_directory (name, "/assets")
+	|| android_is_special_directory (name, "/content"))
+      return Qnil;
+#endif
+    if (get_fs_usage (name, NULL, &u) != 0)
+      return Qnil;
+    return list3 (blocks_to_bytes (u.fsu_blocksize, u.fsu_blocks, false),
+		  blocks_to_bytes (u.fsu_blocksize, u.fsu_bfree, false),
+		  blocks_to_bytes (u.fsu_blocksize, u.fsu_bavail,
+				   u.fsu_bavail_top_bit_set));
+  }
+#else
+  return Qnil;
+#endif
+#else
+  return Qnil;
+#endif
+}
+
+/* --- G3: the copy / rename / link / delete policy ------------------- */
+
+DEFUN ("--fileio-copy-file", Fc_fileio_copy_file,
+       Sc_fileio_copy_file, 6, 6, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: copy FILE to NEWNAME and
+return a *plain boolean* for the success.  OK-IF-EXISTS, KEEP-TIME,
+PRESERVE-UID-GID, and PRESERVE-PERMS are the preserve / overwrite
+policy.  The leaf does NOT report a file error; the caller keeps
+`report_file_errno'.  M47 imp-2, brief.org section 5.
+
+OPEN (cr.org F1): this leaf still calls the hub Fcopy_file.  The pure
+policy is a large block interleaved with the handler dispatch, so it
+needs a factor-helper step.  */)
+  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists,
+   Lisp_Object keep_time, Lisp_Object preserve_uid_gid,
+   Lisp_Object preserve_perms)
+{
+#ifndef MSDOS
+  if (!STRINGP (file) || !STRINGP (newname))
+    return Qnil;
+  return Fcopy_file (file, newname, ok_if_exists, keep_time,
+		     preserve_uid_gid, preserve_perms);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-make-directory-internal", Fc_fileio_make_directory_internal,
+       Sc_fileio_make_directory_internal, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: create the directory DIR
+and return a *plain boolean* for the success.  The `mkdir' syscall
+stays C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object dir)
+{
+#ifndef MSDOS
+  Lisp_Object directory;
+  if (!STRINGP (dir))
+    return Qnil;
+  directory = Fexpand_file_name (dir, Qnil);
+  return (emacs_mkdir (SSDATA (ENCODE_FILE (directory)),
+		       0777 & ~auto_saving_dir_umask) == 0)
+	 ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-delete-directory-internal",
+       Fc_fileio_delete_directory_internal,
+       Sc_fileio_delete_directory_internal, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: delete the directory
+DIR and return a *plain boolean* for the success.  The `rmdir' syscall
+stays C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object dir)
+{
+#ifndef MSDOS
+  Lisp_Object directory;
+  if (!STRINGP (dir))
+    return Qnil;
+  directory = Fdirectory_file_name (Fexpand_file_name (dir, Qnil));
+  return (emacs_rmdir (SSDATA (ENCODE_FILE (directory))) == 0) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-delete-file-internal", Fc_fileio_delete_file_internal,
+       Sc_fileio_delete_file_internal, 1, 1, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: delete the file FN and
+return a *plain boolean* for the success.  The `unlink' syscall stays
+C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
+section 5.  */)
+  (Lisp_Object fn)
+{
+#ifndef MSDOS
+  Lisp_Object filename;
+  if (!STRINGP (fn))
+    return Qnil;
+  filename = Fexpand_file_name (fn, Qnil);
+  return (emacs_unlink (SSDATA (ENCODE_FILE (filename))) == 0
+	  || errno == ENOENT)
+	 ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-rename-file", Fc_fileio_rename_file,
+       Sc_fileio_rename_file, 3, 3, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: rename FILE to NEWNAME
+and return a *plain boolean* for the success.  OK-IF-EXISTS is the
+overwrite policy.  The `rename' syscall stays C.  The leaf does NOT
+report a file error.  M47 imp-2, brief.org section 5.
+
+OPEN (cr.org F1): this leaf still calls the hub Frename_file.  The pure
+policy is interleaved with the handler dispatch and the overwrite
+query, so it needs a factor-helper step.  */)
+  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists)
+{
+#ifndef MSDOS
+  if (!STRINGP (file) || !STRINGP (newname))
+    return Qnil;
+  return Frename_file (file, newname, ok_if_exists);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-add-name-to-file", Fc_fileio_add_name_to_file,
+       Sc_fileio_add_name_to_file, 3, 3, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: hard-link FILE to
+NEWNAME and return a *plain boolean* for the success.  OK-IF-EXISTS is
+the overwrite policy.  The `link' / `emacs_symlink' mechanism stays C.
+The leaf does NOT report a file error.  M47 imp-2, brief.org section
+5.
+
+OPEN (cr.org F1): this leaf still calls the hub Fadd_name_to_file.  The
+pure policy is interleaved with the handler dispatch and the overwrite
+query, so it needs a factor-helper step.  */)
+  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists)
+{
+#ifndef MSDOS
+  if (!STRINGP (file) || !STRINGP (newname))
+    return Qnil;
+  return Fadd_name_to_file (file, newname, ok_if_exists);
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--fileio-make-symbolic-link", Fc_fileio_make_symbolic_link,
+       Sc_fileio_make_symbolic_link, 3, 3, 0,
+       doc: /* FIX-20261003-guilemacs: Internal: make LINKNAME a symbolic
+link to TARGET and return a *plain boolean* for the success.
+OK-IF-EXISTS is the overwrite policy.  The `emacs_symlink' syscall stays
+C.  The leaf does NOT report a file error.  M47 imp-2, brief.org section
+5.
+
+OPEN (cr.org F1): this leaf still calls the hub
+Fmake_symbolic_link.  The pure policy is interleaved with the handler
+dispatch and the overwrite query, so it needs a factor-helper step.  */)
+  (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_exists)
+{
+#ifndef MSDOS
+  if (!STRINGP (target) || !STRINGP (linkname))
+    return Qnil;
+  return Fmake_symbolic_link (target, linkname, ok_if_exists);
+#else
+  return Qnil;
+#endif
+}
+
 void
 init_fileio (void)
 {

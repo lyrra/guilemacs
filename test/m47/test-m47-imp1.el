@@ -6,10 +6,10 @@
 ;;; block, the module name and the leaf shape, and the A1 / A2 decision.
 ;;;
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the base numbers of brief.org section 3, re-measured at the
-;;;         M47 imp-1 base abf26c469.  src/fileio.c is 6,484 lines, 52
-;;;         DEFUNs, 1 scm_c_public_ref site, and includes guile.h;
-;;;         mod/emacs/fileio.scm is 36 lines;
+;;;   D1 -- the base numbers of brief.org section 3, re-measured after
+;;;         M47 imp-2 added the 26 typed C leaves.  src/fileio.c is
+;;;         6,927 lines, 78 DEFUNs, 1 scm_c_public_ref site, and
+;;;         includes guile.h; mod/emacs/fileio.scm is 167 lines;
 ;;;         scm_c_public_ref over src/*.[chm] is 193; src/keyboard.c is
 ;;;         11,233 lines and 447 DEFUNs; src/keyboard-globals.c is 490
 ;;;         lines; the combined keyboard surface is 11,723 (margin 237
@@ -182,16 +182,16 @@ that a stale string is GONE, not that a current string is present."
 
 (setq m47-imp1--group 'd1)
 
-(m47-imp1--check "fileio.c-lines-6484"
-                 (eql 6484 (m47-imp1--lines "src/fileio.c")))
-(m47-imp1--check "fileio.c-defuns-52"
-                 (eql 52 (m47-imp1--count "src/fileio.c" "^DEFUN (\"")))
+(m47-imp1--check "fileio.c-lines-7265"
+                 (eql 7265 (m47-imp1--lines "src/fileio.c")))
+(m47-imp1--check "fileio.c-defuns-78"
+                 (eql 78 (m47-imp1--count "src/fileio.c" "^DEFUN (\"")))
 (m47-imp1--check "fileio.c-scm-ref-1"
                  (eql 1 (m47-imp1--count "src/fileio.c" "scm_c_public_ref")))
 (m47-imp1--check "fileio.c-has-guile.h"
                  (m47-imp1--tracked-p "src/fileio.c" "#include \"guile.h\""))
-(m47-imp1--check "fileio.scm-lines-36"
-                 (eql 36 (m47-imp1--lines "mod/emacs/fileio.scm")))
+(m47-imp1--check "fileio.scm-lines-167"
+                 (eql 167 (m47-imp1--lines "mod/emacs/fileio.scm")))
 (m47-imp1--check "scm-c-public-ref-193"
                  (eql 193 (m47-imp1--count-scm-ref)))
 (m47-imp1--check "keyboard.c-lines-11233"
