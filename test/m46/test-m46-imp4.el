@@ -9,7 +9,7 @@
 ;;;   S1 -- the surface of brief.org section 6, re-measured at HEAD:
 ;;;         src/filelock.c (1,216 lines, 13 DEFUNs, 6 scm_c_public_ref
 ;;;         sites, the guile.h include); mod/emacs/filelock.scm (104);
-;;;         tree-wide scm_c_public_ref over src/*.[chm] is 193;
+;;;         tree-wide scm_c_public_ref over src/*.[chm] is 201;
 ;;;         src/callproc.c (2,387 / 7 / 4); src/sysdep.c (4,950 / 7);
 ;;;         src/keyboard.c (11,233 / 447); src/keyboard-globals.c (490);
 ;;;         the combined keyboard surface (11,723); the margin (237
@@ -152,8 +152,8 @@ of the presence of docs/."
                  (m46-imp4--contains-p "src/filelock.c" "#include \"guile.h\""))
 (m46-imp4--check "filelock.scm-lines-104"
                  (eql 104 (m46-imp4--lines "mod/emacs/filelock.scm")))
-(m46-imp4--check "scm-c-public-ref-193"
-                 (eql 193 (m46-imp4--count-scm-ref)))
+(m46-imp4--check "scm-c-public-ref-201"
+                 (eql 201 (m46-imp4--count-scm-ref)))
 (m46-imp4--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp4--lines "src/callproc.c")))
 (m46-imp4--check "callproc.c-defuns-7"

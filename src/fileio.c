@@ -388,6 +388,133 @@ restore_point_unwind (Lisp_Object location)
 }
 
 
+/* FIX-20261003-guilemacs: M47 imp-3 -- the G1 dispatch helpers over the
+   path policy of (emacs fileio): the hub keeps the handler dispatch,
+   the module owns the path decision, the leaf holds the mechanism
+   (brief.org section 4, Reading B).  */
+
+static Lisp_Object
+find_file_name_handler_scheme (Lisp_Object file, Lisp_Object operation)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-find-file-name-handler");
+  return SCM_CALL_2 (proc, file, operation);
+}
+
+static Lisp_Object
+file_name_directory_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-name-directory");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+file_name_nondirectory_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-name-nondirectory");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+file_name_as_directory_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-name-as-directory");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+directory_file_name_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-directory-file-name");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+file_name_concat_scheme (ptrdiff_t nargs, Lisp_Object *args)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-name-concat");
+  return SCM_CALL_N (proc, args, nargs);
+}
+
+static Lisp_Object
+expand_file_name_scheme (Lisp_Object name, Lisp_Object default_directory)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-expand-file-name");
+  return SCM_CALL_2 (proc, name, default_directory);
+}
+
+static Lisp_Object
+substitute_in_file_name_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-substitute-in-file-name");
+  return SCM_CALL_1 (proc, fn);
+}
+
+/* The pure byte-level mechanism of find-file-name-handler: the walk of
+   `file-name-handler-alist'.  It returns a plain value only: the
+   handler or nil.  It runs no handler call, changes no buffer, and has
+   no unwind point (brief.org section 4.1).  */
+
+static Lisp_Object
+find_file_name_handler_1 (Lisp_Object file, Lisp_Object operation)
+{
+  Lisp_Object chain, inhibited_handlers, result;
+  ptrdiff_t pos = -1;
+
+  result = Qnil;
+  if (!STRINGP (file))
+    return Qnil;
+
+  if (EQ (operation, Vinhibit_file_name_operation))
+    inhibited_handlers = Vinhibit_file_name_handlers;
+  else
+    inhibited_handlers = Qnil;
+
+  for (chain = Vfile_name_handler_alist; CONSP (chain);
+       chain = XCDR (chain))
+    {
+      Lisp_Object elt = XCAR (chain);
+      if (CONSP (elt))
+	{
+	  Lisp_Object string = XCAR (elt);
+	  ptrdiff_t match_pos;
+	  Lisp_Object handler = XCDR (elt);
+	  Lisp_Object operations = Qnil;
+
+	  if (SYMBOLP (handler))
+	    operations = Fget (handler, Qoperations);
+
+	  if (STRINGP (string)
+	      && (match_pos = fast_string_match (string, file)) > pos
+	      && (NILP (operations) || ! NILP (Fmemq (operation, operations))))
+	    {
+	      Lisp_Object tem = Fmemq (handler, inhibited_handlers);
+	      if (NILP (tem))
+		{
+		  result = handler;
+		  pos = match_pos;
+		}
+	    }
+	}
+    }
+  return result;
+}
+
 DEFUN ("find-file-name-handler", Ffind_file_name_handler,
        Sfind_file_name_handler, 2, 2, 0,
        doc: /* Return FILENAME's handler function for OPERATION, if it has one.
@@ -402,50 +529,18 @@ use the standard functions without calling themselves recursively.  */)
   (Lisp_Object filename, Lisp_Object operation)
 {
   /* This function must not munge the match data.  */
-  Lisp_Object chain, inhibited_handlers, result;
-  ptrdiff_t pos = -1;
+  Lisp_Object result;
 
-  result = Qnil;
   CHECK_STRING (filename);
 
-  if (EQ (operation, Vinhibit_file_name_operation))
-    inhibited_handlers = Vinhibit_file_name_handlers;
-  else
-    inhibited_handlers = Qnil;
+  /* The module owns the walk; the C leaf holds the mechanism.  */
+  result = find_file_name_handler_scheme (filename, operation);
 
-  for (chain = Vfile_name_handler_alist; CONSP (chain);
-       chain = XCDR (chain))
-    {
-      Lisp_Object elt;
-      elt = XCAR (chain);
-      if (CONSP (elt))
-	{
-	  Lisp_Object string = XCAR (elt);
-	  ptrdiff_t match_pos;
-	  Lisp_Object handler = XCDR (elt);
-	  Lisp_Object operations = Qnil;
+  /* D1: one maybe_quit after the walk.  The old loop quit once per
+     alist element, so the response to C-g changes.  brief.org
+     section 9.  */
+  maybe_quit ();
 
-	  if (SYMBOLP (handler))
-	    operations = Fget (handler, Qoperations);
-
-	  if (STRINGP (string)
-	      && (match_pos = fast_string_match (string, filename)) > pos
-	      && (NILP (operations) || ! NILP (Fmemq (operation, operations))))
-	    {
-	      Lisp_Object tem;
-
-	      handler = XCDR (elt);
-	      tem = Fmemq (handler, inhibited_handlers);
-	      if (NILP (tem))
-		{
-		  result = handler;
-		  pos = match_pos;
-		}
-	    }
-	}
-
-      maybe_quit ();
-    }
   return result;
 }
 
@@ -471,21 +566,16 @@ Given a Unix syntax file name, returns a string ending in slash.  */)
       return STRINGP (handled_name) ? handled_name : Qnil;
     }
 
-  return file_name_directory (filename);
+  /* The module owns the decision; the C leaf holds the mechanism.  */
+  return file_name_directory_scheme (filename);
 }
 
-/* Return the directory component of FILENAME, or nil if FILENAME does
-   not contain a directory component.  */
+/* FIX-20261003-guilemacs: M47 imp-3 -- the pure byte-level
+   mechanism (brief.org section 4.1, Reading B).  */
 
-Lisp_Object
-file_name_directory (Lisp_Object filename)
+static Lisp_Object
+file_name_directory_1 (Lisp_Object filename)
 {
-  /* Try Scheme-based implementation first to replace SSDATA usage */
-  Lisp_Object scheme_result = guile_file_path_directory (filename);
-  if (!NILP (scheme_result) && STRINGP (scheme_result) && SCHARS (scheme_result) > 0)
-    return scheme_result;
-
-  /* Fallback to original C implementation for complex cases */
   char *beg = SSDATA (filename);
   char const *p = beg + SBYTES (filename);
 
@@ -558,6 +648,16 @@ file_name_directory (Lisp_Object filename)
 #endif	/* DOS_NT */
 }
 
+/* Return the directory component of FILENAME, or nil if FILENAME does
+   not contain a directory component.  External callers keep the plain
+   C behavior; the module adds the Scheme decision for the DEFUN hub.  */
+
+Lisp_Object
+file_name_directory (Lisp_Object filename)
+{
+  return file_name_directory_1 (filename);
+}
+
 DEFUN ("file-name-nondirectory", Ffile_name_nondirectory,
        Sfile_name_nondirectory, 1, 1, 0,
        doc: /* Return file name FILENAME sans its directory.
@@ -566,7 +666,6 @@ this is everything after the last slash,
 or the entire name if it contains no slash.  */)
   (Lisp_Object filename)
 {
-  register const char *beg, *p, *end;
   Lisp_Object handler;
 
   CHECK_STRING (filename);
@@ -583,12 +682,20 @@ or the entire name if it contains no slash.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-  /* Try Scheme-based implementation first to replace SSDATA usage */
-  Lisp_Object scheme_result = guile_file_path_nondirectory (filename);
-  if (!NILP (scheme_result) && STRINGP (scheme_result))
-    return scheme_result;
+  /* The module owns the decision; the C leaf holds the mechanism.  */
+  return file_name_nondirectory_scheme (filename);
+}
 
-  /* Fallback to original C implementation for complex cases */
+/* FIX-20261003-guilemacs: M47 imp-3 -- the pure byte-level mechanism of
+   file-name-nondirectory.  The Scheme decision moved up to (emacs
+   fileio), so this helper holds no guile bridge (brief.org section 4.1,
+   Reading B).  It returns a plain value only.  */
+
+static Lisp_Object
+file_name_nondirectory_1 (Lisp_Object filename)
+{
+  register const char *beg, *p, *end;
+
   beg = SSDATA (filename);
   end = p = beg + SBYTES (filename);
 
@@ -675,10 +782,7 @@ For a Unix-syntax file name, just appends a slash unless a trailing slash
 is already present.  */)
   (Lisp_Object file)
 {
-  char *buf;
-  ptrdiff_t length;
-  Lisp_Object handler, val;
-  USE_SAFE_ALLOCA;
+  Lisp_Object handler;
 
   CHECK_STRING (file);
 
@@ -694,16 +798,8 @@ is already present.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    file = Fdowncase (file);
-#endif
-  buf = SAFE_ALLOCA (SBYTES (file) + file_name_as_directory_slop + 1);
-  const char *str = scm_to_locale_string (file);
-  length = file_name_as_directory (buf, str, strlen (str), false);
-  val = make_specified_string (buf, -1, length, false);
-  SAFE_FREE ();
-  return val;
+  /* The module owns the decision; the C leaf holds the mechanism.  */
+  return file_name_as_directory_scheme (file);
 }
 
 /* Convert from directory name SRC of length SRCLEN to file name in
@@ -766,10 +862,7 @@ a directory is different from its name as a file.
 In Unix-syntax, this function just removes the final slash.  */)
   (Lisp_Object directory)
 {
-  char *buf;
-  ptrdiff_t length;
-  Lisp_Object handler, val;
-  USE_SAFE_ALLOCA;
+  Lisp_Object handler;
 
   CHECK_STRING (directory);
 
@@ -785,15 +878,8 @@ In Unix-syntax, this function just removes the final slash.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-#ifdef WINDOWSNT
-  if (!NILP (Vw32_downcase_file_names))
-    directory = Fdowncase (directory);
-#endif
-  buf = SAFE_ALLOCA (SBYTES (directory) + 1);
-  length = directory_file_name (buf, SSDATA (directory), SBYTES (directory), false);
-  val = make_specified_string (buf, -1, length, false);
-  SAFE_FREE ();
-  return val;
+  /* The module owns the decision; the C leaf holds the mechanism.  */
+  return directory_file_name_scheme (directory);
 }
 
 DEFUN ("make-temp-file-internal", Fmake_temp_file_internal,
@@ -877,91 +963,80 @@ inserted before concatenating.
 usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  ptrdiff_t chars = 0, bytes = 0, multibytes = 0, eargs = 0;
-  Lisp_Object *elements = args;
-  Lisp_Object result;
-  ptrdiff_t i;
+  /* The module owns the join policy; the C leaf holds the mechanism.  */
+  return file_name_concat_scheme (nargs, args);
+}
 
-  /* First go through the list to check the types and see whether
-     they're all of the same multibytedness. */
+/* FIX-20261003-guilemacs: M47 imp-3 -- the pure byte-level mechanism of
+   file-name-concat.  It joins the path ARGS... and returns a plain
+   string, or nil on a bad type.  The separator test is the C
+   IS_DIRECTORY_SEP scan; it calls no Scheme bridge (cr.org F3,
+   brief.org section 4.1 / section 6).  No handler call, no buffer
+   change, and no unwind point.  */
+
+static bool
+file_name_ends_with_sep (Lisp_Object s)
+{
+  ptrdiff_t n = SBYTES (s);
+  return n > 0 && IS_DIRECTORY_SEP (SREF (s, n - 1));
+}
+
+static Lisp_Object
+file_name_concat_1 (ptrdiff_t nargs, Lisp_Object *args)
+{
+  Lisp_Object *elements;
+  Lisp_Object result;
+  ptrdiff_t i, nelems = 0, bytes = 0, chars = 0;
+
+  /* Filter out nil / "" elements and check the types.  A non-string,
+     non-nil element makes the whole join nil.  A unibyte non-ASCII
+     string needs the multibyte conversion.  */
+  elements = xmalloc ((nargs > 0 ? nargs : 1) * sizeof *elements);
   for (i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      /* Skip empty and nil elements. */
       if (NILP (arg))
 	continue;
-      CHECK_STRING (arg);
+      if (!STRINGP (arg))
+	{
+	  xfree (elements);
+	  return Qnil;
+	}
       if (SCHARS (arg) == 0)
 	continue;
-      eargs++;
-      /* We're not adding a slash to the final part. */
-      if (i == nargs - 1
-	  || guile_ends_with_directory_separator (arg))
-	{
-	  bytes += SBYTES (arg);
-	  chars += SCHARS (arg);
-	}
-      else
-	{
-	  bytes += SBYTES (arg) + 1;
-	  chars += SCHARS (arg) + 1;
-	}
+      if (!STRING_MULTIBYTE (arg) && !string_ascii_p (arg))
+	arg = Fstring_to_multibyte (arg);
+      elements[nelems++] = arg;
     }
 
-  /* Convert if needed. */
-  if ((multibytes != 0 && multibytes != nargs)
-      || eargs != nargs)
+  /* One size pass.  Only the non-final elements can add a separator.  */
+  for (i = 0; i < nelems; i++)
     {
-      int j = 0;
-      elements = xmalloc (eargs * sizeof *elements);
-      bytes = 0;
-      chars = 0;
-
-      /* Filter out nil/"". */
-      for (i = 0; i < nargs; i++)
+      Lisp_Object arg = elements[i];
+      bytes += SBYTES (arg);
+      chars += SCHARS (arg);
+      if (i < nelems - 1 && !file_name_ends_with_sep (arg))
 	{
-	  Lisp_Object arg = args[i];
-	  if (!NILP (arg) && SCHARS (arg) != 0)
-	    elements[j++] = arg;
-	}
-
-      for (i = 0; i < eargs; i++)
-	{
-	  Lisp_Object arg = elements[i];
-	  /* Use multibyte or all-ASCII strings as is. */
-	  if (!STRING_MULTIBYTE (arg) && !string_ascii_p (arg))
-	    elements[i] = Fstring_to_multibyte (arg);
-	  arg = elements[i];
-	  /* We have to recompute the number of bytes. */
-	  if (i == eargs - 1
-	      || guile_ends_with_directory_separator (arg))
-	    {
-	      bytes += SBYTES (arg);
-	      chars += SCHARS (arg);
-	    }
-	  else
-	    {
-	      bytes += SBYTES (arg) + 1;
-	      chars += SCHARS (arg) + 1;
-	    }
+	  bytes += 1;
+	  chars += 1;
 	}
     }
 
   /* In Guile, strings are immutable, so we can't use make_uninit_string
-     and write to it. Instead, build the result in a temporary C buffer. */
+     and write to it.  Build the result in a temporary C buffer.  */
   USE_SAFE_ALLOCA;
   char *buffer = SAFE_ALLOCA (bytes + 1);
   char *p = buffer;
 
-  /* Copy over the data. */
-  for (i = 0; i < eargs; i++)
+  /* Copy over the data.  */
+  for (i = 0; i < nelems; i++)
     {
       Lisp_Object arg = elements[i];
       ptrdiff_t arg_bytes = SBYTES (arg);
       memcpy (p, SSDATA (arg), arg_bytes);
       p += arg_bytes;
-      /* The last element shouldn't have a slash added at the end. */
-      if (i < eargs - 1 && !IS_DIRECTORY_SEP (*(p - 1)))
+      /* The last element should not have a slash added at the end.  */
+      if (i < nelems - 1 && !IS_DIRECTORY_SEP (*(p - 1)))
 	*p++ = DIRECTORY_SEP;
     }
 
@@ -970,8 +1045,7 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
   result = make_multibyte_string (buffer, chars, bytes);
   SAFE_FREE ();
 
-  if (elements != args)
-    xfree (elements);
+  xfree (elements);
 
   return result;
 }
@@ -1046,21 +1120,7 @@ sure DIRNAME in this example doesn't end in a slash, unless it's
 the root directory.  */)
   (Lisp_Object name, Lisp_Object default_directory)
 {
-  /* These point to SDATA and need to be careful with string-relocation
-     during GC (via DECODE_FILE).  */
-  char *nm;
-  char *nmlim;
-  const char *newdir;
-  const char *newdirlim;
-  /* This should only point to alloca'd data.  */
-  char *target;
-
-  ptrdiff_t tlen;
-  ptrdiff_t length, nbytes;
   Lisp_Object handler, result, handled_name;
-  bool multibyte;
-  Lisp_Object hdir;
-  USE_SAFE_ALLOCA;
 
   CHECK_STRING (name);
   //CHECK_STRING_NULL_BYTES (name);
@@ -1167,6 +1227,45 @@ the root directory.  */)
 	  }
       }
   }
+  /* The module owns the decision; the leaf calls `expand_file_name_1'.  */
+  result = expand_file_name_scheme (name, default_directory);
+
+  /* Again look to see if the file name has special constructs in it
+     and perhaps call the corresponding file name handler.  This is needed
+     for filenames such as "/foo/../user@host:/bar/../baz".  Expanding
+     the ".." component gives us "/user@host:/bar/../baz" which needs
+     to be expanded again.  */
+  handler = Ffind_file_name_handler (result, Qexpand_file_name);
+  if (!NILP (handler))
+    {
+      handled_name = call3 (handler, Qexpand_file_name,
+			    result, default_directory);
+      if (! STRINGP (handled_name))
+	error ("Invalid handler in `file-name-handler-alist'");
+      result = handled_name;
+    }
+
+  return result;
+}
+
+/* FIX-20261003-guilemacs: M47 imp-3 -- the pure byte-level
+   mechanism (brief.org section 4.1 / section 7, Reading B).  */
+
+static Lisp_Object
+expand_file_name_1 (Lisp_Object name, Lisp_Object default_directory)
+{
+  char *nm;
+  char *nmlim;
+  const char *newdir;
+  const char *newdirlim;
+  char *target;
+  ptrdiff_t tlen;
+  ptrdiff_t length, nbytes;
+  Lisp_Object result;
+  bool multibyte;
+  Lisp_Object hdir;
+  USE_SAFE_ALLOCA;
+
   multibyte = false;
   bool defdir_multibyte = false;
   if (multibyte != defdir_multibyte)
@@ -1453,21 +1552,6 @@ the root directory.  */)
     result = make_specified_string (target, -1, o - target, multibyte);
   }
 
-  /* Again look to see if the file name has special constructs in it
-     and perhaps call the corresponding file name handler.  This is needed
-     for filenames such as "/foo/../user@host:/bar/../baz".  Expanding
-     the ".." component gives us "/user@host:/bar/../baz" which needs
-     to be expanded again.  */
-  handler = Ffind_file_name_handler (result, Qexpand_file_name);
-  if (!NILP (handler))
-    {
-      handled_name = call3 (handler, Qexpand_file_name,
-			    result, default_directory);
-      if (! STRINGP (handled_name))
-	error ("Invalid handler in `file-name-handler-alist'");
-      result = handled_name;
-    }
-
   SAFE_FREE ();
   return result;
 }
@@ -1607,16 +1691,9 @@ If `//' appears, everything up to and including the first of
 those `/' is discarded.  */)
   (Lisp_Object filename)
 {
-  char *nm, *p, *x, *endp;
-  bool substituted = false;
-  bool multibyte;
-  char *xnm;
   Lisp_Object handler;
 
   CHECK_STRING (filename);
-
-  /* In Guile, all strings are UTF-8, so we always use multibyte mode */
-  multibyte = true;
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
@@ -1629,6 +1706,30 @@ those `/' is discarded.  */)
 	return handled_name;
       error ("Invalid handler in `file-name-handler-alist'");
     }
+
+  /* The module owns the substitution decision; the leaf holds it.  */
+  return substitute_in_file_name_scheme (filename);
+}
+
+/* FIX-20261003-guilemacs: M47 imp-3 -- the pure byte-level mechanism of
+   substitute-in-file-name: the /~ and // restart, the $VAR expansion
+   through `substitute-env-in-file-name', and the final strip.  It
+   returns a plain value.  The leaf `--fileio-substitute-in-file-name'
+   calls it; the hub does not (cr.org F1).  The /~ restart recurses
+   through the hub so the file name handler is checked again, exactly as
+   the imp-2 hub did.  */
+
+static Lisp_Object
+substitute_in_file_name_1 (Lisp_Object filename)
+{
+  char *nm, *p, *x, *endp;
+  bool substituted = false;
+  bool multibyte;
+  char *xnm;
+  USE_SAFE_ALLOCA;
+
+  /* In Guile, all strings are UTF-8, so we always use multibyte mode */
+  multibyte = true;
 
   /* Always work on a copy of the string, in case GC happens during
      decode of environment variables, causing the original Lisp_String
@@ -6212,48 +6313,8 @@ brief.org section 5.  */)
   (Lisp_Object file, Lisp_Object operation)
 {
 #ifndef MSDOS
-  /* The pure walk of `file-name-handler-alist', NOT the hub
-     Ffind_file_name_handler (cr.org F1).  */
-  Lisp_Object chain, inhibited_handlers, result;
-  ptrdiff_t pos = -1;
-
-  if (!STRINGP (file))
-    return Qnil;
-
-  result = Qnil;
-  if (EQ (operation, Vinhibit_file_name_operation))
-    inhibited_handlers = Vinhibit_file_name_handlers;
-  else
-    inhibited_handlers = Qnil;
-
-  for (chain = Vfile_name_handler_alist; CONSP (chain);
-       chain = XCDR (chain))
-    {
-      Lisp_Object elt = XCAR (chain);
-      if (CONSP (elt))
-	{
-	  Lisp_Object string = XCAR (elt);
-	  ptrdiff_t match_pos;
-	  Lisp_Object handler = XCDR (elt);
-	  Lisp_Object operations = Qnil;
-
-	  if (SYMBOLP (handler))
-	    operations = Fget (handler, Qoperations);
-
-	  if (STRINGP (string)
-	      && (match_pos = fast_string_match (string, file)) > pos
-	      && (NILP (operations) || ! NILP (Fmemq (operation, operations))))
-	    {
-	      Lisp_Object tem = Fmemq (handler, inhibited_handlers);
-	      if (NILP (tem))
-		{
-		  result = handler;
-		  pos = match_pos;
-		}
-	    }
-	}
-    }
-  return result;
+  /* The pure mechanism `find_file_name_handler_1', NOT the hub Ffind_file_name_handler (cr.org F1).  */
+  return find_file_name_handler_1 (file, operation);
 #else
   return Qnil;
 #endif
@@ -6270,7 +6331,7 @@ section 5.  */)
 #ifndef MSDOS
   if (!STRINGP (fn))
     return Qnil;
-  return file_name_directory (fn);
+  return file_name_directory_1 (fn);
 #else
   return Qnil;
 #endif
@@ -6284,29 +6345,10 @@ split.  M47 imp-2, brief.org section 5.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object scheme_result;
-
   if (!STRINGP (fn))
     return Qnil;
-
-  /* The pure split, NOT the hub Ffile_name_nondirectory (cr.org F1).  */
-  scheme_result = guile_file_path_nondirectory (fn);
-  if (!NILP (scheme_result) && STRINGP (scheme_result))
-    return scheme_result;
-
-  {
-    const char *beg = SSDATA (fn);
-    const char *end = beg + SBYTES (fn);
-    const char *p = end;
-    while (p != beg && !IS_DIRECTORY_SEP (p[-1])
-#ifdef DOS_NT
-	   && !(p[-1] == ':'
-		&& (p == beg + 2 || (p == beg + 4 && IS_DIRECTORY_SEP (*beg))))
-#endif
-	   )
-      p--;
-    return make_specified_string (p, -1, end - p, false);
-  }
+  /* The pure mechanism `file_name_nondirectory_1', NOT the hub Ffile_name_nondirectory (cr.org F1).  */
+  return file_name_nondirectory_1 (fn);
 #else
   return Qnil;
 #endif
@@ -6375,89 +6417,8 @@ brief.org section 5.  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
 #ifndef MSDOS
-  ptrdiff_t chars = 0, bytes = 0, eargs = 0;
-  Lisp_Object *elements = args;
-  Lisp_Object result;
-  ptrdiff_t i;
-
-  /* First pass: check the types and count the bytes.  A bad type gives
-     nil, not an abort (brief.org section 6).  */
-  for (i = 0; i < nargs; i++)
-    {
-      Lisp_Object arg = args[i];
-      if (NILP (arg))
-	continue;
-      if (!STRINGP (arg))
-	return Qnil;
-      if (SCHARS (arg) == 0)
-	continue;
-      eargs++;
-      if (i == nargs - 1 || guile_ends_with_directory_separator (arg))
-	{
-	  bytes += SBYTES (arg);
-	  chars += SCHARS (arg);
-	}
-      else
-	{
-	  bytes += SBYTES (arg) + 1;
-	  chars += SCHARS (arg) + 1;
-	}
-    }
-
-  if (eargs != nargs)
-    {
-      int j = 0;
-      elements = xmalloc (eargs * sizeof *elements);
-      bytes = 0;
-      chars = 0;
-      for (i = 0; i < nargs; i++)
-	{
-	  Lisp_Object arg = args[i];
-	  if (!NILP (arg) && SCHARS (arg) != 0)
-	    elements[j++] = arg;
-	}
-      for (i = 0; i < eargs; i++)
-	{
-	  Lisp_Object arg = elements[i];
-	  if (!STRING_MULTIBYTE (arg) && !string_ascii_p (arg))
-	    elements[i] = Fstring_to_multibyte (arg);
-	  arg = elements[i];
-	  if (i == eargs - 1 || guile_ends_with_directory_separator (arg))
-	    {
-	      bytes += SBYTES (arg);
-	      chars += SCHARS (arg);
-	    }
-	  else
-	    {
-	      bytes += SBYTES (arg) + 1;
-	      chars += SCHARS (arg) + 1;
-	    }
-	}
-    }
-
-  {
-    char *p;
-    USE_SAFE_ALLOCA;
-    char *buffer = SAFE_ALLOCA (bytes + 1);
-    p = buffer;
-    for (i = 0; i < eargs; i++)
-      {
-	Lisp_Object arg = elements[i];
-	ptrdiff_t arg_bytes = SBYTES (arg);
-	memcpy (p, SSDATA (arg), arg_bytes);
-	p += arg_bytes;
-	if (i < eargs - 1 && !IS_DIRECTORY_SEP (*(p - 1)))
-	  *p++ = DIRECTORY_SEP;
-      }
-    *p = '\0';
-    result = make_multibyte_string (buffer, chars, bytes);
-    SAFE_FREE ();
-  }
-
-  if (elements != args)
-    xfree (elements);
-
-  return result;
+  /* The pure mechanism `file_name_concat_1', NOT the hub Ffile_name_concat (cr.org F1).  */
+  return file_name_concat_1 (nargs, args);
 #else
   return Qnil;
 #endif
@@ -6467,18 +6428,16 @@ DEFUN ("--fileio-expand-file-name", Fc_fileio_expand_file_name,
        Sc_fileio_expand_file_name, 1, 2, 0,
        doc: /* FIX-20261003-guilemacs: Internal: convert NAME to an
 absolute canonical name and return it as a *plain string*.  DEFAULT is a
-plain string or nil.  The `.` / `..` / default-directory policy is
-`expand-file-name'.  M47 imp-2, brief.org section 5.
-
-OPEN (cr.org F1): this leaf still calls the hub Fexpand_file_name.  The
-pure policy is interleaved with the handler dispatch in a large block,
-so it needs a factor-helper step before the hub is rewired.  */)
+plain string or nil.  The `.` / `..` / default-directory policy is the
+pure helper `expand_file_name_1'; the hub Fexpand_file_name keeps the
+handler dispatch.  M47 imp-2, brief.org section 5; M47 imp-3 section 7.  */)
   (Lisp_Object name, Lisp_Object default_directory)
 {
 #ifndef MSDOS
   if (!STRINGP (name))
     return Qnil;
-  return Fexpand_file_name (name, default_directory);
+  /* The pure mechanism `expand_file_name_1', NOT the hub Fexpand_file_name (cr.org F1).  */
+  return expand_file_name_1 (name, default_directory);
 #else
   return Qnil;
 #endif
@@ -6488,17 +6447,16 @@ DEFUN ("--fileio-substitute-in-file-name", Fc_fileio_substitute_in_file_name,
        Sc_fileio_substitute_in_file_name, 1, 1, 0,
        doc: /* FIX-20261003-guilemacs: Internal: substitute $VAR and ~ in
 FN and return the result as a *plain string*.  The substitution policy
-is `substitute-in-file-name'.  M47 imp-2, brief.org section 5.
-
-OPEN (cr.org F1): this leaf still calls the hub
-Fsubstitute_in_file_name.  The pure policy is interleaved with a
-handler call, so it needs a factor-helper step.  */)
+is the pure helper `substitute_in_file_name_1'; the hub
+Fsubstitute_in_file_name keeps the handler dispatch.  M47 imp-2, brief.org section 5;
+M47 imp-3 section 7.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
   if (!STRINGP (fn))
     return Qnil;
-  return Fsubstitute_in_file_name (fn);
+  /* The pure mechanism `substitute_in_file_name_1', NOT the hub Fsubstitute_in_file_name (cr.org F1).  */
+  return substitute_in_file_name_1 (fn);
 #else
   return Qnil;
 #endif

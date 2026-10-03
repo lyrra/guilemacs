@@ -102,25 +102,159 @@
 (defelisp %--fileio-add-name-to-file          --fileio-add-name-to-file)
 (defelisp %--fileio-make-symbolic-link        --fileio-make-symbolic-link)
 
-;; G1 -- the file-name / path policy.  Each wrapper returns a plain
-;; string or nil.
+;;; --- G1: the file-name / path policy (M47 imp-3) --------------------
+;;;
+;;; Reading B (brief.org section 4 / section 5): the module owns the
+;;; path *decision*; the C leaf holds the byte-level *mechanism*.  Most
+;;; procedures below call the Scheme path procedure of
+;;; (emacs lookup-functions) first, and call their C leaf only when the
+;;; Scheme procedure yields no value.  The expand-file-name and
+;;; substitute-in-file-name decisions are module-local Scheme, because
+;;; no path procedure for them exists (cr.org F2).  The leaf never
+;;; recurses into its own hub (cr.org F1).
+
+;; Resolve the reused path procedures of (emacs lookup-functions)
+;; lazily, so this module does not eagerly import it (the M9-M46
+;; convention, cf. the %safe-run-hooks! delay above).
+(define %file-path-directory
+  (delay (module-ref (resolve-module '(emacs lookup-functions))
+                     'file-path-directory)))
+(define %file-path-nondirectory
+  (delay (module-ref (resolve-module '(emacs lookup-functions))
+                     'file-path-nondirectory)))
+(define %ends-with-directory-separator?
+  (delay (module-ref (resolve-module '(emacs lookup-functions))
+                     'ends-with-directory-separator?)))
+
+;; The alist walk is pure C; the module passes through to the leaf.
+;; (The handler *dispatch* stays in the C hub.)
 (define (fileio-find-file-name-handler file operation)
   ((force %--fileio-find-file-name-handler) file operation))
+
+;; The directory is the file-path-directory decision.  An empty result
+;; means "no directory", so fall back to the C mechanism (nil).
 (define (fileio-file-name-directory fn)
-  ((force %--fileio-file-name-directory) fn))
+  (if (string? fn)
+      (let ((dir ((force %file-path-directory) fn)))
+        (if (and (string? dir) (> (string-length dir) 0))
+            dir
+            ((force %--fileio-file-name-directory) fn)))
+      ((force %--fileio-file-name-directory) fn)))
+
+;; The non-directory decision is the file-path-nondirectory split.  When
+;; the Scheme split yields no value, the C mechanism `file_name_
+;; nondirectory_1' runs (cr.org F6).
 (define (fileio-file-name-nondirectory fn)
-  ((force %--fileio-file-name-nondirectory) fn))
+  (if (string? fn)
+      (let ((nd ((force %file-path-nondirectory) fn)))
+        (if (string? nd) nd ((force %--fileio-file-name-nondirectory) fn)))
+      ((force %--fileio-file-name-nondirectory) fn)))
+
+;; A name that already ends with a directory separator is a directory
+;; name; otherwise the C mechanism appends the separator.
 (define (fileio-file-name-as-directory fn)
-  ((force %--fileio-file-name-as-directory) fn))
+  (if (and (string? fn) ((force %ends-with-directory-separator?) fn))
+      fn
+      ((force %--fileio-file-name-as-directory) fn)))
+
+;; Strip the final separators in Scheme; keep "/" and "//" alone.
+(define (fileio--directory-name-strip fn)
+  (if (string=? fn "//")
+      fn
+      (let loop ((i (string-length fn)))
+        (if (and (> i 1) (char=? (string-ref fn (- i 1)) #\/))
+            (loop (- i 1))
+            (substring fn 0 i)))))
+
 (define (fileio-directory-file-name fn)
-  ((force %--fileio-directory-file-name) fn))
-;; The C leaf is MANY-arity, so forward all the arguments.
+  (if (string? fn)
+      (fileio--directory-name-strip fn)
+      ((force %--fileio-directory-file-name) fn)))
+
+;; The join decision: drop nil / empty components and insert a
+;; separator between components.  A bad type falls back to the C leaf
+;; (which returns nil).
+(define (fileio--concat-ok? args)
+  (cond ((null? args) #t)
+        ((or (string? (car args)) (not (car args)))
+         (fileio--concat-ok? (cdr args)))
+        (else #f)))
+
 (define (fileio-file-name-concat . args)
-  (apply (force %--fileio-file-name-concat) args))
+  (if (fileio--concat-ok? args)
+      (let loop ((rest args) (acc #f))
+        (cond
+         ((null? rest) (or acc ""))
+         ((or (not (car rest))
+              (and (string? (car rest)) (= 0 (string-length (car rest)))))
+          (loop (cdr rest) acc))
+         (else
+          (loop (cdr rest)
+                (if acc
+                    (string-append acc
+                                   (if ((force %ends-with-directory-separator?)
+                                        acc)
+                                       "" "/")
+                                   (car rest))
+                    (car rest))))))
+      (apply (force %--fileio-file-name-concat) args)))
+
+;; The two G1 blocks whose C policy was interleaved with the handler
+;; dispatch.  The C leaf now holds the byte-level mechanism; the module
+;; owns the decision (cr.org F2).  Each procedure returns its input
+;; unchanged when the path holds no work for the byte scan, and calls
+;; its C leaf only when the Scheme decision yields no value
+;; (brief.org section 5.2, Reading B).
+
+(define (fileio--has-substring? s sub)
+  "Non-nil when S holds SUB as a substring."
+  (let ((n (string-length s)) (m (string-length sub)))
+    (let loop ((i 0))
+      (cond ((> (+ i m) n) #f)
+            ((string=? (substring s i (+ i m)) sub) #t)
+            (else (loop (+ i 1)))))))
+
+(define (fileio--ends-with? s suffix)
+  "Non-nil when S ends with SUFFIX."
+  (let ((n (string-length s)) (m (string-length suffix)))
+    (and (>= n m) (string=? (substring s (- n m) n) suffix))))
+
+;; The default-directory decision.  An absolute path that holds no
+;; `.` / `..` component and no doubled separator expands to itself, so
+;; the module answers without the byte scan; all other names fall
+;; through to the leaf.
+(define (fileio--expand-decision name)
+  (and (string? name)
+       (> (string-length name) 0)
+       (char=? (string-ref name 0) #\/)
+       (not (fileio--has-substring? name "//"))
+       (not (fileio--has-substring? name "/./"))
+       (not (fileio--has-substring? name "/../"))
+       (not (fileio--ends-with? name "/."))
+       (not (fileio--ends-with? name "/.."))
+       name))
+
 (define (fileio-expand-file-name name . rest)
-  (apply (force %--fileio-expand-file-name) name rest))
+  (if (fileio--expand-decision name)
+      name
+      (apply (force %--fileio-expand-file-name) name rest)))
+
+;; The substitution decision.  A name with no `$', `~', or doubled
+;; separator work is returned unchanged; the leaf runs otherwise.
+(define (fileio--needs-substitution? fn)
+  (or (fileio--has-substring? fn "$")
+      (fileio--has-substring? fn "~")
+      (let ((n (string-length fn)))
+        (let loop ((i 1))
+          (cond ((>= i n) #f)
+                ((and (char=? (string-ref fn i) #\/)
+                      (char=? (string-ref fn (- i 1)) #\/)) #t)
+                (else (loop (+ i 1))))))))
+
 (define (fileio-substitute-in-file-name fn)
-  ((force %--fileio-substitute-in-file-name) fn))
+  (if (and (string? fn) (not (fileio--needs-substitution? fn)))
+      fn
+      ((force %--fileio-substitute-in-file-name) fn)))
 
 ;; G2 -- the OS-query predicate policy.  Each wrapper returns a plain
 ;; boolean, a string, an integer, a list, or nil.

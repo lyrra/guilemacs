@@ -92,8 +92,6 @@ static SCM scm_substring_no_properties_scheme = SCM_BOOL_F;
 
 /* File path operation function references */
 static SCM scm_file_path_absolute_p = SCM_BOOL_F;
-static SCM scm_file_path_directory = SCM_BOOL_F;
-static SCM scm_file_path_nondirectory = SCM_BOOL_F;
 static SCM scm_file_path_safe_p = SCM_BOOL_F;
 
 /* String concatenation function references */
@@ -217,8 +215,6 @@ init_guile_fns (void)
 
   /* File path operation functions */
   scm_file_path_absolute_p = safe_public_ref ("language elisp emacs", "file-path-absolute-p");
-  scm_file_path_directory = safe_public_ref ("language elisp emacs", "file-path-directory");
-  scm_file_path_nondirectory = safe_public_ref ("language elisp emacs", "file-path-nondirectory");
   scm_file_path_safe_p = safe_public_ref ("language elisp emacs", "file-path-safe-p");
 
   /* String concatenation functions */
@@ -319,8 +315,6 @@ init_guile_fns (void)
 
   /* Protect file path operation functions from GC */
   scm_gc_protect_object (scm_file_path_absolute_p);
-  scm_gc_protect_object (scm_file_path_directory);
-  scm_gc_protect_object (scm_file_path_nondirectory);
   scm_gc_protect_object (scm_file_path_safe_p);
 
   /* Protect string concatenation functions from GC */
@@ -1601,44 +1595,6 @@ guile_file_path_absolute_p (Lisp_Object path)
   /* scm_file_path_absolute_p is now the actual procedure (not a variable) */
   SCM result = SCM_CALL_1 (scm_file_path_absolute_p, path);
   return scm_is_true (result);
-}
-
-/* Extract directory component from path */
-Lisp_Object
-guile_file_path_directory (Lisp_Object path)
-{
-  if (!scm_is_true (scm_file_path_directory))
-    return Qnil;
-
-  if (!STRINGP (path))
-    return Qnil;
-
-  /* scm_file_path_directory is now the actual procedure (not a variable) */
-  SCM result = SCM_CALL_1 (scm_file_path_directory, path);
-
-  if (scm_is_false (result))
-    return build_string ("");
-
-  return result;
-}
-
-/* Extract filename component from path */
-Lisp_Object
-guile_file_path_nondirectory (Lisp_Object path)
-{
-  if (!scm_is_true (scm_file_path_nondirectory))
-    return Qnil;
-
-  if (!STRINGP (path))
-    return Qnil;
-
-  /* scm_file_path_nondirectory is now the actual procedure (not a variable) */
-  SCM result = SCM_CALL_1 (scm_file_path_nondirectory, path);
-
-  if (scm_is_false (result))
-    return build_string ("");
-
-  return result;
 }
 
 /* Check if path is safe (no directory traversal) */

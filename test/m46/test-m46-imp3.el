@@ -27,7 +27,7 @@
 ;;;         read_lock_data, kill, unlock_file_handle_error, and the five
 ;;;         DEFUNs are unchanged.
 ;;;   T5 -- the surface: re-measure src/filelock.c lines and DEFUNs, and
-;;;         the tree-wide scm_c_public_ref count (193).
+;;;         the tree-wide scm_c_public_ref count (201).
 ;;;   T6 -- a per-group min-count guard.  Pin each group apart from the
 ;;;         total, so a truncated corpus fails.
 ;;;   T7 -- the gated runtime probe.  Run the built src/emacs and
@@ -297,8 +297,8 @@ real error, not a pass."
                  (eql 1216 (m46-imp3--lines "src/filelock.c")))
 (m46-imp3--check "filelock.c-defuns-13"
                  (eql 13 (m46-imp3--count "src/filelock.c" "^DEFUN (\"")))
-(m46-imp3--check "tree-wide-scm-public-ref-193"
-                 (eql 193 (m46-imp3--count-scm-ref)))
+(m46-imp3--check "tree-wide-scm-public-ref-201"
+                 (eql 201 (m46-imp3--count-scm-ref)))
 (m46-imp3--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp3--lines "src/callproc.c")))
 (m46-imp3--check "sysdep.c-lines-4950"

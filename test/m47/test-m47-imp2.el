@@ -11,7 +11,8 @@
 ;;;   E1 -- the 26 leaf DEFUNs exist in src/fileio.c with the exact names
 ;;;         of brief.org section 5; the ^DEFUN count is 78; the file
 ;;;         holds "guile.h"; the line count is the re-measured value
-;;;         7265 (the imp-2 leaf-block repair grows the file).
+;;;         7223 (the imp-2 leaf-block repair grew the file; imp-3
+;;;         re-measured it).
 ;;;   E2 -- the plain-value shape (brief.org section 3): each leaf doc
 ;;;         string holds "plain" and a shape word ("string", "integer",
 ;;;         "boolean", or "list").
@@ -157,8 +158,8 @@ real error, not a pass."
                  (eql 26 (m47-imp2--count "src/fileio.c" "^DEFUN (\"--fileio-")))
 (m47-imp2--check "defun-count-78"
                  (eql 78 (m47-imp2--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp2--check "fileio.c-lines-7265"
-                 (eql 7265 (m47-imp2--lines "src/fileio.c")))
+(m47-imp2--check "fileio.c-lines-7223"
+                 (eql 7223 (m47-imp2--lines "src/fileio.c")))
 (m47-imp2--check "fileio.c-has-guile.h"
                  (m47-imp2--contains-p "src/fileio.c" "#include \"guile.h\""))
 (m47-imp2--check "leaf-block-comment-m47"
@@ -243,8 +244,8 @@ real error, not a pass."
 (m47-imp2--check "mech-check-file-access"
                  (m47-imp2--contains-p "src/fileio.c" "check_file_access"))
 ;; imp-2 adds no ref site: the dispatch helpers are imp-3 … imp-5 work.
-(m47-imp2--check "scm-ref-1"
-                 (eql 1 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp2--check "scm-ref-9"
+                 (eql 9 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
 ;; The two large blocks and the modtime group stay present (STAYS C).
 (m47-imp2--check "stays-insert-file-contents"
                  (m47-imp2--contains-p "src/fileio.c"
@@ -342,17 +343,18 @@ INFO-skip when the binary is absent; a probe error is a FAIL."
 (setq m47-imp2--group 'e7)
 
 (defvar m47-imp2--open-leaves
-  '("expand-file-name" "substitute-in-file-name" "copy-file"
-    "rename-file" "add-name-to-file" "make-symbolic-link")
-  "The leaves that still call their hub (OPEN, cr.org F1).")
+  '("copy-file" "rename-file" "add-name-to-file" "make-symbolic-link")
+  "The leaves that still call their hub (OPEN, cr.org F1).  M47 imp-3
+unblocked the 2 G1 leaves (expand-file-name, substitute-in-file-name),
+so only the 4 G3 leaves stay OPEN.")
 
 (defvar m47-imp2--leaf-mechanism
-  '(("find-file-name-handler"    . "Vfile_name_handler_alist")
-    ("file-name-directory"       . "file_name_directory (fn)")
-    ("file-name-nondirectory"    . "guile_file_path_nondirectory")
+  '(("find-file-name-handler"    . "find_file_name_handler_1")
+    ("file-name-directory"       . "file_name_directory_1 (fn)")
+    ("file-name-nondirectory"    . "file_name_nondirectory_1 (fn)")
     ("file-name-as-directory"    . "file_name_as_directory (buf")
     ("directory-file-name"       . "directory_file_name (buf")
-    ("file-name-concat"          . "guile_ends_with_directory_separator")
+    ("file-name-concat"          . "file_name_concat_1")
     ("file-exists-p"             . "check_file_access")
     ("file-executable-p"         . "check_file_access")
     ("file-readable-p"           . "check_file_access")

@@ -11,7 +11,7 @@
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget);
-;;;         scm_c_public_ref over src/*.[chm] is 193;
+;;;         scm_c_public_ref over src/*.[chm] is 201;
 ;;;         mod/emacs/tty-modes.scm is 313 lines; src/callproc.c is
 ;;;         2,387 lines and 7 DEFUNs; and src/filelock.c is 1,216 lines
 ;;;         and 13 DEFUNs.  imp-2 added the eight lockfile leaves and the
@@ -198,8 +198,8 @@ draft hash)."
                        (kg (m46-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m46-imp1--check "scm-c-public-ref-193"
-                 (eql 193 (m46-imp1--count-scm-ref)))
+(m46-imp1--check "scm-c-public-ref-201"
+                 (eql 201 (m46-imp1--count-scm-ref)))
 (m46-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m46-imp1--lines "mod/emacs/tty-modes.scm")))
 (m46-imp1--check "callproc.c-lines-2387"

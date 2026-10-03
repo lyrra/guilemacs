@@ -231,6 +231,7 @@
 (group (m47) ; M47 imp-1 audit + imp-2 the typed C fileio.c leaves (docs/m47-plan.org)
   "test/m47/test-m47-imp1.el"                 ; M47 imp-1 audit: the base re-scan, the block line map (the 32 block definitions + the ref site), the file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
   "test/m47/test-m47-imp2.el"                 ; M47 imp-2: the 26 typed C leaves (--fileio-file-name-directory, --fileio-expand-file-name, ...), (emacs fileio), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
+  "test/m47/test-m47-imp3.el"                 ; M47 imp-3: the 8 G1 dispatch helpers and the 8 pure C mechanisms, the rewired file-name / path hubs, the 2 OPEN G1 leaves unblocked, the real (emacs fileio) path policy, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

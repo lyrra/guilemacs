@@ -193,8 +193,6 @@ extern Lisp_Object guile_substring_no_properties (Lisp_Object string, Lisp_Objec
 
 /* File path operations */
 extern bool guile_file_path_absolute_p (Lisp_Object path);
-extern Lisp_Object guile_file_path_directory (Lisp_Object path);
-extern Lisp_Object guile_file_path_nondirectory (Lisp_Object path);
 extern bool guile_file_path_safe_p (Lisp_Object path);
 
 /* String concatenation operations */

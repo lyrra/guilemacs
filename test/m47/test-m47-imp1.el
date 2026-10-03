@@ -8,9 +8,9 @@
 ;;; This corpus reads files only.  It has no C dependency.  It pins:
 ;;;   D1 -- the base numbers of brief.org section 3, re-measured after
 ;;;         M47 imp-2 added the 26 typed C leaves.  src/fileio.c is
-;;;         6,927 lines, 78 DEFUNs, 1 scm_c_public_ref site, and
-;;;         includes guile.h; mod/emacs/fileio.scm is 167 lines;
-;;;         scm_c_public_ref over src/*.[chm] is 193; src/keyboard.c is
+;;;         7,223 lines, 78 DEFUNs, 9 scm_c_public_ref sites, and
+;;;         includes guile.h; mod/emacs/fileio.scm is 301 lines;
+;;;         scm_c_public_ref over src/*.[chm] is 201; src/keyboard.c is
 ;;;         11,233 lines and 447 DEFUNs; src/keyboard-globals.c is 490
 ;;;         lines; the combined keyboard surface is 11,723 (margin 237
 ;;;         under the 11,960 M31 budget).
@@ -182,18 +182,18 @@ that a stale string is GONE, not that a current string is present."
 
 (setq m47-imp1--group 'd1)
 
-(m47-imp1--check "fileio.c-lines-7265"
-                 (eql 7265 (m47-imp1--lines "src/fileio.c")))
+(m47-imp1--check "fileio.c-lines-7223"
+                 (eql 7223 (m47-imp1--lines "src/fileio.c")))
 (m47-imp1--check "fileio.c-defuns-78"
                  (eql 78 (m47-imp1--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp1--check "fileio.c-scm-ref-1"
-                 (eql 1 (m47-imp1--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp1--check "fileio.c-scm-ref-9"
+                 (eql 9 (m47-imp1--count "src/fileio.c" "scm_c_public_ref")))
 (m47-imp1--check "fileio.c-has-guile.h"
                  (m47-imp1--tracked-p "src/fileio.c" "#include \"guile.h\""))
-(m47-imp1--check "fileio.scm-lines-167"
-                 (eql 167 (m47-imp1--lines "mod/emacs/fileio.scm")))
-(m47-imp1--check "scm-c-public-ref-193"
-                 (eql 193 (m47-imp1--count-scm-ref)))
+(m47-imp1--check "fileio.scm-lines-301"
+                 (eql 301 (m47-imp1--lines "mod/emacs/fileio.scm")))
+(m47-imp1--check "scm-c-public-ref-201"
+                 (eql 201 (m47-imp1--count-scm-ref)))
 (m47-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp1--lines "src/keyboard.c")))
 (m47-imp1--check "keyboard.c-defuns-447"
@@ -221,115 +221,115 @@ that a stale string is GONE, not that a current string is present."
 (setq m47-imp1--group 'd2)
 
 ;; G1 -- the file-name / path policy
-(m47-imp1--check "find-file-name-handler-def-391"
-                 (eql 391 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"find-file-name-handler\"")))
-(m47-imp1--check "file-name-directory-def-452"
-                 (eql 452 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"file-name-directory\"")))
-(m47-imp1--check "file-name-nondirectory-def-561"
-                 (eql 561 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"file-name-nondirectory\"")))
-(m47-imp1--check "file-name-as-directory-def-667"
-                 (eql 667 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"file-name-as-directory\"")))
-(m47-imp1--check "directory-file-name-def-760"
-                 (eql 760 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"directory-file-name\"")))
-(m47-imp1--check "file-name-concat-def-871"
-                 (eql 871 (m47-imp1--line-of
-                           "src/fileio.c" "DEFUN (\"file-name-concat\"")))
-(m47-imp1--check "expand-file-name-def-1015"
-                 (eql 1015 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"expand-file-name\"")))
-(m47-imp1--check "substitute-in-file-name-def-1594"
-                 (eql 1594 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"substitute-in-file-name\"")))
+(m47-imp1--check "find-file-name-handler-def-518"
+                 (eql 518 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"find-file-name-handler\"")))
+(m47-imp1--check "file-name-directory-def-547"
+                 (eql 547 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-name-directory\"")))
+(m47-imp1--check "file-name-nondirectory-def-661"
+                 (eql 661 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-name-nondirectory\"")))
+(m47-imp1--check "file-name-as-directory-def-774"
+                 (eql 774 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-name-as-directory\"")))
+(m47-imp1--check "directory-file-name-def-856"
+                 (eql 856 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"directory-file-name\"")))
+(m47-imp1--check "file-name-concat-def-957"
+                 (eql 957 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-name-concat\"")))
+(m47-imp1--check "expand-file-name-def-1089"
+                 (eql 1089 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"expand-file-name\"")))
+(m47-imp1--check "substitute-in-file-name-def-1678"
+                 (eql 1678 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"substitute-in-file-name\"")))
 
 ;; G2 -- the OS-query predicate policy
-(m47-imp1--check "file-exists-p-def-2568"
-                 (eql 2568 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-exists-p\"")))
-(m47-imp1--check "file-executable-p-def-2580"
-                 (eql 2580 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-executable-p\"")))
-(m47-imp1--check "file-readable-p-def-2590"
-                 (eql 2590 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-readable-p\"")))
-(m47-imp1--check "file-writable-p-def-2598"
-                 (eql 2598 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-writable-p\"")))
-(m47-imp1--check "access-file-def-2636"
-                 (eql 2636 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"access-file\"")))
-(m47-imp1--check "file-symlink-p-def-2720"
-                 (eql 2720 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-symlink-p\"")))
-(m47-imp1--check "file-directory-p-def-2743"
-                 (eql 2743 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-directory-p\"")))
-(m47-imp1--check "file-regular-p-def-2917"
-                 (eql 2917 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-regular-p\"")))
-(m47-imp1--check "file-modes-def-3207"
-                 (eql 3207 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-modes\"")))
-(m47-imp1--check "file-newer-than-file-p-def-3356"
-                 (eql 3356 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-newer-than-file-p\"")))
-(m47-imp1--check "file-system-info-def-6119"
-                 (eql 6119 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"file-system-info\"")))
+(m47-imp1--check "file-exists-p-def-2669"
+                 (eql 2669 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-exists-p\"")))
+(m47-imp1--check "file-executable-p-def-2681"
+                 (eql 2681 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-executable-p\"")))
+(m47-imp1--check "file-readable-p-def-2691"
+                 (eql 2691 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-readable-p\"")))
+(m47-imp1--check "file-writable-p-def-2699"
+                 (eql 2699 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-writable-p\"")))
+(m47-imp1--check "access-file-def-2737"
+                 (eql 2737 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"access-file\"")))
+(m47-imp1--check "file-symlink-p-def-2821"
+                 (eql 2821 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-symlink-p\"")))
+(m47-imp1--check "file-directory-p-def-2844"
+                 (eql 2844 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-directory-p\"")))
+(m47-imp1--check "file-regular-p-def-3018"
+                 (eql 3018 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-regular-p\"")))
+(m47-imp1--check "file-modes-def-3308"
+                 (eql 3308 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-modes\"")))
+(m47-imp1--check "file-newer-than-file-p-def-3457"
+                 (eql 3457 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-newer-than-file-p\"")))
+(m47-imp1--check "file-system-info-def-6220"
+                 (eql 6220 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"file-system-info\"")))
 
 ;; G3 -- the copy / rename / link / delete policy
-(m47-imp1--check "copy-file-def-1784"
-                 (eql 1784 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"copy-file\"")))
-(m47-imp1--check "make-directory-internal-def-2113"
-                 (eql 2113 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"make-directory-internal\"")))
-(m47-imp1--check "delete-directory-internal-def-2134"
-                 (eql 2134 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"delete-directory-internal\"")))
-(m47-imp1--check "delete-file-internal-def-2153"
-                 (eql 2153 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"delete-file-internal\"")))
-(m47-imp1--check "rename-file-def-2275"
-                 (eql 2275 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"rename-file\"")))
-(m47-imp1--check "add-name-to-file-def-2403"
-                 (eql 2403 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"add-name-to-file\"")))
-(m47-imp1--check "make-symbolic-link-def-2459"
-                 (eql 2459 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"make-symbolic-link\"")))
+(m47-imp1--check "copy-file-def-1885"
+                 (eql 1885 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"copy-file\"")))
+(m47-imp1--check "make-directory-internal-def-2214"
+                 (eql 2214 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"make-directory-internal\"")))
+(m47-imp1--check "delete-directory-internal-def-2235"
+                 (eql 2235 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"delete-directory-internal\"")))
+(m47-imp1--check "delete-file-internal-def-2254"
+                 (eql 2254 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"delete-file-internal\"")))
+(m47-imp1--check "rename-file-def-2376"
+                 (eql 2376 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"rename-file\"")))
+(m47-imp1--check "add-name-to-file-def-2504"
+                 (eql 2504 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"add-name-to-file\"")))
+(m47-imp1--check "make-symbolic-link-def-2560"
+                 (eql 2560 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"make-symbolic-link\"")))
 
 ;; the large blocks (STAYS C)
-(m47-imp1--check "insert-file-contents-def-3602"
-                 (eql 3602 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"insert-file-contents\"")))
-(m47-imp1--check "write-region-def-4926"
-                 (eql 4926 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"write-region\"")))
-(m47-imp1--check "do-auto-save-def-5800"
-                 (eql 5800 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"do-auto-save\"")))
+(m47-imp1--check "insert-file-contents-def-3703"
+                 (eql 3703 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"insert-file-contents\"")))
+(m47-imp1--check "write-region-def-5027"
+                 (eql 5027 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"write-region\"")))
+(m47-imp1--check "do-auto-save-def-5901"
+                 (eql 5901 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"do-auto-save\"")))
 
 ;; the modtime group (STAYS C)
-(m47-imp1--check "verify-visited-file-modtime-def-5592"
-                 (eql 5592 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"verify-visited-file-modtime\"")))
-(m47-imp1--check "visited-file-modtime-def-5636"
-                 (eql 5636 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"visited-file-modtime\"")))
-(m47-imp1--check "set-visited-file-modtime-def-5648"
-                 (eql 5648 (m47-imp1--line-of
-                            "src/fileio.c" "DEFUN (\"set-visited-file-modtime\"")))
+(m47-imp1--check "verify-visited-file-modtime-def-5693"
+                 (eql 5693 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"verify-visited-file-modtime\"")))
+(m47-imp1--check "visited-file-modtime-def-5737"
+                 (eql 5737 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"visited-file-modtime\"")))
+(m47-imp1--check "set-visited-file-modtime-def-5749"
+                 (eql 5749 (m47-imp1--line-of
+                 "src/fileio.c" "DEFUN (\"set-visited-file-modtime\"")))
 
 ;; the ref site: the one scm_c_public_ref site sits inside do-auto-save
-(m47-imp1--check "fileio.c-ref-site-5796"
-                 (eql 5796 (m47-imp1--line-of
-                            "src/fileio.c" "scm_c_public_ref (\"emacs fileio\"")))
+(m47-imp1--check "fileio.c-ref-site-5897"
+                 (eql 5897 (m47-imp1--line-of
+                 "src/fileio.c" "scm_c_public_ref (\"emacs fileio\", \"fileio-run-auto-save-hook!\"")))
 
 ;;; --- D3. The leaf-shape words (gitignored plan, brief.org section 4.3) --
 

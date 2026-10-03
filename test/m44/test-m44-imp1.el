@@ -11,7 +11,7 @@
 ;;;         and 7 DEFUNs; src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget);
-;;;         scm_c_public_ref over src/*.[chm] is 193; and
+;;;         scm_c_public_ref over src/*.[chm] is 201; and
 ;;;         mod/emacs/tty-modes.scm is 313 lines.
 ;;;   D2 -- the signal / suspend line facts of brief.org section 2 and
 ;;;         section 4.  These are facts in tracked files, so a drift is a
@@ -188,8 +188,8 @@ regression, and must not turn the gate red."
                        (kg (m44-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m44-imp1--check "scm-c-public-ref-193"
-                 (eql 193 (m44-imp1--count-scm-ref)))
+(m44-imp1--check "scm-c-public-ref-201"
+                 (eql 201 (m44-imp1--count-scm-ref)))
 (m44-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m44-imp1--lines "mod/emacs/tty-modes.scm")))
 

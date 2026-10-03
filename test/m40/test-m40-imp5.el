@@ -142,11 +142,11 @@ milestone.org is the untracked live tracker)."
                         (eql 237 (- 11960 (+ k kg))))))
 ;; The tree-wide scm_c_public_ref count over src/*.c and src/*.h, like
 ;; the guard scan in test/m40/test-m40-imp2.scm §8.
-(m40-imp5--check "surface/tree-ref-sites-193"
+(m40-imp5--check "surface/tree-ref-sites-201"
                  (let ((files (directory-files (expand-file-name "src" m40-imp5--root)
                                                t "\\.[ch]\\'")))
                    (and (consp files)
-                        (eql 193
+                        (eql 201
                              (let ((n 0))
                                (dolist (f files)
                                  (with-temp-buffer

@@ -8,7 +8,7 @@
 ;;; It pins:
 ;;;   S1 -- the surface of brief.org section 6, re-measured at HEAD:
 ;;;         src/callproc.c (2,387 lines, 7 DEFUNs, 4 scm_c_public_ref
-;;;         sites); tree-wide scm_c_public_ref over src/*.[chm] is 193;
+;;;         sites); tree-wide scm_c_public_ref over src/*.[chm] is 201;
 ;;;         src/sysdep.c (4,950 / 7); src/keyboard.c (11,233 / 447);
 ;;;         src/keyboard-globals.c (490); the combined keyboard surface
 ;;;         (11,723); the margin (237 under the 11,960 M31 budget); and
@@ -144,8 +144,8 @@ of the presence of docs/."
                  (eql 7 (m45-imp4--count "src/callproc.c" "^DEFUN (\"")))
 (m45-imp4--check "callproc.c-scm-ref-4"
                  (eql 4 (m45-imp4--count "src/callproc.c" "scm_c_public_ref")))
-(m45-imp4--check "scm-c-public-ref-193"
-                 (eql 193 (m45-imp4--count-scm-ref)))
+(m45-imp4--check "scm-c-public-ref-201"
+                 (eql 201 (m45-imp4--count-scm-ref)))
 (m45-imp4--check "sysdep.c-lines-4950"
                  (eql 4950 (m45-imp4--lines "src/sysdep.c")))
 (m45-imp4--check "sysdep.c-defuns-7"
