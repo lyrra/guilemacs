@@ -31,8 +31,9 @@
 ;;;   T6 -- a per-group min-count guard.  Pin each group apart from the
 ;;;         total, so a truncated corpus fails.
 ;;;   T7 -- the gated runtime probe.  Run the built src/emacs and
-;;;         exercise the rewired path.  An absent or non-runnable
-;;;         src/emacs is an INFO-skip, never a silent pass.
+;;;         exercise the rewired path.  Only an absent src/emacs (or no
+;;;         writable scratch directory) is an INFO-skip; a non-zero exit
+;;;         or a missing match is a FAIL, never a silent pass.
 ;;;   T8 -- the shape rule: --filelock-lock-owner returns the raw owner
 ;;;         line for the another-owns case (brief.org section 6).
 ;;;
@@ -352,11 +353,42 @@ real error, not a pass."
 ;;; --- T7. The gated runtime probes (brief.org section 9) -------------
 
 ;; The policy now runs in src/emacs, so run that binary in batch and
-;; exercise the rewired path.  Each probe is an INFO skip when the
-;; binary is absent -- never a silent pass.
+;; exercise the rewired path.  Only an absent or non-executable binary
+;; is an INFO-skip.  A non-zero exit, a run error, or a missing match is
+;; a FAIL -- never a silent pass.
+;;
+;; The lock probes write a file, so they need a writable directory.  The
+;; sandbox denies writes under /tmp, so pick the first directory that
+;; accepts a file: $TMPDIR, /tmp, then <root>/test/m46/scratch.  A
+;; hardcoded /tmp turned every write probe into a fake skip.
 
 (defvar m46-imp3--emacs
   (expand-file-name "src/emacs" m46-imp3--root))
+
+(defun m46-imp3--writable-p (dir)
+  "Non-nil when DIR exists and accepts a new file."
+  (and (stringp dir)
+       (file-directory-p dir)
+       (let ((probe (expand-file-name "m46-imp3-write-probe" dir)))
+         (condition-case nil
+             (progn (with-temp-file probe (insert "x"))
+                    (delete-file probe)
+                    t)
+           (error nil)))))
+
+(defvar m46-imp3--scratch
+  (let ((tree (expand-file-name "test/m46/scratch" m46-imp3--root)))
+    (or (and (m46-imp3--writable-p (getenv "TMPDIR"))
+             (file-name-as-directory (getenv "TMPDIR")))
+        (and (m46-imp3--writable-p "/tmp") "/tmp/")
+        (progn (ignore-errors (make-directory tree t))
+               (and (m46-imp3--writable-p tree)
+                    (file-name-as-directory tree)))))
+  "A writable directory for the runtime probes, or nil when none exists.")
+
+(defun m46-imp3--scratch-file (name)
+  "Return NAME under the probe scratch directory, or nil without one."
+  (and m46-imp3--scratch (concat m46-imp3--scratch name)))
 
 (defvar m46-imp3--boot-eval
   "(princ (format \"boot=%S\\n\" (--filelock-boot-sec)))")
@@ -364,80 +396,82 @@ real error, not a pass."
 ;; The lock_file / unlock_file hubs route through the module: lock a
 ;; temp file, then file-locked-p reports t (we own it) and nil after the
 ;; unlock.
-(defvar m46-imp3--cycle-eval
-  (concat "(let ((f \"/tmp/m46-imp3-cycle\"))"
-          " (with-temp-file f (insert \"x\"))"
-          " (lock-file f)"
-          " (princ (format \"locked=%S\\n\" (file-locked-p f)))"
-          " (unlock-file f)"
-          " (princ (format \"unlocked=%S\\n\" (file-locked-p f)))"
-          " (ignore-errors (delete-file f)))"))
+(defun m46-imp3--cycle-eval ()
+  (format (concat "(let ((f %S))"
+                  " (with-temp-file f (insert \"x\"))"
+                  " (lock-file f)"
+                  " (princ (format \"locked=%%S\\n\" (file-locked-p f)))"
+                  " (unlock-file f)"
+                  " (princ (format \"unlocked=%%S\\n\" (file-locked-p f)))"
+                  " (ignore-errors (delete-file f)))")
+          (m46-imp3--scratch-file "m46-imp3-cycle")))
 
 ;; A fabricated foreign-host lock makes the another-owns branch of the
 ;; owner leaf return the raw line; file-locked-p takes the user prefix.
-(defvar m46-imp3--raw-eval
-  (concat "(let* ((f \"/tmp/m46-imp3-raw\")"
-          " (l (concat (file-name-directory f) \".#\""
-          " (file-name-nondirectory f))))"
-          " (with-temp-file f (insert \"x\"))"
-          " (ignore-errors (delete-file l))"
-          " (make-symbolic-link \"someone@zzz-otherhost.999999:1\" l)"
-          " (princ (format \"raw=%S\\n\" (--filelock-lock-owner l)))"
-          " (princ (format \"flp=%S\\n\" (file-locked-p f)))"
-          " (ignore-errors (delete-file l))"
-          " (ignore-errors (delete-file f)))"))
+(defun m46-imp3--raw-eval ()
+  (format (concat "(let* ((f %S)"
+                  " (l (concat (file-name-directory f) \".#\""
+                  " (file-name-nondirectory f))))"
+                  " (with-temp-file f (insert \"x\"))"
+                  " (ignore-errors (delete-file l))"
+                  " (make-symbolic-link \"someone@zzz-otherhost.999999:1\" l)"
+                  " (princ (format \"raw=%%S\\n\" (--filelock-lock-owner l)))"
+                  " (princ (format \"flp=%%S\\n\" (file-locked-p f)))"
+                  " (ignore-errors (delete-file l))"
+                  " (ignore-errors (delete-file f)))")
+          (m46-imp3--scratch-file "m46-imp3-raw")))
 
-(defun m46-imp3--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
+(defun m46-imp3--probe-run (eval)
+  "Run EVAL in the built src/emacs in batch.
+Return nil when the binary is absent or not executable; else return
+the cons (STATUS . OUTPUT).  STATUS is the exit code, or the error
+description when the run itself failed."
   (when (file-executable-p m46-imp3--emacs)
     (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m46-imp3--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
+      (let ((status (condition-case err
+                        (call-process "/bin/sh" nil (current-buffer) nil "-c"
+                                      (format "printf '' | %s --batch --eval '%s'"
+                                              m46-imp3--emacs eval))
+                      (error (format "%S" err)))))
+        (cons status (buffer-string))))))
 
-(let ((out (m46-imp3--probe-output m46-imp3--boot-eval)))
-  (if (null out)
-      (princ "INFO m46/imp3/boot-sec probe skipped (no runnable built src/emacs)\n")
-    (m46-imp3--check "probe/boot-sec-returns-integer"
-                     (and (stringp out)
-                          (string-match-p "boot=[0-9]" out)
-                          t))))
+(defun m46-imp3--probe-tail (out)
+  "The last line of OUT, for a FAIL report."
+  (car (last (split-string (or out "") "\n" t))))
 
-(let ((out (m46-imp3--probe-output m46-imp3--cycle-eval)))
-  (if (null out)
-      (princ "INFO m46/imp3/lock-cycle probe skipped (no runnable built src/emacs)\n")
-    (progn
-      (m46-imp3--check "probe/lock-file-owned-t"
-                       (and (stringp out)
-                            (string-match-p "locked=t" out)
-                            t))
-      (m46-imp3--check "probe/unlock-file-nil"
-                       (and (stringp out)
-                            (string-match-p "unlocked=nil" out)
-                            t)))))
+(defun m46-imp3--probe (eval checks)
+  "Run EVAL in the built src/emacs, then apply CHECKS to its output.
+CHECKS is a list of (NAME . REGEXP).  An absent binary or a missing
+scratch directory is an INFO-skip.  A non-zero exit, a run error, or a
+missing match is a FAIL."
+  (let ((res (and eval (m46-imp3--probe-run eval)))
+        (name (car (car checks))))
+    (cond
+     ((null eval)
+      (princ (format "INFO m46/imp3/%s skipped (no writable scratch directory)\n"
+                     name)))
+     ((null res)
+      (princ (format "INFO m46/imp3/%s skipped (no built src/emacs)\n" name)))
+     ((not (and (integerp (car res)) (zerop (car res))))
+      (princ (format "INFO m46/imp3/%s exit=%S last=%s\n"
+                     name (car res) (m46-imp3--probe-tail (cdr res))))
+      (dolist (c checks) (m46-imp3--check (car c) nil)))
+     (t
+      (dolist (c checks)
+        (m46-imp3--check (car c)
+                         (and (string-match-p (cdr c) (cdr res)) t)))))))
 
-(let ((out (m46-imp3--probe-output m46-imp3--raw-eval)))
-  (if (null out)
-      (princ "INFO m46/imp3/raw-owner-line probe skipped (no runnable built src/emacs)\n")
-    (progn
-      (m46-imp3--check "probe/owner-raw-line-string"
-                       (and (stringp out)
-                            (string-match-p
-                             "raw=\"someone@zzz-otherhost.999999:1\"" out)
-                            t))
-      (m46-imp3--check "probe/locked-p-user-prefix"
-                       (and (stringp out)
-                            (string-match-p "flp=\"someone\"" out)
-                            t)))))
+(m46-imp3--probe m46-imp3--boot-eval
+                 '(("probe/boot-sec-returns-integer" . "boot=[0-9]")))
+
+(m46-imp3--probe (and m46-imp3--scratch (m46-imp3--cycle-eval))
+                 '(("probe/lock-file-owned-t" . "locked=t")
+                   ("probe/unlock-file-nil" . "unlocked=nil")))
+
+(m46-imp3--probe (and m46-imp3--scratch (m46-imp3--raw-eval))
+                 '(("probe/owner-raw-line-string"
+                    . "raw=\"someone@zzz-otherhost.999999:1\"")
+                   ("probe/locked-p-user-prefix" . "flp=\"someone\"")))
 
 (princ (format "=== m46 imp-3 rewire suite done (%d tracked checks; t1 %d, t2 %d, t3 %d, t4 %d, t5 %d, t8 %d) ===\n"
                m46-imp3--registered

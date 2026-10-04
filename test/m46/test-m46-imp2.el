@@ -26,8 +26,9 @@
 ;;;         min-count guard fails when the corpus is truncated.  Pin E1
 ;;;         and E2 separately (cr.org F3).
 ;;;   E6 -- the gated runtime probe.  Run the built src/emacs and call
-;;;         three leaves.  Each probe is an INFO-skip when the binary is
-;;;         absent.  A probe error is a FAIL, never a silent pass.
+;;;         five leaves.  Only an absent binary (or no writable scratch
+;;;         directory) is an INFO-skip.  A non-zero exit, a run error,
+;;;         or a missing match is a FAIL, never a silent pass.
 ;;;
 ;;; A read error is a real error, never a silent pass.  An absent src/
 ;;; file is a real error.
@@ -265,86 +266,113 @@ real error, not a pass."
 ;;; --- E6. The gated runtime probe (brief.org section 6) ---------------
 
 ;; The leaves are compiled into src/emacs, not into this harness, so run
-;; that binary in batch and call three of them.  Each probe is an INFO
-;; skip when the binary is absent -- never a silent pass.  A probe error
-;; is a FAIL.
+;; that binary in batch and call five of them.  Only an absent or
+;; non-executable binary is an INFO-skip.  A non-zero exit, a run error,
+;; or a missing match is a FAIL -- never a silent pass.
+;;
+;; A probe that writes a file needs a writable directory.  The sandbox
+;; denies writes under /tmp, so pick the first directory that accepts a
+;; file: $TMPDIR, /tmp, then <root>/test/m46/scratch.  A hardcoded /tmp
+;; turned every write probe into a fake skip.
 
 (defvar m46-imp2--emacs
   (expand-file-name "src/emacs" m46-imp2--root))
 
+(defun m46-imp2--writable-p (dir)
+  "Non-nil when DIR exists and accepts a new file."
+  (and (stringp dir)
+       (file-directory-p dir)
+       (let ((probe (expand-file-name "m46-imp2-write-probe" dir)))
+         (condition-case nil
+             (progn (with-temp-file probe (insert "x"))
+                    (delete-file probe)
+                    t)
+           (error nil)))))
+
+(defvar m46-imp2--scratch
+  (let ((tree (expand-file-name "test/m46/scratch" m46-imp2--root)))
+    (or (and (m46-imp2--writable-p (getenv "TMPDIR"))
+             (file-name-as-directory (getenv "TMPDIR")))
+        (and (m46-imp2--writable-p "/tmp") "/tmp/")
+        (progn (ignore-errors (make-directory tree t))
+               (and (m46-imp2--writable-p tree)
+                    (file-name-as-directory tree)))))
+  "A writable directory for the runtime probes, or nil when none exists.")
+
+(defun m46-imp2--scratch-file (name)
+  "Return NAME under the probe scratch directory, or nil without one."
+  (and m46-imp2--scratch (concat m46-imp2--scratch name)))
+
 (defvar m46-imp2--boot-eval
   "(princ (format \"boot=%S\\n\" (--filelock-boot-sec)))")
-
-(defvar m46-imp2--lfn-eval
-  "(princ (format \"lfn=%S\\n\" (--filelock-lock-file-name \"/tmp/m46-probe\")))")
 
 (defvar m46-imp2--wos-eval
   "(princ (format \"wos=%S\\n\" (--filelock-within-one-second 5 6)))")
 
-(defvar m46-imp2--owner-eval
-  "(let ((f \"/tmp/m46-probe-owner\") (l nil)) (with-temp-file f (insert \"x\")) (lock-file f) (setq l (--filelock-lock-file-name f)) (princ (format \"owner=%S\\n\" (--filelock-lock-owner l))) (unlock-file f) (ignore-errors (delete-file f)))")
+(defun m46-imp2--lfn-eval ()
+  (format "(princ (format \"lfn=%%S\\n\" (--filelock-lock-file-name %S)))"
+          (m46-imp2--scratch-file "m46-probe")))
 
-(defvar m46-imp2--free-eval
-  "(let ((f \"/tmp/m46-probe-free\") (l nil)) (with-temp-file f (insert \"x\")) (setq l (--filelock-lock-file-name f)) (princ (format \"lfp=%S\\n\" (--filelock-lock-free-p l))) (ignore-errors (delete-file l)) (ignore-errors (delete-file f)))")
+(defun m46-imp2--owner-eval ()
+  (format "(let ((f %S) (l nil)) (with-temp-file f (insert \"x\")) (lock-file f) (setq l (--filelock-lock-file-name f)) (princ (format \"owner=%%S\\n\" (--filelock-lock-owner l))) (unlock-file f) (ignore-errors (delete-file f)))"
+          (m46-imp2--scratch-file "m46-probe-owner")))
 
-(defun m46-imp2--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
+(defun m46-imp2--free-eval ()
+  (format "(let ((f %S) (l nil)) (with-temp-file f (insert \"x\")) (setq l (--filelock-lock-file-name f)) (princ (format \"lfp=%%S\\n\" (--filelock-lock-free-p l))) (ignore-errors (delete-file l)) (ignore-errors (delete-file f)))"
+          (m46-imp2--scratch-file "m46-probe-free")))
+
+(defun m46-imp2--probe-run (eval)
+  "Run EVAL in the built src/emacs in batch.
+Return nil when the binary is absent or not executable; else return
+the cons (STATUS . OUTPUT).  STATUS is the exit code, or the error
+description when the run itself failed."
   (when (file-executable-p m46-imp2--emacs)
     (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m46-imp2--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
+      (let ((status (condition-case err
+                        (call-process "/bin/sh" nil (current-buffer) nil "-c"
+                                      (format "printf '' | %s --batch --eval '%s'"
+                                              m46-imp2--emacs eval))
+                      (error (format "%S" err)))))
+        (cons status (buffer-string))))))
 
-(let ((out (m46-imp2--probe-output m46-imp2--boot-eval)))
-  (if (null out)
-      (princ "INFO m46/imp2/boot-sec-probe skipped (no runnable built src/emacs)\n")
-    (m46-imp2--check "probe/boot-sec-returns-integer"
-                     (and (stringp out)
-                          (string-match-p "boot=[0-9]" out)
-                          t))))
+(defun m46-imp2--probe-tail (out)
+  "The last line of OUT, for a FAIL report."
+  (car (last (split-string (or out "") "\n" t))))
 
-(let ((out (m46-imp2--probe-output m46-imp2--lfn-eval)))
-  (if (null out)
-      (princ "INFO m46/imp2/lock-file-name-probe skipped (no runnable built src/emacs)\n")
-    (m46-imp2--check "probe/lock-file-name-returns-string"
-                     (and (stringp out)
-                          (string-match-p "lfn=\"" out)
-                          t))))
+(defun m46-imp2--probe (name eval regexp)
+  "Check that the built src/emacs prints REGEXP when it runs EVAL.
+An absent binary is an INFO-skip.  A non-zero exit, a run error, or a
+missing match is a FAIL."
+  (let ((res (and eval (m46-imp2--probe-run eval))))
+    (cond
+     ((null eval)
+      (princ (format "INFO m46/imp2/%s skipped (no writable scratch directory)\n"
+                     name)))
+     ((null res)
+      (princ (format "INFO m46/imp2/%s skipped (no built src/emacs)\n" name)))
+     ((not (and (integerp (car res)) (zerop (car res))))
+      (princ (format "INFO m46/imp2/%s exit=%S last=%s\n"
+                     name (car res) (m46-imp2--probe-tail (cdr res))))
+      (m46-imp2--check name nil))
+     (t
+      (m46-imp2--check name (and (string-match-p regexp (cdr res)) t))))))
 
-(let ((out (m46-imp2--probe-output m46-imp2--wos-eval)))
-  (if (null out)
-      (princ "INFO m46/imp2/within-one-second-probe skipped (no runnable built src/emacs)\n")
-    (m46-imp2--check "probe/within-one-second-returns-t"
-                     (and (stringp out)
-                          (string-match-p "wos=t" out)
-                          t))))
+(m46-imp2--probe "probe/boot-sec-returns-integer"
+                 m46-imp2--boot-eval "boot=[0-9]")
+
+(m46-imp2--probe "probe/lock-file-name-returns-string"
+                 (and m46-imp2--scratch (m46-imp2--lfn-eval)) "lfn=\"")
+
+(m46-imp2--probe "probe/within-one-second-returns-t"
+                 m46-imp2--wos-eval "wos=t")
 
 ;; cr.org F3: this process owns the lock, so the owner leaf reports t.
-(let ((out (m46-imp2--probe-output m46-imp2--owner-eval)))
-  (if (null out)
-      (princ "INFO m46/imp2/lock-owner-probe skipped (no runnable built src/emacs)\n")
-    (m46-imp2--check "probe/lock-owner-this-process-t"
-                     (and (stringp out)
-                          (string-match-p "owner=t" out)
-                          t))))
+(m46-imp2--probe "probe/lock-owner-this-process-t"
+                 (and m46-imp2--scratch (m46-imp2--owner-eval)) "owner=t")
 
 ;; cr.org F2: the lock is free to this process, so lock-free-p reports t.
-(let ((out (m46-imp2--probe-output m46-imp2--free-eval)))
-  (if (null out)
-      (princ "INFO m46/imp2/lock-free-p-probe skipped (no runnable built src/emacs)\n")
-    (m46-imp2--check "probe/lock-free-p-free-t"
-                     (and (stringp out)
-                          (string-match-p "lfp=t" out)
-                          t))))
+(m46-imp2--probe "probe/lock-free-p-free-t"
+                 (and m46-imp2--scratch (m46-imp2--free-eval)) "lfp=t")
 
 (princ (format "=== m46 imp-2 leaves suite done (%d tracked checks; e1 %d, e2 %d, e3 %d, e4 %d) ===\n"
                m46-imp2--registered
