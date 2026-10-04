@@ -240,6 +240,9 @@
   "test/m47/test-m47-imp5.el"                 ; M47 imp-5: the 7 G3 dispatch helpers and the 7 pure C mechanisms (copy_file_1 ... make_symbolic_link_1), the rewired copy / rename / link / delete hubs, the 4 G3 OPEN leaves unblocked, the real (emacs fileio) target-name resolution, the deleted expand_cp_target, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   "test/m47/test-m47-imp6.el"                 ; M47 imp-6 close-out: the re-measured surface, the (m47) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads files only)
   )
+(group (m48) ; M48 imp-1 audit: the src/term.c TTY terminal boundary (docs/m48-plan.org)
+  "test/m48/test-m48-imp1.el"                 ; M48 imp-1 audit: the base re-scan, the block line map (the 19 block definitions + the 3 ref sites), the file facts, the leaf shape, the min-count guard, and the A1/A2 decision (corpus reads files only)
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
