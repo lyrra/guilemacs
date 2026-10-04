@@ -321,9 +321,15 @@ real error, not a pass."
 
 ;;; --- T8. The gated runtime probe (brief.org section 10) --------------
 
-;; The leaves are compiled into src/emacs, not into this harness, so run
-;; that binary in batch and call them.  Each probe is an INFO skip when
-;; the binary is absent -- never a silent pass.
+;; This corpus already runs inside the built src/emacs: the (m45) group
+;; carries no `prelude' key, so tool/run-tests.scm loads these files with
+;; run-tests-loadup-emacs, which is "../src/emacs ... -l <file> --batch".
+;; A probe therefore runs each leaf in a NESTED src/emacs for ISOLATION,
+;; not for access: in the harness process an error or an abort stops the
+;; batch run, and the harness then fails the whole group with "batch
+;; runner never completed".  In a child the same failure is one exit
+;; code.  Each probe is an INFO skip when the binary is absent -- never
+;; a silent pass.
 
 (defvar m45-imp2--emacs
   (expand-file-name "src/emacs" m45-imp2--root))

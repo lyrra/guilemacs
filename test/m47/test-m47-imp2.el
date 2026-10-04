@@ -278,11 +278,17 @@ real error, not a pass."
 
 ;;; --- E6. The gated runtime probe (brief.org section 8.1) ------------
 
-;; The leaves are compiled into src/emacs, not into this harness, so run
-;; that binary in batch and call three of them.  Each probe is an INFO
-;; skip when the binary is absent -- never a silent pass.  A probe error
-;; is a FAIL.  A nested gate run sets GUILEMACS_M47_GATE=1 to skip this
-;; same check, so the run does not recurse.
+;; This corpus already runs inside the built src/emacs: the (m47) group
+;; carries no `prelude' key, so tool/run-tests.scm loads these files with
+;; run-tests-loadup-emacs, which is "../src/emacs ... -l <file> --batch".
+;; A probe therefore runs each leaf in a NESTED src/emacs for ISOLATION,
+;; not for access: in the harness process an error or an abort stops the
+;; batch run, and the harness then fails the whole group with "batch
+;; runner never completed".  In a child the same failure is one exit
+;; code.  Each probe is an INFO skip when the binary is absent -- never
+;; a silent pass.  A probe error is a FAIL.  A nested gate run sets
+;; GUILEMACS_M47_GATE=1 to skip this same check, so the run does not
+;; recurse.
 
 (defvar m47-imp2--emacs
   (expand-file-name "src/emacs" m47-imp2--root))

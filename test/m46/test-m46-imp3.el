@@ -352,10 +352,19 @@ real error, not a pass."
 
 ;;; --- T7. The gated runtime probes (brief.org section 9) -------------
 
-;; The policy now runs in src/emacs, so run that binary in batch and
-;; exercise the rewired path.  Only an absent or non-executable binary
-;; is an INFO-skip.  A non-zero exit, a run error, or a missing match is
-;; a FAIL -- never a silent pass.
+;; This corpus already runs inside the built src/emacs (tool/run-tests.scm
+;; loads the (m46) group with run-tests-loadup-emacs).  A probe runs the
+;; rewired path in a NESTED src/emacs for ISOLATION, not for access: it
+;; takes a real lock and fabricates a foreign-owner lockfile, and in the
+;; harness process a prompt, an error, or an abort would stop the batch
+;; run and fail the whole group ("batch runner never completed").  In a
+;; child the same failure costs one check.  `printf '' |' gives the
+;; child empty stdin, so ask-user-about-lock reads EOF and the gate does
+;; not hang.
+;;
+;; Only an absent or non-executable binary is an INFO-skip.  A non-zero
+;; exit, a run error, or a missing match is a FAIL -- never a silent
+;; pass.
 ;;
 ;; The lock probes write a file, so they need a writable directory.  The
 ;; sandbox denies writes under /tmp, so pick the first directory that

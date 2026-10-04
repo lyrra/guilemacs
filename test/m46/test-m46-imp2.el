@@ -265,10 +265,21 @@ real error, not a pass."
 
 ;;; --- E6. The gated runtime probe (brief.org section 6) ---------------
 
-;; The leaves are compiled into src/emacs, not into this harness, so run
-;; that binary in batch and call five of them.  Only an absent or
-;; non-executable binary is an INFO-skip.  A non-zero exit, a run error,
-;; or a missing match is a FAIL -- never a silent pass.
+;; This corpus already runs inside the built src/emacs: the (m46) group
+;; carries no `prelude' key, so tool/run-tests.scm loads these files with
+;; run-tests-loadup-emacs, which is "../src/emacs ... -l <file> --batch".
+;; A probe therefore runs each leaf in a NESTED src/emacs for ISOLATION,
+;; not for access.  A probe takes a real lock and reads a real lockfile.
+;; In the harness process a prompt, a signalled error, or an abort stops
+;; the batch run, and the harness then fails the whole group with "batch
+;; runner never completed".  In a child the same failure is one exit
+;; code, so it costs one check.  `printf '' |' gives the child empty
+;; stdin, so a prompt reads EOF and does not hang the gate.
+;;
+;; Only an absent or non-executable binary is an INFO-skip.  A non-zero
+;; exit, a run error, or a missing match is a FAIL -- never a silent
+;; pass.  The earlier code mapped "the child exited non-zero" onto the
+;; same nil as "no binary", so an isolated failure became a fake skip.
 ;;
 ;; A probe that writes a file needs a writable directory.  The sandbox
 ;; denies writes under /tmp, so pick the first directory that accepts a
