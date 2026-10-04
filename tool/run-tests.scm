@@ -173,6 +173,10 @@
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   "test/keyboard/test-m38-imp1.el"              ; M38 imp-1: the ERT count mismatch must fail the run (corpus prints PASS/FAIL)
   )
+(group (strings) ; the (emacs strings) module predicates
+  "test/strings/elisp-stringp.el"            ; a SCHEME-MODULE test: the elisp-stringp / elisp-char-or-string-p wrapper arms, which an elisp (stringp X) call cannot reach (the `or' short-circuits on a real string, and the `defined?' guard reads the dynamic current module).  Drives the (emacs strings) procedures directly with the current module set
+  )
+
 (group (m39) ; M39 imp-0 audit (docs/m39-plan.org)
   "test/m39/test-m39-imp1.el"                  ; M39 imp-1: the accept-process-output decision path moved into (emacs process-wait); the ported (secs nsecs flag) contract and the src/process.c wiring
   "test/m39/test-m39-imp2.el"                  ; M39 imp-2: the process read/write decision paths moved into (emacs process-io); the state gate and gap-move contract and the src/process.c wiring

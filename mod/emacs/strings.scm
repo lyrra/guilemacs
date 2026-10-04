@@ -167,9 +167,17 @@ strings.  See docs/m40-plan.org."
 
 (define (elisp-stringp object)
   "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
+  ;; FIX-20261004-guilemacs: the wrapper arm read
+  ;; ((@ (emacs-string) emacs-string-predicate) object).  There is no
+  ;; module (emacs-string) -- resolve-module gives #f -- so whenever the
+  ;; arm was reached, module-variable got #f where it needs a module and
+  ;; the call raised wrong-type-arg instead of answering.  The predicate
+  ;; lives in (emacs text-properties), which this module already imports
+  ;; (see define-module above), so call the imported binding directly
+  ;; and drop the indirection rather than hardcode another module name.
   (if (or (string? object)
           (and (defined? 'emacs-string-predicate)
-               ((@ (emacs-string) emacs-string-predicate) object)))
+               (emacs-string-predicate object)))
       #t #nil))
 
 (define (elisp-char-or-string-p object)
@@ -177,8 +185,11 @@ strings.  See docs/m40-plan.org."
   (if (or (char? object)
           (and (number? object) (>= object 0) (<= object #x3fffff))  ; Emacs character range
           (string? object)
+          ;; FIX-20261004-guilemacs: see elisp-stringp above -- the same
+          ;; (@ (emacs-string) ...) reference named a module that does
+          ;; not exist and raised whenever the arm was reached.
           (and (defined? 'emacs-string-predicate)
-               ((@ (emacs-string) emacs-string-predicate) object)))
+               (emacs-string-predicate object)))
       #t
       #nil))
 
