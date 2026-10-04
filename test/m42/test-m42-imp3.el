@@ -13,7 +13,7 @@
 ;;;                      events in order, and does not wait for a full
 ;;;                      batch.
 ;;;
-;;; The pty driver (test/m42/pty-driver.py) owns the pty pair and the
+;;; The common pty driver (test/pty-driver.py) owns the pty pair and the
 ;;; emacs under test, writes the case bytes to the master, and reads the
 ;;; child report from a pipe.  The runner (test/m42/pty-runner.el)
 ;;; starts the driver and parses its report into (NAME STATUS) pairs.
@@ -84,8 +84,8 @@
 ;;; parser, and the driver's child probe and report format.
 
 (defun m42-imp3--driver-source ()
-  "Return the text of pty-driver.py next to this file, or nil."
-  (let ((path (expand-file-name "pty-driver.py" (m42-imp3--dir))))
+  "Return the text of the common driver test/pty-driver.py, or nil."
+  (let ((path (m42-pty--driver)))
     (and (file-readable-p path)
          (with-temp-buffer
            (insert-file-contents path)
@@ -192,6 +192,5 @@
   (let ((python (executable-find "python3")))
     (when python
       (should (zerop (call-process
-                      python nil nil nil
-                      (expand-file-name "pty-driver.py" (m42-imp3--dir))
+                      python nil nil nil (m42-pty--driver)
                       "--selftest"))))))

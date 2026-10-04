@@ -1,8 +1,10 @@
 ;;; pty-runner.el --- M42 imp-3: start the pty driver and read its report.  -*- lexical-binding: t; -*-
 ;;;
-;;; The runner starts test/m42/pty-driver.py on the emacs under test
-;;; (src/emacs) and reads the driver's stdout.  The driver prints one
-;;; report line per case:
+;;; The runner starts test/pty-driver.py on the emacs under test
+;;; (src/emacs) and reads the driver's stdout.  The driver is the COMMON
+;;; pty driver for every TTY test (M42 and M43 share it); the --group
+;;; flag selects this milestone's cases.  It prints one report line per
+;;; case:
 ;;;
 ;;;   PASS <name>
 ;;;   FAIL <name> <detail>
@@ -22,14 +24,14 @@
 ;;; use `make-process :connection-type 'pty': the child must be the
 ;;; emacs under test, not the test runner (brief.org D1).
 
-;; Keep in sync with CASES in test/m42/pty-driver.py.  The runner needs
-;; the names only for the skip path, where no driver output exists.
+;; Keep in sync with M42_IMP3_CASES in test/pty-driver.py.  The runner
+;; needs the names only for the skip path, where no driver output exists.
 (defconst m42-imp3--cases
   '("m42-imp3/case-1-no-input"
     "m42-imp3/case-2-short-read")
-  "The imp-3 case names.  Matches the driver's CASES table.")
+  "The imp-3 case names.  Matches the driver's M42_IMP3_CASES table.")
 
-;; Keep in sync with IMP4_CASES in test/m42/pty-driver.py.  Used only on
+;; Keep in sync with M42_IMP4_CASES in test/pty-driver.py.  Used only on
 ;; the skip path, where the driver produces no output.
 (defconst m42-imp4--cases
   '("m42-imp4/case-3-meta-key-1"
@@ -39,13 +41,20 @@
     "m42-imp4/case-4-meta-quit-guard"
     "m42-imp4/case-5-terminal-loss"
     "m42-imp4/case-6-continuation")
-  "The imp-4 case names.  Matches the driver's IMP4_CASES table.")
+  "The imp-4 case names.  Matches the driver's M42_IMP4_CASES table.")
 
 (defun m42-imp3--dir ()
   "Return the directory that holds pty-runner.el."
   (file-name-directory (or load-file-name
                            (locate-library "pty-runner")
                            default-directory)))
+
+(defun m42-pty--driver ()
+  "Return the path of the common pty driver, test/pty-driver.py.
+The driver moved out of test/m42/ when M42 and M43 merged their four
+copies into one; it lives one level up, beside the milestone
+directories."
+  (expand-file-name "test/pty-driver.py" (m42-imp3--repo-root)))
 
 (defun m42-imp3--repo-root ()
   "Return the repository root (two levels above test/m42/)."
@@ -93,14 +102,14 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
 
 (defun m42-pty--run-driver (group cases)
   "Run the pty driver for case GROUP, with CASE-names CASES.
-GROUP selects the driver's case table (\"imp3\" or \"imp4\").  Return a
-list of (NAME . STATUS) pairs.  STATUS is the symbol PASS, a
+GROUP selects the driver's case table (\"m42-imp3\" or \"m42-imp4\").
+Return a list of (NAME . STATUS) pairs.  STATUS is the symbol PASS, a
 (FAIL . DETAIL) pair, or an (INFO DETAIL) list.  Every environment gap
 (python3, src/emacs, pty) returns one INFO pair per name in CASES, never
 a FAIL."
   (let ((python (executable-find "python3"))
         (emacs (m42-imp3--emacs))
-        (driver (expand-file-name "pty-driver.py" (m42-imp3--dir))))
+        (driver (m42-pty--driver)))
     (cond
      ((not (file-readable-p driver))
       (m42-pty--skip cases "no pty-driver.py"))
@@ -123,13 +132,13 @@ a FAIL."
   "Run the imp-3 pty cases on the emacs under test.
 Return a list of (NAME . STATUS) pairs.  Never a FAIL for an environment
 gap (python3, src/emacs, pty) -- those return INFO pairs."
-  (m42-pty--run-driver "imp3" m42-imp3--cases))
+  (m42-pty--run-driver "m42-imp3" m42-imp3--cases))
 
 (defun m42-imp4-run-driver ()
   "Run the imp-4 pty cases on the emacs under test.
 Return a list of (NAME . STATUS) pairs.  Never a FAIL for an environment
 gap (python3, src/emacs, pty) -- those return INFO pairs."
-  (m42-pty--run-driver "imp4" m42-imp4--cases))
+  (m42-pty--run-driver "m42-imp4" m42-imp4--cases))
 
 (provide 'pty-runner)
 ;;; pty-runner.el ends here

@@ -1,6 +1,6 @@
 ;;; test-m42-imp4.el --- M42 imp-4 (pty cases 3-6) suite.
 ;;;
-;;; imp-4 extends the imp-3 pty harness (test/m42/pty-driver.py and
+;;; imp-4 extends the imp-3 pty harness (test/pty-driver.py and
 ;;; test/m42/pty-runner.el) with four behaviour cases (brief.org):
 ;;;
 ;;;   case-3/meta-key-*      the meta decode, one sub-case per
@@ -90,8 +90,8 @@
 ;;; the -2 return -- and the runner's skip path.
 
 (defun m42-imp4--driver-source ()
-  "Return the text of pty-driver.py next to this file, or nil."
-  (let ((path (expand-file-name "pty-driver.py" (m42-imp3--dir))))
+  "Return the text of the common driver test/pty-driver.py, or nil."
+  (let ((path (m42-pty--driver)))
     (and (file-readable-p path)
          (with-temp-buffer
            (insert-file-contents path)
@@ -208,8 +208,7 @@
   (let ((python (executable-find "python3")))
     (when python
       (should (zerop (call-process
-                      python nil nil nil
-                      (expand-file-name "pty-driver.py" (m42-imp3--dir))
+                      python nil nil nil (m42-pty--driver)
                       "--selftest"))))))
 
 (ert-deftest m42-imp4/skip-probe-leaves-no-stray-test ()

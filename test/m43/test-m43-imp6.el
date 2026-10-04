@@ -201,22 +201,28 @@ the symbol `m43-imp6-absent' when REL does not exist."
 
 ;;; --- S4'. The F2 repair holds (brief.org section 5) ------------------
 ;;;
-;;; The imp-3 / imp-4 / imp-5 corpora call pty-driver-imp3.py,
-;;; pty-driver-imp4.py, and pty-driver-imp5.py a "tracked artifact".  The
-;;; files live under test/, which is not gitignored, so the close-out
-;;; commit carries them.  An absent driver is a real FAIL, never a
-;;; silent skip.  This is not S4 of brief.org section 12.1: it reads file
-;;; presence, not the git index, so it needs no git and holds on any tree
-;;; that carries the drivers.
+;;; The imp-3 / imp-4 / imp-5 corpora call the pty driver a "tracked
+;;; artifact".  The four copies -- test/m42/pty-driver.py and the three
+;;; test/m43/pty-driver-impN.py -- are merged into ONE common driver,
+;;; test/pty-driver.py, whose --group flag selects the cases.  It lives
+;;; under test/, which is not gitignored, so the commit carries it.  An
+;;; absent driver is a real FAIL, never a silent skip.  This is not S4 of
+;;; brief.org section 12.1: it reads file presence and content, not the
+;;; git index, so it needs no git and holds on any tree that carries the
+;;; driver.
+;;;
+;;; Keep one check per M43 group.  Presence alone would not catch a merge
+;;; that dropped a group, so each check reads the group's case name out
+;;; of the common driver.
 
 (m43-imp6--check "f2/pty-driver-imp3-present"
-                 (file-exists-p (expand-file-name "test/m43/pty-driver-imp3.py"
-                                                  m43-imp6--root)))
+                 (m43-imp6--contains-p "test/pty-driver.py"
+                                       "\"m43-imp3/pty-e2e\""))
 (m43-imp6--check "f2/pty-driver-imp4-present"
-                 (file-exists-p (expand-file-name "test/m43/pty-driver-imp4.py"
-                                                  m43-imp6--root)))
+                 (m43-imp6--contains-p "test/pty-driver.py"
+                                       "\"m43-imp4/pty-e2e\""))
 (m43-imp6--check "f2/pty-driver-imp5-present"
-                 (file-exists-p (expand-file-name "test/m43/pty-driver-imp5.py"
-                                                  m43-imp6--root)))
+                 (m43-imp6--contains-p "test/pty-driver.py"
+                                       "\"m43-imp5/pty-e2e\""))
 
 (princ "=== m43 imp-6 close-out suite done ===\n")

@@ -288,16 +288,16 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
 ;;; 11.4).
 
 (m43-imp5--check "pty/driver-present"
-                 (m43-imp5--file-has "test/m43/pty-driver-imp5.py"
+                 (m43-imp5--file-has "test/pty-driver.py"
                                      "set-tty-size"))
 (m43-imp5--check "pty/driver-size-probe"
-                 (m43-imp5--file-has "test/m43/pty-driver-imp5.py"
+                 (m43-imp5--file-has "test/pty-driver.py"
                                      "module-ref mod 'tty-size"))
 
 ;;; --- The observable size check (brief.org section 11.3) --------------
 ;;;
 ;;; The check needs a pty and the built src/emacs.  The corpus ATTEMPTS the
-;;; pty: pty-driver-imp5.py calls os.openpty, and only a failed attempt is
+;;; pty: test/pty-driver.py calls os.openpty, and only a failed attempt is
 ;;; an environment-gated INFO skip, never a silent pass.  On success the
 ;;; driver runs the built emacs on the pty slave, probes the size, applies
 ;;; a known size with set-tty-size, reads it back, and reports
@@ -325,15 +325,14 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
     (cons (match-string 1 line) (list 'INFO (match-string 2 line))))
    (t nil)))
 
-(let* ((dir (file-name-directory (or load-file-name default-directory)))
-       (driver (expand-file-name "pty-driver-imp5.py" dir))
+(let* ((driver (expand-file-name "test/pty-driver.py" m43-imp5--root))
        (python (executable-find "python3"))
        (emacs (m43-imp5--emacs))
        (name "m43-imp5/pty-e2e")
        (results
         (cond
          ((not (file-readable-p driver))
-          (list (cons name (cons 'FAIL "missing pty-driver-imp5.py (tracked artifact)"))))
+          (list (cons name (cons 'FAIL "missing test/pty-driver.py (tracked artifact)"))))
          ((not python)
           (list (cons name (list 'INFO "skipped (no python3)"))))
          ((not emacs)
@@ -341,7 +340,8 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
          (t
           (with-temp-buffer
             (let ((rc (condition-case err
-                          (call-process python nil t nil driver "--emacs" emacs)
+                          (call-process python nil t nil driver
+                                        "--group" "m43-imp5" "--emacs" emacs)
                         (error (cons 'ERROR err))))
                   (parsed nil))
               (dolist (l (split-string (buffer-string) "\n"))

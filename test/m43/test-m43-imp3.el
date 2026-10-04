@@ -247,7 +247,7 @@ pass)."
 ;;; --- The observable tty-mode check (brief.org section 11, 12) --------
 ;;;
 ;;; The check needs a pty and the built src/emacs.  The corpus ATTEMPTS
-;;; the pty: pty-driver-imp3.py calls os.openpty, and only a failed
+;;; the pty: test/pty-driver.py calls os.openpty, and only a failed
 ;;; attempt is an environment-gated INFO skip, never a silent pass (review
 ;;; cr.org F3).  On success the driver runs the built emacs on the pty
 ;;; slave, applies the wanted mode through init-tty-mode, reads the mode
@@ -275,15 +275,14 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
     (cons (match-string 1 line) (list 'INFO (match-string 2 line))))
    (t nil)))
 
-(let* ((dir (file-name-directory (or load-file-name default-directory)))
-       (driver (expand-file-name "pty-driver-imp3.py" dir))
+(let* ((driver (expand-file-name "test/pty-driver.py" m43-imp3--root))
        (python (executable-find "python3"))
        (emacs (m43-imp3--emacs))
        (name "m43-imp3/pty-e2e")
        (results
         (cond
          ((not (file-readable-p driver))
-          (list (cons name (cons 'FAIL "missing pty-driver-imp3.py (tracked artifact)"))))
+          (list (cons name (cons 'FAIL "missing test/pty-driver.py (tracked artifact)"))))
          ((not python)
           (list (cons name (list 'INFO "skipped (no python3)"))))
          ((not emacs)
@@ -291,7 +290,8 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
          (t
           (with-temp-buffer
             (let ((rc (condition-case err
-                          (call-process python nil t nil driver "--emacs" emacs)
+                          (call-process python nil t nil driver
+                                        "--group" "m43-imp3" "--emacs" emacs)
                         (error (cons 'ERROR err))))
                   (parsed nil))
               (dolist (l (split-string (buffer-string) "\n"))
