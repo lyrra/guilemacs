@@ -20,12 +20,12 @@
 ;;;         untracked, so a present-but-stale or absent record is an
 ;;;         INFO-skip, never a FAIL.  These checks register no ERT test,
 ;;;         so the m45 gate total does not depend on docs/.
-;;;   S3 -- the gated gate check: run the m45 gate on the built
-;;;         src/emacs and check exit 0 and the pass total (brief.org
-;;;         section 5 T3).  INFO-skip when src/emacs is absent.  The
-;;;         check sets GUILEMACS_M45_GATE=1; the nested run reads that
-;;;         from the environment and INFO-skips this same check, so the
-;;;         nesting is exactly one level (the m38-imp1 recursion lesson).
+;;;   S3 -- the group-total check: the m45 group registers at least
+;;;         its docs-independent floor (brief.org section 5 T3).  It
+;;;         is an `ert-deftest', so its body runs after every corpus
+;;;         of the group has loaded and sees them all, whatever order
+;;;         tool/run-tests.scm picked.  It replaces a nested gate
+;;;         subprocess that re-ran the whole group and doubled it.
 ;;;   S5 -- the corpus is registered in the (m45) group of
 ;;;         tool/run-tests.scm (brief.org section 5 T5).
 ;;;   S6 -- the per-group min-count guard (brief.org section 5 T4).
@@ -200,56 +200,35 @@ of the presence of docs/."
 
 ;;; --- S3. The gated gate check (brief.org section 5 T3) --------------
 
-;; The gate needs the built src/emacs (the ERT batch runner).  Run the
-;; m45 gate as a subprocess and read its pass total.  The subprocess is
-;; given GUILEMACS_M45_GATE=1; the nested load of this corpus sees that
-;; variable and INFO-skips this check, so the nesting is exactly one
-;; level.  Without the guard the m45 gate would re-run itself without
-;; bound (the m38-imp1 recursion lesson).
+;; This check USED to run the whole m45 gate as a subprocess and read
+;; its pass total, guarded by GUILEMACS_M45_GATE so the nested load
+;; skipped the check and the recursion stopped at one level.  That
+;; doubled the group: measured, the nested run cost 10.6s of the m45
+;; group's 21.3s, re-running the very tests that had just run.
 ;;
-;; The pinned total is the *nested* total: the m45 group holds imp-1 54,
-;; imp-2 48, imp-3 60 and imp-4 17 (S1 12 + S5 2 + this check skipped +
-;; S6 3).  162 + 17 = 179.  The bound is a minimum, so it fails only when
-;; the m45 total drops.  The S2 checks register no ERT test, so the m45
-;; total does not depend on docs/; the surface pins of S1 are the hard
-;; checks.
-
-(defvar m45-imp4--emacs
-  (expand-file-name "src/emacs" m45-imp4--root))
+;; The same assertion now runs IN THIS PROCESS.  ERT runs every test
+;; after all four corpora have loaded, so a test BODY sees the whole
+;; group's registered tests whatever order tool/run-tests.scm loaded the
+;; files in -- it randomises them, so a load-time count could not do
+;; this.
+;;
+;; The subprocess only ever proved two things.  The group total, which
+;; is pinned here.  And that the run exits 0 -- which is a tautology:
+;; the harness exits non-zero exactly when one of these tests fails, so
+;; the check could never observe its own failure.
+;;
+;; The floor is the docs-independent total: imp-1 54, imp-2 48, imp-3 60
+;; and imp-4 17 (S1 12 + S5 2 + S6 3).  162 + 17 = 179.  The bound is a
+;; minimum, so it fails only when the m45 total drops.  The S2 checks
+;; register no ERT test, so the total does not depend on docs/.
 
 (defvar m45-imp4--min-gate-total 179
-  "The minimum m45 pass total at imp-4 (the nested run).")
+  "The minimum number of ERT tests the m45 group registers.")
 
-(defun m45-imp4--gate-run ()
-  "Run the m45 gate on the built src/emacs.  Return (STATUS . OUTPUT),
-or nil when src/emacs is absent.  Set GUILEMACS_M45_GATE=1 so the
-nested imp-4 gate check skips itself (no recursion)."
-  (when (file-executable-p m45-imp4--emacs)
-    (let* ((script (expand-file-name "tool/run-tests.sh" m45-imp4--root))
-           (default-directory m45-imp4--root))
-      (with-temp-buffer
-        (let ((status
-               (call-process
-                "/bin/sh" nil (current-buffer) nil "-c"
-                (format "GUILEMACS_M45_GATE=1 %s --filter=m45" script))))
-          (cons status (buffer-string)))))))
-
-(defun m45-imp4--gate-total (output)
-  "Parse the passed count from the harness OUTPUT, or nil."
-  (when (string-match ", \\([0-9]+\\) passed, \\([0-9]+\\) failed" output)
-    (string-to-number (match-string 1 output))))
-
-(if (getenv "GUILEMACS_M45_GATE")
-    (princ "INFO m45/imp4/gate/m45-exit0-total skipped (nested gate run)\n")
-  (let ((run (m45-imp4--gate-run)))
-    (if (null run)
-        (princ "INFO m45/imp4/gate/m45-exit0-total skipped (no runnable built src/emacs)\n")
-      (let* ((status (car run))
-             (total (m45-imp4--gate-total (cdr run))))
-        (m45-imp4--check "gate/m45-exit0-total"
-                         (and (integerp status) (eql 0 status)
-                              (integerp total)
-                              (>= total m45-imp4--min-gate-total)))))))
+(ert-deftest m45-imp4/gate-m45-total ()
+  "The m45 group registers at least its docs-independent floor."
+  (should (>= (length (ert-select-tests "^m45-imp" t))
+              m45-imp4--min-gate-total)))
 
 ;;; --- S2. The close-out records (brief.org section 5 T2) -------------
 ;;;

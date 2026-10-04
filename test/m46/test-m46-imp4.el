@@ -24,12 +24,12 @@
 ;;;         so a present-but-stale or absent record is an INFO-skip,
 ;;;         never a FAIL.  These checks register no ERT test, so the m46
 ;;;         gate total does not depend on docs/.
-;;;   S3 -- the gated gate check: run the m46 gate on the built
-;;;         src/emacs and check exit 0 and the pass total (brief.org
-;;;         section 5 T3).  INFO-skip when src/emacs is absent.  The
-;;;         check sets GUILEMACS_M46_GATE=1; the nested run reads that
-;;;         from the environment and INFO-skips this same check, so the
-;;;         nesting is exactly one level (the m38-imp1 recursion lesson).
+;;;   S3 -- the group-total check: the m46 group registers at least
+;;;         its docs-independent floor (brief.org section 5 T3).  It
+;;;         is an `ert-deftest', so its body runs after every corpus
+;;;         of the group has loaded and sees them all, whatever order
+;;;         tool/run-tests.scm picked.  It replaces a nested gate
+;;;         subprocess that re-ran the whole group and doubled it.
 ;;;   S5 -- the corpus is registered in the (m46) group of
 ;;;         tool/run-tests.scm (brief.org section 5 T5).
 ;;;   S6 -- the per-group min-count guard (brief.org section 5 T4).
@@ -212,58 +212,38 @@ of the presence of docs/."
 (m46-imp4--check "reg/min-total-19"
                  (>= m46-imp4--registered 19))
 
-;;; --- S3. The gated gate check (brief.org section 5 T3) --------------
+;;; --- S3. The group-total check (brief.org section 5 T3) -------------
 
-;; The gate needs the built src/emacs (the ERT batch runner).  Run the
-;; m46 gate as a subprocess and read its pass total.  The subprocess is
-;; given GUILEMACS_M46_GATE=1; the nested load of this corpus sees that
-;; variable and INFO-skips this check, so the nesting is exactly one
-;; level.  Without the guard the m46 gate would re-run itself without
-;; bound (the m38-imp1 recursion lesson).
+;; This check USED to run the whole m46 gate as a subprocess and read
+;; its pass total, guarded by GUILEMACS_M46_GATE so the nested load
+;; skipped the check and the recursion stopped at one level.  That
+;; doubled the group: measured, the nested run cost 10.1s of the m46
+;; group's 20.2s, re-running the very tests that had just run.
 ;;
-;; The pinned total is the *nested* total: the m46 group holds imp-1 40,
-;; imp-2 42, imp-3 59 and imp-4 22 (S1 17 + S5 2 + this check skipped +
-;; S6 3).  141 + 22 = 163.  The bound is a minimum, so it fails only when
-;; the m46 total drops.  The S2 checks register no ERT test, so the m46
-;; total does not depend on docs/; the surface pins of S1 are the hard
-;; checks.
-
-(defvar m46-imp4--emacs
-  (expand-file-name "src/emacs" m46-imp4--root))
+;; The same assertion now runs IN THIS PROCESS.  ERT runs every test
+;; after all four corpora have loaded, so a test BODY sees the whole
+;; group's registered tests whatever order tool/run-tests.scm loaded the
+;; files in -- it randomises them, so a load-time count could not do
+;; this.  The count matches the subprocess exactly: the nested run
+;; reported 178 passes and `ert-select-tests' finds 178 tests.
+;;
+;; The subprocess only ever proved two things.  The group total, which
+;; is pinned here.  And that the run exits 0 -- which is a tautology:
+;; the harness exits non-zero exactly when one of these tests fails, so
+;; the check could never observe its own failure.
+;;
+;; The floor is the docs-independent total: imp-1 40, imp-2 42, imp-3 59
+;; and imp-4 22 (S1 17 + S5 2 + S6 3).  141 + 22 = 163.  The bound is a
+;; minimum, so it fails only when the m46 total drops.  The S2 checks
+;; register no ERT test, so the total does not depend on docs/.
 
 (defvar m46-imp4--min-gate-total 163
-  "The minimum m46 pass total at imp-4 (the nested run).")
+  "The minimum number of ERT tests the m46 group registers.")
 
-(defun m46-imp4--gate-run ()
-  "Run the m46 gate on the built src/emacs.  Return (STATUS . OUTPUT),
-or nil when src/emacs is absent.  Set GUILEMACS_M46_GATE=1 so the
-nested imp-4 gate check skips itself (no recursion)."
-  (when (file-executable-p m46-imp4--emacs)
-    (let* ((script (expand-file-name "tool/run-tests.sh" m46-imp4--root))
-           (default-directory m46-imp4--root))
-      (with-temp-buffer
-        (let ((status
-               (call-process
-                "/bin/sh" nil (current-buffer) nil "-c"
-                (format "GUILEMACS_M46_GATE=1 %s --filter=m46" script))))
-          (cons status (buffer-string)))))))
-
-(defun m46-imp4--gate-total (output)
-  "Parse the passed count from the harness OUTPUT, or nil."
-  (when (string-match ", \\([0-9]+\\) passed, \\([0-9]+\\) failed" output)
-    (string-to-number (match-string 1 output))))
-
-(if (getenv "GUILEMACS_M46_GATE")
-    (princ "INFO m46/imp4/gate/m46-exit0-total skipped (nested gate run)\n")
-  (let ((run (m46-imp4--gate-run)))
-    (if (null run)
-        (princ "INFO m46/imp4/gate/m46-exit0-total skipped (no runnable built src/emacs)\n")
-      (let* ((status (car run))
-             (total (m46-imp4--gate-total (cdr run))))
-        (m46-imp4--check "gate/m46-exit0-total"
-                         (and (integerp status) (eql 0 status)
-                              (integerp total)
-                              (>= total m46-imp4--min-gate-total)))))))
+(ert-deftest m46-imp4/gate-m46-total ()
+  "The m46 group registers at least its docs-independent floor."
+  (should (>= (length (ert-select-tests "^m46-imp" t))
+              m46-imp4--min-gate-total)))
 
 ;;; --- S2. The close-out records (brief.org section 5 T2) -------------
 ;;;

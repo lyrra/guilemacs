@@ -189,6 +189,25 @@ READ_PATH_PROBE = r"""
   (join "@@JOIN@@" out))
 """
 
+# The Scheme side of the mode comparison, shared by the two mode probes.
+# A termios mode is (IFLAG OFLAG CFLAG LFLAG CC-BYTEVECTOR), so equality
+# is four numbers plus a bytevector walk.  This was copied in both
+# probes; it is spliced in with @@MODE_HELPERS@@.
+MODE_HELPERS = r"""
+  (define (cc=? a b)
+    (and (= (bytevector-length a) (bytevector-length b))
+         (let loop ((i 0))
+           (or (= i (bytevector-length a))
+               (and (= (bytevector-u8-ref a i) (bytevector-u8-ref b i))
+                    (loop (1+ i)))))))
+  (define (mode=? a b)
+    (and (= (list-ref a 0) (list-ref b 0))
+         (= (list-ref a 1) (list-ref b 1))
+         (= (list-ref a 2) (list-ref b 2))
+         (= (list-ref a 3) (list-ref b 3))
+         (cc=? (list-ref a 4) (list-ref b 4))))
+"""
+
 # M43 imp-3: the observable TTY mode.  Compute the wanted mode with the
 # pure policy (tty-mode-wanted), apply it with the imp-2 leaf through the
 # thin entry point (init-tty-mode), read the terminal mode back, and
@@ -197,15 +216,20 @@ READ_PATH_PROBE = r"""
 # `init-tty-mode' merges the build constants itself, so FLAGS holds only
 # the plain inputs.  `tty-mode-wanted' needs the constants in its flag
 # list, so FULL appends them.  FD 0 is the pty slave.
+#
+# THE JUDGEMENT STAYS IN THE CHILD here, unlike every other probe.  The
+# wanted mode comes from `tty-mode-wanted' over the build constants, so
+# the driver cannot know it; only the child can see both sides.  The
+# probe therefore reports the comparison, not the values.
 MODE_PROBE = r"""
 (let* ((mod (resolve-module '(emacs tty-modes)))
        (get (module-ref mod 'tty-get-mode))
        (init (module-ref mod 'init-tty-mode))
        (wanted (module-ref mod 'tty-mode-wanted))
        (consts (module-ref mod 'tty-mode-constants))
-       (flags (list 'flow-control? #f 'meta-key? #t
-                    'controlling-tty? #t 'quit-char 7))
+       (flags (list @@FLAGS@@))
        (base (get 0)))
+@@MODE_HELPERS@@
   (if (not base)
       "no-base-mode"
       (let* ((full (append flags (consts)))
@@ -214,34 +238,22 @@ MODE_PROBE = r"""
              (after (get 0)))
         (cond
          ((not after) "no-mode-after-apply")
-         ((and (= (list-ref after 0) (list-ref expect 0))
-               (= (list-ref after 1) (list-ref expect 1))
-               (= (list-ref after 2) (list-ref expect 2))
-               (= (list-ref after 3) (list-ref expect 3))
-               (let ((actual-cc (list-ref after 4))
-                     (wanted-cc (list-ref expect 4)))
-                 (and (= (bytevector-length actual-cc)
-                         (bytevector-length wanted-cc))
-                      (let loop ((i 0))
-                        (or (= i (bytevector-length actual-cc))
-                            (and (= (bytevector-u8-ref actual-cc i)
-                                    (bytevector-u8-ref wanted-cc i))
-                                 (loop (1+ i))))))))
-          "ok")
+         ((mode=? after expect) "ok")
          (else (format #f "mismatch expected=~s actual=~s" expect after))))))
 """
 
 # M43 imp-4: the observable TTY-mode restore.  Read the pre-init mode,
 # save it, apply the Emacs mode through `init-tty-mode', restore the
 # saved mode through `reset-tty-mode', read the mode back, and compare.
+# The judgement stays in the child for the same reason as MODE_PROBE.
 RESTORE_PROBE = r"""
 (let* ((mod (resolve-module '(emacs tty-modes)))
        (get (module-ref mod 'tty-get-mode))
        (init (module-ref mod 'init-tty-mode))
        (reset (module-ref mod 'reset-tty-mode))
-       (flags (list 'flow-control? #f 'meta-key? #t
-                    'controlling-tty? #t 'quit-char 7))
+       (flags (list @@FLAGS@@))
        (saved (get 0)))
+@@MODE_HELPERS@@
   (if (not saved)
       "no-base-mode"
       (let* ((_init (init 0 saved flags))
@@ -249,26 +261,18 @@ RESTORE_PROBE = r"""
              (after (get 0)))
         (cond
          ((not after) "no-mode-after-reset")
-         ((and (= (list-ref after 0) (list-ref saved 0))
-               (= (list-ref after 1) (list-ref saved 1))
-               (= (list-ref after 2) (list-ref saved 2))
-               (= (list-ref after 3) (list-ref saved 3))
-               (let ((actual-cc (list-ref after 4))
-                     (saved-cc (list-ref saved 4)))
-                 (and (= (bytevector-length actual-cc)
-                         (bytevector-length saved-cc))
-                      (let loop ((i 0))
-                        (or (= i (bytevector-length actual-cc))
-                            (and (= (bytevector-u8-ref actual-cc i)
-                                    (bytevector-u8-ref saved-cc i))
-                                 (loop (1+ i))))))))
-          "ok")
+         ((mode=? after saved) "ok")
          (else (format #f "mismatch saved=~s after=~s" saved after))))))
 """
 
 # M43 imp-5: the observable TTY size.  Probe the size through the thin
-# entry point (tty-size), apply a known size with set-tty-size, read the
-# size back, and compare.
+# entry point (tty-size), apply the case's size with set-tty-size, read
+# the size back, and REPORT IT as "<width> <height>".
+#
+# Unlike the two mode probes, this one does not judge: the driver knows
+# the size it asked for, so the case can expect the string.  The error
+# arms still report a word, which never equals the expected size and so
+# becomes a FAIL carrying its reason.
 SIZE_PROBE = r"""
 (let* ((mod (resolve-module '(emacs tty-modes)))
        (get-size (module-ref mod 'tty-size))
@@ -276,14 +280,14 @@ SIZE_PROBE = r"""
        (before (get-size 0)))
   (if (not (pair? before))
       "no-size"
-      (let ((status (set-size 0 30 100)))
+      (let ((status (set-size 0 @@HEIGHT@@ @@WIDTH@@)))
         (if (< status 0)
             (format #f "set-failed ~s" status)
             (let ((after (get-size 0)))
-              (cond
-               ((not (pair? after)) "no-size-after-set")
-               ((and (= (car after) 100) (= (cdr after) 30)) "ok")
-               (else (format #f "mismatch after=~s" after))))))))
+              (if (not (pair? after))
+                  "no-size-after-set"
+                  (string-append (number->string (car after)) " "
+                                 (number->string (cdr after)))))))))
 """
 
 
@@ -433,27 +437,43 @@ M42_IMP4_CASES = (
                     (0, 0, [])], quit_char=7),
 )
 
-# The M43 probes do their own comparison, because a termios mode is a
-# Scheme bytevector that must not cross the layer.  Each reports "ok" or
-# a description of the mismatch.
+# The tty flags the two mode cases drive the policy with.  This is CASE
+# DATA, so it lives here and not inside a probe; both probes take it
+# through @@FLAGS@@.
+TTY_FLAGS = ("'flow-control? #f 'meta-key? #t "
+             "'controlling-tty? #t 'quit-char 7")
+
+# The size the imp-5 case applies and reads back.  set-tty-size takes
+# (fd HEIGHT WIDTH); tty-size returns (WIDTH . HEIGHT), so the expected
+# report is "<width> <height>".
+SIZE_HEIGHT = 30
+SIZE_WIDTH = 100
+
+# The two mode probes judge in the child, because only the child can see
+# both the wanted mode and the actual one; each reports "ok" or a
+# description.  The size probe reports its measurement, like the
+# read-path cases, and the case holds the expected value.
 M43_CASES = (
     {
         "name": "m43-imp3/pty-e2e",
         "group": "m43-imp3",
         "probe": MODE_PROBE,
+        "subst": {"FLAGS": TTY_FLAGS, "MODE_HELPERS": MODE_HELPERS},
         "expect": "ok",
     },
     {
         "name": "m43-imp4/pty-e2e",
         "group": "m43-imp4",
         "probe": RESTORE_PROBE,
+        "subst": {"FLAGS": TTY_FLAGS, "MODE_HELPERS": MODE_HELPERS},
         "expect": "ok",
     },
     {
         "name": "m43-imp5/pty-e2e",
         "group": "m43-imp5",
         "probe": SIZE_PROBE,
-        "expect": "ok",
+        "subst": {"HEIGHT": str(SIZE_HEIGHT), "WIDTH": str(SIZE_WIDTH)},
+        "expect": "%d %d" % (SIZE_WIDTH, SIZE_HEIGHT),
     },
 )
 
@@ -837,14 +857,85 @@ def scheme_report_program():
     return "\n".join(lines)
 
 
+def scheme_mode_program():
+    """Return a guile program that exercises the shared mode comparison.
+
+    MODE_HELPERS only ever runs inside the child, on a pty host, so
+    drive `mode=?' here over crafted modes instead.  A mode is
+    (IFLAG OFLAG CFLAG LFLAG CC-BYTEVECTOR).
+    """
+    # The bytevector procedures live in (rnrs bytevectors).  Inside the
+    # child they are already bound, because the probe runs in Emacs's
+    # Guile; a bare `guile -c' needs the import.
+    return "\n".join([
+        "(use-modules (rnrs bytevectors))",
+        "(let ()",
+        MODE_HELPERS,
+        '  (define (m a cc) (list a 1 2 3 cc))',
+        '  (format #t "mode-equal\\t~a\\n"'
+        ' (mode=? (m 9 #vu8(1 2)) (m 9 #vu8(1 2))))',
+        '  (format #t "mode-flag-differs\\t~a\\n"'
+        ' (mode=? (m 9 #vu8(1 2)) (m 8 #vu8(1 2))))',
+        '  (format #t "mode-cc-differs\\t~a\\n"'
+        ' (mode=? (m 9 #vu8(1 2)) (m 9 #vu8(1 3))))',
+        '  (format #t "mode-cc-length-differs\\t~a\\n"'
+        ' (mode=? (m 9 #vu8(1 2)) (m 9 #vu8(1 2 3))))',
+        "  #t)",
+    ])
+
+
 def selftest_scheme():
-    """Check the Scheme report formatter against the Python renderer.
+    """Check the Scheme helpers against their Python twins.
 
     Needs guile on PATH.  Returns a list of problems; an absent guile
     returns a single INFO-style note, not a failure, because the check
     is a cross-check of two implementations and guile may be missing on
     a packaging host.
     """
+    problems = _scheme_report_check()
+    problems.extend(_scheme_mode_check())
+    return problems
+
+
+def _run_guile(program):
+    """Run PROGRAM under guile.  Return (stdout, problem-or-None)."""
+    try:
+        proc = subprocess.run(["guile", "-c", program],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=60)
+    except (OSError, subprocess.SubprocessError) as err:
+        return ("", "INFO scheme cross-check skipped (no runnable guile: %s)"
+                % err)
+    if proc.returncode != 0:
+        return ("", "scheme helpers failed to run: %s"
+                % proc.stderr.decode("utf-8", "replace").strip()[-300:])
+    return (proc.stdout.decode("utf-8", "replace"), None)
+
+
+def _scheme_mode_check():
+    """Drive the shared mode comparison under guile."""
+    out, problem = _run_guile(scheme_mode_program())
+    if problem:
+        return [problem]
+    want = {"mode-equal": "#t",
+            "mode-flag-differs": "#f",
+            "mode-cc-differs": "#f",
+            "mode-cc-length-differs": "#f"}
+    problems = []
+    seen = {}
+    for line in out.splitlines():
+        if "\t" in line:
+            label, got = line.split("\t", 1)
+            seen[label] = got
+    for label, expected in want.items():
+        if seen.get(label) != expected:
+            problems.append("scheme mode=? %s: got %r want %r"
+                            % (label, seen.get(label), expected))
+    return problems
+
+
+def _scheme_report_check():
+    """Check the Scheme report formatter against the Python renderer."""
     program = scheme_report_program()
     try:
         proc = subprocess.run(["guile", "-c", program],
@@ -962,8 +1053,12 @@ def selftest():
     check("expect-continuation",
           expect_string(_case("m42-imp4/case-6-continuation")),
           "3 1 65:0,7:0 | 0 0 -")
-    for case in M43_CASES:
-        check("expect-%s" % case["name"], expect_string(case), "ok")
+    check("expect-mode", expect_string(_case("m43-imp3/pty-e2e")), "ok")
+    check("expect-restore", expect_string(_case("m43-imp4/pty-e2e")), "ok")
+    # The size case expects its measurement, not a verdict word.  tty-size
+    # returns (WIDTH . HEIGHT) while set-tty-size takes (fd HEIGHT WIDTH),
+    # so the order is swapped between the call and the report; pin it.
+    check("expect-size", expect_string(_case("m43-imp5/pty-e2e")), "100 30")
 
     # --- the verdict ----------------------------------------------------
     check("ok-passes", verdict(_case("m43-imp3/pty-e2e"), "ok")[0], "PASS")
@@ -1122,13 +1217,37 @@ def selftest():
         problems.append("size probe does not resolve tty-size via module-ref")
     if "module-ref mod 'set-tty-size" not in size_src:
         problems.append("size probe does not resolve set-tty-size via module-ref")
-    if "set-size 0 30 100" not in size_src:
-        problems.append("size probe does not apply a known size through set-tty-size")
-    # Each M43 probe reports "ok" on success, which is what its case
-    # expects; a probe that lost that literal could never pass.
-    for case in M43_CASES:
+    if "set-size 0 %d %d" % (SIZE_HEIGHT, SIZE_WIDTH) not in size_src:
+        problems.append("size probe does not apply the case size through set-tty-size")
+    # The size probe REPORTS its measurement; it must not judge.  A
+    # literal "ok" there would mean the verdict crept back into Scheme.
+    if '"ok"' in SIZE_PROBE:
+        problems.append("size probe judges instead of reporting its measurement")
+    # The two mode probes do judge, and must keep the literal their case
+    # expects; a probe that lost it could never pass.
+    for case in (_case("m43-imp3/pty-e2e"), _case("m43-imp4/pty-e2e")):
         if '"ok"' not in case["probe"]:
             problems.append("probe of %s cannot report ok" % case["name"])
+    # The case data left the probes: the flags and the size are spliced
+    # in, so neither probe holds a literal of its own.
+    for name, probe in (("mode", MODE_PROBE), ("restore", RESTORE_PROBE)):
+        if "@@FLAGS@@" not in probe:
+            problems.append("%s probe hardcodes its flags" % name)
+        if "@@MODE_HELPERS@@" not in probe:
+            problems.append("%s probe does not splice the shared mode helpers"
+                            % name)
+    if "@@HEIGHT@@" not in SIZE_PROBE or "@@WIDTH@@" not in SIZE_PROBE:
+        problems.append("size probe hardcodes its size")
+    # The shared comparison really is shared: one definition, two users.
+    for name, src in (("mode", mode_src), ("restore", restore_src)):
+        if "(define (mode=? a b)" not in src:
+            problems.append("%s probe lost the shared mode comparison" % name)
+        if "bytevector-u8-ref" not in src:
+            problems.append("%s probe lost the cc bytevector walk" % name)
+    # The flags reach both probes with the quit char the policy needs.
+    for name, src in (("mode", mode_src), ("restore", restore_src)):
+        if "'quit-char 7" not in src:
+            problems.append("%s probe did not receive the case flags" % name)
     # A probe must not carry another family's body: a swapped probe would
     # report the wrong string and never match.
     if "tty-read-avail-input!" in mode_src:

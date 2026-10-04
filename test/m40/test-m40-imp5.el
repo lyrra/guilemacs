@@ -296,12 +296,53 @@ test/ is tracked, so the summary must be in the commit (cr.org F1)."
                        "names the base commit 764ec06")))
 ;; F4: the line counter must equal `wc -l' (newline count) even when
 ;; the file has no final newline.  "a\nb\nc" is 2 lines to wc -l.
-(m40-imp5--check "lines/counter-matches-wc-l-no-trailing-newline"
-                 (let ((f (make-temp-file "m40-imp5-nonl")))
-                   (unwind-protect
-                       (progn
-                         (with-temp-file f (insert "a\nb\nc"))
-                         (eql 2 (m40-imp5--lines f)))
-                     (ignore-errors (delete-file f)))))
+;;
+;; The check needs a writable directory.  `make-temp-file' uses
+;; `temporary-file-directory', which is /tmp, and this sandbox denies
+;; writes there: the unguarded call signalled "Creating file with
+;; prefix: Permission denied" DURING LOAD, which aborted the whole m40
+;; batch before ERT reported anything -- the harness then failed the
+;; group with "batch runner never completed" and no result at all.
+;;
+;; So: pick the first directory that accepts a file -- $TMPDIR, /tmp,
+;; then <root>/test/m40/scratch -- and guard the body, so an
+;; environment failure costs THIS ONE CHECK and never the group.
+
+(defun m40-imp5--writable-p (dir)
+  "Non-nil when DIR exists and accepts a new file."
+  (and (stringp dir)
+       (file-directory-p dir)
+       (let ((probe (expand-file-name "m40-imp5-write-probe" dir)))
+         (condition-case nil
+             (progn (with-temp-file probe (insert "x"))
+                    (delete-file probe)
+                    t)
+           (error nil)))))
+
+(defvar m40-imp5--scratch
+  (let ((tree (expand-file-name "test/m40/scratch" m40-imp5--root)))
+    (or (and (m40-imp5--writable-p (getenv "TMPDIR"))
+             (file-name-as-directory (getenv "TMPDIR")))
+        (and (m40-imp5--writable-p "/tmp") "/tmp/")
+        (progn (ignore-errors (make-directory tree t))
+               (and (m40-imp5--writable-p tree)
+                    (file-name-as-directory tree)))))
+  "A writable directory for the temp-file check, or nil when none exists.")
+
+(if (null m40-imp5--scratch)
+    (princ (concat "INFO m40/imp5/lines/counter-matches-wc-l-no-trailing-newline"
+                   " skipped (no writable scratch directory)\n"))
+  (m40-imp5--check
+   "lines/counter-matches-wc-l-no-trailing-newline"
+   (condition-case err
+       (let* ((temporary-file-directory m40-imp5--scratch)
+              (f (make-temp-file "m40-imp5-nonl")))
+         (unwind-protect
+             (progn
+               (with-temp-file f (insert "a\nb\nc"))
+               (eql 2 (m40-imp5--lines f)))
+           (ignore-errors (delete-file f))))
+     (error (princ (format "INFO m40/imp5/lines-counter error=%S\n" err))
+            nil))))
 
 (princ "=== m40 imp-5 close-out suite done ===\n")
