@@ -9,20 +9,35 @@ same pty scaffolding and differed only in the child probe:
     test/m43/pty-driver-imp4.py  -> group  m43-imp4
     test/m43/pty-driver-imp5.py  -> group  m43-imp5
 
-The scaffolding is the hard part and is now written once: pty
-allocation and the EACCES skip, the forked child, the controlling
-terminal, the FIFO gate, the report pipe, the timeout, and the cleanup.
-A case supplies only its Scheme probe and its expected result.
+The scaffolding is the hard part and is written once: pty allocation and
+the EACCES skip, the forked child, the controlling terminal, the FIFO
+gate, the report pipe, the timeout, and the cleanup.
 
-The driver owns the pty pair and the child process.  The child is the
-emacs under test; its stdin/stdout are the pty slave, which it acquires
-as its controlling terminal.  The child writes its report to a pipe,
-never to the pty: the report pipe is handed to the child as its stderr
-(fd 2).  The driver writes case bytes to the pty master and reads the
-report from the pipe.
+THE REPORT FORMAT IS ONE FORMAT.  A probe is a Scheme expression whose
+value is a STRING.  The child prints the elisp `%S' of that value, so
+every report is one double-quoted line, and the driver compares the
+string with the case's expected string.  There is one regex, one parser
+and one comparison for every case.
 
-One child runs per case.  That keeps the pty bytes and the report apart
-and removes any need to synchronise several reads inside one child.
+    probe value "ok"                  case expects "ok"           -> PASS
+    probe value "mismatch after=..."  case expects "ok"           -> FAIL
+
+A probe that measures several numbers formats them into that one
+string; it does NOT return a structure for the driver to pick apart.
+Two rules keep such a string unambiguous:
+
+    an empty list is "-", never the empty string;
+    a repeated group is joined with " | ".
+
+So the read-path probe reports "<return> <stored> <order>" per call,
+where <order> is "code:mods" pairs joined with ",":
+
+    "0 0 -"                          no input: return 0, stored 0
+    "2 2 65:0,66:0"                  two bytes, two events
+    "3 1 65:0,7:0 | 0 0 -"           two calls
+
+A case may spell its expectation structurally (see read_path_case) for
+readability; expect_string resolves that to the one wire format.
 
 The driver prints one report line per case on its stdout:
 
@@ -34,14 +49,12 @@ A host that cannot allocate a pty (/dev/ptmx gives EACCES, errno 13)
 prints one INFO line per case and exits 0.  That is an environment-gated
 skip: never a PASS and never a FAIL.
 
-A case has one of two report KINDS:
-
-    "tokens" -- the M42 read-path shape.  The child reports a flat token
-                list, (RETURN BEFORE AFTER ORDER-STRING) per call, and
-                the driver compares (return, stored, order) per call.
-    "string" -- the M43 mode/size shape.  The child reports one Scheme
-                string; "ok" is the pass and any other string is the
-                failure detail.
+ADDING A CASE.  Write a probe whose value is a string, give the case a
+`probe`, a `group` and an `expect`, and add it to CASES.  A probe may
+carry @@NAME@@ placeholders; the case fills them in through `subst`.
+Optional keys: `bytes` to write to the pty master, `close_master` to
+take the terminal away after READY, and `env_gate` to turn a value
+mismatch into an INFO skip on a host that cannot produce the result.
 
 Python 3 only.  No third-party module.
 
@@ -65,20 +78,59 @@ import time
 import termios
 
 # The meta modifier bit, duplicated from (emacs event-modifiers)
-# meta-modifier (char-meta = #x8000000).  The probe reports each stored
-# event as a "code:mods" token; a byte whose high bit sets the meta
-# modifier (meta key 1) decodes to mods == META.
+# meta-modifier (char-meta = #x8000000).  The read-path probe reports
+# each stored event as a "code:mods" token; a byte whose high bit sets
+# the meta modifier (meta key 1) decodes to mods == META.
 META = 0x8000000
 
+# The report token for an empty list.  An empty Scheme list reached
+# through `eval-scheme' prints as the opaque "#<scheme ()>" object, and
+# an empty string is invisible inside a space-separated report, so a
+# probe writes this instead.
+EMPTY = "-"
+
+# The separator between the repeats of a group (the read path's calls).
+JOIN = " | "
+
 
 # --------------------------------------------------------------------
-# The child probes.  One per behaviour under test.
+# The child probes.  Each one's value is a STRING.
 # --------------------------------------------------------------------
+
+# The Scheme side of the report format.  A probe that measures several
+# numbers splices these in with the @@HELPERS@@ placeholder and formats
+# its report with `fmt-call' and `join'.
+#
+# `fmt-call' is the Scheme twin of render_call below, and `join' is the
+# twin of "@@JOIN@@".join.  The two must agree exactly, or a correct
+# measurement reports as a FAIL.  selftest_scheme() runs these helpers
+# under guile and compares them with the Python renderer for every case,
+# so the pair is checked on a host with no pty.
+REPORT_HELPERS = r"""
+  (define (tok pair)
+    (string-append (number->string (car pair)) ":"
+                   (number->string (cdr pair))))
+  (define (join sep items)
+    (if (null? items)
+        ""
+        (let loop ((l (cdr items)) (s (car items)))
+          (if (null? l) s (loop (cdr l) (string-append s sep (car l)))))))
+  (define (fmt-call ret stored ev)
+    (string-append
+     (if (number? ret) (number->string ret) "no-terminal")
+     " " (number->string stored)
+     " " (if (null? ev) "@@EMPTY@@" (join "," (map tok ev)))))
+"""
 
 # M42: the TTY raw-input read path, through (emacs gobble).  Take the
 # newest terminal, record every decoded keystroke the policy makes as
-# (code . mods), call tty-read-avail-input! CALLS times, and report one
-# flat token list: per call, (RETURN BEFORE AFTER ORDER-STRING).
+# (code . mods), call tty-read-avail-input! @@CALLS@@ times, and report
+# "<return> <stored> <order>" per call, joined with " | ".
+#
+# The probe computes <stored> itself, as the DIFFERENCE between the
+# kbd_buffer count after and before the call.  A difference does not
+# depend on what the buffer held when the child started, so the expected
+# string stays valid whatever the startup leaves behind.
 #
 # `eval-scheme' evaluates its string in the current module, not in
 # (emacs gobble), so every binding the probe needs -- including
@@ -96,14 +148,8 @@ META = 0x8000000
 #
 # The per-case meta-key / quit-char stubs use the established pattern:
 # module-set! the promise to a new delay, run, then module-set! the
-# original promise back.  @@META_STUB@@ and @@QUIT_STUB@@ are filled in
-# by build_probe; an empty string leaves the real leaf in place.
-#
-# ORDER-STRING is a Scheme string of space-separated "code:mods" tokens.
-# An empty event list must not be reported as the raw Scheme list: an
-# empty Scheme list reached through `eval-scheme' prints as the opaque
-# "#<scheme ()>" object, which the driver regex would reject and turn a
-# passing no-input case into a false FAIL.
+# original promise back.  @@META_STUB@@ and @@QUIT_STUB@@ are empty when
+# the case asks for no stub.
 READ_PATH_PROBE = r"""
 (let* ((mod (resolve-module '(emacs gobble)))
        (terms ((force (module-ref mod '%terminal-list))))
@@ -119,6 +165,9 @@ READ_PATH_PROBE = r"""
        (calls @@CALLS@@)
        (order '())
        (out '()))
+  ;; The report helpers come first: an internal `define' must precede
+  ;; every expression of the body.
+@@HELPERS@@
   @@META_STUB@@
   @@QUIT_STUB@@
   (module-set!
@@ -132,20 +181,12 @@ READ_PATH_PROBE = r"""
            (n1 ((force nr)))
            (ev order))
       (set! order '())
-      (set! out
-            (append out
-                    (list ret prev n1
-                          (let flat ((l ev) (s ""))
-                            (if (null? l) s
-                                (flat (cdr l)
-                                      (string-append
-                                       s (number->string (car (car l))) ":"
-                                       (number->string (cdr (car l))) " ")))))))
+      (set! out (append out (list (fmt-call ret (- n1 prev) ev))))
       (if (> k 1) (loop (- k 1) n1) #f)))
   (module-set! mod '%--ie-ascii-keystroke-event mk)
   (module-set! mod '%--tty-meta-key meta-o)
   (module-set! mod '%--quit-char quit-o)
-  out)
+  (join "@@JOIN@@" out))
 """
 
 # M43 imp-3: the observable TTY mode.  Compute the wanted mode with the
@@ -251,52 +292,60 @@ SIZE_PROBE = r"""
 # corpora, which match "PASS <name>" lines.  Do not rename a case.
 # --------------------------------------------------------------------
 
-# Each "tokens" case names the bytes to push into the pty master and the
-# expected read-path result:
-#
-#   expect_return -- the value the path returns (the read count).
-#   expect_stored -- the number of events stored in kbd_buffer.
-#   expect_order  -- the decoded events, in store order, as (code, mods).
-#
-# Optional fields:
-#   calls        -- call the read path this many times (default 1).
-#   meta_key     -- stub %--tty-meta-key to this value before the read.
-#   quit_char    -- stub %--quit-char to this value before the read.
-#   expect_calls -- per-call expectations for a multi-call case; each item
-#                   is {"return": .., "stored": .., "order": [(code, mods)]}.
-#   close_master -- close the pty master after READY, before the read.  The
-#                   child ignores SIGHUP, so the hangup does not kill it;
-#                   the slave read then fails with EIO -> the
-#                   close-terminal result -2 (case 5).
-#   env_gate     -- a reason string.  A value mismatch (not a timeout or a
-#                   missing report) becomes an environment-gated INFO skip
-#                   with this reason instead of a FAIL (case 5).  Used only
-#                   when the host cannot give the expected result; never an
-#                   unconditional skip.
-#
+def read_path_case(name, group, data, calls, meta_key=None, quit_char=None,
+                   **extra):
+    """Build one read-path case.
+
+    CALLS is a list of (return, stored, order) triples, one per call to
+    the read path; ORDER is a list of (code, mods) pairs.  The triples
+    are the readable spelling of the expected report; expect_string
+    renders them into the one wire format.  META_KEY and QUIT_CHAR stub
+    the matching (emacs gobble) leaf for the duration of the probe.
+    """
+    meta_stub = ("(module-set! mod '%--tty-meta-key (delay (lambda (t) {})))"
+                 .format(meta_key) if meta_key is not None else "")
+    quit_stub = ("(module-set! mod '%--quit-char (delay (lambda () {})))"
+                 .format(quit_char) if quit_char is not None else "")
+    case = {
+        "name": name,
+        "group": group,
+        "probe": READ_PATH_PROBE,
+        "subst": {"CALLS": str(len(calls)),
+                  "META_STUB": meta_stub,
+                  "QUIT_STUB": quit_stub},
+        "bytes": data,
+        "expect_calls": calls,
+    }
+    case.update(extra)
+    return case
+
+
+def render_call(ret, stored, order):
+    """Render one read-path call as "<return> <stored> <order>"."""
+    tokens = ",".join("%d:%d" % (code, mods) for code, mods in order)
+    return "%s %d %s" % (ret, stored, tokens if tokens else EMPTY)
+
+
+def expect_string(case):
+    """Return the exact report string CASE expects.
+
+    A case may give `expect` directly, or give `expect_calls` as the
+    readable per-call spelling of a read-path report.
+    """
+    if "expect" in case:
+        return case["expect"]
+    return JOIN.join(render_call(*call) for call in case["expect_calls"])
+
+
 # Case 1: the pty holds no bytes.  The path returns 0 and stores nothing.
 # Case 2: two bytes, far fewer than one batch (KBD_BUFFER_SIZE - 1 =
 #         4095).  The path returns the short count (2) and stores exactly
 #         two events, in order.  It must not wait for the rest of a batch.
 M42_IMP3_CASES = (
-    {
-        "name": "m42-imp3/case-1-no-input",
-        "group": "m42-imp3",
-        "kind": "tokens",
-        "bytes": b"",
-        "expect_return": 0,
-        "expect_stored": 0,
-        "expect_order": [],
-    },
-    {
-        "name": "m42-imp3/case-2-short-read",
-        "group": "m42-imp3",
-        "kind": "tokens",
-        "bytes": b"AB",
-        "expect_return": 2,
-        "expect_stored": 2,
-        "expect_order": [(0x41, 0), (0x42, 0)],
-    },
+    read_path_case("m42-imp3/case-1-no-input", "m42-imp3", b"",
+                   [(0, 0, [])]),
+    read_path_case("m42-imp3/case-2-short-read", "m42-imp3", b"AB",
+                   [(2, 2, [(0x41, 0), (0x42, 0)])]),
 )
 
 # Case 3: the meta decode, one sub-case per %--tty-meta-key value.
@@ -352,117 +401,59 @@ M42_IMP3_CASES = (
 # branch and is not ring-appended, so the real model stores 2 and 1.  The
 # product is not changed.
 M42_IMP4_CASES = (
-    {
-        "name": "m42-imp4/case-3-meta-key-1",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"\x81\xe1",
-        "meta_key": 1,
-        "expect_return": 2,
-        "expect_stored": 2,
-        "expect_order": [(0x01, META), (0x61, META)],
-    },
-    {
-        "name": "m42-imp4/case-3-meta-key-2",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"\x81\xe1",
-        "meta_key": 2,
-        "expect_return": 2,
-        "expect_stored": 2,
-        "expect_order": [(0x81, 0), (0xe1, 0)],
-    },
-    {
-        "name": "m42-imp4/case-3-meta-key-0",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"\x81\xe1",
-        "meta_key": 0,
-        "expect_return": 2,
-        "expect_stored": 2,
-        "expect_order": [(0x01, 0), (0x61, 0)],
-    },
-    {
-        "name": "m42-imp4/case-4-quit-byte",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"AB\x07CD",
-        "quit_char": 7,
-        "expect_return": 5,
-        # FIX-20260928-guilemacs: 65 and 66 enter kbd_buffer; the raw C-g
-        # is decoded but takes the quit-char branch, so it is not
-        # ring-appended (see the case-4 comment block above).
-        "expect_stored": 2,
-        "expect_order": [(0x41, 0), (0x42, 0), (0x07, 0)],
-    },
-    {
-        "name": "m42-imp4/case-4-meta-quit-guard",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"A\x87",
-        "meta_key": 1,
-        "quit_char": 7,
-        "expect_return": 2,
-        "expect_stored": 2,
-        "expect_order": [(0x41, 0), (0x07, META)],
-    },
-    {
-        "name": "m42-imp4/case-5-terminal-loss",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"",
-        # Take the tty away after READY.  The child ignores SIGHUP, so the
-        # hangup does not kill it; the slave read then fails with EIO ->
-        # the close-terminal result -2.  If the host cannot give EIO,
-        # run_case reports an environment-gated INFO skip (the "env_gate"
-        # reason), never an unconditional one.
-        "close_master": True,
-        "expect_return": -2,
-        "expect_stored": 0,
-        "expect_order": [],
-        "env_gate": "host did not give EIO on master close",
-    },
-    {
-        "name": "m42-imp4/case-6-continuation",
-        "group": "m42-imp4",
-        "kind": "tokens",
-        "bytes": b"A\x07B",
-        "quit_char": 7,
-        "calls": 2,
-        "expect_calls": [
-            # FIX-20260928-guilemacs: call 1 reads all 3 bytes and decodes
-            # 65 and 7, but only 65 enters kbd_buffer -- the raw C-g takes
-            # the quit-char branch (see the case-4 comment block).  Call 2
-            # finds an empty tty, because that one read consumed B.
-            {"return": 3, "stored": 1, "order": [(0x41, 0), (0x07, 0)]},
-            {"return": 0, "stored": 0, "order": []},
-        ],
-    },
+    read_path_case("m42-imp4/case-3-meta-key-1", "m42-imp4", b"\x81\xe1",
+                   [(2, 2, [(0x01, META), (0x61, META)])], meta_key=1),
+    read_path_case("m42-imp4/case-3-meta-key-2", "m42-imp4", b"\x81\xe1",
+                   [(2, 2, [(0x81, 0), (0xe1, 0)])], meta_key=2),
+    read_path_case("m42-imp4/case-3-meta-key-0", "m42-imp4", b"\x81\xe1",
+                   [(2, 2, [(0x01, 0), (0x61, 0)])], meta_key=0),
+    # FIX-20260928-guilemacs: 65 and 66 enter kbd_buffer; the raw C-g is
+    # decoded but takes the quit-char branch, so it is not ring-appended
+    # (see the case-4 comment block above).
+    read_path_case("m42-imp4/case-4-quit-byte", "m42-imp4", b"AB\x07CD",
+                   [(5, 2, [(0x41, 0), (0x42, 0), (0x07, 0)])], quit_char=7),
+    read_path_case("m42-imp4/case-4-meta-quit-guard", "m42-imp4", b"A\x87",
+                   [(2, 2, [(0x41, 0), (0x07, META)])],
+                   meta_key=1, quit_char=7),
+    # Take the tty away after READY.  The child ignores SIGHUP, so the
+    # hangup does not kill it; the slave read then fails with EIO -> the
+    # close-terminal result -2.  If the host cannot give EIO, the verdict
+    # is an environment-gated INFO skip (the "env_gate" reason), never an
+    # unconditional one.
+    read_path_case("m42-imp4/case-5-terminal-loss", "m42-imp4", b"",
+                   [(-2, 0, [])],
+                   close_master=True,
+                   env_gate="host did not give EIO on master close"),
+    # FIX-20260928-guilemacs: call 1 reads all 3 bytes and decodes 65 and
+    # 7, but only 65 enters kbd_buffer -- the raw C-g takes the quit-char
+    # branch (see the case-4 comment block).  Call 2 finds an empty tty,
+    # because that one read consumed B.
+    read_path_case("m42-imp4/case-6-continuation", "m42-imp4", b"A\x07B",
+                   [(3, 1, [(0x41, 0), (0x07, 0)]),
+                    (0, 0, [])], quit_char=7),
 )
 
-# The M43 cases are "string" cases: the child reports one Scheme string
-# and "ok" is the pass.  Each has its own probe and its own failure text.
+# The M43 probes do their own comparison, because a termios mode is a
+# Scheme bytevector that must not cross the layer.  Each reports "ok" or
+# a description of the mismatch.
 M43_CASES = (
     {
         "name": "m43-imp3/pty-e2e",
         "group": "m43-imp3",
-        "kind": "string",
         "probe": MODE_PROBE,
-        "fail_text": "applied tty mode != wanted mode",
+        "expect": "ok",
     },
     {
         "name": "m43-imp4/pty-e2e",
         "group": "m43-imp4",
-        "kind": "string",
         "probe": RESTORE_PROBE,
-        "fail_text": "restored tty mode != saved mode",
+        "expect": "ok",
     },
     {
         "name": "m43-imp5/pty-e2e",
         "group": "m43-imp5",
-        "kind": "string",
         "probe": SIZE_PROBE,
-        "fail_text": "tty size read-back != applied size",
+        "expect": "ok",
     },
 )
 
@@ -528,17 +519,9 @@ CHILD_PROGRAM = r""";;; pty-child.el --- the emacs under test's pty probe.
   (kill-emacs 0))
 """
 
-# A "tokens" report is the elisp %S of a flat token list.  Each call
-# contributes (RETURN BEFORE AFTER ORDER-STRING); ORDER is a Scheme
-# string of space-separated "code:mods" tokens, so an empty order never
-# prints as an opaque "#<scheme ()>" object that the regex would reject.
-# The regex accepts the single-call shape and any number of extra calls.
-_TOKEN = r'(no-terminal|-?\d+)\s+(\d+)\s+(\d+)\s+"([^"]*)"'
-_TOKEN_RE = re.compile(_TOKEN)
-TOKENS_REPORT_RE = re.compile(r'^\(%s(?:\s+%s)*\)$' % (_TOKEN, _TOKEN))
-
-# A "string" report is the elisp %S of a Scheme string: one quoted line.
-STRING_REPORT_RE = re.compile(r'^"(.*)"$')
+# The report is the elisp %S of the probe's string value: one line, in
+# double quotes.  There is one report shape, so there is one regex.
+REPORT_RE = re.compile(r'^"(.*)"$')
 
 
 def emit(kind, name, detail=None):
@@ -584,16 +567,10 @@ def deliver_raw(fd):
     be signalled into a quit.
 
     Measured evidence, from the earlier failing run (before this clear):
-    m42 case 4 gave (2, 2, [0x43, 0x44]) instead of (5, 3, [0x41, 0x42,
-    0x07]), and case 6 gave (1, 1, [0x42]) instead of (3, 2, [0x41,
-    0x07]).  Each measured order holds exactly the bytes that follow the
-    quit byte, so the queue was flushed at the 0x07.
-
-    With the clear in place, case 4 measured (5, 2, [0x41, 0x42, 0x07])
-    and case 6 call 1 measured (3, 1, [0x41, 0x07]): the whole batch
-    arrives and only the bytes before the C-g enter kbd_buffer.  The case
-    tables pin those stored counts (2 and 1); see the case-4 comment
-    block.
+    m42 case 4 gave "2 2 67:0,68:0" instead of "5 2 65:0,66:0,7:0", and
+    case 6 gave "1 1 66:0" instead of "3 1 65:0,7:0".  Each measured order
+    holds exactly the bytes that follow the quit byte, so the queue was
+    flushed at the 0x07.
 
     Clear ISIG, so the kernel delivers every case byte unchanged, then read
     the attributes back and confirm the clear took effect.  The child also
@@ -636,31 +613,32 @@ def group_cases(group):
 
 
 def build_probe(case):
-    """Return the Scheme probe text for CASE, with its leaf stubs filled in.
+    """Return CASE's probe text, with every @@NAME@@ placeholder filled in.
 
-    A "string" case carries its own probe verbatim.  A "tokens" case uses
-    the shared read-path probe and fills in the call count and the
-    optional meta-key / quit-char stubs.
+    The case's `subst` maps a placeholder name to its text.  EMPTY and
+    JOIN are supplied to every probe, so a probe formats its report with
+    the same tokens the driver expects.  An unresolved placeholder is a
+    programming error, not a silent mismatch.
     """
-    if case["kind"] == "string":
-        return case["probe"]
-    meta_key = case.get("meta_key")
-    quit_char = case.get("quit_char")
-    meta_stub = ("(module-set! mod '%--tty-meta-key (delay (lambda (t) {})))"
-                 .format(meta_key) if meta_key is not None else "")
-    quit_stub = ("(module-set! mod '%--quit-char (delay (lambda () {})))"
-                 .format(quit_char) if quit_char is not None else "")
-    return (READ_PATH_PROBE
-            .replace("@@CALLS@@", str(case.get("calls", 1)))
-            .replace("@@META_STUB@@", meta_stub)
-            .replace("@@QUIT_STUB@@", quit_stub))
+    text = case["probe"]
+    subst = dict(case.get("subst", {}))
+    subst.setdefault("HELPERS", REPORT_HELPERS)
+    subst.setdefault("EMPTY", EMPTY)
+    subst.setdefault("JOIN", JOIN)
+    for key, value in subst.items():
+        text = text.replace("@@%s@@" % key, value)
+    left = re.search(r"@@[A-Z_]+@@", text)
+    if left:
+        raise AssertionError("case %s leaves %s unresolved"
+                             % (case["name"], left.group(0)))
+    return text
 
 
 def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     """Return child elisp that waits on GATE_PATH before probing CASE."""
     # Embed the probe as an elisp string literal.  Escape backslash and
-    # double quote; the probe uses double-quoted strings (the order
-    # string) but no backslash.
+    # double quote; a probe uses double-quoted strings (the report
+    # tokens) but no backslash.
     gate = '"%s"' % gate_path.replace("\\", "\\\\").replace('"', '\\"')
     scheme_probe = "(begin (call-with-input-file %s read-char) %s)" % (
         gate, build_probe(case).strip())
@@ -668,77 +646,30 @@ def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     return CHILD_PROGRAM % {"probe": '"%s"' % probe}
 
 
-def parse_tokens_report(text):
-    """Parse a "tokens" report into a list of per-call tuples.
-
-    Each tuple is (ret, before, after, order), where order is a list of
-    (code, mods) pairs.  Return None when no report line is present.
-    """
+def parse_report(text):
+    """Return the probe's string value from the child's output, or None."""
     for line in text.splitlines():
-        line = line.strip()
-        if not TOKENS_REPORT_RE.match(line):
-            continue
-        calls = []
-        for m in _TOKEN_RE.finditer(line[1:-1]):
-            ret_tok, before, after, order_tok = m.groups()
-            ret = ret_tok if ret_tok == "no-terminal" else int(ret_tok)
-            order = [tuple(int(x) for x in tok.split(":"))
-                     for tok in order_tok.split() if tok]
-            calls.append((ret, int(before), int(after), order))
-        if calls:
-            return calls
-    return None
-
-
-def parse_string_report(text):
-    """Return the Scheme-string result of a "string" report, or None."""
-    for line in text.splitlines():
-        m = STRING_REPORT_RE.match(line.strip())
+        m = REPORT_RE.match(line.strip())
         if m:
             return m.group(1)
     return None
 
 
-def parse_report(text, kind):
-    """Parse TEXT with the parser of KIND ("tokens" or "string")."""
-    if kind == "string":
-        return parse_string_report(text)
-    return parse_tokens_report(text)
-
-
-def expected_calls(case):
-    """Return CASE's expected per-call tuples as a list of dicts."""
-    if "expect_calls" in case:
-        return case["expect_calls"]
-    return [{"return": case["expect_return"],
-             "stored": case["expect_stored"],
-             "order": case["expect_order"]}]
-
-
 def verdict(case, got):
-    """Compare the parsed report GOT with CASE's expectation.
+    """Compare the report GOT with CASE's expectation.
 
     Return (kind, detail) where kind is "PASS", "FAIL" or "INFO".
     """
-    if case["kind"] == "string":
-        if got == "ok":
-            return ("PASS", None)
-        return ("FAIL", "%s (%s)" % (case["fail_text"], got))
-
-    exp = expected_calls(case)
-    measured = [(ret, after - before, order)
-                for (ret, before, after, order) in got]
-    want = [(e["return"], e["stored"], e["order"]) for e in exp]
-    detail = "measured %r want %r" % (measured, want)
-    if measured == want:
-        return ("PASS", detail)
+    want = expect_string(case)
+    if got == want:
+        return ("PASS", "measured %r" % got)
     if case.get("env_gate"):
         # An environment-gated skip.  m42 case 5 expects the -2 (EIO)
         # arm; a host that cannot give EIO measures another value.  Report
         # INFO with the measured value -- not a FAIL and not an
         # unconditional skip.
-        return ("INFO", "%s (measured %r)" % (case["env_gate"], measured))
-    return ("FAIL", detail)
+        return ("INFO", "%s (measured %r)" % (case["env_gate"], got))
+    return ("FAIL", "measured %r want %r" % (got, want))
 
 
 def child_session():
@@ -828,8 +759,7 @@ def run_case(case, emacs, timeout):
                 # require Emacs shutdown or pipe EOF after a valid report;
                 # cleanup below will stop a child that remains alive.
                 if ready_seen and parse_report(
-                        report.decode("utf-8", "replace"),
-                        case["kind"]) is not None:
+                        report.decode("utf-8", "replace")) is not None:
                     break
             elif child.poll() is not None:
                 break
@@ -868,7 +798,7 @@ def run_case(case, emacs, timeout):
     if not input_sent:
         return (name, "FAIL", "case input was not sent")
 
-    got = parse_report(report.decode("utf-8", "replace"), case["kind"])
+    got = parse_report(report.decode("utf-8", "replace"))
     if got is None:
         return (name, "FAIL", "no child report (raw %r)" % report[:200])
 
@@ -881,8 +811,70 @@ def _case(name):
     return next(c for c in CASES if c["name"] == name)
 
 
+def scheme_report_program():
+    """Return a guile program that prints every case's expected report.
+
+    It defines the real REPORT_HELPERS and drives `fmt-call' with each
+    read-path case's expected (return, stored, order) triples, exactly
+    as the probe does.  Running it proves that the Scheme formatter and
+    the Python renderer produce the same string -- the one thing a host
+    with no pty cannot otherwise check, because the formatter only ever
+    runs inside the child.
+    """
+    helpers = REPORT_HELPERS.replace("@@EMPTY@@", EMPTY)
+    lines = ["(let ()", helpers]
+    for case in CASES:
+        if "expect_calls" not in case:
+            continue
+        calls = " ".join(
+            '(fmt-call %s %d (list %s))'
+            % (ret, stored,
+               " ".join("(cons %d %d)" % (c, m) for c, m in order))
+            for ret, stored, order in case["expect_calls"])
+        lines.append('  (format #t "~a\\t~a\\n" "%s" (join "%s" (list %s)))'
+                     % (case["name"], JOIN, calls))
+    lines.append("  #t)")
+    return "\n".join(lines)
+
+
+def selftest_scheme():
+    """Check the Scheme report formatter against the Python renderer.
+
+    Needs guile on PATH.  Returns a list of problems; an absent guile
+    returns a single INFO-style note, not a failure, because the check
+    is a cross-check of two implementations and guile may be missing on
+    a packaging host.
+    """
+    program = scheme_report_program()
+    try:
+        proc = subprocess.run(["guile", "-c", program],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=60)
+    except (OSError, subprocess.SubprocessError) as err:
+        return ["INFO scheme cross-check skipped (no runnable guile: %s)" % err]
+    if proc.returncode != 0:
+        return ["scheme helpers failed to run: %s"
+                % proc.stderr.decode("utf-8", "replace").strip()[-300:]]
+    problems = []
+    seen = set()
+    for line in proc.stdout.decode("utf-8", "replace").splitlines():
+        if "\t" not in line:
+            continue
+        name, got = line.split("\t", 1)
+        seen.add(name)
+        want = expect_string(_case(name))
+        if got != want:
+            problems.append("scheme fmt-call for %s: got %r want %r"
+                            % (name, got, want))
+    for case in CASES:
+        if "expect_calls" in case and case["name"] not in seen:
+            problems.append("scheme cross-check produced no line for %s"
+                            % case["name"])
+    return problems
+
+
 def selftest():
-    """Exercise the report parsers, the case tables and the source builder.
+    """Exercise the parser, the case tables and the source builder.
 
     Runs on any host: it never allocates a pty and never starts a child.
     Returns 0 when every check passes, 1 otherwise.  The ERT wrappers
@@ -901,11 +893,10 @@ def selftest():
         if case["group"] not in GROUPS:
             problems.append("case %s has an unknown group %r"
                             % (case["name"], case["group"]))
-        if case["kind"] not in ("tokens", "string"):
-            problems.append("case %s has an unknown kind %r"
-                            % (case["name"], case["kind"]))
-        if case["kind"] == "string" and not case.get("probe"):
-            problems.append("string case %s has no probe" % case["name"])
+        if not case.get("probe"):
+            problems.append("case %s has no probe" % case["name"])
+        if "expect" not in case and "expect_calls" not in case:
+            problems.append("case %s declares no expectation" % case["name"])
     for group in GROUPS:
         if not group_cases(group):
             problems.append("group %s has no case" % group)
@@ -917,68 +908,86 @@ def selftest():
     check("m43-imp5-case-count", len(group_cases("m43-imp5")), 1)
     check("total-case-count", len(CASES), 12)
 
-    # --- the "tokens" parser (M42) -----------------------------------
-    # A passing no-input case: an empty order is a quoted empty string,
-    # never the opaque "#<scheme ()>" object a real run would reject.
-    check("empty-order", parse_tokens_report('(0 0 0 "")'), [(0, 0, 0, [])])
-    check("short-read", parse_tokens_report('(2 0 2 "65:0 66:0 ")'),
-          [(2, 0, 2, [(65, 0), (66, 0)])])
-    check("terminal-loss", parse_tokens_report('(-2 1 1 "")'), [(-2, 1, 1, [])])
-    check("no-terminal", parse_tokens_report('(no-terminal 0 0 "")'),
-          [("no-terminal", 0, 0, [])])
-    check("meta-decode",
-          parse_tokens_report('(2 0 2 "1:134217728 97:134217728 ")'),
-          [(2, 0, 2, [(1, META), (97, META)])])
-    # The two-call continuation shape: extra fields after the first order.
-    check("two-calls", parse_tokens_report('(3 0 2 "65:0 7:0 " 0 2 2 "")'),
-          [(3, 0, 2, [(65, 0), (7, 0)]), (0, 2, 2, [])])
-    check("noise-around-report",
-          parse_tokens_report('garbage\n(2 0 2 "65:0 66:0 ")\ntrailing\n'),
-          [(2, 0, 2, [(65, 0), (66, 0)])])
-    check("no-report", parse_tokens_report("no report here"), None)
-    # Regression pin: the old opaque empty-list form must not parse.
-    check("rejects-opaque-empty",
-          parse_tokens_report("(0 0 0 #<scheme ()>)"), None)
-    # A truncated two-call line (one token missing) must not parse.
-    check("rejects-partial-call", parse_tokens_report('(3 0 2 "65:0 " 0 2)'), None)
-
-    # --- the "string" parser (M43) -----------------------------------
-    check("parse-ok", parse_string_report('"ok"'), "ok")
-    check("parse-mismatch", parse_string_report('"mismatch"'), "mismatch")
-    check("parse-noise", parse_string_report('garbage\n"ok"\ntrailing'), "ok")
-    check("parse-no-report", parse_string_report("no report here"), None)
+    # --- the one parser ------------------------------------------------
+    check("parse-ok", parse_report('"ok"'), "ok")
+    check("parse-mismatch", parse_report('"mismatch after=(1 . 2)"'),
+          "mismatch after=(1 . 2)")
+    check("parse-read-path", parse_report('"2 2 65:0,66:0"'), "2 2 65:0,66:0")
+    check("parse-two-calls", parse_report('"3 1 65:0,7:0 | 0 0 -"'),
+          "3 1 65:0,7:0 | 0 0 -")
+    check("parse-noise", parse_report('garbage\n"ok"\ntrailing'), "ok")
+    check("parse-no-report", parse_report("no report here"), None)
     # An elisp error report is the %S of a string, so it is a quoted line
     # too; the parser must return a non-"ok" value that becomes a FAIL.
-    check("parse-error-string", parse_string_report('"#<error>"'), "#<error>")
+    check("parse-error-string", parse_report('"#<error>"'), "#<error>")
+    # Regression pin: the old structured form is not a report any more.
+    # A probe whose value is a list prints unquoted, so it must not parse
+    # -- that is a probe bug, and a FAIL, never a silent pass.
+    check("rejects-unquoted-list", parse_report('(0 0 0 "")'), None)
+    check("rejects-opaque-empty", parse_report("#<scheme ()>"), None)
 
-    # The two parsers must not accept each other's shape, or a report
-    # read with the wrong kind would silently pass.
-    check("tokens-parser-rejects-string", parse_tokens_report('"ok"'), None)
-    check("string-parser-rejects-tokens",
-          parse_string_report('(0 0 0 "")'), None)
+    # --- the report renderer -------------------------------------------
+    check("render-empty-order", render_call(0, 0, []), "0 0 -")
+    check("render-one-event", render_call(2, 2, [(65, 0)]), "2 2 65:0")
+    check("render-two-events", render_call(2, 2, [(65, 0), (66, 0)]),
+          "2 2 65:0,66:0")
+    check("render-negative-return", render_call(-2, 0, []), "-2 0 -")
+    check("render-meta", render_call(2, 2, [(1, META)]), "2 2 1:134217728")
+    # An empty order must never render as the empty string: two adjacent
+    # separators would make the report ambiguous.
+    if render_call(0, 0, []).endswith(" "):
+        problems.append("render_call leaves a trailing separator")
 
-    # --- the verdict --------------------------------------------------
-    check("string-ok-passes", verdict(_case("m43-imp3/pty-e2e"), "ok")[0], "PASS")
-    check("string-other-fails",
+    # --- the expected strings of every case ----------------------------
+    check("expect-case-1", expect_string(_case("m42-imp3/case-1-no-input")),
+          "0 0 -")
+    check("expect-case-2", expect_string(_case("m42-imp3/case-2-short-read")),
+          "2 2 65:0,66:0")
+    check("expect-meta-key-1",
+          expect_string(_case("m42-imp4/case-3-meta-key-1")),
+          "2 2 1:134217728,97:134217728")
+    check("expect-meta-key-2",
+          expect_string(_case("m42-imp4/case-3-meta-key-2")),
+          "2 2 129:0,225:0")
+    check("expect-meta-key-0",
+          expect_string(_case("m42-imp4/case-3-meta-key-0")),
+          "2 2 1:0,97:0")
+    check("expect-quit-byte", expect_string(_case("m42-imp4/case-4-quit-byte")),
+          "5 2 65:0,66:0,7:0")
+    check("expect-meta-quit-guard",
+          expect_string(_case("m42-imp4/case-4-meta-quit-guard")),
+          "2 2 65:0,7:134217728")
+    check("expect-terminal-loss",
+          expect_string(_case("m42-imp4/case-5-terminal-loss")), "-2 0 -")
+    check("expect-continuation",
+          expect_string(_case("m42-imp4/case-6-continuation")),
+          "3 1 65:0,7:0 | 0 0 -")
+    for case in M43_CASES:
+        check("expect-%s" % case["name"], expect_string(case), "ok")
+
+    # --- the verdict ----------------------------------------------------
+    check("ok-passes", verdict(_case("m43-imp3/pty-e2e"), "ok")[0], "PASS")
+    check("other-fails",
           verdict(_case("m43-imp3/pty-e2e"), "mismatch x=1")[0], "FAIL")
-    check("tokens-match-passes",
-          verdict(_case("m42-imp3/case-1-no-input"), [(0, 0, 0, [])])[0], "PASS")
-    check("tokens-mismatch-fails",
-          verdict(_case("m42-imp3/case-1-no-input"), [(1, 0, 1, [])])[0], "FAIL")
+    check("read-path-match-passes",
+          verdict(_case("m42-imp3/case-1-no-input"), "0 0 -")[0], "PASS")
+    check("read-path-mismatch-fails",
+          verdict(_case("m42-imp3/case-1-no-input"), "1 1 65:0")[0], "FAIL")
     # The env_gate case reports INFO on a mismatch, never a FAIL.
     check("env-gate-mismatch-is-info",
-          verdict(_case("m42-imp4/case-5-terminal-loss"), [(0, 0, 0, [])])[0],
-          "INFO")
+          verdict(_case("m42-imp4/case-5-terminal-loss"), "0 0 -")[0], "INFO")
+    # ... but it still PASSes on the expected value.
+    check("env-gate-match-passes",
+          verdict(_case("m42-imp4/case-5-terminal-loss"), "-2 0 -")[0], "PASS")
 
-    # --- the M42 case-table models ------------------------------------
+    # --- the M42 case-table models --------------------------------------
     # The case-6 continuation must match the code under test: the first
     # read consumes the whole FIONREAD batch, so the byte after the quit
     # char is dropped and call 2 sees an empty tty (return 0, stored 0, no
     # events).  A return of 1 with event 66 would be a false FAIL on a
     # host with a pty.
-    cont = _case("m42-imp4/case-6-continuation")
     check("case-6-continuation-model",
-          [(e["return"], e["stored"], e["order"]) for e in cont["expect_calls"]],
+          _case("m42-imp4/case-6-continuation")["expect_calls"],
           [(3, 1, [(0x41, 0), (0x07, 0)]), (0, 0, [])])
 
     # FIX-20260928-guilemacs: the chosen model: a raw C-g is decoded but
@@ -990,28 +999,24 @@ def selftest():
     # quit_char, so it IS stored.  Pin both the guard and the case-4
     # stored counts, so a regression in either is a SELFTEST FAIL on any
     # host (no pty needed).
-    guard = _case("m42-imp4/case-4-meta-quit-guard")
     check("case-4-meta-quit-guard-model",
-          (guard["expect_return"], guard["expect_stored"], guard["expect_order"]),
-          (2, 2, [(0x41, 0), (0x07, META)]))
-    quitcase = _case("m42-imp4/case-4-quit-byte")
+          _case("m42-imp4/case-4-meta-quit-guard")["expect_calls"],
+          [(2, 2, [(0x41, 0), (0x07, META)])])
     check("case-4-quit-byte-stored-model",
-          (quitcase["expect_return"], quitcase["expect_stored"],
-           quitcase["expect_order"]),
-          (5, 2, [(0x41, 0), (0x42, 0), (0x07, 0)]))
+          _case("m42-imp4/case-4-quit-byte")["expect_calls"],
+          [(5, 2, [(0x41, 0), (0x42, 0), (0x07, 0)])])
 
     # Case 5 is a measured case, not an unconditional skip: it closes the
-    # pty master and expects the -2 (EIO) arm.  It must not carry a
-    # `skip` reason.
+    # pty master and expects the -2 (EIO) arm.
     term_loss = _case("m42-imp4/case-5-terminal-loss")
     if term_loss.get("skip"):
         problems.append("case-5-terminal-loss is an unconditional skip")
     if not term_loss.get("close_master"):
         problems.append("case-5-terminal-loss does not close the pty master")
-    if term_loss["expect_return"] != -2 or term_loss["expect_stored"] != 0:
-        problems.append("case-5-terminal-loss does not expect the -2 arm")
+    check("case-5-terminal-loss-model", term_loss["expect_calls"],
+          [(-2, 0, [])])
 
-    # --- the child source: shared parts -------------------------------
+    # --- the child source: shared parts ---------------------------------
     src = build_child_source(_case("m42-imp3/case-1-no-input"))
     if "eval-scheme" not in src:
         problems.append("child source lost the eval-scheme call")
@@ -1030,35 +1035,63 @@ def selftest():
     # `sigaction' still reaches the READY signal.
     if '(condition-case nil (eval-scheme "(sigaction 1 1)") (error nil))' not in src:
         problems.append("child source does not guard the SIGHUP ignore call")
-    # Every case must build a child source, whatever its kind.
+    # Every case must build a child source with no placeholder left.
+    # build_probe raises on an unresolved @@NAME@@, so this also proves
+    # each case fills in every placeholder its probe declares.
     for case in CASES:
-        if "eval-scheme" not in build_child_source(case):
-            problems.append("case %s builds no child source" % case["name"])
+        try:
+            if "eval-scheme" not in build_child_source(case):
+                problems.append("case %s builds no child source" % case["name"])
+        except AssertionError as err:
+            problems.append(str(err))
+    # The guard has teeth: an unfilled placeholder must raise.
+    try:
+        build_probe({"name": "probe-guard", "probe": "@@NOPE@@", "subst": {}})
+        problems.append("build_probe accepts an unresolved placeholder")
+    except AssertionError:
+        pass
 
-    # --- the child source: the M42 read-path probe --------------------
+    # --- the child source: the M42 read-path probe ------------------------
     if "module-ref mod 'tty-read-avail-input!" not in src:
         problems.append("probe does not resolve tty-read-avail-input! via module-ref")
     if "(tty-read-avail-input! term)" in src:
         problems.append("probe still calls tty-read-avail-input! unqualified")
     # %terminal-list and %--kbd-buffer-nr-stored force to procedures that
     # must be called: a single (force ...) reads the procedure, not its
-    # value, and the report carries non-numeric fields the regex rejects.
+    # value, and the report would carry a procedure instead of a count.
     if "((force (module-ref mod '%terminal-list)))" not in src:
         problems.append("probe does not call the forced %terminal-list procedure")
     if "((force nr))" not in src:
         problems.append("probe does not call the forced %--kbd-buffer-nr-stored procedure")
-    # The probe records (code . mods) and reports "code:mods" tokens.
     probe = build_probe(_case("m42-imp3/case-1-no-input"))
+    # The probe records (code . mods) and reports "code:mods" tokens.
     if "(cons code mods)" not in probe:
         problems.append("probe does not record the modifier with the code")
     if '":"' not in probe:
-        problems.append("probe does not build a code:mods order string")
+        problems.append("probe does not build a code:mods order token")
+    # The probe computes the STORED count itself, as a difference.  An
+    # absolute count would depend on what the buffer held at startup.
+    if "(- n1 prev)" not in probe:
+        problems.append("probe does not report stored as a difference")
+    # The probe builds the one wire format: the EMPTY token for no events
+    # and the JOIN separator between calls.
+    if '"%s"' % EMPTY not in probe:
+        problems.append("probe does not emit the EMPTY token for an empty order")
+    if '"%s"' % JOIN not in probe:
+        problems.append("probe does not join the calls with the JOIN separator")
     # The probe takes the newest terminal.  %terminal-list is oldest-first,
     # so the head is the oldest; the probe must reverse it.
     if "(and (pair? terms) (car terms))" in probe:
         problems.append("probe takes the oldest terminal, not the newest")
     if "(reverse terms)" not in probe:
         problems.append("probe does not select the newest terminal")
+    # The call count comes from the length of the expected call list, so a
+    # case cannot ask for two calls and expect one report field.
+    if "(calls 1)" not in probe:
+        problems.append("single-call case does not set calls to 1")
+    two = build_probe(_case("m42-imp4/case-6-continuation"))
+    if "(calls 2)" not in two:
+        problems.append("continuation case does not set calls to 2")
 
     # Stubs appear only when a case asks for them, and restore after.
     if "%--tty-meta-key (delay (lambda (t)" in src:
@@ -1071,7 +1104,7 @@ def selftest():
     if "(module-set! mod '%--tty-meta-key meta-o)" not in stubbed:
         problems.append("probe does not restore %--tty-meta-key")
 
-    # --- the child source: the M43 probes -----------------------------
+    # --- the child source: the M43 probes ---------------------------------
     mode_src = build_child_source(_case("m43-imp3/pty-e2e"))
     if "module-ref mod 'tty-mode-wanted" not in mode_src:
         problems.append("mode probe does not resolve tty-mode-wanted via module-ref")
@@ -1091,20 +1124,25 @@ def selftest():
         problems.append("size probe does not resolve set-tty-size via module-ref")
     if "set-size 0 30 100" not in size_src:
         problems.append("size probe does not apply a known size through set-tty-size")
-    # A string case must not carry the read-path probe, and the other way
-    # round: a swapped probe would report the wrong shape and never parse.
+    # Each M43 probe reports "ok" on success, which is what its case
+    # expects; a probe that lost that literal could never pass.
+    for case in M43_CASES:
+        if '"ok"' not in case["probe"]:
+            problems.append("probe of %s cannot report ok" % case["name"])
+    # A probe must not carry another family's body: a swapped probe would
+    # report the wrong string and never match.
     if "tty-read-avail-input!" in mode_src:
         problems.append("the mode case carries the read-path probe")
     if "tty-mode-wanted" in src:
         problems.append("the read-path case carries the mode probe")
 
-    # --- the ISIG clear ------------------------------------------------
+    # --- the ISIG clear ---------------------------------------------------
     # FIX-20260928-guilemacs: run_case must clear ISIG on the pty before it
     # writes the case bytes.  Emacs arms the tty with ISIG and
     # c_cc[VQUIT] = quit_char (src/sysdep.c, init_sys_modes), so the line
     # discipline reads a written raw quit byte as VQUIT, flushes the queue
-    # and raises SIGQUIT.  The failing run measured (2, 2, [67, 68]) for
-    # case 4 and (1, 1, [66]) for case 6 -- the bytes after the quit byte
+    # and raises SIGQUIT.  The failing run measured "2 2 67:0,68:0" for
+    # case 4 and "1 1 66:0" for case 6 -- the bytes after the quit byte
     # only.  Without the clear, both cases fail on a pty host.
     deliver_src = inspect.getsource(deliver_raw)
     run_src = inspect.getsource(run_case)
@@ -1168,6 +1206,17 @@ def selftest():
     finally:
         termios.tcgetattr = saved_getattr
         termios.tcsetattr = saved_setattr
+
+    # --- the Scheme formatter against the Python renderer ---------------
+    # The probe's fmt-call only ever runs inside the child, on a pty
+    # host.  This drives the same helpers under guile and compares them
+    # with render_call, so a formatter that disagrees with the expected
+    # string is caught here instead of on a pty host.
+    for problem in selftest_scheme():
+        if problem.startswith("INFO "):
+            print("SELFTEST %s" % problem)
+        else:
+            problems.append(problem)
 
     if problems:
         for problem in problems:

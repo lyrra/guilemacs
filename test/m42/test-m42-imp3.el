@@ -176,9 +176,20 @@
                           (m42-imp3--driver-source))))
 
 (ert-deftest m42-imp3/driver-reports-order-as-string ()
-  ;; An empty stored-order list must not print as the opaque
-  ;; "#<scheme ()>" object, which the driver regex would reject.
-  (should (string-match-p "order-str" (m42-imp3--driver-source))))
+  ;; The report is ONE format: the probe's value is a string, so the
+  ;; driver has one regex and one comparison.  An empty stored-order
+  ;; list must not reach the report as an empty string (invisible
+  ;; between two separators) nor as the opaque "#<scheme ()>" object;
+  ;; the probe writes the EMPTY token "-" instead.
+  ;; NOTE: `string-match-p' takes a REGEXP, and `?' is a quantifier in
+  ;; Emacs syntax, so a needle must avoid Scheme's `null?' and friends
+  ;; unless it is quoted.
+  (let ((src (m42-imp3--driver-source)))
+    (should (string-match-p "EMPTY = \"-\"" src))
+    (should (string-match-p (regexp-quote "(if (null? ev) \"@@EMPTY@@\"") src))
+    ;; The stored count is a difference, so the expected string does not
+    ;; depend on what kbd_buffer held when the child started.
+    (should (string-match-p "(- n1 prev)" src))))
 
 (ert-deftest m42-imp3/driver-calls-forced-defelisp-leaves ()
   ;; %terminal-list and %--kbd-buffer-nr-stored are defelisp promises

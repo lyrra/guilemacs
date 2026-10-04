@@ -138,11 +138,15 @@
     (should (string-match-p "code:mods" src))))
 
 (ert-deftest m42-imp4/driver-regex-accepts-two-calls ()
-  ;; REPORT_RE must accept the single-call shape and the extra-call
-  ;; fields (brief.org).
+  ;; The report is ONE format, so there is one REPORT_RE.  A multi-call
+  ;; case puts its calls in that one string, joined with " | ", and the
+  ;; continuation case pins the exact two-call string.
   (let ((src (m42-imp4--driver-source)))
     (should (string-match-p "REPORT_RE" src))
-    (should (string-match-p "no-terminal|-?" src))))
+    (should (string-match-p "JOIN = \" | \"" src))
+    (should (string-match-p "3 1 65:0,7:0 | 0 0 -" src))
+    ;; A terminal that went away reports the word, not a number.
+    (should (string-match-p "no-terminal" src))))
 
 (ert-deftest m42-imp4/driver-has-group-selector ()
   (should (string-match-p "--group" (m42-imp4--driver-source))))
@@ -152,17 +156,23 @@
   ;; ignores SIGHUP before the read and the driver closes the pty master,
   ;; so the slave read fails with EIO -> the close-terminal result -2.  A
   ;; host that cannot give EIO reports an environment-gated INFO skip.
-  ;; The case must be a measured case, not an unconditional `skip`.  Check
-  ;; the case entry itself -- a positive check on the case table, not a
-  ;; whole-file negative match that an unrelated `skip` key would break.
+  ;; The case must be a measured case, not an unconditional `skip`.  The
+  ;; case is built by `read_path_case', so pin its arguments rather than
+  ;; a dict literal: the name, the two flags, and the expected report.
+  ;; The driver's own --selftest pins the (-2, 0, []) model structurally.
   (let* ((src (m42-imp4--driver-source))
-         (entry (and (string-match "m42-imp4/case-5-terminal-loss[^}]*}" src)
+         (entry (and (string-match
+                      "m42-imp4/case-5-terminal-loss\\(.\\|\n\\)*?env_gate=[^\n]*"
+                      src)
                      (match-string 0 src))))
     (should entry)
-    (should (string-match-p "close_master" entry))
-    (should (string-match-p "env_gate" entry))
-    (should (string-match-p "\"expect_return\": -2" entry))
-    (should-not (string-match-p "\"skip\":" entry))))
+    (should (string-match-p "close_master=True" entry))
+    (should (string-match-p "env_gate=" entry))
+    ;; -2 is the close-terminal result and nothing is stored.
+    (should (string-match-p "(-2, 0, \\[\\])" entry))
+    (should-not (string-match-p "\"skip\"" entry))
+    ;; The expected report string for the -2 arm.
+    (should (string-match-p "\"-2 0 -\"" src))))
 
 (ert-deftest m42-imp4/child-binds-inhibit-quit ()
   ;; brief.org: a stored quit byte (cases 4 and 6) sets
