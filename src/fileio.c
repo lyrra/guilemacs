@@ -465,6 +465,123 @@ substitute_in_file_name_scheme (Lisp_Object fn)
   return SCM_CALL_1 (proc, fn);
 }
 
+/* FIX-20261004-guilemacs: M47 imp-4 -- the G2 dispatch helpers over the
+   G2 OS-query predicate policy of (emacs fileio).  The hub keeps the
+   handler dispatch and the name resolution; the module owns the
+   decision; the typed C leaf holds the OS query only (brief.org
+   section 5).  Each helper resolves its module procedure once, so the
+   tree-wide module-ref pin stays at one place per block.  */
+
+static Lisp_Object
+file_exists_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-exists-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_executable_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-executable-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_readable_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-readable-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_writable_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-writable-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+access_file_scheme (Lisp_Object absname, Lisp_Object operation)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-access-file");
+  return SCM_CALL_2 (proc, absname, operation);
+}
+
+static Lisp_Object
+file_symlink_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-symlink-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_directory_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-directory-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_regular_p_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-regular-p");
+  return SCM_CALL_1 (proc, absname);
+}
+
+static Lisp_Object
+file_modes_scheme (Lisp_Object absname, Lisp_Object flag)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-modes");
+  return SCM_CALL_2 (proc, absname, flag);
+}
+
+static Lisp_Object
+file_newer_than_file_p_scheme (Lisp_Object absname1, Lisp_Object absname2)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-newer-than-file-p");
+  return SCM_CALL_2 (proc, absname1, absname2);
+}
+
+static Lisp_Object
+file_system_info_scheme (Lisp_Object absname)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-file-system-info");
+  return SCM_CALL_1 (proc, absname);
+}
+
+/* The G2 leaf -> hub error channel.  brief.org section 12: a Guile call
+   can clobber `errno', so a leaf captures the error in these two words
+   before the layer returns, and the hub runs the report.  G2_ERRNO_FILE
+   selects the name the hub reports on: 0 = none, 1 = the first name, 2 =
+   the second name.  Only the 4 blocks that report a file error
+   (`access-file', `file-modes', `file-newer-than-file-p',
+   `file-system-info') use the channel.  */
+
+static int fileio_g2_errno;
+static int fileio_g2_errno_file;
+
 /* The pure byte-level mechanism of find-file-name-handler: the walk of
    `file-name-handler-alist'.  It returns a plain value only: the
    handler or nil.  It runs no handler call, changes no buffer, and has
@@ -2644,26 +2761,47 @@ file_name_absolute_p (char const *filename)
 		  || user_homedir (&filename[1]))));
 }
 
-/* Return t if FILE exists and is accessible via OPERATION and AMODE,
-   nil (setting errno) if not.  */
+/* FIX-20261004-guilemacs: M47 imp-4 -- the pure byte-level mechanism of
+   the access family: one `access' query over an ALREADY expanded name.
+   It runs no handler call and no name expansion (brief.org section
+   4.1).  The hub keeps the handler dispatch and the name resolution.  */
 
 static Lisp_Object
-check_file_access (Lisp_Object file, Lisp_Object operation, int amode)
+check_file_access_1 (Lisp_Object absname, int amode)
 {
-  file = Fexpand_file_name (file, Qnil);
-  Lisp_Object handler = Ffind_file_name_handler (file, operation);
-  if (!NILP (handler))
-    {
-      Lisp_Object ok = call2 (handler, operation, file);
-      /* This errno value is bogus.  Any caller that depends on errno
-	 should be rethought anyway, to avoid a race between testing a
-	 handled file's accessibility and using the file.  */
-      errno = 0;
-      return ok;
-    }
-
-  char *encoded_file = SSDATA (ENCODE_FILE (file));
+  char *encoded_file = SSDATA (ENCODE_FILE (absname));
   return file_access_p (encoded_file, amode) ? Qt : Qnil;
+}
+
+/* FIX-20261004-guilemacs: M47 imp-4 -- the pure write-access mechanism
+   of `file-writable-p' over an ALREADY expanded name.  It holds the
+   W_OK test, the ENOENT fallback to the parent directory, and the
+   W_OK | X_OK test (brief.org section 4.2).  The hub keeps the handler
+   dispatch and the name resolution.  */
+
+static Lisp_Object
+file_writable_p_1 (Lisp_Object absname)
+{
+  Lisp_Object dir, encoded = ENCODE_FILE (absname);
+  if (file_access_p (SSDATA (encoded), W_OK))
+    return Qt;
+  if (errno != ENOENT)
+    return Qnil;
+
+  dir = file_name_directory (absname);
+  eassert (!NILP (dir));
+#ifdef MSDOS
+  dir = Fdirectory_file_name (dir);
+#endif /* MSDOS */
+  encoded = ENCODE_FILE (dir);
+#ifdef WINDOWSNT
+  /* The read-only attribute of the parent directory doesn't affect
+     whether a file or directory can be created within it.  Some day we
+     should check ACLs though, which do affect this.  */
+  return file_directory_p (encoded) ? Qt : Qnil;
+#else
+  return file_access_p (SSDATA (encoded), W_OK | X_OK) ? Qt : Qnil;
+#endif
 }
 
 DEFUN ("file-exists-p", Ffile_exists_p, Sfile_exists_p, 1, 1, 0,
@@ -2675,7 +2813,26 @@ This returns nil for a symlink to a nonexistent file.
 Use `file-symlink-p' to test for such links.  */)
   (Lisp_Object filename)
 {
-  return check_file_access (filename, Qfile_exists_p, F_OK);
+  Lisp_Object absname, handler;
+  CHECK_STRING (filename);
+  absname = Fexpand_file_name (filename, Qnil);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (absname, Qfile_exists_p);
+  if (!NILP (handler))
+    {
+      Lisp_Object ok = call2 (handler, Qfile_exists_p, absname);
+      /* This errno value is bogus.  Any caller that depends on errno
+	 should be rethought anyway, to avoid a race between testing a
+	 handled file's accessibility and using the file.  */
+      errno = 0;
+      return ok;
+    }
+
+  /* The module owns the access decision; the leaf runs the `access'
+     query (brief.org section 4.1).  */
+  return file_exists_p_scheme (absname);
 }
 
 DEFUN ("file-executable-p", Ffile_executable_p, Sfile_executable_p, 1, 1, 0,
@@ -2685,7 +2842,23 @@ For a directory, this means you can access files in that directory.
 purpose, though.)  */)
   (Lisp_Object filename)
 {
-  return check_file_access (filename, Qfile_executable_p, X_OK);
+  Lisp_Object absname, handler;
+  CHECK_STRING (filename);
+  absname = Fexpand_file_name (filename, Qnil);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (absname, Qfile_executable_p);
+  if (!NILP (handler))
+    {
+      Lisp_Object ok = call2 (handler, Qfile_executable_p, absname);
+      errno = 0;
+      return ok;
+    }
+
+  /* The module owns the access decision; the leaf runs the `access'
+     query (brief.org section 4.1).  */
+  return file_executable_p_scheme (absname);
 }
 
 DEFUN ("file-readable-p", Ffile_readable_p, Sfile_readable_p, 1, 1, 0,
@@ -2693,15 +2866,30 @@ DEFUN ("file-readable-p", Ffile_readable_p, Sfile_readable_p, 1, 1, 0,
 See also `file-exists-p' and `file-attributes'.  */)
   (Lisp_Object filename)
 {
-  return check_file_access (filename, Qfile_readable_p, R_OK);
+  Lisp_Object absname, handler;
+  CHECK_STRING (filename);
+  absname = Fexpand_file_name (filename, Qnil);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (absname, Qfile_readable_p);
+  if (!NILP (handler))
+    {
+      Lisp_Object ok = call2 (handler, Qfile_readable_p, absname);
+      errno = 0;
+      return ok;
+    }
+
+  /* The module owns the access decision; the leaf runs the `access'
+     query (brief.org section 4.1).  */
+  return file_readable_p_scheme (absname);
 }
 
 DEFUN ("file-writable-p", Ffile_writable_p, Sfile_writable_p, 1, 1, 0,
        doc: /* Return t if file FILENAME can be written or created by you.  */)
   (Lisp_Object filename)
 {
-  Lisp_Object absname, dir, encoded;
-  Lisp_Object handler;
+  Lisp_Object absname, handler;
 
   absname = Fexpand_file_name (filename, Qnil);
 
@@ -2711,27 +2899,9 @@ DEFUN ("file-writable-p", Ffile_writable_p, Sfile_writable_p, 1, 1, 0,
   if (!NILP (handler))
     return call2 (handler, Qfile_writable_p, absname);
 
-  encoded = ENCODE_FILE (absname);
-  if (file_access_p (SSDATA (encoded), W_OK))
-    return Qt;
-  if (errno != ENOENT)
-    return Qnil;
-
-  dir = file_name_directory (absname);
-  eassert (!NILP (dir));
-#ifdef MSDOS
-  dir = Fdirectory_file_name (dir);
-#endif /* MSDOS */
-
-  encoded = ENCODE_FILE (dir);
-#ifdef WINDOWSNT
-  /* The read-only attribute of the parent directory doesn't affect
-     whether a file or directory can be created within it.  Some day we
-     should check ACLs though, which do affect this.  */
-  return file_directory_p (encoded) ? Qt : Qnil;
-#else
-  return file_access_p (SSDATA (encoded), W_OK | X_OK) ? Qt : Qnil;
-#endif
+  /* The module owns the write-access decision; the leaf runs the pure
+     mechanism `file_writable_p_1' (brief.org section 4.2).  */
+  return file_writable_p_scheme (absname);
 }
 
 DEFUN ("access-file", Faccess_file, Saccess_file, 2, 2, 0,
@@ -2740,7 +2910,7 @@ The second argument STRING is prepended to the error message.
 If there is no error, returns nil.  */)
   (Lisp_Object filename, Lisp_Object string)
 {
-  Lisp_Object handler, encoded_filename, absname;
+  Lisp_Object handler, absname;
 
   CHECK_STRING (filename);
   absname = Fexpand_file_name (filename, Qnil);
@@ -2753,11 +2923,12 @@ If there is no error, returns nil.  */)
   if (!NILP (handler))
     return call3 (handler, Qaccess_file, absname, string);
 
-  encoded_filename = ENCODE_FILE (absname);
-
-  if (sys_faccessat (AT_FDCWD, SSDATA (encoded_filename), R_OK,
-		     AT_EACCESS) != 0)
-    report_file_error (SSDATA (string), filename);
+  /* The module owns the decision; the leaf runs the `faccessat' query.
+     The leaf captures errno in the G2 channel, because the Guile call
+     can clobber it (brief.org section 4.3 and section 12).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (access_file_scheme (absname, Qaccess_file)))
+    report_file_errno (SSDATA (string), filename, fileio_g2_errno);
 
   return Qnil;
 }
@@ -2838,7 +3009,9 @@ This function does not check whether the link target exists.  */)
   if (!NILP (handler))
     return call2 (handler, Qfile_symlink_p, filename);
 
-  return emacs_readlinkat (AT_FDCWD, SSDATA (ENCODE_FILE (filename)));
+  /* The module owns the decision; the leaf runs the pure
+     `emacs_readlinkat' read (brief.org section 4.4).  */
+  return file_symlink_p_scheme (filename);
 }
 
 DEFUN ("file-directory-p", Ffile_directory_p, Sfile_directory_p, 1, 1, 0,
@@ -2862,7 +3035,9 @@ See `file-symlink-p' to distinguish symlinks.  */)
   if (!NILP (handler))
     return call2 (handler, Qfile_directory_p, absname);
 
-  return file_directory_p (ENCODE_FILE (absname)) ? Qt : Qnil;
+  /* The module owns the decision; the leaf runs the pure
+     `file_directory_p' query (brief.org section 4.5).  */
+  return file_directory_p_scheme (absname);
 }
 
 /* Return true if FILE is a directory or a symlink to a directory.
@@ -3024,7 +3199,6 @@ Symbolic links to regular files count as regular files.
 See `file-symlink-p' to distinguish symlinks.  */)
   (Lisp_Object filename)
 {
-  struct stat st;
   Lisp_Object absname = expand_and_dir_to_file (filename);
 
   /* If the file name has special constructs in it,
@@ -3033,19 +3207,9 @@ See `file-symlink-p' to distinguish symlinks.  */)
   if (!NILP (handler))
     return call2 (handler, Qfile_regular_p, absname);
 
-#ifdef WINDOWSNT
-  /* Tell stat to use expensive method to get accurate info.  */
-  Lisp_Object true_attributes = Vw32_get_true_file_attributes;
-  Vw32_get_true_file_attributes = Qt;
-#endif
-
-  int stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
-
-#ifdef WINDOWSNT
-  Vw32_get_true_file_attributes = true_attributes;
-#endif
-
-  return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
+  /* The module owns the decision; the leaf holds the `fstatat' +
+     `S_ISREG' query (brief.org section 4.6).  */
+  return file_regular_p_scheme (absname);
 }
 
 DEFUN ("file-selinux-context", Ffile_selinux_context,
@@ -3311,7 +3475,6 @@ Return nil if FILENAME does not exist.  If optional FLAG is `nofollow',
 do not follow FILENAME if it is a symbolic link.  */)
   (Lisp_Object filename, Lisp_Object flag)
 {
-  struct stat st;
   int nofollow = symlink_nofollow_flag (flag);
   Lisp_Object absname = expand_and_dir_to_file (filename);
 
@@ -3321,10 +3484,17 @@ do not follow FILENAME if it is a symbolic link.  */)
   if (!NILP (handler))
     return call3 (handler, Qfile_modes, absname, flag);
 
-  char *fname = SSDATA (ENCODE_FILE (absname));
-  if (emacs_fstatat (AT_FDCWD, fname, &st, nofollow) != 0)
-    return file_attribute_errno (absname, errno);
-  return make_fixnum (st.st_mode & 07777);
+  /* The module owns the decision; the leaf holds the `fstatat' read and
+     the `st_mode & 07777' mask.  The hub keeps symlink_nofollow_flag and
+     runs the error report on the G2 errno channel (brief.org section
+     4.7 and section 12).  */
+  fileio_g2_errno_file = 0;
+  {
+    Lisp_Object modes = file_modes_scheme (absname, make_fixnum (nofollow));
+    if (NILP (modes) && fileio_g2_errno_file == 1)
+      return file_attribute_errno (absname, fileio_g2_errno);
+    return modes;
+  }
 }
 
 DEFUN ("set-file-modes", Fset_file_modes, Sset_file_modes, 2, 3,
@@ -3461,9 +3631,6 @@ if FILE2 does not exist, the return value is t.
 For existing files, this compares their last-modified times.  */)
   (Lisp_Object file1, Lisp_Object file2)
 {
-  struct stat st1, st2;
-  Lisp_Object encoded;
-
   CHECK_STRING (file1);
   CHECK_STRING (file2);
 
@@ -3479,27 +3646,19 @@ For existing files, this compares their last-modified times.  */)
   if (!NILP (handler))
     return call3 (handler, Qfile_newer_than_file_p, absname1, absname2);
 
-  encoded = ENCODE_FILE (absname1);
-
-  int err1;
-  if (emacs_fstatat (AT_FDCWD, SSDATA (encoded), &st1, 0) == 0)
-    err1 = 0;
-  else
-    {
-      err1 = errno;
-      if (err1 != EOVERFLOW)
-	return file_attribute_errno (absname1, err1);
-    }
-  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname2)), &st2, 0) != 0)
-    {
-      file_attribute_errno (absname2, errno);
-      return Qt;
-    }
-  if (err1)
-    file_attribute_errno (absname1, err1);
-
-  return (timespec_cmp (get_stat_mtime (&st2), get_stat_mtime (&st1)) < 0
-	  ? Qt : Qnil);
+  /* The module owns the decision; the leaf holds the two `fstatat'
+     calls and the `timespec_cmp' compare.  The hub runs the error
+     report on the G2 errno channel (brief.org section 4.8 and section
+     12).  */
+  fileio_g2_errno_file = 0;
+  {
+    Lisp_Object newer = file_newer_than_file_p_scheme (absname1, absname2);
+    if (fileio_g2_errno_file == 1)
+      file_attribute_errno (absname1, fileio_g2_errno);
+    else if (fileio_g2_errno_file == 2)
+      file_attribute_errno (absname2, fileio_g2_errno);
+    return newer;
+  }
 }
 
 enum { READ_BUF_SIZE = MAX_ALLOCA };
@@ -6238,32 +6397,18 @@ If the underlying system call fails, value is nil.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
-  /* Try to detect whether or not fsusage.o is actually built.  */
-#if defined STAT_STATFS2_BSIZE || defined STAT_STATFS2_FRSIZE	\
-  || defined STAT_STATFS2_FSIZE || defined STAT_STATFS3_OSF1	\
-  || defined STAT_STATFS4 || defined STAT_STATVFS		\
-  || defined STAT_STATVFS64
-  struct fs_usage u;
-  const char *name;
-
-  name = SSDATA (ENCODE_FILE (filename));
-
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* With special directories, this information is unavailable.  */
-  if (android_is_special_directory (name, "/assets")
-      || android_is_special_directory (name, "/content"))
-    return Qnil;
-#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
-
-  if (get_fs_usage (name, NULL, &u) != 0)
-    return errno == ENOSYS ? Qnil : file_attribute_errno (filename, errno);
-  return list3 (blocks_to_bytes (u.fsu_blocksize, u.fsu_blocks, false),
-		blocks_to_bytes (u.fsu_blocksize, u.fsu_bfree, false),
-		blocks_to_bytes (u.fsu_blocksize, u.fsu_bavail,
-				 u.fsu_bavail_top_bit_set));
-#else
-  return Qnil;
-#endif
+  /* The module owns the decision; the leaf holds the `get_fs_usage' /
+     `statvfs' query and the `blocks_to_bytes' conversion.  The hub runs
+     the error report on the G2 errno channel (brief.org section 4.9 and
+     section 12).  */
+  fileio_g2_errno_file = 0;
+  {
+    Lisp_Object info = file_system_info_scheme (filename);
+    if (NILP (info) && fileio_g2_errno_file == 1)
+      return fileio_g2_errno == ENOSYS ? Qnil
+	: file_attribute_errno (filename, fileio_g2_errno);
+    return info;
+  }
 }
 
 #endif /* !DOS_NT */
@@ -6475,7 +6620,7 @@ section 5.  */)
 #ifndef MSDOS
   if (!STRINGP (fn))
     return Qnil;
-  return check_file_access (fn, Qfile_exists_p, F_OK);
+  return check_file_access_1 (fn, F_OK);
 #else
   return Qnil;
 #endif
@@ -6492,7 +6637,7 @@ section 5.  */)
 #ifndef MSDOS
   if (!STRINGP (fn))
     return Qnil;
-  return check_file_access (fn, Qfile_executable_p, X_OK);
+  return check_file_access_1 (fn, X_OK);
 #else
   return Qnil;
 #endif
@@ -6509,7 +6654,7 @@ section 5.  */)
 #ifndef MSDOS
   if (!STRINGP (fn))
     return Qnil;
-  return check_file_access (fn, Qfile_readable_p, R_OK);
+  return check_file_access_1 (fn, R_OK);
 #else
   return Qnil;
 #endif
@@ -6523,33 +6668,12 @@ policy of `file-writable-p'.  M47 imp-2, brief.org section 5.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object absname, encoded;
-
   if (!STRINGP (fn))
     return Qnil;
-
-  /* The pure write-access policy, NOT the hub Ffile_writable_p
-     (cr.org F1).  The hub keeps the handler dispatch.  */
-  absname = Fexpand_file_name (fn, Qnil);
-  encoded = ENCODE_FILE (absname);
-  if (file_access_p (SSDATA (encoded), W_OK))
-    return Qt;
-  if (errno != ENOENT)
-    return Qnil;
-
-  {
-    Lisp_Object dir = file_name_directory (absname);
-    eassert (!NILP (dir));
-#ifdef MSDOS
-    dir = Fdirectory_file_name (dir);
-#endif
-    encoded = ENCODE_FILE (dir);
-#ifdef WINDOWSNT
-    return file_directory_p (encoded) ? Qt : Qnil;
-#else
-    return file_access_p (SSDATA (encoded), W_OK | X_OK) ? Qt : Qnil;
-#endif
-  }
+  /* The pure write-access mechanism `file_writable_p_1' over the ALREADY
+     expanded name, NOT the hub Ffile_writable_p (cr.org F1, brief.org
+     section 4.2).  The hub keeps the handler dispatch.  */
+  return file_writable_p_1 (fn);
 #else
   return Qnil;
 #endif
@@ -6565,14 +6689,20 @@ The decision is one `faccessat' query.  M47 imp-2, brief.org section
   (Lisp_Object fn, Lisp_Object op)
 {
 #ifndef MSDOS
-  Lisp_Object absname;
   (void) op;			/* OP is the hub's handler key, not policy */
   if (!STRINGP (fn))
     return Qnil;
-  absname = Fexpand_file_name (fn, Qnil);
-  return (sys_faccessat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)), R_OK,
-			 AT_EACCESS) == 0)
-	 ? Qt : Qnil;
+  /* The pure mechanism over the ALREADY expanded name, NOT the hub
+     Faccess_file (cr.org F1, brief.org section 4.3).  The leaf captures
+     errno in the G2 channel for the hub's report.  */
+  if (sys_faccessat (AT_FDCWD, SSDATA (ENCODE_FILE (fn)), R_OK,
+		     AT_EACCESS) != 0)
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+      return Qnil;
+    }
+  return Qt;
 #else
   return Qnil;
 #endif
@@ -6587,11 +6717,11 @@ section 5.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object absname;
   if (!STRINGP (fn))
     return Qnil;
-  absname = Fexpand_file_name (fn, Qnil);
-  return emacs_readlinkat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)));
+  /* The pure mechanism over the ALREADY expanded name, NOT the hub
+     Ffile_symlink_p (cr.org F1, brief.org section 4.4).  */
+  return emacs_readlinkat (AT_FDCWD, SSDATA (ENCODE_FILE (fn)));
 #else
   return Qnil;
 #endif
@@ -6606,11 +6736,11 @@ t when FN is a directory, else nil.  The decision is the shared helper
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object absname;
   if (!STRINGP (fn))
     return Qnil;
-  absname = expand_and_dir_to_file (fn);
-  return file_directory_p (ENCODE_FILE (absname)) ? Qt : Qnil;
+  /* The pure mechanism over the ALREADY expanded name, NOT the hub
+     Ffile_directory_p (cr.org F1, brief.org section 4.5).  */
+  return file_directory_p (ENCODE_FILE (fn)) ? Qt : Qnil;
 #else
   return Qnil;
 #endif
@@ -6625,20 +6755,21 @@ t when FN is a regular file, else nil.  The decision is the pure
 {
 #ifndef MSDOS
   struct stat st;
-  Lisp_Object absname;
   int stat_result;
   if (!STRINGP (fn))
     return Qnil;
-  absname = expand_and_dir_to_file (fn);
+  /* The pure `fstatat' + `S_ISREG' mechanism over the ALREADY expanded
+     name, NOT the hub Ffile_regular_p (cr.org F1, brief.org section
+     4.6).  */
 #ifdef WINDOWSNT
   {
     Lisp_Object true_attributes = Vw32_get_true_file_attributes;
     Vw32_get_true_file_attributes = Qt;
-    stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
+    stat_result = emacs_fstatat (AT_FDCWD, SSDATA (fn), &st, 0);
     Vw32_get_true_file_attributes = true_attributes;
   }
 #else
-  stat_result = emacs_fstatat (AT_FDCWD, SSDATA (absname), &st, 0);
+  stat_result = emacs_fstatat (AT_FDCWD, SSDATA (fn), &st, 0);
 #endif
   return stat_result == 0 && S_ISREG (st.st_mode) ? Qt : Qnil;
 #else
@@ -6647,24 +6778,28 @@ t when FN is a regular file, else nil.  The decision is the pure
 }
 
 DEFUN ("--fileio-file-modes", Fc_fileio_file_modes,
-       Sc_fileio_file_modes, 1, 1, 0,
+       Sc_fileio_file_modes, 2, 2, 0,
        doc: /* FIX-20261003-guilemacs: Internal: return the mode bits of
 FN as a *plain integer*, or nil.  The decision is the pure `fstatat'
 read over the helper `symlink_nofollow_flag'.  M47 imp-2, brief.org
 section 5.  */)
-  (Lisp_Object fn)
+  (Lisp_Object fn, Lisp_Object nofollow)
 {
 #ifndef MSDOS
   struct stat st;
-  Lisp_Object absname;
-  int nofollow;
   if (!STRINGP (fn))
     return Qnil;
-  nofollow = symlink_nofollow_flag (Qnil);
-  absname = expand_and_dir_to_file (fn);
-  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname)),
-		     &st, nofollow) != 0)
-    return Qnil;
+  /* The pure `fstatat' read + `st_mode & 07777' mechanism over the
+     ALREADY expanded name.  NOFOLLOW is the hub's fixnum from
+     `symlink_nofollow_flag' (cr.org F1, brief.org section 4.7).  The
+     leaf captures errno in the G2 channel for the hub's report.  */
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (fn)),
+		     &st, XFIXNUM (nofollow)) != 0)
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+      return Qnil;
+    }
   return make_fixnum (st.st_mode & 07777);
 #else
   return Qnil;
@@ -6681,28 +6816,38 @@ policy of `file-newer-than-file-p'.  M47 imp-2, brief.org section
 {
 #ifndef MSDOS
   struct stat st1, st2;
-  Lisp_Object absname1, absname2;
   int err1;
 
   if (!STRINGP (a) || !STRINGP (b))
     return Qnil;
 
-  absname1 = expand_and_dir_to_file (a);
-  absname2 = expand_and_dir_to_file (b);
-  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname1)),
-		     &st1, 0) == 0)
+  /* The pure two-`fstatat' + `timespec_cmp' mechanism over the ALREADY
+     expanded names, NOT the hub Ffile_newer_than_file_p (cr.org F1,
+     brief.org section 4.8).  The leaf captures which name failed and
+     its errno in the G2 channel for the hub's report.  */
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (a)), &st1, 0) == 0)
     err1 = 0;
   else
     {
       err1 = errno;
       if (err1 != EOVERFLOW)
-	return Qnil;
+	{
+	  fileio_g2_errno = err1;
+	  fileio_g2_errno_file = 1;
+	  return Qnil;
+	}
     }
-  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (absname2)),
-		     &st2, 0) != 0)
-    return Qt;
+  if (emacs_fstatat (AT_FDCWD, SSDATA (ENCODE_FILE (b)), &st2, 0) != 0)
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 2;
+      return Qt;
+    }
   if (err1)
-    return Qnil;
+    {
+      fileio_g2_errno = err1;
+      fileio_g2_errno_file = 1;
+    }
   return timespec_cmp (get_stat_mtime (&st2),
 		       get_stat_mtime (&st1)) < 0 ? Qt : Qnil;
 #else
@@ -6719,12 +6864,13 @@ over the helper `blocks_to_bytes'.  M47 imp-2, brief.org section 5.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object filename;
   const char *name;
   if (!STRINGP (fn))
     return Qnil;
-  filename = Fexpand_file_name (fn, Qnil);
-  name = SSDATA (ENCODE_FILE (filename));
+  /* The pure `get_fs_usage' / `statvfs' query + `blocks_to_bytes'
+     mechanism over the ALREADY expanded name, NOT the hub
+     Ffile_system_info (cr.org F1, brief.org section 4.9).  */
+  name = SSDATA (ENCODE_FILE (fn));
 
 #if defined STAT_STATFS2_BSIZE || defined STAT_STATFS2_FRSIZE	\
   || defined STAT_STATFS2_FSIZE || defined STAT_STATFS3_OSF1	\
@@ -6738,7 +6884,11 @@ over the helper `blocks_to_bytes'.  M47 imp-2, brief.org section 5.  */)
       return Qnil;
 #endif
     if (get_fs_usage (name, NULL, &u) != 0)
-      return Qnil;
+      {
+	fileio_g2_errno = errno;
+	fileio_g2_errno_file = 1;
+	return Qnil;
+      }
     return list3 (blocks_to_bytes (u.fsu_blocksize, u.fsu_blocks, false),
 		  blocks_to_bytes (u.fsu_blocksize, u.fsu_bfree, false),
 		  blocks_to_bytes (u.fsu_blocksize, u.fsu_bavail,

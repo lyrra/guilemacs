@@ -256,30 +256,44 @@
       fn
       ((force %--fileio-substitute-in-file-name) fn)))
 
-;; G2 -- the OS-query predicate policy.  Each wrapper returns a plain
-;; boolean, a string, an integer, a list, or nil.
+;; G2 -- the OS-query predicate policy (M47 imp-4).  The C leaf holds the
+;; OS query; this module holds the decision (brief.org section 6).  Each
+;; procedure calls its leaf through the delay and returns a plain Scheme
+;; value: #t / #f, a string, an integer, a list, or #f.  The module makes
+;; no FFI call and no raw syscall.
 (define (fileio-file-exists-p fn)
-  ((force %--fileio-file-exists-p) fn))
+  (let ((r ((force %--fileio-file-exists-p) fn)))
+    (if r #t #f)))
 (define (fileio-file-executable-p fn)
-  ((force %--fileio-file-executable-p) fn))
+  (let ((r ((force %--fileio-file-executable-p) fn)))
+    (if r #t #f)))
 (define (fileio-file-readable-p fn)
-  ((force %--fileio-file-readable-p) fn))
+  (let ((r ((force %--fileio-file-readable-p) fn)))
+    (if r #t #f)))
 (define (fileio-file-writable-p fn)
-  ((force %--fileio-file-writable-p) fn))
+  (let ((r ((force %--fileio-file-writable-p) fn)))
+    (if r #t #f)))
 (define (fileio-access-file fn op)
-  ((force %--fileio-access-file) fn op))
+  (let ((r ((force %--fileio-access-file) fn op)))
+    (if r #t #f)))
 (define (fileio-file-symlink-p fn)
-  ((force %--fileio-file-symlink-p) fn))
+  (let ((r ((force %--fileio-file-symlink-p) fn)))
+    (if (string? r) r #f)))
 (define (fileio-file-directory-p fn)
-  ((force %--fileio-file-directory-p) fn))
+  (let ((r ((force %--fileio-file-directory-p) fn)))
+    (if r #t #f)))
 (define (fileio-file-regular-p fn)
-  ((force %--fileio-file-regular-p) fn))
-(define (fileio-file-modes fn)
-  ((force %--fileio-file-modes) fn))
+  (let ((r ((force %--fileio-file-regular-p) fn)))
+    (if r #t #f)))
+(define (fileio-file-modes fn nofollow)
+  (let ((r ((force %--fileio-file-modes) fn nofollow)))
+    (if r r #f)))
 (define (fileio-file-newer-than-file-p a b)
-  ((force %--fileio-file-newer-than-file-p) a b))
+  (let ((r ((force %--fileio-file-newer-than-file-p) a b)))
+    (if r #t #f)))
 (define (fileio-file-system-info fn)
-  ((force %--fileio-file-system-info) fn))
+  (let ((r ((force %--fileio-file-system-info) fn)))
+    (if (pair? r) r #f)))
 
 ;; G3 -- the copy / rename / link / delete policy.  Each wrapper returns
 ;; a plain boolean; the leaf does NOT report a file error.

@@ -158,8 +158,8 @@ real error, not a pass."
                  (eql 26 (m47-imp2--count "src/fileio.c" "^DEFUN (\"--fileio-")))
 (m47-imp2--check "defun-count-78"
                  (eql 78 (m47-imp2--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp2--check "fileio.c-lines-7223"
-                 (eql 7223 (m47-imp2--lines "src/fileio.c")))
+(m47-imp2--check "fileio.c-lines-7373"
+                 (eql 7373 (m47-imp2--lines "src/fileio.c")))
 (m47-imp2--check "fileio.c-has-guile.h"
                  (m47-imp2--contains-p "src/fileio.c" "#include \"guile.h\""))
 (m47-imp2--check "leaf-block-comment-m47"
@@ -244,8 +244,8 @@ real error, not a pass."
 (m47-imp2--check "mech-check-file-access"
                  (m47-imp2--contains-p "src/fileio.c" "check_file_access"))
 ;; imp-2 adds no ref site: the dispatch helpers are imp-3 … imp-5 work.
-(m47-imp2--check "scm-ref-9"
-                 (eql 9 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp2--check "scm-ref-20"
+                 (eql 20 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
 ;; The two large blocks and the modtime group stay present (STAYS C).
 (m47-imp2--check "stays-insert-file-contents"
                  (m47-imp2--contains-p "src/fileio.c"
@@ -349,12 +349,12 @@ so only the 4 G3 leaves stay OPEN.")
     ("file-exists-p"             . "check_file_access")
     ("file-executable-p"         . "check_file_access")
     ("file-readable-p"           . "check_file_access")
-    ("file-writable-p"           . "file_access_p")
+    ("file-writable-p"           . "file_writable_p_1")
     ("access-file"               . "sys_faccessat")
     ("file-symlink-p"            . "emacs_readlinkat")
     ("file-directory-p"          . "file_directory_p (ENCODE_FILE")
     ("file-regular-p"            . "S_ISREG")
-    ("file-modes"                . "symlink_nofollow_flag")
+    ("file-modes"                . "XFIXNUM (nofollow)")
     ("file-newer-than-file-p"    . "timespec_cmp")
     ("file-system-info"          . "blocks_to_bytes")
     ("make-directory-internal"   . "emacs_mkdir")
