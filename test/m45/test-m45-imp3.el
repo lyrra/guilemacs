@@ -394,27 +394,49 @@ real error, not a pass."
 
 ;;; --- T7. The gated runtime probe (brief.org section 7.1 T7) ---------
 
-;; The policy now runs in src/emacs, so run that binary in batch and
-;; exercise the rewired path.  Each probe is an INFO skip when the
-;; binary is absent -- never a silent pass.
+;; This corpus runs inside the built src/emacs (tool/run-tests.scm loads
+;; the (m45) group with run-tests-loadup-emacs), so a probe exercises the
+;; rewired path DIRECTLY, in this process.
+;;
+;; An earlier version ran each probe in a nested src/emacs --batch to
+;; isolate the harness from a failing probe.  That cost one full emacs
+;; startup per probe, and it reported a non-zero child exit as a skip.
+;; The isolation is not worth the price: one failing probe may stop the
+;; load of the rest.  `condition-case' still holds an ordinary signalled
+;; error to that one probe.  A probe still spawns a child -- that is the
+;; point, it is the rewired call_process path -- but the probe itself no
+;; longer needs a second emacs around it.
+;;
+;; A missing leaf is a FAIL, not a skip.  There is no src/emacs
+;; INFO-skip any more.
 
-(defvar m45-imp3--emacs
-  (expand-file-name "src/emacs" m45-imp3--root))
+(defun m45-imp3--probe (name thunk)
+  "Register NAME from the value of THUNK, which exercises the rewired path.
+A non-nil value is a PASS.  A signalled error is a FAIL, never a silent
+pass; the error is printed so the cause is visible."
+  (m45-imp3--check
+   name
+   (condition-case err
+       (and (funcall thunk) t)
+     (error (princ (format "INFO m45/imp3/%s error=%S\n" name err))
+            nil))))
 
 ;; call-process "echo" writes "hi" to the buffer.
-(defvar m45-imp3--echo-eval
-  (concat "(with-temp-buffer"
-          " (call-process \"echo\" nil t nil \"hi\")"
-          " (princ (format \"echo=%S\\n\" (buffer-string))))"))
+(m45-imp3--probe "probe/call-process-echo"
+                 (lambda ()
+                   (with-temp-buffer
+                     (call-process "echo" nil t nil "hi")
+                     (string-prefix-p "hi" (buffer-string)))))
 
 ;; One env var crosses callproc-env into the child.
-(defvar m45-imp3--env-eval
-  (concat "(let ((process-environment"
-          " (cons \"GUIMACS_PROBE=ok\" process-environment)))"
-          " (with-temp-buffer"
-          " (call-process \"/bin/sh\" nil t nil \"-c\""
-          " \"printf %s \\\"$GUIMACS_PROBE\\\"\")"
-          " (princ (format \"env=%S\\n\" (buffer-string)))))"))
+(m45-imp3--probe "probe/env-var-crosses"
+                 (lambda ()
+                   (let ((process-environment
+                          (cons "GUIMACS_PROBE=ok" process-environment)))
+                     (with-temp-buffer
+                       (call-process "/bin/sh" nil t nil "-c"
+                                     "printf %s \"$GUIMACS_PROBE\"")
+                       (equal "ok" (buffer-string))))))
 
 ;; create_temp_file now calls (emacs process-create) `callproc-temp-name'.
 ;; Run that rewired leaf and check it returns a (temp-dir pattern) list of
@@ -422,49 +444,13 @@ real error, not a pass."
 ;; file fed to the child's stdin) is a pre-existing guilemacs limitation
 ;; -- it yields empty stdin at HEAD (imp-2) too -- so the probe pins the
 ;; rewired temp-name policy, not that path.
-(defvar m45-imp3--temp-name-eval
-  "(princ (format \"tempname=%S\\n\" (--callproc-temp-name)))")
-
-(defun m45-imp3--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
-  (when (file-executable-p m45-imp3--emacs)
-    (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m45-imp3--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
-
-(let ((out (m45-imp3--probe-output m45-imp3--echo-eval)))
-  (if (null out)
-      (princ "INFO m45/imp3/call-process-echo probe skipped (no runnable built src/emacs)\n")
-    (m45-imp3--check "probe/call-process-echo"
-                     (and (stringp out)
-                          (string-match-p "echo=\"hi" out)
-                          t))))
-
-(let ((out (m45-imp3--probe-output m45-imp3--env-eval)))
-  (if (null out)
-      (princ "INFO m45/imp3/env-var probe skipped (no runnable built src/emacs)\n")
-    (m45-imp3--check "probe/env-var-crosses"
-                     (and (stringp out)
-                          (string-match-p "env=\"ok\"" out)
-                          t))))
-
-(let ((out (m45-imp3--probe-output m45-imp3--temp-name-eval)))
-  (if (null out)
-      (princ "INFO m45/imp3/callproc-temp-name probe skipped (no runnable built src/emacs)\n")
-    (m45-imp3--check "probe/callproc-temp-name-list"
-                     (and (stringp out)
-                          (string-match-p "tempname=(\"[^\"]*\" \"[^\"]*\")" out)
-                          t))))
+(m45-imp3--probe "probe/callproc-temp-name-list"
+                 (lambda ()
+                   (let ((got (--callproc-temp-name)))
+                     (and (listp got)
+                          (eql 2 (length got))
+                          (stringp (nth 0 got))
+                          (stringp (nth 1 got))))))
 
 (princ (format "=== m45 imp-3 rewire suite done (%d tracked checks; t1 %d, t2 %d, t3 %d, t4 %d, t5 %d) ===\n"
                m45-imp3--registered

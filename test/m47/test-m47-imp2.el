@@ -278,65 +278,50 @@ real error, not a pass."
 
 ;;; --- E6. The gated runtime probe (brief.org section 8.1) ------------
 
-;; This corpus already runs inside the built src/emacs: the (m47) group
-;; carries no `prelude' key, so tool/run-tests.scm loads these files with
+;; This corpus runs inside the built src/emacs: the (m47) group carries
+;; no `prelude' key, so tool/run-tests.scm loads these files with
 ;; run-tests-loadup-emacs, which is "../src/emacs ... -l <file> --batch".
-;; A probe therefore runs each leaf in a NESTED src/emacs for ISOLATION,
-;; not for access: in the harness process an error or an abort stops the
-;; batch run, and the harness then fails the whole group with "batch
-;; runner never completed".  In a child the same failure is one exit
-;; code.  Each probe is an INFO skip when the binary is absent -- never
-;; a silent pass.  A probe error is a FAIL.  A nested gate run sets
-;; GUILEMACS_M47_GATE=1 to skip this same check, so the run does not
-;; recurse.
+;; A probe therefore calls the leaf DIRECTLY, in this process.
+;;
+;; An earlier version ran each probe in a nested src/emacs --batch to
+;; isolate the harness from a failing probe.  That cost one full emacs
+;; startup per probe, and it reported a non-zero child exit as a skip.
+;; The isolation is not worth the price: one failing probe may stop the
+;; load of the rest.  `condition-case' still holds an ordinary signalled
+;; error to that one probe.  Each leaf here is a pure string policy: it
+;; makes no OS call and writes no file.
+;;
+;; A missing leaf is a FAIL, not a skip: the imp-2 leaves must exist in
+;; the built binary.  There is no src/emacs INFO-skip any more.
+;;
+;; The GUILEMACS_M47_GATE guard stays.  An in-process probe cannot
+;; recurse, so the guard now only keeps the nested gate run short; it
+;; also keeps the nested check count what it was.
 
-(defvar m47-imp2--emacs
-  (expand-file-name "src/emacs" m47-imp2--root))
-
-(defun m47-imp2--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
-  (when (file-executable-p m47-imp2--emacs)
-    (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m47-imp2--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
-
-(defvar m47-imp2--dir-eval
-  "(princ (format \"dir=%S\\n\" (--fileio-file-name-directory \"/a/b\")))")
-(defvar m47-imp2--nd-eval
-  "(princ (format \"nd=%S\\n\" (--fileio-file-name-nondirectory \"/a/b\")))")
-(defvar m47-imp2--exp-eval
-  "(princ (format \"exp=%S\\n\" (--fileio-expand-file-name \"/a/../b\" nil)))")
-
-(defun m47-imp2--probe (tag eval pattern)
-  "Run one gated runtime probe.  TAG names the probe.  EVAL runs in the
-built src/emacs and must print a line that matches PATTERN.  Report an
-INFO-skip when the binary is absent; a probe error is a FAIL."
-  (let ((out (m47-imp2--probe-output eval)))
-    (if (null out)
-        (princ (format
-                "INFO m47/imp2/%s-probe skipped (no runnable built src/emacs)\n"
-                tag))
-      (m47-imp2--check (format "probe/%s" tag)
-                       (and (stringp out)
-                            (string-match-p pattern out)
-                            t)))))
+(defun m47-imp2--probe (tag thunk)
+  "Register the probe TAG from the value of THUNK, which calls a leaf.
+A non-nil value is a PASS.  A signalled error is a FAIL, never a silent
+pass; the error is printed so the cause is visible.  An undefined leaf
+signals void-function, so it is a FAIL too."
+  (m47-imp2--check
+   (format "probe/%s" tag)
+   (condition-case err
+       (and (funcall thunk) t)
+     (error (princ (format "INFO m47/imp2/%s error=%S\n" tag err))
+            nil))))
 
 (if (getenv "GUILEMACS_M47_GATE")
     (princ "INFO m47/imp2/runtime-probes skipped (nested gate run)\n")
   (progn
-    (m47-imp2--probe "file-name-directory" m47-imp2--dir-eval "dir=\"/a/\"")
-    (m47-imp2--probe "file-name-nondirectory" m47-imp2--nd-eval "nd=\"b\"")
-    (m47-imp2--probe "expand-file-name" m47-imp2--exp-eval "exp=\"/b\"")))
+    (m47-imp2--probe "file-name-directory"
+                     (lambda ()
+                       (equal "/a/" (--fileio-file-name-directory "/a/b"))))
+    (m47-imp2--probe "file-name-nondirectory"
+                     (lambda ()
+                       (equal "b" (--fileio-file-name-nondirectory "/a/b"))))
+    (m47-imp2--probe "expand-file-name"
+                     (lambda ()
+                       (equal "/b" (--fileio-expand-file-name "/a/../b" nil))))))
 
 ;;; --- E7. The leaf-body repair (cr.org F1) ---------------------------
 

@@ -321,78 +321,54 @@ real error, not a pass."
 
 ;;; --- T8. The gated runtime probe (brief.org section 10) --------------
 
-;; This corpus already runs inside the built src/emacs: the (m45) group
-;; carries no `prelude' key, so tool/run-tests.scm loads these files with
+;; This corpus runs inside the built src/emacs: the (m45) group carries
+;; no `prelude' key, so tool/run-tests.scm loads these files with
 ;; run-tests-loadup-emacs, which is "../src/emacs ... -l <file> --batch".
-;; A probe therefore runs each leaf in a NESTED src/emacs for ISOLATION,
-;; not for access: in the harness process an error or an abort stops the
-;; batch run, and the harness then fails the whole group with "batch
-;; runner never completed".  In a child the same failure is one exit
-;; code.  Each probe is an INFO skip when the binary is absent -- never
-;; a silent pass.
+;; A probe therefore calls the leaf DIRECTLY, in this process.
+;;
+;; An earlier version ran each probe in a nested src/emacs --batch to
+;; isolate the harness from a failing probe.  That cost one full emacs
+;; startup per probe, and it reported a non-zero child exit as a skip.
+;; The isolation is not worth the price: one failing probe may stop the
+;; load of the rest.  `condition-case' still holds an ordinary signalled
+;; error to that one probe.  Each leaf here returns a value and writes
+;; no file, and the two dynamic bindings are `let'-scoped, so a probe
+;; leaves no state behind.
+;;
+;; A missing leaf is a FAIL, not a skip: the imp-2 leaves must exist in
+;; the built binary.  There is no src/emacs INFO-skip any more.
 
-(defvar m45-imp2--emacs
-  (expand-file-name "src/emacs" m45-imp2--root))
+(defun m45-imp2--probe (name thunk)
+  "Register NAME from the value of THUNK, which calls a leaf.
+A non-nil value is a PASS.  A signalled error is a FAIL, never a silent
+pass; the error is printed so the cause is visible.  An undefined leaf
+signals void-function, so it is a FAIL too."
+  (m45-imp2--check
+   name
+   (condition-case err
+       (and (funcall thunk) t)
+     (error (princ (format "INFO m45/imp2/%s error=%S\n" name err))
+            nil))))
 
-(defvar m45-imp2--resolve-eval
-  (concat "(princ (format \"resolve=%S\\n\""
-          " (--callproc-resolve-program \"/bin/sh\")))"))
+(m45-imp2--probe "probe/resolve-program-returns-string"
+                 (lambda ()
+                   (let ((got (--callproc-resolve-program "/bin/sh")))
+                     (and (stringp got) (string-prefix-p "/" got)))))
 
 ;; cr.org F1: with process-environment ("A" "A=1"), add_env drops "A=1"
 ;; (the existing lone "A" wins, then the lone-name removal drops "A").
 ;; The leaf must agree, so the result must not hold "A=1".
-(defvar m45-imp2--f1-eval
-  (concat "(let ((process-environment (list \"A\" \"A=1\")))"
-          " (princ (format \"f1=%S\\n\""
-          " (and (member \"A=1\" (--callproc-env default-directory)) t))))"))
+(m45-imp2--probe "probe/env-dedup-lone-name"
+                 (lambda ()
+                   (let ((process-environment (list "A" "A=1")))
+                     (null (member "A=1" (--callproc-env default-directory))))))
 
 ;; cr.org F2: a non-ASCII-compatible coding-system-for-write must fall
 ;; back to raw-text, so "A" stays one byte and is still "A".
-(defvar m45-imp2--f2-eval
-  (concat "(let ((coding-system-for-write (quote utf-16)))"
-          " (princ (format \"f2=%S\\n\""
-          " (and (member \"A\" (--callproc-argv \"/bin/echo\" (list \"A\"))) t))))"))
-
-(defun m45-imp2--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
-  (when (file-executable-p m45-imp2--emacs)
-    (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m45-imp2--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
-
-(let ((out (m45-imp2--probe-output m45-imp2--resolve-eval)))
-  (if (null out)
-      (princ "INFO m45/imp2/resolve-program-probe skipped (no runnable built src/emacs)\n")
-    (m45-imp2--check "probe/resolve-program-returns-string"
-                     (and (stringp out)
-                          (string-match-p "resolve=\"/" out)
-                          t))))
-
-(let ((out (m45-imp2--probe-output m45-imp2--f1-eval)))
-  (if (null out)
-      (princ "INFO m45/imp2/env-dedup-probe skipped (no runnable built src/emacs)\n")
-    (m45-imp2--check "probe/env-dedup-lone-name"
-                     (and (stringp out)
-                          (string-match-p "f1=nil" out)
-                          t))))
-
-(let ((out (m45-imp2--probe-output m45-imp2--f2-eval)))
-  (if (null out)
-      (princ "INFO m45/imp2/argv-ascii-compat-probe skipped (no runnable built src/emacs)\n")
-    (m45-imp2--check "probe/argv-ascii-compat-fallback"
-                     (and (stringp out)
-                          (string-match-p "f2=t" out)
-                          t))))
+(m45-imp2--probe "probe/argv-ascii-compat-fallback"
+                 (lambda ()
+                   (let ((coding-system-for-write 'utf-16))
+                     (member "A" (--callproc-argv "/bin/echo" (list "A"))))))
 
 (princ (format "=== m45 imp-2 leaves suite done (%d tracked checks; t1 %d, t2 %d, t3 %d, t4 %d, t5 %d, t6 %d) ===\n"
                m45-imp2--registered

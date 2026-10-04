@@ -246,10 +246,21 @@ error, not a pass)."
 ;;;
 ;;; Case 1: the non-tty pipe-fd probe.  On a pipe fd, --tty-get-mode must
 ;;; return #f (the read arm fails) and --tty-set-mode must return a
-;;; negative status (the failure arm).  The C leaves live in the built
-;;; src/emacs, not in this harness, so run that binary in batch with a
-;;; pipe on stdin (printf '' | emacs ...).  When no runnable built
-;;; binary exists, case 1 is an INFO skip -- never a silent pass.
+;;; negative status (the failure arm).
+;;;
+;;; KEEP THE NESTED src/emacs HERE.  The sibling m45 / m46 / m47 probes
+;;; call their leaf in this process, because this corpus already runs
+;;; inside the built src/emacs (tool/run-tests.scm loads the (m43) group
+;;; with run-tests-loadup-emacs).  This probe is different: the nested
+;;; run CONSTRUCTS THE TEST CONDITION.  "printf '' | emacs ..." puts a
+;;; PIPE on fd 0, which is the whole point of the case.  In this process
+;;; fd 0 is inherited from whatever started the gate -- a TTY in a
+;;; terminal run, a pipe under CI -- so an in-process probe would assert
+;;; the opposite thing depending on how the gate was started.  The cost
+;;; is one emacs startup, and it buys determinism.
+;;;
+;;; When no runnable built binary exists, case 1 is an INFO skip --
+;;; never a silent pass.
 ;;;
 ;;; Case 2: the pty end-to-end round-trip is an INFO skip on this host,
 ;;; which cannot allocate a pty (os.openpty gives EACCES, errno 13;

@@ -372,66 +372,60 @@ the forbidden hub.")
 
 ;;; --- T7. The gated runtime probes (brief.org section 13.3) ----------
 
-;; The policy now runs in src/emacs, so run that binary in batch and
-;; exercise the 8 rewired hubs.  Each probe is an INFO skip when the
-;; binary is absent -- never a silent pass.  A nested gate run sets
-;; GUILEMACS_M47_GATE=1 to skip the probe, so the run does not recurse.
+;; This corpus runs inside the built src/emacs (tool/run-tests.scm loads
+;; the (m47) group with run-tests-loadup-emacs), so a probe calls the
+;; rewired hub DIRECTLY, in this process.
+;;
+;; An earlier version ran the hubs in a nested src/emacs --batch.  It
+;; paid one full emacs startup PER TAG and ran the same eval eight times
+;; for eight assertions on identical output; it also reported a non-zero
+;; child exit as a skip.  The isolation is not worth the price: one
+;; failing probe may stop the load of the rest.  `condition-case' still
+;; holds an ordinary signalled error to that one probe.  Each hub here
+;; is pure name policy: it makes no OS call and writes no file, and
+;; find-file-name-handler only matches a name against the handler alist.
+;;
+;; A broken hub is a FAIL, not a skip.  There is no src/emacs INFO-skip
+;; any more.  The GUILEMACS_M47_GATE guard stays: an in-process probe
+;; cannot recurse, so it now only keeps the nested gate run short and
+;; keeps the nested check count what it was.
 
-(defvar m47-imp3--emacs
-  (expand-file-name "src/emacs" m47-imp3--root))
-
-(defun m47-imp3--probe-output (eval)
-  "Return the output of the built src/emacs running EVAL, or nil.
-Run src/emacs in batch; EVAL must print one tagged line.  Return nil
-when the binary is absent or the run fails."
-  (when (file-executable-p m47-imp3--emacs)
-    (with-temp-buffer
-      (let ((status nil))
-        (condition-case nil
-            (setq status
-                  (call-process
-                   "/bin/sh" nil (current-buffer) nil "-c"
-                   (format "printf '' | %s --batch --eval '%s'"
-                           m47-imp3--emacs eval)))
-          (error (setq status nil)))
-        (when (and (integerp status) (zerop status))
-          (buffer-string))))))
-
-(defvar m47-imp3--hubs-eval
-  (concat "(progn"
-          " (princ (format \"dir=%S\\n\" (file-name-directory \"/a/b\")))"
-          " (princ (format \"nd=%S\\n\" (file-name-nondirectory \"/a/b\")))"
-          " (princ (format \"asdir=%S\\n\" (file-name-as-directory \"/a/b\")))"
-          " (princ (format \"dirfile=%S\\n\" (directory-file-name \"/a/b/\")))"
-          " (princ (format \"concat=%S\\n\" (file-name-concat \"/a\" \"b\" \"c\")))"
-          " (princ (format \"ffnh=%S\\n\""
-          " (find-file-name-handler \"/tmp/m47-imp3-zzz\" (quote file-exists-p))))"
-          " (princ (format \"exp=%S\\n\" (expand-file-name \"foo\" \"/a/b/\")))"
-          " (princ (format \"sub=%S\\n\" (substitute-in-file-name \"/x//y\"))))"))
-
-(defun m47-imp3--probe (tag pattern)
-  "Run one gated runtime probe.  Report an INFO-skip when the binary is
-absent; a probe error is a FAIL."
-  (let ((out (m47-imp3--probe-output m47-imp3--hubs-eval)))
-    (if (null out)
-        (princ (format
-                "INFO m47/imp3/%s-probe skipped (no runnable built src/emacs)\n"
-                tag))
-      (imp-register-bool-as-ert-test
-       (format "m47-imp3/probe/%s" tag)
-       (and (stringp out) (string-match-p pattern out) t)))))
+(defun m47-imp3--probe (tag thunk)
+  "Register the probe TAG from the value of THUNK, which calls a rewired hub.
+A non-nil value is a PASS.  A signalled error is a FAIL, never a silent
+pass; the error is printed so the cause is visible.  Like the earlier
+nested version this registers an ERT test directly, so it does not move
+the tracked-check counts of T1 ... T5."
+  (imp-register-bool-as-ert-test
+   (format "m47-imp3/probe/%s" tag)
+   (condition-case err
+       (and (funcall thunk) t)
+     (error (princ (format "INFO m47/imp3/%s error=%S\n" tag err))
+            nil))))
 
 (if (getenv "GUILEMACS_M47_GATE")
     (princ "INFO m47/imp3/runtime-probes skipped (nested gate run)\n")
   (progn
-    (m47-imp3--probe "file-name-directory"   "dir=\"/a/\"")
-    (m47-imp3--probe "file-name-nondirectory" "nd=\"b\"")
-    (m47-imp3--probe "file-name-as-directory" "asdir=\"/a/b/\"")
-    (m47-imp3--probe "directory-file-name"   "dirfile=\"/a/b\"")
-    (m47-imp3--probe "file-name-concat"      "concat=\"/a/b/c\"")
-    (m47-imp3--probe "find-file-name-handler" "ffnh=nil")
-    (m47-imp3--probe "expand-file-name"      "exp=\"/a/b/foo\"")
-    (m47-imp3--probe "substitute-in-file-name" "sub=\"/y\"")))
+    (m47-imp3--probe "file-name-directory"
+                     (lambda () (equal "/a/" (file-name-directory "/a/b"))))
+    (m47-imp3--probe "file-name-nondirectory"
+                     (lambda () (equal "b" (file-name-nondirectory "/a/b"))))
+    (m47-imp3--probe "file-name-as-directory"
+                     (lambda () (equal "/a/b/" (file-name-as-directory "/a/b"))))
+    (m47-imp3--probe "directory-file-name"
+                     (lambda () (equal "/a/b" (directory-file-name "/a/b/"))))
+    (m47-imp3--probe "file-name-concat"
+                     (lambda () (equal "/a/b/c" (file-name-concat "/a" "b" "c"))))
+    (m47-imp3--probe "find-file-name-handler"
+                     (lambda ()
+                       (null (find-file-name-handler "/tmp/m47-imp3-zzz"
+                                                     'file-exists-p))))
+    (m47-imp3--probe "expand-file-name"
+                     (lambda ()
+                       (equal "/a/b/foo" (expand-file-name "foo" "/a/b/"))))
+    (m47-imp3--probe "substitute-in-file-name"
+                     (lambda ()
+                       (equal "/y" (substitute-in-file-name "/x//y"))))))
 
 (princ (format "=== m47 imp-3 rewire suite done (%d tracked checks; t1 %d, t2 %d, t3 %d, t4 %d, t5 %d) ===\n"
                m47-imp3--registered
