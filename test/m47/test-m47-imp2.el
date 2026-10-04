@@ -158,8 +158,8 @@ real error, not a pass."
                  (eql 26 (m47-imp2--count "src/fileio.c" "^DEFUN (\"--fileio-")))
 (m47-imp2--check "defun-count-78"
                  (eql 78 (m47-imp2--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp2--check "fileio.c-lines-7373"
-                 (eql 7373 (m47-imp2--lines "src/fileio.c")))
+(m47-imp2--check "fileio.c-lines-7575"
+                 (eql 7575 (m47-imp2--lines "src/fileio.c")))
 (m47-imp2--check "fileio.c-has-guile.h"
                  (m47-imp2--contains-p "src/fileio.c" "#include \"guile.h\""))
 (m47-imp2--check "leaf-block-comment-m47"
@@ -177,17 +177,21 @@ real error, not a pass."
   (m47-imp2--check (format "docname-%s" leaf)
                    (m47-imp2--contains-p "src/fileio.c"
                                          (format "--fileio-%s\"" leaf))))
-(m47-imp2--check "doc-marker-26"
-                 (eql 26 (m47-imp2--count "src/fileio.c" "M47 imp-2,")))
+(m47-imp2--check "doc-marker-19"
+                 ;; M47 imp-5 relabelled the 7 G3 leaf docstrings, so the
+                 ;; imp-2 marker count fell 26 -> 19.
+                 (eql 19 (m47-imp2--count "src/fileio.c" "M47 imp-2,")))
 (m47-imp2--check "doc-plain-sites-26"
                  (eql 26 (m47-imp2--count "src/fileio.c" "\\*plain ")))
 ;; The shape words, measured after the imp-2 leaf block.
 (m47-imp2--check "doc-plain-string-10"
                  (eql 10 (m47-imp2--count "src/fileio.c" "plain string")))
-(m47-imp2--check "doc-plain-integer-1"
-                 (eql 1 (m47-imp2--count "src/fileio.c" "plain integer")))
-(m47-imp2--check "doc-plain-boolean-15"
-                 (eql 15 (m47-imp2--count "src/fileio.c" "plain boolean")))
+(m47-imp2--check "doc-plain-integer-3"
+                 ;; M47 imp-5: the rename leaf now returns a plain integer.
+                 (eql 3 (m47-imp2--count "src/fileio.c" "plain integer")))
+(m47-imp2--check "doc-plain-boolean-14"
+                 ;; M47 imp-5: the rename leaf moved from boolean to integer.
+                 (eql 14 (m47-imp2--count "src/fileio.c" "plain boolean")))
 (m47-imp2--check "doc-plain-list-1"
                  (eql 1 (m47-imp2--count "src/fileio.c" "plain list")))
 ;; A leaf doc string names a plain shape and never a C I/O mechanism
@@ -244,8 +248,8 @@ real error, not a pass."
 (m47-imp2--check "mech-check-file-access"
                  (m47-imp2--contains-p "src/fileio.c" "check_file_access"))
 ;; imp-2 adds no ref site: the dispatch helpers are imp-3 … imp-5 work.
-(m47-imp2--check "scm-ref-20"
-                 (eql 20 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp2--check "scm-ref-27"
+                 (eql 27 (m47-imp2--count "src/fileio.c" "scm_c_public_ref")))
 ;; The two large blocks and the modtime group stay present (STAYS C).
 (m47-imp2--check "stays-insert-file-contents"
                  (m47-imp2--contains-p "src/fileio.c"
@@ -334,10 +338,10 @@ signals void-function, so it is a FAIL too."
 (setq m47-imp2--group 'e7)
 
 (defvar m47-imp2--open-leaves
-  '("copy-file" "rename-file" "add-name-to-file" "make-symbolic-link")
+  '()
   "The leaves that still call their hub (OPEN, cr.org F1).  M47 imp-3
-unblocked the 2 G1 leaves (expand-file-name, substitute-in-file-name),
-so only the 4 G3 leaves stay OPEN.")
+unblocked the 2 G1 leaves, and M47 imp-5 unblocked the 4 G3 leaves, so
+no leaf stays OPEN.")
 
 (defvar m47-imp2--leaf-mechanism
   '(("find-file-name-handler"    . "find_file_name_handler_1")
@@ -357,9 +361,9 @@ so only the 4 G3 leaves stay OPEN.")
     ("file-modes"                . "XFIXNUM (nofollow)")
     ("file-newer-than-file-p"    . "timespec_cmp")
     ("file-system-info"          . "blocks_to_bytes")
-    ("make-directory-internal"   . "emacs_mkdir")
-    ("delete-directory-internal" . "emacs_rmdir")
-    ("delete-file-internal"      . "emacs_unlink"))
+    ("make-directory-internal"   . "make_directory_internal_1")
+    ("delete-directory-internal" . "delete_directory_internal_1")
+    ("delete-file-internal"      . "delete_file_internal_1"))
   "For each repaired leaf, a mechanism token its body must hold.")
 
 (defun m47-imp2--leaf-body (block)

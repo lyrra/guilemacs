@@ -295,21 +295,76 @@
   (let ((r ((force %--fileio-file-system-info) fn)))
     (if (pair? r) r #f)))
 
-;; G3 -- the copy / rename / link / delete policy.  Each wrapper returns
-;; a plain boolean; the leaf does NOT report a file error.
+;; G3 -- the copy / rename / link / delete policy (M47 imp-5).  The
+;; module owns the target-name resolution (the expand_cp_target policy)
+;; and the overwrite / preserve decision; the C leaf holds the OS
+;; mechanism (brief.org section 6).  Each procedure returns a plain
+;; value: a boolean, an integer `errno', or #f.  The module makes no FFI
+;; call and no raw syscall.
+
+(define (fileio--starts-with? s prefix)
+  "Non-nil when S starts with PREFIX."
+  (let ((n (string-length s)) (m (string-length prefix)))
+    (and (>= n m) (string=? (substring s 0 m) prefix))))
+
+;; The expand_cp_target decision: if NEWNAME is a directory name, the
+;; target is the expansion of the basename of FILE under NEWNAME;
+;; otherwise the target is the expansion of NEWNAME.
+(define (fileio--resolve-target file newname)
+  (if (and (string? newname)
+           ((force %ends-with-directory-separator?) newname))
+      (fileio-expand-file-name (fileio-file-name-nondirectory file) newname)
+      (fileio-expand-file-name newname)))
+
 (define (fileio-copy-file file newname ok-if-exists keep-time
                           preserve-uid-gid preserve-perms)
-  ((force %--fileio-copy-file) file newname ok-if-exists keep-time
-   preserve-uid-gid preserve-perms))
+  (let ((target (fileio--resolve-target file newname)))
+    ((force %--fileio-copy-file) file target ok-if-exists keep-time
+     preserve-uid-gid preserve-perms)))
+
 (define (fileio-make-directory-internal dir)
-  ((force %--fileio-make-directory-internal) dir))
+  (if (string? dir)
+      ((force %--fileio-make-directory-internal) dir)
+      #f))
+
+;; The remove decision strips the final separator first (brief.org
+;; section 6).
 (define (fileio-delete-directory-internal dir)
-  ((force %--fileio-delete-directory-internal) dir))
+  (if (string? dir)
+      ((force %--fileio-delete-directory-internal)
+       (fileio-directory-file-name dir))
+      #f))
+
 (define (fileio-delete-file-internal fn)
-  ((force %--fileio-delete-file-internal) fn))
+  (if (string? fn)
+      ((force %--fileio-delete-file-internal) fn)
+      #f))
+
+;; The overwrite decision: a non-nil, non-integer OK-IF-EXISTS means a
+;; plain rename; otherwise try emacs_renameat_noreplace first.
 (define (fileio-rename-file file newname ok-if-exists)
-  ((force %--fileio-rename-file) file newname ok-if-exists))
+  (let* ((plain (and ok-if-exists (not (integer? ok-if-exists))))
+         (target (fileio--resolve-target
+                  (fileio-directory-file-name file) newname)))
+    ((force %--fileio-rename-file) file target (if plain #t #f))))
+
 (define (fileio-add-name-to-file file newname ok-if-exists)
-  ((force %--fileio-add-name-to-file) file newname ok-if-exists))
+  (let ((target (fileio--resolve-target file newname)))
+    ((force %--fileio-add-name-to-file) file target ok-if-exists)))
+
+;; The ~ / /: target rule applies only when OK-IF-EXISTS is an integer
+;; (brief.org section 6).  A leading "~" expands; a leading "/:" is
+;; stripped.
+(define (fileio--symlink-target target ok-if-exists)
+  (if (not (and (string? target) (integer? ok-if-exists)))
+      target
+      (cond ((fileio--starts-with? target "~")
+             (fileio-expand-file-name target))
+            ((fileio--starts-with? target "/:")
+             (substring target 2))
+            (else target))))
+
 (define (fileio-make-symbolic-link target linkname ok-if-exists)
-  ((force %--fileio-make-symbolic-link) target linkname ok-if-exists))
+  (let* ((target (fileio--symlink-target target ok-if-exists))
+         (link (fileio--resolve-target target linkname)))
+    ((force %--fileio-make-symbolic-link) target link ok-if-exists)))

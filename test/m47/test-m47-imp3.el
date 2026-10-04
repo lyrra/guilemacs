@@ -270,8 +270,8 @@ the forbidden hub.")
 ;; Only the 4 G3 OPEN markers remain (imp-5 owns them, not imp-3).  Count
 ;; the leaf doc marker "OPEN (cr.org F1):", not the block comment that
 ;; merely names it.
-(m47-imp3--check "open-markers-left-4"
-                 (eql 4 (m47-imp3--count "src/fileio.c" "OPEN (cr.org F1):")))
+(m47-imp3--check "open-markers-left-0"
+                 (eql 0 (m47-imp3--count "src/fileio.c" "OPEN (cr.org F1):")))
 
 ;;; --- T4. The module holds the real G1 path policy (brief.org 4.4) ----
 
@@ -330,20 +330,20 @@ the forbidden hub.")
                    ;; lines (brief.org section 9), not the 301-line module
                    ;; base.  The old bound 301 made this check vacuous.
                    (and (integerp n) (> n 7223))))
-(m47-imp3--check "fileio.c-lines-7373"
-                 (eql 7373 (m47-imp3--lines "src/fileio.c")))
+(m47-imp3--check "fileio.c-lines-7575"
+                 (eql 7575 (m47-imp3--lines "src/fileio.c")))
 (m47-imp3--check "fileio.c-defuns-78"
                  (eql 78 (m47-imp3--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp3--check "fileio.c-scm-ref-20"
-                 (eql 20 (m47-imp3--count "src/fileio.c" "scm_c_public_ref")))
-(m47-imp3--check "fileio.scm-lines-315"
-                 (eql 315 (m47-imp3--lines "mod/emacs/fileio.scm")))
-(m47-imp3--check "tree-wide-scm-public-ref-212"
+(m47-imp3--check "fileio.c-scm-ref-27"
+                 (eql 27 (m47-imp3--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp3--check "fileio.scm-lines-370"
+                 (eql 370 (m47-imp3--lines "mod/emacs/fileio.scm")))
+(m47-imp3--check "tree-wide-scm-public-ref-219"
                  (let ((total 0)
                        (dir (expand-file-name "src" m47-imp3--root)))
                    (dolist (f (directory-files dir t "\\.[chm]\\'"))
                      (setq total (+ total (or (m47-imp3--count f "scm_c_public_ref") 0))))
-                   (eql 212 total)))
+                   (eql 219 total)))
 (m47-imp3--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp3--lines "src/keyboard.c")))
 (m47-imp3--check "keyboard-globals.c-lines-490"

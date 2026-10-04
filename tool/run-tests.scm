@@ -237,6 +237,7 @@
   "test/m47/test-m47-imp2.el"                 ; M47 imp-2: the 26 typed C leaves (--fileio-file-name-directory, --fileio-expand-file-name, ...), (emacs fileio), the guile.h include, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   "test/m47/test-m47-imp3.el"                 ; M47 imp-3: the 8 G1 dispatch helpers and the 8 pure C mechanisms, the rewired file-name / path hubs, the 2 OPEN G1 leaves unblocked, the real (emacs fileio) path policy, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   "test/m47/test-m47-imp4.el"                 ; M47 imp-4: the 11 G2 dispatch helpers and the 11 pure C mechanisms (check_file_access_1, file_writable_p_1), the rewired OS-query predicate hubs (file-exists-p ... file-system-info), the real (emacs fileio) G2 decision, the C errno channel, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
+  "test/m47/test-m47-imp5.el"                 ; M47 imp-5: the 7 G3 dispatch helpers and the 7 pure C mechanisms (copy_file_1 ... make_symbolic_link_1), the rewired copy / rename / link / delete hubs, the 4 G3 OPEN leaves unblocked, the real (emacs fileio) target-name resolution, the deleted expand_cp_target, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

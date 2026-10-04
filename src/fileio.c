@@ -571,6 +571,89 @@ file_system_info_scheme (Lisp_Object absname)
   return SCM_CALL_1 (proc, absname);
 }
 
+/* FIX-20261004-guilemacs: M47 imp-5 -- the G3 dispatch helpers over the
+   G3 copy / rename / link / delete policy of (emacs fileio).  The hub
+   keeps the handler dispatch and the error report; the module owns the
+   target-name resolution and the overwrite / preserve decision; the
+   typed C leaf holds the OS mechanism only (brief.org section 5).  Each
+   helper resolves its module procedure once, so the tree-wide
+   module-ref pin adds exactly one ref per block.  */
+
+static Lisp_Object
+copy_file_scheme (Lisp_Object file, Lisp_Object newname,
+		  Lisp_Object ok_if_already_exists, Lisp_Object keep_time,
+		  Lisp_Object preserve_uid_gid, Lisp_Object preserve_permissions)
+{
+  static SCM proc = SCM_UNDEFINED;
+  Lisp_Object args[6];
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-copy-file");
+  args[0] = file;
+  args[1] = newname;
+  args[2] = ok_if_already_exists;
+  args[3] = keep_time;
+  args[4] = preserve_uid_gid;
+  args[5] = preserve_permissions;
+  return SCM_CALL_N (proc, args, 6);
+}
+
+static Lisp_Object
+make_directory_internal_scheme (Lisp_Object dir)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-make-directory-internal");
+  return SCM_CALL_1 (proc, dir);
+}
+
+static Lisp_Object
+delete_directory_internal_scheme (Lisp_Object dir)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-delete-directory-internal");
+  return SCM_CALL_1 (proc, dir);
+}
+
+static Lisp_Object
+delete_file_internal_scheme (Lisp_Object fn)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-delete-file-internal");
+  return SCM_CALL_1 (proc, fn);
+}
+
+static Lisp_Object
+rename_file_scheme (Lisp_Object file, Lisp_Object newname,
+		    Lisp_Object ok_if_already_exists)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-rename-file");
+  return SCM_CALL_3 (proc, file, newname, ok_if_already_exists);
+}
+
+static Lisp_Object
+add_name_to_file_scheme (Lisp_Object file, Lisp_Object newname,
+			 Lisp_Object ok_if_already_exists)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-add-name-to-file");
+  return SCM_CALL_3 (proc, file, newname, ok_if_already_exists);
+}
+
+static Lisp_Object
+make_symbolic_link_scheme (Lisp_Object target, Lisp_Object linkname,
+			   Lisp_Object ok_if_already_exists)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs fileio", "fileio-make-symbolic-link");
+  return SCM_CALL_3 (proc, target, linkname, ok_if_already_exists);
+}
+
 /* The G2 leaf -> hub error channel.  brief.org section 12: a Guile call
    can clobber `errno', so a leaf captures the error in these two words
    before the layer returns, and the hub runs the report.  G2_ERRNO_FILE
@@ -956,19 +1039,9 @@ DEFUN ("directory-name-p", Fdirectory_name_p, Sdirectory_name_p, 1, 1, 0,
   return IS_DIRECTORY_SEP (c) ? Qt : Qnil;
 }
 
-/* Return the expansion of NEWNAME, except that if NEWNAME is a
-   directory name then return the expansion of FILE's basename under
-   NEWNAME.  This resembles how 'cp FILE NEWNAME' works, except that
-   it requires NEWNAME to be a directory name (typically, by ending in
-   "/").  */
-
-static Lisp_Object
-expand_cp_target (Lisp_Object file, Lisp_Object newname)
-{
-  return (!NILP (Fdirectory_name_p (newname))
-	  ? Fexpand_file_name (Ffile_name_nondirectory (file), newname)
-	  : Fexpand_file_name (newname, Qnil));
-}
+/* The `expand_cp_target' target-name resolution moved to (emacs fileio)
+   in M47 imp-5: the module owns the decision and the C hubs call it
+   through their dispatch helper (brief.org section 6).  */
 
 DEFUN ("directory-file-name", Fdirectory_file_name, Sdirectory_file_name,
        1, 1, 0,
@@ -1999,43 +2072,20 @@ clone_file (int dest, int source)
 }
 #endif
 
-DEFUN ("copy-file", Fcopy_file, Scopy_file, 2, 6,
-       "fCopy file: \nGCopy %s to file: \np\nP",
-       doc: /* Copy FILE to NEWNAME.  Both args must be strings.
-If NEWNAME is a directory name, copy FILE to a like-named file under
-NEWNAME.  For NEWNAME to be recognized as a directory name, it should
-end in a slash.
+/* FIX-20261004-guilemacs: M47 imp-5 -- the pure copy mechanism of
+   `copy-file' over two ALREADY expanded names.  It holds the OS work
+   (emacs_fd_open / copy_file_range / read / write / ftruncate / fchmod /
+   fchown / futimens / close), the ACL and SELinux calls, and the
+   unwind-protect points.  It runs no handler call and no
+   Fexpand_file_name; the hub keeps the handler dispatch and the module
+   owns the target-name resolution and the overwrite / preserve decision
+   (brief.org section 5.2).  */
 
-This function always sets the file modes of the output file to match
-the input file.
-
-The optional third argument OK-IF-ALREADY-EXISTS specifies what to do
-if file NEWNAME already exists.  If OK-IF-ALREADY-EXISTS is nil,
-signal a `file-already-exists' error without overwriting.  If
-OK-IF-ALREADY-EXISTS is an integer, request confirmation from the user
-about overwriting; this is what happens in interactive use with M-x.
-Any other value for OK-IF-ALREADY-EXISTS means to overwrite the
-existing file.
-
-Fourth arg KEEP-TIME non-nil means give the output file the same
-last-modified time as the old one.  (This works on only some systems.)
-
-A prefix arg makes KEEP-TIME non-nil.
-
-If PRESERVE-UID-GID is non-nil, try to transfer the uid and gid of
-FILE to NEWNAME.
-
-If PRESERVE-PERMISSIONS is non-nil, copy permissions of FILE to NEWNAME;
-this includes the file modes, along with ACL entries and SELinux
-context if present.  Otherwise, if NEWNAME is created its file
-permission bits are those of FILE, masked by the default file
-permissions.  */)
-  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists,
-   Lisp_Object keep_time, Lisp_Object preserve_uid_gid,
-   Lisp_Object preserve_permissions)
+static Lisp_Object
+copy_file_1 (Lisp_Object file, Lisp_Object newname,
+	     Lisp_Object ok_if_already_exists, Lisp_Object keep_time,
+	     Lisp_Object preserve_uid_gid, Lisp_Object preserve_permissions)
 {
-  Lisp_Object handler;
-  dynwind_begin ();
   Lisp_Object encoded_file, encoded_newname;
 #if HAVE_LIBSELINUX
   char *con;
@@ -2050,22 +2100,6 @@ permissions.  */)
   int ofd;
   struct stat st;
 #endif
-
-  file = Fexpand_file_name (file, Qnil);
-  newname = expand_cp_target (file, newname);
-
-  /* If the input file name has special constructs in it,
-     call the corresponding file name handler.  */
-  handler = Ffind_file_name_handler (file, Qcopy_file);
-  /* Likewise for output file name.  */
-  if (NILP (handler))
-    handler = Ffind_file_name_handler (newname, Qcopy_file);
-  if (!NILP (handler)) {
-    dynwind_end ();
-    return call7 (handler, Qcopy_file, file, newname,
-		  ok_if_already_exists, keep_time, preserve_uid_gid,
-		  preserve_permissions);
-  }
 
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
@@ -2323,28 +2357,115 @@ permissions.  */)
 #endif /* MSDOS */
 #endif /* not WINDOWSNT */
 
-  dynwind_end ();
+  return Qnil;
+}
 
+DEFUN ("copy-file", Fcopy_file, Scopy_file, 2, 6,
+       "fCopy file: \nGCopy %s to file: \np\nP",
+       doc: /* Copy FILE to NEWNAME.  Both args must be strings.
+If NEWNAME is a directory name, copy FILE to a like-named file under
+NEWNAME.  For NEWNAME to be recognized as a directory name, it should
+end in a slash.
+
+This function always sets the file modes of the output file to match
+the input file.
+
+The optional third argument OK-IF-ALREADY-EXISTS specifies what to do
+if file NEWNAME already exists.  If OK-IF-ALREADY-EXISTS is nil,
+signal a `file-already-exists' error without overwriting.  If
+OK-IF-ALREADY-EXISTS is an integer, request confirmation from the user
+about overwriting; this is what happens in interactive use with M-x.
+Any other value for OK-IF-ALREADY-EXISTS means to overwrite the
+existing file.
+
+Fourth arg KEEP-TIME non-nil means give the output file the same
+last-modified time as the old one.  (This works on only some systems.)
+
+A prefix arg makes KEEP-TIME non-nil.
+
+If PRESERVE-UID-GID is non-nil, try to transfer the uid and gid of
+FILE to NEWNAME.
+
+If PRESERVE-PERMISSIONS is non-nil, copy permissions of FILE to NEWNAME;
+this includes the file modes, along with ACL entries and SELinux
+context if present.  Otherwise, if NEWNAME is created its file
+permission bits are those of FILE, masked by the default file
+permissions.  */)
+  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists,
+   Lisp_Object keep_time, Lisp_Object preserve_uid_gid,
+   Lisp_Object preserve_permissions)
+{
+  Lisp_Object handler;
+  dynwind_begin ();
+
+  file = Fexpand_file_name (file, Qnil);
+
+  /* If the input file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (file, Qcopy_file);
+  /* Likewise for output file name.  */
+  if (NILP (handler))
+    handler = Ffind_file_name_handler (newname, Qcopy_file);
+  if (!NILP (handler)) {
+    dynwind_end ();
+    return call7 (handler, Qcopy_file, file, newname,
+		  ok_if_already_exists, keep_time, preserve_uid_gid,
+		  preserve_permissions);
+  }
+
+  /* The module owns the target-name resolution and the overwrite /
+     preserve decision; the leaf runs the mechanism `copy_file_1'
+     (brief.org section 5.3).  */
+  copy_file_scheme (file, newname, ok_if_already_exists, keep_time,
+		    preserve_uid_gid, preserve_permissions);
+
+  dynwind_end ();
   return Qnil;
 }
 
+/* FIX-20261004-guilemacs: M47 imp-5 -- the pure create / remove
+   mechanisms over ALREADY expanded names.  Each holds one syscall only
+   and runs no handler call and no Fexpand_file_name (brief.org section
+   5.2).  The matching C leaf captures `errno' in the G3 channel.  */
+
+static Lisp_Object
+make_directory_internal_1 (Lisp_Object directory)
+{
+  const char *dir = SSDATA (ENCODE_FILE (directory));
+  return (emacs_mkdir (dir, 0777 & ~auto_saving_dir_umask) == 0) ? Qt : Qnil;
+}
+
+static Lisp_Object
+delete_directory_internal_1 (Lisp_Object directory)
+{
+  const char *dir = SSDATA (ENCODE_FILE (directory));
+  return (emacs_rmdir (dir) == 0) ? Qt : Qnil;
+}
+
+static Lisp_Object
+delete_file_internal_1 (Lisp_Object filename)
+{
+  return (emacs_unlink (SSDATA (ENCODE_FILE (filename))) == 0
+	  || errno == ENOENT)
+	 ? Qt : Qnil;
+}
+
 DEFUN ("make-directory-internal", Fmake_directory_internal,
        Smake_directory_internal, 1, 1, 0,
        doc: /* Create a new directory named DIRECTORY.  */)
   (Lisp_Object directory)
 {
-  const char *dir;
-  Lisp_Object encoded_dir;
-
   CHECK_STRING (directory);
   directory = Fexpand_file_name (directory, Qnil);
 
-  encoded_dir = ENCODE_FILE (directory);
-
-  dir = SSDATA (encoded_dir);
-
-  if (emacs_mkdir (dir, 0777 & ~auto_saving_dir_umask) != 0)
-    report_file_error ("Creating directory", directory);
+  /* The module owns the create decision; the leaf runs the mechanism
+     `make_directory_internal_1' (brief.org section 5.3).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (make_directory_internal_scheme (directory)))
+    {
+      errno = fileio_g2_errno;
+      report_file_error ("Creating directory", directory);
+    }
 
   return Qnil;
 }
@@ -2354,16 +2475,18 @@ DEFUN ("delete-directory-internal", Fdelete_directory_internal,
        doc: /* Delete the directory named DIRECTORY.  Does not follow symlinks.  */)
   (Lisp_Object directory)
 {
-  const char *dir;
-  Lisp_Object encoded_dir;
-
   CHECK_STRING (directory);
-  directory = Fdirectory_file_name (Fexpand_file_name (directory, Qnil));
-  encoded_dir = ENCODE_FILE (directory);
-  dir = SSDATA (encoded_dir);
+  directory = Fexpand_file_name (directory, Qnil);
 
-  if (emacs_rmdir (dir) != 0)
-    report_file_error ("Removing directory", directory);
+  /* The module owns the `directory-file-name' strip and the remove
+     decision; the leaf runs the mechanism
+     `delete_directory_internal_1' (brief.org section 5.3).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (delete_directory_internal_scheme (directory)))
+    {
+      errno = fileio_g2_errno;
+      report_file_error ("Removing directory", directory);
+    }
 
   return Qnil;
 }
@@ -2374,15 +2497,17 @@ If it is a symlink, remove the symlink.
 If file has multiple names, it continues to exist with the other names. */)
   (Lisp_Object filename)
 {
-  Lisp_Object encoded_file;
-
   CHECK_STRING (filename);
   filename = Fexpand_file_name (filename, Qnil);
-  encoded_file = ENCODE_FILE (filename);
 
-  if (emacs_unlink (SSDATA (encoded_file)) != 0
-      && errno != ENOENT)
-    report_file_error ("Removing old name", filename);
+  /* The module owns the unlink decision (ENOENT is OK); the leaf runs
+     the mechanism `delete_file_internal_1' (brief.org section 5.3).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (delete_file_internal_scheme (filename)))
+    {
+      errno = fileio_g2_errno;
+      report_file_error ("Removing old name", filename);
+    }
   return Qnil;
 }
 
@@ -2490,6 +2615,33 @@ is case-insensitive.  */)
     }
 }
 
+/* FIX-20261004-guilemacs: M47 imp-5 -- the pure rename mechanism over
+   two ALREADY resolved names.  It holds the `emacs_renameat_noreplace'
+   and `emacs_rename' calls only.  It returns 0 on success, else the
+   `errno'.  It runs no handler call and no Fexpand_file_name (brief.org
+   section 5.2).  */
+
+static int
+rename_file_1 (Lisp_Object file, Lisp_Object newname, bool plain)
+{
+  Lisp_Object encoded_file = ENCODE_FILE (file);
+  Lisp_Object encoded_newname = ENCODE_FILE (newname);
+
+  if (!plain)
+    {
+      if (emacs_renameat_noreplace (AT_FDCWD, SSDATA (encoded_file),
+				    AT_FDCWD, SSDATA (encoded_newname))
+	  == 0)
+	return 0;
+      return errno;
+    }
+
+  if (emacs_rename (SSDATA (encoded_file),
+		    SSDATA (encoded_newname)) == 0)
+    return 0;
+  return errno;
+}
+
 DEFUN ("rename-file", Frename_file, Srename_file, 2, 3,
        "fRename file: \nGRename %s to file: \np",
        doc: /* Rename FILE as NEWNAME.  Both args must be strings.
@@ -2504,8 +2656,7 @@ An integer third arg means request confirmation if NEWNAME already exists.
 This is what happens in interactive use with M-x.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists)
 {
-  Lisp_Object handler;
-  Lisp_Object encoded_file, encoded_newname;
+  Lisp_Object handler, encoded_file;
 
   file = Fexpand_file_name (file, Qnil);
 
@@ -2523,9 +2674,6 @@ This is what happens in interactive use with M-x.  */)
     }
 #endif
 
-  if (!case_only_rename)
-    newname = expand_cp_target (Fdirectory_file_name (file), newname);
-
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
   handler = Ffind_file_name_handler (file, Qrename_file);
@@ -2536,22 +2684,23 @@ This is what happens in interactive use with M-x.  */)
 		  file, newname, ok_if_already_exists);
 
   encoded_file = ENCODE_FILE (file);
-  encoded_newname = ENCODE_FILE (newname);
 
   bool plain_rename = (case_only_rename
 		       || (!NILP (ok_if_already_exists)
 			   && !FIXNUMP (ok_if_already_exists)));
-  int rename_errno UNINIT;
+  int rename_errno;
+  Lisp_Object res;
+
+  /* The module owns the target-name resolution and the overwrite
+     decision; the leaf runs the mechanism `rename_file_1' (brief.org
+     section 5.3).  The leaf returns the `errno' as a plain integer.  */
   if (!plain_rename)
     {
-      if (emacs_renameat_noreplace (AT_FDCWD,
-				    SSDATA (encoded_file),
-				    AT_FDCWD,
-				    SSDATA (encoded_newname))
-	  == 0)
+      res = rename_file_scheme (file, newname, ok_if_already_exists);
+      rename_errno = FIXNUMP (res) ? XFIXNUM (res) : 0;
+      if (rename_errno == 0)
 	return Qnil;
 
-      rename_errno = errno;
       switch (rename_errno)
 	{
 	case EEXIST: case EINVAL: case ENOSYS:
@@ -2569,10 +2718,10 @@ This is what happens in interactive use with M-x.  */)
 
   if (plain_rename)
     {
-      if (emacs_rename (SSDATA (encoded_file),
-			SSDATA (encoded_newname)) == 0)
+      res = rename_file_scheme (file, newname, Qt);
+      rename_errno = FIXNUMP (res) ? XFIXNUM (res) : 0;
+      if (rename_errno == 0)
 	return Qnil;
-      rename_errno = errno;
       /* Don't prompt again.  */
       ok_if_already_exists = Qt;
     }
@@ -2618,6 +2767,40 @@ This is what happens in interactive use with M-x.  */)
   return Qnil;
 }
 
+/* FIX-20261004-guilemacs: M47 imp-5 -- the pure hard-link mechanism of
+   `add-name-to-file' over two ALREADY expanded names.  It holds the
+   link / unlink + link calls, the Android VFS check, and the overwrite
+   query.  It runs no handler call and no Fexpand_file_name (brief.org
+   section 5.2).  */
+
+static Lisp_Object
+add_name_to_file_1 (Lisp_Object file, Lisp_Object newname,
+		    Lisp_Object ok_if_already_exists)
+{
+  Lisp_Object encoded_file = ENCODE_FILE (file);
+  Lisp_Object encoded_newname = ENCODE_FILE (newname);
+  check_vfs_filename (encoded_file, "Trying to create hard link to "
+		      "file within special directory");
+  check_vfs_filename (encoded_newname, "Trying to create hard link"
+		      " within special directory");
+
+  if (link (SSDATA (encoded_file), SSDATA (encoded_newname)) == 0)
+    return Qt;
+
+  if (errno == EEXIST)
+    {
+      if (NILP (ok_if_already_exists)
+	  || FIXNUMP (ok_if_already_exists))
+	barf_or_query_if_file_exists (newname, true, "make it a new name",
+				      FIXNUMP (ok_if_already_exists), false);
+      emacs_unlink (SSDATA (encoded_newname));
+      if (link (SSDATA (encoded_file), SSDATA (encoded_newname)) == 0)
+	return Qt;
+    }
+
+  return Qnil;
+}
+
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
        "fAdd name to file: \nGName to add to %s: \np",
        doc: /* Give FILE additional name NEWNAME.  Both args must be strings.
@@ -2631,47 +2814,65 @@ This is what happens in interactive use with M-x.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists)
 {
   Lisp_Object handler;
-  Lisp_Object encoded_file, encoded_newname;
 
   file = Fexpand_file_name (file, Qnil);
-  newname = expand_cp_target (file, newname);
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
   handler = Ffind_file_name_handler (file, Qadd_name_to_file);
+  /* Likewise for the new name (brief.org section 5.3).  */
+  if (NILP (handler))
+    handler = Ffind_file_name_handler (newname, Qadd_name_to_file);
   if (!NILP (handler))
-    return call4 (handler, Qadd_name_to_file, file,
-		  newname, ok_if_already_exists);
+    return call4 (handler, Qadd_name_to_file, file, newname,
+		  ok_if_already_exists);
 
-  /* If the new name has special constructs in it,
-     call the corresponding file name handler.  */
-  handler = Ffind_file_name_handler (newname, Qadd_name_to_file);
-  if (!NILP (handler))
-    return call4 (handler, Qadd_name_to_file, file,
-		  newname, ok_if_already_exists);
+  /* The module owns the target-name resolution and the overwrite
+     decision; the leaf runs the mechanism `add_name_to_file_1'
+     (brief.org section 5.3).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (add_name_to_file_scheme (file, newname, ok_if_already_exists)))
+    {
+      errno = fileio_g2_errno;
+      report_file_error ("Adding new name", list2 (file, newname));
+    }
+  return Qnil;
+}
 
-  encoded_file = ENCODE_FILE (file);
-  encoded_newname = ENCODE_FILE (newname);
-  check_vfs_filename (encoded_file, "Trying to create hard link to "
-		      "file within special directory");
-  check_vfs_filename (encoded_newname, "Trying to create hard link"
-		      " within special directory");
+/* FIX-20261004-guilemacs: M47 imp-5 -- the pure symbolic-link mechanism
+   of `make-symbolic-link' over two ALREADY resolved names.  It holds
+   the symlink / unlink + symlink calls and the overwrite query.  It
+   runs no handler call and no Fexpand_file_name (brief.org section
+   5.2).  */
 
-  if (link (SSDATA (encoded_file), SSDATA (encoded_newname)) == 0)
-    return Qnil;
+static Lisp_Object
+make_symbolic_link_1 (Lisp_Object target, Lisp_Object linkname,
+		      Lisp_Object ok_if_already_exists)
+{
+  Lisp_Object encoded_target = ENCODE_FILE (target);
+  Lisp_Object encoded_linkname = ENCODE_FILE (linkname);
+
+  if (emacs_symlink (SSDATA (encoded_target),
+		     SSDATA (encoded_linkname)) == 0)
+    return Qt;
+
+  if (errno == ENOSYS)
+    xsignal1 (Qfile_error,
+	      build_string ("Symbolic links are not supported"));
 
   if (errno == EEXIST)
     {
       if (NILP (ok_if_already_exists)
 	  || FIXNUMP (ok_if_already_exists))
-	barf_or_query_if_file_exists (newname, true, "make it a new name",
+	barf_or_query_if_file_exists (linkname, true, "make it a link",
 				      FIXNUMP (ok_if_already_exists), false);
-      emacs_unlink (SSDATA (newname));
-      if (link (SSDATA (encoded_file), SSDATA (encoded_newname)) == 0)
-	return Qnil;
+      emacs_unlink (SSDATA (encoded_linkname));
+      if (emacs_symlink (SSDATA (encoded_target),
+			 SSDATA (encoded_linkname)) == 0)
+	return Qt;
     }
 
-  report_file_error ("Adding new name", list2 (file, newname));
+  return Qnil;
 }
 
 DEFUN ("make-symbolic-link", Fmake_symbolic_link, Smake_symbolic_link, 2, 3,
@@ -2688,17 +2889,8 @@ This happens for interactive use with M-x.  */)
   (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_already_exists)
 {
   Lisp_Object handler;
-  Lisp_Object encoded_target, encoded_linkname;
 
   CHECK_STRING (target);
-  if (FIXNUMP (ok_if_already_exists))
-    {
-      if (guile_string_starts_with_char (target, '~'))
-	target = Fexpand_file_name (target, Qnil);
-      else if (guile_path_starts_with (target, "/:"))
-	target = Fsubstring_no_properties (target, make_fixnum (2), Qnil);
-    }
-  linkname = expand_cp_target (target, linkname);
 
   /* If the new link name has special constructs in it,
      call the corresponding file name handler.  */
@@ -2707,30 +2899,17 @@ This happens for interactive use with M-x.  */)
     return call4 (handler, Qmake_symbolic_link, target,
 		  linkname, ok_if_already_exists);
 
-  encoded_target = ENCODE_FILE (target);
-  encoded_linkname = ENCODE_FILE (linkname);
-
-  if (emacs_symlink (SSDATA (encoded_target),
-		     SSDATA (encoded_linkname)) == 0)
-    return Qnil;
-
-  if (errno == ENOSYS)
-    xsignal1 (Qfile_error,
-	      build_string ("Symbolic links are not supported"));
-
-  if (errno == EEXIST)
+  /* The module owns the target-name resolution, the ~ / /: target rule,
+     and the overwrite decision; the leaf runs the mechanism
+     `make_symbolic_link_1' (brief.org section 5.3).  */
+  fileio_g2_errno_file = 0;
+  if (NILP (make_symbolic_link_scheme (target, linkname,
+				       ok_if_already_exists)))
     {
-      if (NILP (ok_if_already_exists)
-	  || FIXNUMP (ok_if_already_exists))
-	barf_or_query_if_file_exists (linkname, true, "make it a link",
-				      FIXNUMP (ok_if_already_exists), false);
-      emacs_unlink (SSDATA (encoded_linkname));
-      if (emacs_symlink (SSDATA (encoded_target),
-			 SSDATA (encoded_linkname)) == 0)
-	return Qnil;
+      errno = fileio_g2_errno;
+      report_file_error ("Making symbolic link", list2 (target, linkname));
     }
-
-  report_file_error ("Making symbolic link", list2 (target, linkname));
+  return Qnil;
 }
 
 
@@ -6440,12 +6619,11 @@ If the underlying system call fails, value is nil.  */)
    A leaf holds no file-name-handler dispatch: call2 / call3 runs
    arbitrary Lisp, so the C hub keeps it (brief.org section 3).
 
-   The leaves marked "OPEN (cr.org F1)" still call their public hub.
-   They need a factor-helper step: the pure policy is interleaved with
-   the handler dispatch in a large block (expand-file-name,
-   substitute-in-file-name, copy-file, rename-file, add-name-to-file,
-   make-symbolic-link).  Do not rewire their hubs onto these leaves
-   until that step lands.  */
+   M47 imp-5 removes the last OPEN leaf: the 4 G3 leaves
+   (--fileio-copy-file, --fileio-rename-file, --fileio-add-name-to-file,
+   --fileio-make-symbolic-link) now call their pure C mechanisms
+   (copy_file_1, rename_file_1, add_name_to_file_1,
+   make_symbolic_link_1).  No G1 / G2 / G3 leaf calls a public hub.  */
 
 /* --- G1: the file-name / path policy -------------------------------- */
 
@@ -6906,15 +7084,12 @@ over the helper `blocks_to_bytes'.  M47 imp-2, brief.org section 5.  */)
 
 DEFUN ("--fileio-copy-file", Fc_fileio_copy_file,
        Sc_fileio_copy_file, 6, 6, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: copy FILE to NEWNAME and
-return a *plain boolean* for the success.  OK-IF-EXISTS, KEEP-TIME,
-PRESERVE-UID-GID, and PRESERVE-PERMS are the preserve / overwrite
-policy.  The leaf does NOT report a file error; the caller keeps
-`report_file_errno'.  M47 imp-2, brief.org section 5.
-
-OPEN (cr.org F1): this leaf still calls the hub Fcopy_file.  The pure
-policy is a large block interleaved with the handler dispatch, so it
-needs a factor-helper step.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: copy FILE to NEWNAME and
+return a *plain boolean* for the success.  FILE and NEWNAME are ALREADY
+expanded.  OK-IF-EXISTS, KEEP-TIME, PRESERVE-UID-GID, and PRESERVE-PERMS
+are the preserve / overwrite policy.  The leaf calls the pure mechanism
+`copy_file_1', never the hub Fcopy_file (cr.org F1).  It runs no handler
+call and no Fexpand_file_name.  M47 imp-5, brief.org section 5.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists,
    Lisp_Object keep_time, Lisp_Object preserve_uid_gid,
    Lisp_Object preserve_perms)
@@ -6922,8 +7097,9 @@ needs a factor-helper step.  */)
 #ifndef MSDOS
   if (!STRINGP (file) || !STRINGP (newname))
     return Qnil;
-  return Fcopy_file (file, newname, ok_if_exists, keep_time,
-		     preserve_uid_gid, preserve_perms);
+  copy_file_1 (file, newname, ok_if_exists, keep_time,
+	       preserve_uid_gid, preserve_perms);
+  return Qt;
 #else
   return Qnil;
 #endif
@@ -6931,20 +7107,25 @@ needs a factor-helper step.  */)
 
 DEFUN ("--fileio-make-directory-internal", Fc_fileio_make_directory_internal,
        Sc_fileio_make_directory_internal, 1, 1, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: create the directory DIR
-and return a *plain boolean* for the success.  The `mkdir' syscall
-stays C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
-section 5.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: create the directory DIR
+and return a *plain boolean* for the success.  DIR is ALREADY expanded.
+The leaf calls the pure mechanism `make_directory_internal_1', never the
+hub Fmake_directory_internal (cr.org F1).  It runs no handler call and
+no Fexpand_file_name; it captures `errno' in the G3 channel.  M47 imp-5,
+brief.org section 5.  */)
   (Lisp_Object dir)
 {
 #ifndef MSDOS
-  Lisp_Object directory;
+  Lisp_Object r;
   if (!STRINGP (dir))
     return Qnil;
-  directory = Fexpand_file_name (dir, Qnil);
-  return (emacs_mkdir (SSDATA (ENCODE_FILE (directory)),
-		       0777 & ~auto_saving_dir_umask) == 0)
-	 ? Qt : Qnil;
+  r = make_directory_internal_1 (dir);
+  if (NILP (r))
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+    }
+  return r;
 #else
   return Qnil;
 #endif
@@ -6953,18 +7134,26 @@ section 5.  */)
 DEFUN ("--fileio-delete-directory-internal",
        Fc_fileio_delete_directory_internal,
        Sc_fileio_delete_directory_internal, 1, 1, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: delete the directory
-DIR and return a *plain boolean* for the success.  The `rmdir' syscall
-stays C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
-section 5.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: delete the directory DIR
+and return a *plain boolean* for the success.  DIR is ALREADY expanded
+and stripped of its final separator.  The leaf calls the pure mechanism
+`delete_directory_internal_1', never the hub
+Fdelete_directory_internal (cr.org F1).  It runs no handler call and no
+Fexpand_file_name; it captures `errno' in the G3 channel.  M47 imp-5,
+brief.org section 5.  */)
   (Lisp_Object dir)
 {
 #ifndef MSDOS
-  Lisp_Object directory;
+  Lisp_Object r;
   if (!STRINGP (dir))
     return Qnil;
-  directory = Fdirectory_file_name (Fexpand_file_name (dir, Qnil));
-  return (emacs_rmdir (SSDATA (ENCODE_FILE (directory))) == 0) ? Qt : Qnil;
+  r = delete_directory_internal_1 (dir);
+  if (NILP (r))
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+    }
+  return r;
 #else
   return Qnil;
 #endif
@@ -6972,20 +7161,25 @@ section 5.  */)
 
 DEFUN ("--fileio-delete-file-internal", Fc_fileio_delete_file_internal,
        Sc_fileio_delete_file_internal, 1, 1, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: delete the file FN and
-return a *plain boolean* for the success.  The `unlink' syscall stays
-C.  The leaf does NOT report a file error.  M47 imp-2, brief.org
-section 5.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: delete the file FN and
+return a *plain boolean* for the success.  FN is ALREADY expanded.  The
+leaf calls the pure mechanism `delete_file_internal_1', never the hub
+Fdelete_file_internal (cr.org F1).  It runs no handler call and no
+Fexpand_file_name; it captures `errno' in the G3 channel.  M47 imp-5,
+brief.org section 5.  */)
   (Lisp_Object fn)
 {
 #ifndef MSDOS
-  Lisp_Object filename;
+  Lisp_Object r;
   if (!STRINGP (fn))
     return Qnil;
-  filename = Fexpand_file_name (fn, Qnil);
-  return (emacs_unlink (SSDATA (ENCODE_FILE (filename))) == 0
-	  || errno == ENOENT)
-	 ? Qt : Qnil;
+  r = delete_file_internal_1 (fn);
+  if (NILP (r))
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+    }
+  return r;
 #else
   return Qnil;
 #endif
@@ -6993,42 +7187,45 @@ section 5.  */)
 
 DEFUN ("--fileio-rename-file", Fc_fileio_rename_file,
        Sc_fileio_rename_file, 3, 3, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: rename FILE to NEWNAME
-and return a *plain boolean* for the success.  OK-IF-EXISTS is the
-overwrite policy.  The `rename' syscall stays C.  The leaf does NOT
-report a file error.  M47 imp-2, brief.org section 5.
-
-OPEN (cr.org F1): this leaf still calls the hub Frename_file.  The pure
-policy is interleaved with the handler dispatch and the overwrite
-query, so it needs a factor-helper step.  */)
-  (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists)
+       doc: /* FIX-20261004-guilemacs: Internal: rename FILE to NEWNAME and
+return a *plain integer* for the result: 0 on success, else the `errno'.
+FILE and NEWNAME are ALREADY resolved.  PLAIN is the overwrite decision
+(nil means try `emacs_renameat_noreplace' first).  The leaf calls the
+pure mechanism `rename_file_1', never the hub Frename_file (cr.org F1).
+It runs no handler call and no Fexpand_file_name.  M47 imp-5, brief.org
+section 5.  */)
+  (Lisp_Object file, Lisp_Object newname, Lisp_Object plain)
 {
 #ifndef MSDOS
   if (!STRINGP (file) || !STRINGP (newname))
-    return Qnil;
-  return Frename_file (file, newname, ok_if_exists);
+    return make_fixnum (EINVAL);
+  return make_fixnum (rename_file_1 (file, newname, !NILP (plain)));
 #else
-  return Qnil;
+  return make_fixnum (0);
 #endif
 }
 
 DEFUN ("--fileio-add-name-to-file", Fc_fileio_add_name_to_file,
        Sc_fileio_add_name_to_file, 3, 3, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: hard-link FILE to
-NEWNAME and return a *plain boolean* for the success.  OK-IF-EXISTS is
-the overwrite policy.  The `link' / `emacs_symlink' mechanism stays C.
-The leaf does NOT report a file error.  M47 imp-2, brief.org section
-5.
-
-OPEN (cr.org F1): this leaf still calls the hub Fadd_name_to_file.  The
-pure policy is interleaved with the handler dispatch and the overwrite
-query, so it needs a factor-helper step.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: hard-link FILE to NEWNAME
+and return a *plain boolean* for the success.  FILE and NEWNAME are
+ALREADY resolved.  OK-IF-EXISTS is the overwrite policy.  The leaf calls
+the pure mechanism `add_name_to_file_1', never the hub Fadd_name_to_file
+(cr.org F1).  It runs no handler call and no Fexpand_file_name; it
+captures `errno' in the G3 channel.  M47 imp-5, brief.org section 5.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_exists)
 {
 #ifndef MSDOS
+  Lisp_Object r;
   if (!STRINGP (file) || !STRINGP (newname))
     return Qnil;
-  return Fadd_name_to_file (file, newname, ok_if_exists);
+  r = add_name_to_file_1 (file, newname, ok_if_exists);
+  if (NILP (r))
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+    }
+  return r;
 #else
   return Qnil;
 #endif
@@ -7036,21 +7233,26 @@ query, so it needs a factor-helper step.  */)
 
 DEFUN ("--fileio-make-symbolic-link", Fc_fileio_make_symbolic_link,
        Sc_fileio_make_symbolic_link, 3, 3, 0,
-       doc: /* FIX-20261003-guilemacs: Internal: make LINKNAME a symbolic
-link to TARGET and return a *plain boolean* for the success.
-OK-IF-EXISTS is the overwrite policy.  The `emacs_symlink' syscall stays
-C.  The leaf does NOT report a file error.  M47 imp-2, brief.org section
-5.
-
-OPEN (cr.org F1): this leaf still calls the hub
-Fmake_symbolic_link.  The pure policy is interleaved with the handler
-dispatch and the overwrite query, so it needs a factor-helper step.  */)
+       doc: /* FIX-20261004-guilemacs: Internal: make LINKNAME a symbolic
+link to TARGET and return a *plain boolean* for the success.  TARGET and
+LINKNAME are ALREADY resolved.  OK-IF-EXISTS is the overwrite policy.
+The leaf calls the pure mechanism `make_symbolic_link_1', never the hub
+Fmake_symbolic_link (cr.org F1).  It runs no handler call and no
+Fexpand_file_name; it captures `errno' in the G3 channel.  M47 imp-5,
+brief.org section 5.  */)
   (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_exists)
 {
 #ifndef MSDOS
+  Lisp_Object r;
   if (!STRINGP (target) || !STRINGP (linkname))
     return Qnil;
-  return Fmake_symbolic_link (target, linkname, ok_if_exists);
+  r = make_symbolic_link_1 (target, linkname, ok_if_exists);
+  if (NILP (r))
+    {
+      fileio_g2_errno = errno;
+      fileio_g2_errno_file = 1;
+    }
+  return r;
 #else
   return Qnil;
 #endif

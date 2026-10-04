@@ -335,14 +335,15 @@ the forbidden hub.")
 (setq m47-imp4--group 't5)
 
 (m47-imp4--check "open-markers-left-4"
-                 (eql 4 (m47-imp4--count "src/fileio.c" "OPEN (cr.org F1):")))
+                 (eql 0 (m47-imp4--count "src/fileio.c" "OPEN (cr.org F1):")))
 (dolist (leaf '("copy-file" "rename-file" "add-name-to-file" "make-symbolic-link"))
   (m47-imp4--check (format "open-leaf-%s" leaf)
                    (let ((code (m47-imp4--strip-comments
                                 (or (m47-imp4--leaf-body leaf) ""))))
-                     (and (string-match-p
-                           (regexp-quote (format "%s (" (m47-imp4--hub-name leaf)))
-                           code)
+                     (and (stringp code)
+                          (not (string-match-p
+                                (regexp-quote (format "%s (" (m47-imp4--hub-name leaf)))
+                                code))
                           t))))
 (m47-imp4--check "g3-leaves-still-26"
                  (eql 26 (m47-imp4--count "src/fileio.c" "^DEFUN (\"--fileio-")))
@@ -354,14 +355,14 @@ the forbidden hub.")
 (m47-imp4--check "fileio.c-grows-past-imp3"
                  (let ((n (m47-imp4--lines "src/fileio.c")))
                    (and (integerp n) (> n 7223))))
-(m47-imp4--check "fileio.c-lines-7373"
-                 (eql 7373 (m47-imp4--lines "src/fileio.c")))
+(m47-imp4--check "fileio.c-lines-7575"
+                 (eql 7575 (m47-imp4--lines "src/fileio.c")))
 (m47-imp4--check "fileio.c-defuns-78"
                  (eql 78 (m47-imp4--count "src/fileio.c" "^DEFUN (\"")))
-(m47-imp4--check "fileio.c-scm-ref-20"
-                 (eql 20 (m47-imp4--count "src/fileio.c" "scm_c_public_ref")))
-(m47-imp4--check "fileio.scm-lines-315"
-                 (eql 315 (m47-imp4--lines "mod/emacs/fileio.scm")))
+(m47-imp4--check "fileio.c-scm-ref-27"
+                 (eql 27 (m47-imp4--count "src/fileio.c" "scm_c_public_ref")))
+(m47-imp4--check "fileio.scm-lines-370"
+                 (eql 370 (m47-imp4--lines "mod/emacs/fileio.scm")))
 (m47-imp4--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp4--lines "src/keyboard.c")))
 (m47-imp4--check "keyboard-globals.c-lines-490"
