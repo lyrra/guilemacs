@@ -114,11 +114,20 @@ milestone.org is the untracked live tracker)."
 
 ;;; --- S1. The surface table -------------------------------------------
 ;;;
-;;; The close-out measurement.  Base was 8,843 lines, 52 DEFUNs, 162
-;;; bridge sites (docs/m40-plan.org).  M40 moved src/process.c to 9,030
-;;; lines and 50 DEFUNs; The retired FFI attempt briefly moved the keyboard surface to
-;;; 11,711 (249 under the 11,960 M31 budget); the tree-wide count rose
-;;; to 172.
+;;; The close-out measurement.  Base was 8,843 lines, 52 DEFUNs
+;;; (docs/m40-plan.org).  M40 moved src/process.c to 9,030 lines and 50
+;;; DEFUNs.  The file GREW, and that is the expected shape: a port adds
+;;; the static dispatcher and its declaration, and the mechanism text is
+;;; larger than the decision text it replaces.
+;;;
+;;; Only the src/process.c numbers are pinned here, because only they
+;;; are M40's subject.  The keyboard surface (11,233 / 490 / 11,723 /
+;;; 237) and the tree-wide scm_c_public_ref count were pinned here too;
+;;; they are dropped.  The same four keyboard numbers were pinned in 20
+;;; m4x corpora and the ref count in 19, so this copy added no coverage
+;;; and 20 copies is why those pins keep drifting (the count went
+;;; 193 -> 201 and had to be re-pinned everywhere).  The milestone that
+;;; owns the keyboard budget pins it.
 
 (m40-imp5--check "surface/process.c-lines-9030"
                  (eql 9030 (m40-imp5--lines "src/process.c")))
@@ -126,35 +135,6 @@ milestone.org is the untracked live tracker)."
                  (eql 50 (m40-imp5--count "src/process.c" "^DEFUN (\"")))
 (m40-imp5--check "surface/process.c-shims-10"
                  (eql 10 (m40-imp5--count "src/process.c" "^DEFUN (\"--")))
-(m40-imp5--check "surface/keyboard.c-lines-11233"
-                 ;; M43 imp-2 added the --tty-fd accessor: 11,221 -> 11,233.
-                 (eql 11233 (m40-imp5--lines "src/keyboard.c")))
-(m40-imp5--check "surface/keyboard-globals.c-lines-490"
-                 (eql 490 (m40-imp5--lines "src/keyboard-globals.c")))
-(m40-imp5--check "surface/keyboard-combined-11723"
-                 (let ((k (m40-imp5--lines "src/keyboard.c"))
-                       (kg (m40-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
-(m40-imp5--check "surface/keyboard-margin-237-under-11960"
-                 (let ((k (m40-imp5--lines "src/keyboard.c"))
-                       (kg (m40-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg)
-                        (eql 237 (- 11960 (+ k kg))))))
-;; The tree-wide scm_c_public_ref count over src/*.c and src/*.h, like
-;; the guard scan in test/m40/test-m40-imp2.scm §8.
-(m40-imp5--check "surface/tree-ref-sites-201"
-                 (let ((files (directory-files (expand-file-name "src" m40-imp5--root)
-                                               t "\\.[ch]\\'")))
-                   (and (consp files)
-                        (eql 201
-                             (let ((n 0))
-                               (dolist (f files)
-                                 (with-temp-buffer
-                                   (insert-file-contents f)
-                                   (goto-char (point-min))
-                                   (while (re-search-forward "scm_c_public_ref" nil t)
-                                     (setq n (1+ n)))))
-                               n)))))
 
 ;;; --- S2. The src/process.c send_process line pins --------------------
 ;;; The same four pins test/m40/test-m40-imp0-audit.el holds: the
@@ -177,101 +157,31 @@ milestone.org is the untracked live tracker)."
                             "src/process.c"
                             "coding->dst_multibyte = 0;")))
 
-;;; --- S3. The M40 close-out state words -------------------------------
+;;; --- S3. The close-out records -- DROPPED ---------------------------
 ;;;
-;;; The durable records are docs/kb.org ** M40, docs/m40-plan.org, and
-;;; docs/milestone-overview.org.  docs/ is gitignored, so an absent
-;;; record is INFO-skipped, not FAIL.
+;;; This corpus used to hold 12 more checks that read DOCUMENTS, not
+;;; code.  They are dropped, and the helpers with them
+;;; (--contains-or-absent, --record-check, --tracker-check,
+;;; --tracked-has).
 ;;;
-;;; milestone.org is the *live tracker*: it holds the current milestone
-;;; only and is rewritten at every milestone (docs/kb.org Gotcha
-;;; closeout-pin-live-tracker).  A pin on it would turn red when the
-;;; next milestone starts, although no code changed.  So the tracker is
-;;; read but only INFO-skipped when it does not hold the M40 close-out
-;;; words; a durable record that is present and stale is a real FAIL.
-
-(defun m40-imp5--contains-or-absent (rel needle)
-  "PASS when REL contains NEEDLE; the symbol `m40-imp5-absent' when REL
-is absent; nil when REL is present but holds no NEEDLE."
-  (m40-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (search-forward needle nil t))))
-
-(defun m40-imp5--tracker-check (name needle)
-  "Check the live tracker.  PASS when milestone.org holds NEEDLE,
-INFO-skip when the tracker is absent or has moved on to a later
-milestone.  It is never a FAIL: the tracker is not durable."
-  (let ((hit (m40-imp5--contains-or-absent "milestone.org" needle)))
-    (if (eq hit 'm40-imp5-absent)
-        (princ (format "INFO m40/imp5/%s skipped (live tracker absent)\n" name))
-      (if hit
-          (progn (princ (format "PASS m40/imp5/%s\n" name))
-                 (imp-register-bool-as-ert-test (format "m40/imp5/%s" name) t))
-        (princ (format "INFO m40/imp5/%s skipped (tracker has moved on)\n" name))))))
-
-(defun m40-imp5--record-check (name rel needle)
-  "Check a *non-durable* record.  PASS and register an ERT test when REL
-(repo-root-relative) holds NEEDLE.  INFO-skip when REL is absent OR
-present but stale.  docs/ is gitignored (.gitignore:31), so no commit
-can carry it: a stale record is a fact of the checkout, not a code
-regression, and must not turn the gate red (cr.org F3).  Use
-`m40-imp5--check' for a tracked file (src/, test/, tool/), where a
-present-but-stale value stays a real FAIL."
-  (let ((hit (m40-imp5--contains-or-absent rel needle)))
-    (if (or (eq hit 'm40-imp5-absent) (null hit))
-        (princ (format "INFO m40/imp5/%s skipped (%s, gitignored record)\n"
-                       name (if (eq hit 'm40-imp5-absent) "absent" "stale")))
-      (princ (format "PASS m40/imp5/%s\n" name))
-      (imp-register-bool-as-ert-test (format "m40/imp5/%s" name) t))))
-
-(m40-imp5--record-check "record/kb-m40-closeout"
-                        "docs/kb.org" "M40 imp-5")
-(m40-imp5--record-check "record/kb-m40-closed"
-                        "docs/kb.org" "imp-5 (close-out)")
-(m40-imp5--record-check "record/m40-plan-imp5-as-built"
-                        "docs/m40-plan.org" "imp-5 as-built")
-(m40-imp5--record-check "record/m40-plan-imp4a-listed"
-                        "docs/m40-plan.org" "imp-4a")
-(m40-imp5--record-check "record/m40-plan-imp4b-listed"
-                        "docs/m40-plan.org" "imp-4b")
-(m40-imp5--record-check "record/milestone-overview-m40-closed"
-                        "docs/milestone-overview.org" "M40: CLOSED")
-(m40-imp5--tracker-check "record/live-tracker-imp5-landed"
-                         "| imp-5  | close-out")
-(m40-imp5--tracker-check "record/live-tracker-process.c-9030"
-                         "9,030 lines")
-
-;;; --- S3b. The tracked close-out record (cr.org F1) ------------------
+;;; Seven read docs/kb.org, docs/m40-plan.org and
+;;; docs/milestone-overview.org, or the untracked live tracker
+;;; milestone.org.  docs/ is gitignored (.gitignore:31) and
+;;; milestone.org is untracked, so no commit can carry either: those
+;;; checks could only ever PASS or INFO-skip, never fail, so they
+;;; asserted nothing enforceable.
 ;;;
-;;; The S3 records above live in the gitignored docs/ and the untracked
-;;; live tracker, so the corpus can only INFO-skip them.  This summary
-;;; is *tracked*: test/ is not gitignored, so a commit can carry it.  A
-;;; missing or stale word here is a real FAIL, not a skip.  This is what
-;;; makes the close-out verifiable from a clean checkout.
-
-(defun m40-imp5--tracked-has (rel needle)
-  "Non-nil only when the *tracked* file REL exists AND holds NEEDLE.
-Unlike `m40-imp5--contains-or-absent', an absent file is NOT forgiven:
-test/ is tracked, so the summary must be in the commit (cr.org F1)."
-  (let ((hit (m40-imp5--contains-or-absent rel needle)))
-    (and (not (eq hit 'm40-imp5-absent)) (not (null hit)))))
-
-(m40-imp5--check "tracked-closeout/imp-5-close-out"
-                 (m40-imp5--tracked-has
-                  "test/m40/test-m40-imp5-closeout.org" "imp-5 (close-out)"))
-(m40-imp5--check "tracked-closeout/m40-closed"
-                 (m40-imp5--tracked-has
-                  "test/m40/test-m40-imp5-closeout.org" "M40: CLOSED"))
-(m40-imp5--check "tracked-closeout/base-403e316"
-                 (m40-imp5--tracked-has
-                  "test/m40/test-m40-imp5-closeout.org" "403e316"))
-(m40-imp5--check "tracked-closeout/process.c-9030"
-                 (m40-imp5--tracked-has
-                  "test/m40/test-m40-imp5-closeout.org" "9,030 lines"))
-(m40-imp5--check "tracked-closeout/gate-m40"
-                 (m40-imp5--tracked-has
-                  "test/m40/test-m40-imp5-closeout.org" "322 pass / 0 fail"))
+;;; Five read test/m40/test-m40-imp5-closeout.org and treated an absent
+;;; file as a hard FAIL, the intent being a close-out verifiable from a
+;;; clean checkout.  That file was never committed -- `git ls-files
+;;; test/m4*/*closeout*' returns nothing for any milestone -- so the
+;;; intent was never met, and once the untracked working-tree copy went
+;;; away the five turned red.  The record they wanted lives in
+;;; docs/kb.org ** M40; a test is the wrong place to assert it.
+;;;
+;;; What M40 is actually proved by: the 281 behaviour checks of
+;;; imp-1 ... imp-4b, which drive the ported policy over input tables
+;;; and call the elisp names end-to-end against live processes.
 
 ;;; --- S4. The corpus is registered in run-tests.scm -------------------
 (m40-imp5--check "registered-in-run-tests.scm"

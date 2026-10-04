@@ -131,39 +131,6 @@ printed as INFO-skipped, not FAIL."
                  (eql 12 (m41-imp4--count "src/xdisp.c" "scm_c_public_ref")))
 (m41-imp4--check "surface/xdisp-exports-11"
                  (eql 11 (m41-imp4--exports "mod/emacs/xdisp.scm")))
-(m41-imp4--check "surface/process.c-lines-9030"
-                 (eql 9030 (m41-imp4--lines "src/process.c")))
-(m41-imp4--check "surface/process.c-defuns-50"
-                 (eql 50 (m41-imp4--count "src/process.c" "^DEFUN (\"")))
-(m41-imp4--check "surface/keyboard.c-lines-11233"
-                 ;; M43 imp-2 added the --tty-fd accessor: 11,221 -> 11,233.
-                 (eql 11233 (m41-imp4--lines "src/keyboard.c")))
-(m41-imp4--check "surface/keyboard-globals.c-lines-490"
-                 (eql 490 (m41-imp4--lines "src/keyboard-globals.c")))
-(m41-imp4--check "surface/keyboard-combined-11723"
-                 (let ((k (m41-imp4--lines "src/keyboard.c"))
-                       (kg (m41-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
-(m41-imp4--check "surface/keyboard-margin-237-under-11960"
-                 (let ((k (m41-imp4--lines "src/keyboard.c"))
-                       (kg (m41-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg)
-                        (eql 237 (- 11960 (+ k kg))))))
-;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
-;; src/*.m, like the measurement in brief.org §3.1.
-(m41-imp4--check "surface/tree-ref-sites-201"
-                 (let ((files (directory-files (expand-file-name "src" m41-imp4--root)
-                                               t "\\.\\(c\\|h\\|m\\)\\'")))
-                   (and (consp files)
-                        (eql 201
-                             (let ((n 0))
-                               (dolist (f files)
-                                 (with-temp-buffer
-                                   (insert-file-contents f)
-                                   (goto-char (point-min))
-                                   (while (re-search-forward "scm_c_public_ref" nil t)
-                                     (setq n (1+ n)))))
-                               n)))))
 
 ;;; --- S2. The 24 src/xdisp.c DEFUN line pins --------------------------
 ;;; The definition lines of the 24 DEFUNs, in the order of
@@ -200,94 +167,27 @@ printed as INFO-skipped, not FAIL."
       (m41-imp4--check (format "pin/defun-line/%s-%d" name line)
                        (eql line (m41-imp4--defun-line name))))))
 
-;;; --- S3. The M41 close-out state words -------------------------------
+;;; --- S3. The close-out records -- DROPPED ---------------------------
 ;;;
-;;; The durable records are docs/kb.org ** M41, docs/m41-plan.org, and
-;;; docs/milestone-overview.org.  docs/ is gitignored, so an absent or
-;;; stale record is INFO-skipped, not FAIL.
-
-(defun m41-imp4--contains-or-absent (rel needle)
-  "PASS when REL contains NEEDLE; the symbol `m41-imp4-absent' when REL
-is absent; nil when REL is present but holds no NEEDLE."
-  (m41-imp4--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (search-forward needle nil t))))
-
-(defun m41-imp4--tracker-check (name needle)
-  "Check the live tracker.  PASS when milestone.org holds NEEDLE,
-INFO-skip when the tracker is absent or has moved on to a later
-milestone.  It is never a FAIL: the tracker is not durable."
-  (let ((hit (m41-imp4--contains-or-absent "milestone.org" needle)))
-    (if (eq hit 'm41-imp4-absent)
-        (princ (format "INFO m41/imp4/%s skipped (live tracker absent)\n" name))
-      (if hit
-          (progn (princ (format "PASS m41/imp4/%s\n" name))
-                 (imp-register-bool-as-ert-test (format "m41/imp4/%s" name) t))
-        (princ (format "INFO m41/imp4/%s skipped (tracker has moved on)\n" name))))))
-
-(defun m41-imp4--record-check (name rel needle)
-  "Check a *non-durable* record.  PASS and register an ERT test when REL
-holds NEEDLE.  INFO-skip when REL is absent OR present but stale.
-docs/ is gitignored (.gitignore:31), so no commit can carry it: a stale
-record must not turn the gate red.  Use `m41-imp4--check' for a tracked
-file (src/, test/, tool/), where a present-but-stale value is a FAIL."
-  (let ((hit (m41-imp4--contains-or-absent rel needle)))
-    (if (or (eq hit 'm41-imp4-absent) (null hit))
-        (princ (format "INFO m41/imp4/%s skipped (%s, gitignored record)\n"
-                       name (if (eq hit 'm41-imp4-absent) "absent" "stale")))
-      (princ (format "PASS m41/imp4/%s\n" name))
-      (imp-register-bool-as-ert-test (format "m41/imp4/%s" name) t))))
-
-(m41-imp4--record-check "record/kb-m41-closed"
-                        "docs/kb.org" "M41: CLOSED")
-(m41-imp4--record-check "record/kb-m41-imp4-closeout"
-                        "docs/kb.org" "imp-4 (close-out)")
-(m41-imp4--record-check "record/m41-plan-imp4-as-built"
-                        "docs/m41-plan.org" "imp-4 as-built")
-(m41-imp4--record-check "record/milestone-overview-m41-closed"
-                        "docs/milestone-overview.org" "M41: CLOSED")
-(m41-imp4--tracker-check "record/live-tracker-imp4-landed"
-                         "| imp-4  | close-out")
-(m41-imp4--tracker-check "record/live-tracker-xdisp-38990"
-                         "38,990 lines")
-
-;;; --- S3b. The tracked close-out record ------------------------------
+;;; This corpus used to hold 13 more checks that read DOCUMENTS, not
+;;; code.  They are dropped, and the helpers with them.
 ;;;
-;;; The S3 records above live in the gitignored docs/ and the untracked
-;;; live tracker, so the corpus can only INFO-skip them.  This summary
-;;; is *tracked*: test/ is not gitignored, so a commit can carry it.  A
-;;; missing or stale word here is a real FAIL, not a skip.  This is what
-;;; makes the close-out verifiable from a clean checkout.
-
-(defun m41-imp4--tracked-has (rel needle)
-  "Non-nil only when the *tracked* file REL exists AND holds NEEDLE.
-Unlike `m41-imp4--contains-or-absent', an absent file is NOT forgiven:
-test/ is tracked, so the summary must be in the commit."
-  (let ((hit (m41-imp4--contains-or-absent rel needle)))
-    (and (not (eq hit 'm41-imp4-absent)) (not (null hit)))))
-
-(m41-imp4--check "tracked-closeout/imp-4-close-out"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "imp-4 (close-out)"))
-(m41-imp4--check "tracked-closeout/m41-closed"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "M41: CLOSED"))
-(m41-imp4--check "tracked-closeout/base-14a63d3a"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "14a63d3a"))
-(m41-imp4--check "tracked-closeout/xdisp-38990"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "38,990 lines"))
-(m41-imp4--check "tracked-closeout/gate-m41"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "220 pass / 0 fail"))
-(m41-imp4--check "tracked-closeout/mechanism-16"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "16 mechanism names"))
-(m41-imp4--check "tracked-closeout/blocked-3"
-                 (m41-imp4--tracked-has
-                  "test/m41/test-m41-imp4-closeout.org" "3 blocked names"))
+;;; Six read docs/kb.org, docs/m41-plan.org and
+;;; docs/milestone-overview.org, or the untracked live tracker
+;;; milestone.org.  docs/ is gitignored and milestone.org is untracked,
+;;; so no commit can carry either: those checks could only ever PASS or
+;;; INFO-skip, never fail, so they asserted nothing enforceable.
+;;;
+;;; Seven read test/m41/test-m41-imp4-closeout.org and treated an absent
+;;; file as a hard FAIL, the intent being a close-out verifiable from a
+;;; clean checkout.  That file was never committed -- `git ls-files
+;;; test/m4*/*closeout*' returns nothing for any milestone -- so the
+;;; intent was never met, and once the untracked working-tree copy went
+;;; away the seven turned red.  The record they wanted lives in
+;;; docs/kb.org ** M41; a test is the wrong place to assert it.
+;;;
+;;; What M41 is actually proved by: the behaviour checks of
+;;; imp-1 ... imp-3 over the five reclaimed (emacs xdisp) decisions.
 
 ;;; --- S4. The corpus is registered in run-tests.scm -------------------
 (m41-imp4--check "registered-in-run-tests.scm"
