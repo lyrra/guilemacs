@@ -40,6 +40,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 
+/* FIX-20261005-guilemacs: M49 imp-2 -- the typed C leaves below use the
+   Guile string API over plain values.  */
+#include "guile.h"
+
 #ifdef MSDOS
 #include "msdos.h"	/* for fstatat */
 #endif
@@ -1141,6 +1145,132 @@ The value may be nil if not supported on this platform.  */)
   endgrent ();
 #endif
   return groups;
+}
+
+/* FIX-20261005-guilemacs: M49 imp-2.  The typed C --dired-* leaves over
+   plain values for the src/dired.c directory / attribute boundary.  Each
+   leaf returns one plain value (a string, a boolean, or a list of plain
+   strings) and holds the decision of its MOVES block; the caller passes
+   plain values in.  The mechanism (the readdir loop, fdopendir,
+   emacs_fstatat, sys_faccessat, getpwent / getgrent, filemodestring,
+   scmp, and every file-name-handler call) stays in C.  imp-2 adds leaves
+   only: it moves no policy.  imp-3 (G1 and G2) and imp-4 (G3) rewire the
+   C hubs onto these leaves and delete the inline policy.  See
+   docs/m49-plan.org section 3.3 and brief.org section 4.
+
+   A leaf returns plain values only: no struct dirent *, struct stat *,
+   DIR *, char *, struct passwd *, struct group *, Lisp_Object, or
+   attribute list crosses the layer (the M42 rule).  A leaf calls the
+   MECHANISM, never its own hub, so a later hub rewire cannot recurse.  */
+
+/* --- G1: the listing policy ---------------------------------------- */
+
+DEFUN ("--dired-listing-names", Fdired_listing_names,
+       Sdired_listing_names, 4, 5, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the ordered name
+list of DIRECTORY as a *plain list* of strings.  DIRECTORY is a plain
+string; FULL, MATCH, NOSORT, and COUNT are the plain arguments of
+`directory-files'.  COUNT is an optional plain integer: when it is a
+natural number, return at most COUNT names.  The mechanism (the readdir
+loop, the scmp compare, the sort, and the DECODE_FILE call) stays in C
+(the M42 rule).  It serves both G1 hubs, `directory-files' and
+`directory-files-and-attributes' (attrs = false, and COUNT).  M49
+imp-2, docs/m49-plan.org section 3.3.  */)
+  (Lisp_Object directory, Lisp_Object full, Lisp_Object match,
+   Lisp_Object nosort, Lisp_Object count)
+{
+  directory = Fexpand_file_name (directory, Qnil);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  Lisp_Object handler = Ffind_file_name_handler (directory, Qdirectory_files);
+  if (!NILP (handler))
+    return call6 (handler, Qdirectory_files, directory,
+		  full, match, nosort, count);
+
+  return directory_files_internal (directory, full, match, nosort,
+				   false, Qnil, count);
+}
+
+/* --- G2: the completion policy ------------------------------------- */
+
+DEFUN ("--dired-file-name-completion", Fdired_file_name_completion,
+       Sdired_file_name_completion, 3, 3, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: complete FILE in
+directory DIRECTORY and return one *plain string*, t for a sole exact
+match, or nil.  DIRECTORY, FILE, and PREDICATE are plain arguments.  The
+mechanism (the readdir loop, the scmp compare, and the DECODE_FILE call)
+stays in C (the M42 rule).  M49 imp-2, docs/m49-plan.org section
+3.3.  */)
+  (Lisp_Object directory, Lisp_Object file, Lisp_Object predicate)
+{
+  Lisp_Object handler;
+  directory = Fexpand_file_name (directory, Qnil);
+
+  /* If the directory name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (directory, Qfile_name_completion);
+  if (!NILP (handler))
+    return call4 (handler, Qfile_name_completion, file, directory, predicate);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (file, Qfile_name_completion);
+  if (!NILP (handler))
+    return call4 (handler, Qfile_name_completion, file, directory, predicate);
+
+  return file_name_completion (file, directory, 0, predicate);
+}
+
+DEFUN ("--dired-file-name-all-completions",
+       Fdired_file_name_all_completions, Sdired_file_name_all_completions,
+       2, 2, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return all completions of
+FILE in directory DIRECTORY as a *plain list* of strings.  The list is
+sorted so the result is deterministic.  DIRECTORY and FILE are plain
+strings.  The mechanism (the readdir loop, the scmp compare, and the
+DECODE_FILE call) stays in C (the M42 rule).  M49 imp-2,
+docs/m49-plan.org section 3.3.  */)
+  (Lisp_Object directory, Lisp_Object file)
+{
+  Lisp_Object handler;
+  directory = Fexpand_file_name (directory, Qnil);
+
+  /* If the directory name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (directory, Qfile_name_all_completions);
+  if (!NILP (handler))
+    return call3 (handler, Qfile_name_all_completions, file, directory);
+
+  /* If the file name has special constructs in it,
+     call the corresponding file name handler.  */
+  handler = Ffind_file_name_handler (file, Qfile_name_all_completions);
+  if (!NILP (handler))
+    return call3 (handler, Qfile_name_all_completions, file, directory);
+
+  Lisp_Object completions = file_name_completion (file, directory, 1, Qnil);
+  /* The raw all-flag path returns the entries in readdir order, so the
+     result is not deterministic.  Return a sorted (deterministic) plain
+     name list.  */
+  return CONSP (completions)
+	   ? CALLN (Fsort, completions, Qstring_lessp)
+	   : completions;
+}
+
+/* --- G3: the attribute predicate ----------------------------------- */
+
+DEFUN ("--dired-file-attributes-lessp", Fdired_file_attributes_lessp,
+       Sdired_file_attributes_lessp, 2, 2, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return a *plain boolean*:
+t when the plain file name NAME1 sorts before NAME2 with `string-lessp',
+else nil.  The hub `file-attributes-lessp' takes two attribute lists and
+extracts Fcar of each, so the C hub keeps the Fcar extraction and this
+leaf narrows the argument shape to two plain names (docs/kb.org
+leaf-may-narrow-the-argument-shape).  M49 imp-2, docs/m49-plan.org
+section 3.3.  */)
+  (Lisp_Object name1, Lisp_Object name2)
+{
+  return Fstring_lessp (name1, name2);
 }
 
 void

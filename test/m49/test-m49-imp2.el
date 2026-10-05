@@ -170,6 +170,13 @@ real error, not a pass."
                                          (format "DEFUN (\"--dired-%s\"" leaf))))
 (m49-imp2--check "leaf-defuns-4"
                  (eql 4 (m49-imp2--count "src/dired.c" "^DEFUN (\"--dired-")))
+;; R1 (cr.org section 6): the G1 leaf must carry the hub's COUNT
+;; argument, else the imp-3 rewire of `directory-files' loses COUNT.
+;; The leaf arity is `4, 5' (optional COUNT), so a 4-argument call still
+;; works.
+(m49-imp2--check "g1-leaf-arity-5"
+                 (m49-imp2--contains-p "src/dired.c"
+                                       "Sdired_listing_names, 4, 5, 0,"))
 (m49-imp2--check "defun-count-12"
                  (eql 12 (m49-imp2--count "src/dired.c" "^DEFUN (\"")))
 (m49-imp2--check "dired.c-has-guile.h"
@@ -327,6 +334,19 @@ pass; the error is printed so the cause is visible."
              (write-region "" nil (expand-file-name "bb" dir) nil 'silent)
              (let ((names (--dired-listing-names dir nil nil nil)))
                (and (member "aa" names) (member "bb" names))))
+         (delete-directory dir t)))))
+  (m49-imp2--probe
+   "listing-names-count"
+   (lambda ()
+     (let ((dir (file-name-as-directory (make-temp-file "m49-imp2" t))))
+       (unwind-protect
+           (progn
+             (write-region "" nil (expand-file-name "aa" dir) nil 'silent)
+             (write-region "" nil (expand-file-name "bb" dir) nil 'silent)
+             ;; COUNT = 1: the leaf returns exactly one name, so the imp-3
+             ;; rewire of `directory-files' keeps the COUNT feature.
+             (let ((names (--dired-listing-names dir nil nil nil 1)))
+               (and (consp names) (null (cdr names)))))
          (delete-directory dir t)))))
   (m49-imp2--probe
    "all-completions"

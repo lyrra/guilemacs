@@ -8,10 +8,11 @@
 ;;; wrappers.  It moves no policy; imp-3 (G1 and G2) and imp-4 (G3)
 ;;; rewire the C hubs onto the leaves and move the choice into Scheme.
 ;;;
-;;;   (dired-listing-names directory full match nosort)
+;;;   (dired-listing-names directory full match nosort count)
 ;;;        -> the ordered name list of DIRECTORY as a plain list of
 ;;;           strings.  It serves both G1 hubs, `directory-files' and
-;;;           `directory-files-and-attributes'.
+;;;           `directory-files-and-attributes'.  COUNT is the optional
+;;;           `directory-files' COUNT argument.
 ;;;   (dired-file-name-completion directory file predicate)
 ;;;        -> one plain string, t, or #f.
 ;;;   (dired-file-name-all-completions directory file)
@@ -52,10 +53,12 @@
 (defelisp %--dired-file-attributes-lessp     --dired-file-attributes-lessp)
 
 ;; Return the ordered name list of DIRECTORY as a plain list of
-;; strings.  DIRECTORY is a plain string; FULL, MATCH, and NOSORT are
-;; the plain arguments of `directory-files'.
-(define (dired-listing-names directory full match nosort)
-  ((force %--dired-listing-names) directory full match nosort))
+;; strings.  DIRECTORY is a plain string; FULL, MATCH, NOSORT, and
+;; COUNT are the plain arguments of `directory-files'.  COUNT is a
+;; plain integer or nil: when it is a natural number, at most COUNT
+;; names are returned.
+(define (dired-listing-names directory full match nosort count)
+  ((force %--dired-listing-names) directory full match nosort count))
 
 ;; Complete FILE in directory DIRECTORY and return one plain string, t
 ;; for a sole exact match, or #f.

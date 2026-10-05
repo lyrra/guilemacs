@@ -160,19 +160,20 @@ passes the raw symbol to reach it."
 
 (setq m49-imp1--group 'd1)
 
-;;; imp-2 re-pins these: the guile.h include, the 8 --dired-* leaves, the
-;;; new (emacs dired) module, and the new scm_c_public_ref sites move
-;;; every value below.
-(m49-imp1--check "dired.c-lines-1167"
-                 (eql 1167 (m49-imp1--lines "src/dired.c")))
-(m49-imp1--check "dired.c-defuns-8"
-                 (eql 8 (m49-imp1--count "src/dired.c" "^DEFUN (\"")))
+;;; imp-2 re-pins these: the guile.h include, the 4 --dired-* leaves, and
+;;; the (emacs dired) module move the line count, the DEFUN count, the
+;;; guile.h fact, and the module fact.  imp-2 adds no scm_c_public_ref
+;;; site, so the two ref counts do not move.
+(m49-imp1--check "dired.c-lines-1297"
+                 (eql 1297 (m49-imp1--lines "src/dired.c")))
+(m49-imp1--check "dired.c-defuns-12"
+                 (eql 12 (m49-imp1--count "src/dired.c" "^DEFUN (\"")))
 (m49-imp1--check "dired.c-scm-ref-0"
                  (eql 0 (m49-imp1--count "src/dired.c" "scm_c_public_ref")))
-(m49-imp1--check "dired.c-no-guile.h"
-                 (not (m49-imp1--tracked-p "src/dired.c" "#include \"guile.h\"")))
-(m49-imp1--check "dired-module-absent"
-                 (not (m49-imp1--exists-p "mod/emacs/dired.scm")))
+(m49-imp1--check "dired.c-has-guile.h"
+                 (m49-imp1--tracked-p "src/dired.c" "#include \"guile.h\""))
+(m49-imp1--check "dired-module-present"
+                 (m49-imp1--exists-p "mod/emacs/dired.scm"))
 (m49-imp1--check "scm-c-public-ref-227"
                  (eql 227 (m49-imp1--count-scm-ref)))
 

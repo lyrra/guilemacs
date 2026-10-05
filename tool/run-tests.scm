@@ -247,8 +247,9 @@
   "test/m48/test-m48-imp4.el"                 ; M48 imp-4: the G3 query / geometry policy (tty-frame-geometry / -edges, tty-display-pixel-width / -height) moves to (emacs terminal).  The 4 *_scheme dispatch helpers over the 2 shared static helpers, the rewired hubs with the inline geometry arithmetic and the 80x25 pair gone, the 4 new ref sites, the boundary rules on the unchanged module, and the gated runtime probe (tracked files only, plus the built src/emacs)
   "test/m48/test-m48-imp5.el"                 ; M48 imp-5 close-out: the re-measured surface, the (m48) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads tracked files only)
   )
-(group (m49) ; M49 imp-1 the src/dired.c directory / attribute boundary audit (docs/m49-plan.org)
+(group (m49) ; M49 imp-1 the src/dired.c directory / attribute boundary audit + imp-2 the typed C --dired-* leaves (docs/m49-plan.org)
   "test/m49/test-m49-imp1.el"                 ; M49 imp-1 audit: the base re-scan (D1), the block map as the ordered DEFUN name list (the 8 block names, D2), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m49-plan-lint.sh, which this group does not run
+  "test/m49/test-m49-imp2.el"                 ; M49 imp-2: the 4 typed C --dired-* leaves, the guile.h include, the 4 wrappers of (emacs dired), the boundary rules, and the gated runtime probe
   )
 (group
   "test/src/eval-tests.el"

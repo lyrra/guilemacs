@@ -207,6 +207,9 @@
 (use-modules (emacs process-create))
 ;; M46 imp-2 — the src/filelock.c lockfile leaves in (emacs filelock).
 (use-modules (emacs filelock))
+;; M49 imp-2 — the src/dired.c directory / attribute leaves in
+;; (emacs dired).
+(use-modules (emacs dired))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
