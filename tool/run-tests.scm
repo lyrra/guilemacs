@@ -240,9 +240,10 @@
   "test/m47/test-m47-imp5.el"                 ; M47 imp-5: the 7 G3 dispatch helpers and the 7 pure C mechanisms (copy_file_1 ... make_symbolic_link_1), the rewired copy / rename / link / delete hubs, the 4 G3 OPEN leaves unblocked, the real (emacs fileio) target-name resolution, the deleted expand_cp_target, the re-measured surface, and the gated runtime probe (corpus reads files, and runs the built src/emacs)
   "test/m47/test-m47-imp6.el"                 ; M47 imp-6 close-out: the re-measured surface, the (m47) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads files only)
   )
-(group (m48) ; M48 imp-1 audit + imp-2 the typed C term.c --term-* leaves (docs/m48-plan.org)
+(group (m48) ; M48 imp-1 audit + imp-2 the typed C term.c --term-* leaves + imp-3 the G1 terminal-capability policy (docs/m48-plan.org)
   "test/m48/test-m48-imp1.el"                 ; M48 imp-1 audit: the base re-scan (D1), the block map as the ordered DEFUN name list (the 19 block names + the 3 ref sites, D2), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m48-plan-lint.sh, which this group does not run
   "test/m48/test-m48-imp2.el"                 ; M48 imp-2: the 8 typed C leaves (--term-display-color-p ... --term-display-pixel-height), the 8 wrappers of (emacs terminal), the guile.h include, the boundary rules, and the gated runtime probe (corpus reads tracked files, and runs the built src/emacs)
+  "test/m48/test-m48-imp3.el"                 ; M48 imp-3: the G1 terminal-capability policy (tty-display-color-p / -cells, tty-type, controlling-tty-p) moves to (emacs terminal).  The 4 *_scheme dispatch helpers, the 4 rewired hubs with the inline decision gone, the 4 new ref sites, the boundary rules on the unchanged module, and the gated runtime probe (tracked files only, plus the built src/emacs)
   )
 (group
   "test/src/eval-tests.el"

@@ -351,15 +351,16 @@ the forbidden hub.")
                         (eql 237 (- 11960 (+ kb kg))))))
 
 ;; The one place for the tree-wide scm_c_public_ref pin (brief.org
-;; section 9).  The pin is 212 + 7 G3 dispatch helpers = 219.
-(m47-imp5--check "tree-wide-scm-public-ref-219"
+;; section 9).  The pin is 212 + 7 G3 dispatch helpers = 219 at imp-5;
+;; M48 imp-3 adds 4 G1 dispatch helpers, so it is 223.
+(m47-imp5--check "tree-wide-scm-public-ref-223"
                  (let ((total 0)
                        (dir (expand-file-name "src" m47-imp5--root)))
                    (dolist (f (directory-files dir t "\\.[chm]\\'"))
                      (setq total (+ total
                                     (or (m47-imp5--count f "scm_c_public_ref")
                                         0))))
-                   (and (integerp total) (eql 219 total))))
+                   (and (integerp total) (eql 223 total))))
 
 ;;; --- T7. The group and the guards -----------------------------------
 

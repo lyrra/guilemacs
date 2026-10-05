@@ -2143,6 +2143,48 @@ tty_capable_p (struct tty_display_info *tty, unsigned int caps)
 #endif
 }
 
+/* FIX-20261005-guilemacs: M48 imp-3 -- the G1 dispatch helpers over the
+   terminal-capability policy of (emacs terminal).  The hub reads the
+   C-owned field; the module holds the decision; the typed C leaf of
+   imp-2 holds the value shape.  Each helper resolves its module
+   procedure one time and passes plain values only.  */
+
+static Lisp_Object
+tty_display_color_p_scheme (Lisp_Object colors)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-display-color-p");
+  return SCM_CALL_1 (proc, colors);
+}
+
+static Lisp_Object
+tty_display_color_cells_scheme (Lisp_Object colors)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-display-color-cells");
+  return SCM_CALL_1 (proc, colors);
+}
+
+static Lisp_Object
+term_type_scheme (Lisp_Object type)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-type");
+  return SCM_CALL_1 (proc, type);
+}
+
+static Lisp_Object
+controlling_tty_p_scheme (Lisp_Object name, Lisp_Object dev)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-controlling-tty-p");
+  return SCM_CALL_2 (proc, name, dev);
+}
+
 /* Return non-zero if the terminal is capable to display colors.  */
 
 DEFUN ("tty-display-color-p", Ftty_display_color_p, Stty_display_color_p,
@@ -2155,8 +2197,10 @@ TERMINAL does not refer to a text terminal.  */)
   (Lisp_Object terminal)
 {
   struct terminal *t = decode_tty_terminal (terminal);
+  Lisp_Object colors = t ? make_fixnum (t->display_info.tty->TN_max_colors)
+                         : Qnil;
 
-  return (t && t->display_info.tty->TN_max_colors > 0) ? Qt : Qnil;
+  return tty_display_color_p_scheme (colors);
 }
 
 /* Return the number of supported colors.  */
@@ -2170,8 +2214,10 @@ TERMINAL does not refer to a text terminal.  */)
   (Lisp_Object terminal)
 {
   struct terminal *t = decode_tty_terminal (terminal);
+  Lisp_Object colors = t ? make_fixnum (t->display_info.tty->TN_max_colors)
+                         : Qnil;
 
-  return make_fixnum (t ? t->display_info.tty->TN_max_colors : 0);
+  return tty_display_color_cells_scheme (colors);
 }
 
 #if !defined DOS_NT && !defined HAVE_ANDROID
@@ -2299,7 +2345,7 @@ selected frame's terminal).  */)
 {
   char *name = tty_type_name (terminal);
 
-  return (name? build_string (name) : Qnil);
+  return term_type_scheme (name ? build_string (name) : Qnil);
 }
 
 DEFUN ("controlling-tty-p", Fcontrolling_tty_p, Scontrolling_tty_p, 0, 1, 0,
@@ -2311,8 +2357,12 @@ TERMINAL is not on a tty device.  */)
   (Lisp_Object terminal)
 {
   struct terminal *t = decode_tty_terminal (terminal);
+  Lisp_Object name = (t && t->display_info.tty->name)
+                     ? build_string (t->display_info.tty->name) : Qnil;
+  Lisp_Object dev = (t && t->display_info.tty->name)
+                    ? build_string (dev_tty) : Qnil;
 
-  return (t && !strcmp (t->display_info.tty->name, dev_tty) ? Qt : Qnil);
+  return controlling_tty_p_scheme (name, dev);
 }
 
 DEFUN ("tty-no-underline", Ftty_no_underline, Stty_no_underline, 0, 1, 0,
