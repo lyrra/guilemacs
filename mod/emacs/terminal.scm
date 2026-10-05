@@ -45,7 +45,17 @@
   #:declarative? #t
   #:export (tty-menu-clear-help!
             tty-menu-help-callback
-            tty-menu-discard-mouse-events!))
+            tty-menu-discard-mouse-events!
+            ;; M48 imp-2 -- G1, the terminal-capability policy
+            term-display-color-p
+            term-display-color-cells
+            term-type
+            term-controlling-tty-p
+            ;; M48 imp-2 -- G3, the query / geometry policy
+            term-frame-geometry
+            term-frame-edges
+            term-display-pixel-width
+            term-display-pixel-height))
 
 ;;; --- C shim references ---------------------------------------------
 ;; --menu-items and --clear-input-pending! are the two new M33 imp-1
@@ -56,6 +66,19 @@
 (defelisp %aref                   aref)
 (defelisp %vectorp                vectorp)
 (defelisp %signal                 signal)
+
+;;; --- M48 imp-2: the typed C --term-* leaves ------------------------
+;; One delayed reference per leaf of src/term.c (brief.org section 5).
+;; The leaf name is the contract: imp-3 / imp-4 look the *wrapper* up
+;; with (scm_c_public_ref "emacs terminal" "term-<block>").
+(defelisp %--term-display-color-p       --term-display-color-p)
+(defelisp %--term-display-color-cells   --term-display-color-cells)
+(defelisp %--term-type                  --term-type)
+(defelisp %--term-controlling-tty-p     --term-controlling-tty-p)
+(defelisp %--term-frame-geometry        --term-frame-geometry)
+(defelisp %--term-frame-edges           --term-frame-edges)
+(defelisp %--term-display-pixel-width   --term-display-pixel-width)
+(defelisp %--term-display-pixel-height  --term-display-pixel-height)
 
 ;;; --- lazy cross-module targets -------------------------------------
 ;; Resolve the two cross-module procedures lazily, like gobble.scm does
@@ -132,3 +155,40 @@ boolean #t for the same value; see (emacs command-loop)."
            ;; (menu-item MENU-NAME PANE-NUMBER)
            (menu-object (list 'menu-item pane-name pane)))
       ((force %show-help-echo) help-string #nil menu-object item))))
+
+;;; --- M48 imp-2: the thin wrappers over the typed C --term-* leaves -
+;;; One wrapper per leaf of src/term.c (brief.org section 5).  A wrapper
+;;; is a one-line call to its leaf; the module holds no policy, no FFI
+;;; call, and no raw syscall.  imp-2 adds wrappers only; imp-3 (G1) and
+;;; imp-4 (G3) look these up with
+;;; (scm_c_public_ref "emacs terminal" "term-<block>").
+
+(define (term-display-color-p colors)
+  ((force %--term-display-color-p) colors))
+
+(define (term-display-color-cells colors)
+  ((force %--term-display-color-cells) colors))
+
+(define (term-type type)
+  ((force %--term-type) type))
+
+(define (term-controlling-tty-p name dev-tty)
+  ((force %--term-controlling-tty-p) name dev-tty))
+
+(define (term-frame-geometry left top width height ibw
+                             menu-bar-height tab-bar-height
+                             tool-bar-height tool-bar-on-top)
+  ((force %--term-frame-geometry) left top width height ibw
+   menu-bar-height tab-bar-height tool-bar-height tool-bar-on-top))
+
+(define (term-frame-edges left top width height ibw
+                          menu-bar-height tab-bar-height
+                          tool-bar-height tool-bar-on-top edge-type)
+  ((force %--term-frame-edges) left top width height ibw
+   menu-bar-height tab-bar-height tool-bar-height tool-bar-on-top edge-type))
+
+(define (term-display-pixel-width initial width)
+  ((force %--term-display-pixel-width) initial width))
+
+(define (term-display-pixel-height initial height)
+  ((force %--term-display-pixel-height) initial height))

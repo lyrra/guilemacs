@@ -5,27 +5,30 @@
 ;;; -- the block map of the src/term.c TTY surface, the class of each
 ;;; block, the module name and the leaf shape, and the A1 / A2 decision.
 ;;;
-;;; This corpus reads files only.  It has no C dependency.  It pins:
-;;;   D1 -- the base numbers of brief.org section 3.  src/term.c is
-;;;         5,059 lines, 19 DEFUNs, 3 scm_c_public_ref sites, and
-;;;         includes guile.h; mod/emacs/terminal.scm is 134 lines;
-;;;         scm_c_public_ref over src/*.[chm] is 219; src/keyboard.c is
-;;;         11,233 lines and 447 DEFUNs; src/keyboard-globals.c is 490
-;;;         lines; the combined keyboard surface is 11,723 (margin 237
-;;;         under the 11,960 M31 budget).
-;;;   D2 -- the block line facts of brief.org section 4 (the 19 block
-;;;         definitions) and the three (emacs terminal) ref sites
-;;;         (:3325, :3335, :3634), 22 checks in all.  These are facts in
-;;;         a tracked file, so a drift is a real FAIL.
-;;;   D3 -- the leaf-shape words of brief.org section 6 in
-;;;         docs/m48-plan.org.
-;;;   D4 -- the decision words in the gitignored records
-;;;         docs/m48-plan.org and docs/kb.org.  docs/ is gitignored, so a
-;;;         present-but-stale record is an INFO-skip, not a FAIL; an
-;;;         absent record is also a skip.  Known limit: D3 and D4 are
-;;;         advisory only -- on a fresh clone (no docs/) they register no
-;;;         ERT test, so they cannot turn this gate red; the hard checks
-;;;         D1, D2 and D5 do.
+;;; This corpus reads TRACKED files only.  It has no C dependency.  A
+;;; test does not read docs/: a docs needle is not a behaviour, and
+;;; docs/ is gitignored, so such a check can never fail on a fresh
+;;; clone.  The docs needles live in tool/m48-plan-lint.sh, which the
+;;; (m48) group does not run.  This corpus pins:
+;;;   D1 -- the base numbers of docs/m48-plan.org section 3, re-pinned by
+;;;         imp-2.  src/term.c is 5,261 lines (5,059 + the 8 leaves), 27
+;;;         DEFUNs (19 + the 8 leaves), 3 scm_c_public_ref sites, and
+;;;         includes guile.h; mod/emacs/terminal.scm is 194 lines (134 +
+;;;         the 8 wrappers); scm_c_public_ref over src/*.[chm] is 219;
+;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
+;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
+;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget).
+;;;         11 checks.
+;;;   D2 -- the block map of section 3.1 as the ORDERED DEFUN NAME LIST
+;;;         (the 19 block names in file order), plus the three (emacs
+;;;         terminal) ref sites matched by the module name and the
+;;;         procedure name.  23 checks in all.  These are facts in a
+;;;         tracked file, so a drift is a real FAIL.
+;;;
+;;;         D2 pins NAMES, not line numbers.  The "guile.h" include and
+;;;         each new leaf move every line below them, so a line constant
+;;;         invalidates itself at the next imp.  The ordered name list
+;;;         survives imp-2 and still catches a deletion or a re-order.
 ;;;   D5 -- the (m48) group is registered in tool/run-tests.scm, and this
 ;;;         corpus registers a minimum number of checks per group.  An
 ;;;         --filter that matches no group already reports exit 0 and 0
@@ -33,14 +36,19 @@
 ;;;         really runs.  A single total bound is too loose, so the guard
 ;;;         pins D1 and D2 separately and fails if either group is
 ;;;         truncated.
-;;;   D6 -- the live tracker milestone.org carries no stale string: the
-;;;         M48 base is 18a7e3372 and imp-1 is marked DONE.  The tracker
-;;;         is untracked, so these are advisory only.
 ;;;
-;;; Each tracked-file check is printed as a PASS/FAIL line and turned
-;;; into an ERT test so the harness counts it.  A read error is a real
-;;; error, never a silent pass.  The corpus holds its own copy of every
-;;; number it pins (brief.org section 3 and section 4).
+;;; D3, D4 and D6 of the first pass are gone from the suite.  They read
+;;; docs/m48-plan.org, docs/kb.org and milestone.org.  See
+;;; tool/m48-plan-lint.sh.
+;;;
+;;; From imp-3 this corpus also gets BEHAVIOUR checks: each ported leaf
+;;; of (emacs terminal) is called with plain values and its return value
+;;; is asserted.  That is the real gate; D1, D2 and D5 are the surface
+;;; guard.
+;;;
+;;; Each check is printed as a PASS/FAIL line and turned into an ERT
+;;; test so the harness counts it.  A read error is a real error, never
+;;; a silent pass.  The corpus holds its own copy of every fact it pins.
 
 (princ "=== m48 imp-1 audit suite ===\n")
 
@@ -113,13 +121,22 @@ stale for a gitignored record."
         (while (re-search-forward regexp nil t) (setq n (1+ n)))
         n))))
 
-(defun m48-imp1--line-of (rel needle)
-  "1-based line number of the first literal NEEDLE in REL, or nil."
+(defun m48-imp1--defun-names (rel)
+  "The DEFUN names of REL, in file order.  D2 pins this list instead of
+a line constant: a new leaf moves every line below it, but it cannot
+re-order or delete a block without this list changing.
+A name that starts with two hyphens is a typed --term-* leaf (imp-2),
+not one of the 19 policy blocks, so D2 skips it.  D2 then stays the 19
+block names after imp-2 and still catches a deletion or a re-order."
   (m48-imp1--with rel
     (lambda ()
       (goto-char (point-min))
-      (when (search-forward needle nil t)
-        (line-number-at-pos (match-beginning 0))))))
+      (let ((names '()))
+        (while (re-search-forward "^DEFUN (\"\\([^\"]+\\)\"" nil t)
+          (let ((name (match-string 1)))
+            (unless (string-prefix-p "--" name)
+              (push name names))))
+        (nreverse names)))))
 
 (defun m48-imp1--count-scm-ref ()
   "Count scm_c_public_ref over src/*.[chm] (the brief.org section 3 measure)."
@@ -149,48 +166,24 @@ passes the raw symbol to reach it."
              (setq m48-imp1--registered-d2 (1+ m48-imp1--registered-d2))))
       (imp-register-bool-as-ert-test (format "m48-imp1/%s" name) (and ok t)))))
 
-(defun m48-imp1--doc-check (name rel needle)
-  "Report and register one check on a NON-durable record.  PASS and
-register an ERT test when REL holds NEEDLE.  INFO-skip when REL is
-absent OR present but stale.  docs/ is gitignored, so no commit can
-carry it: a stale document is a fact of the checkout, not a code
-regression, and must not turn the gate red."
-  (let ((hit (m48-imp1--contains-p rel needle)))
-    (if (and hit (not (eq hit 'm48-imp1-absent)))
-        (progn (princ (format "PASS m48/imp1/%s\n" name))
-               (imp-register-bool-as-ert-test (format "m48-imp1/%s" name) t))
-      (princ (format "INFO m48/imp1/%s skipped (%s, gitignored record)\n"
-                     name (if (eq hit 'm48-imp1-absent) "absent" "stale"))))))
-
-(defun m48-imp1--doc-absent-check (name rel needle)
-  "Report and register one check on a NON-durable record.  PASS and
-register an ERT test when REL does NOT hold NEEDLE.  INFO-skip when REL
-is absent.  This is the negative form of `m48-imp1--doc-check': it pins
-that a stale string is GONE, not that a current string is present."
-  (let ((hit (m48-imp1--contains-p rel needle)))
-    (cond
-     ((eq hit 'm48-imp1-absent)
-      (princ (format "INFO m48/imp1/%s skipped (absent, gitignored record)\n" name)))
-     ((not hit)
-      (princ (format "PASS m48/imp1/%s\n" name))
-      (imp-register-bool-as-ert-test (format "m48-imp1/%s" name) t))
-     (t
-      (princ (format "INFO m48/imp1/%s skipped (stale, gitignored record)\n" name))))))
-
-;;; --- D1. The base numbers (brief.org section 3) -----------------------
+;;; --- D1. The base numbers (docs/m48-plan.org section 3) ---------------
 
 (setq m48-imp1--group 'd1)
 
-(m48-imp1--check "term.c-lines-5059"
-                 (eql 5059 (m48-imp1--lines "src/term.c")))
-(m48-imp1--check "term.c-defuns-19"
-                 (eql 19 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
+;;; D1 is re-pinned by imp-2: the 8 new leaves and the 8 wrappers grow
+;;; src/term.c (5,059 -> 5,261 lines, 19 -> 27 DEFUNs) and
+;;; mod/emacs/terminal.scm (134 -> 194 lines).  The ref sites and the
+;;; keyboard surface do not move.
+(m48-imp1--check "term.c-lines-5261"
+                 (eql 5261 (m48-imp1--lines "src/term.c")))
+(m48-imp1--check "term.c-defuns-27"
+                 (eql 27 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
 (m48-imp1--check "term.c-scm-ref-3"
                  (eql 3 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
 (m48-imp1--check "term.c-has-guile.h"
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
-(m48-imp1--check "terminal.scm-lines-134"
-                 (eql 134 (m48-imp1--lines "mod/emacs/terminal.scm")))
+(m48-imp1--check "terminal.scm-lines-194"
+                 (eql 194 (m48-imp1--lines "mod/emacs/terminal.scm")))
 (m48-imp1--check "scm-c-public-ref-219"
                  (eql 219 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
@@ -211,150 +204,83 @@ that a stale string is GONE, not that a current string is present."
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
 
-;;; --- D2. The block line facts (brief.org section 4) ------------------
+;;; --- D2. The block map (docs/m48-plan.org section 3.1) ---------------
 ;;
-;; The block definitions of src/term.c are the 19 DEFUN lines.  The
-;; "guile.h" include and each new leaf move every line below them, so a
-;; later imp re-pins this map.
+;; The block definitions of src/term.c are the 19 DEFUN lines.  D2 pins
+;; their NAMES in file order, not their line numbers: the "guile.h"
+;; include and each new leaf move every line below them, so a line
+;; constant invalidates itself at the next imp.  The ordered name list
+;; survives imp-2 and still catches a deletion or a re-order.
 
 (setq m48-imp1--group 'd2)
 
-(m48-imp1--check "tty-display-color-p-def-2148"
-                 (eql 2148 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-display-color-p\"")))
-(m48-imp1--check "tty-display-color-cells-def-2163"
-                 (eql 2163 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-display-color-cells\"")))
-(m48-imp1--check "tty-type-def-2292"
-                 (eql 2292 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-type\"")))
-(m48-imp1--check "controlling-tty-p-def-2305"
-                 (eql 2305 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"controlling-tty-p\"")))
-(m48-imp1--check "tty-no-underline-def-2318"
-                 (eql 2318 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-no-underline\"")))
-(m48-imp1--check "tty-top-frame-def-2336"
-                 (eql 2336 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-top-frame\"")))
-(m48-imp1--check "suspend-tty-def-2353"
-                 (eql 2353 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"suspend-tty\"")))
-(m48-imp1--check "resume-tty-def-2422"
-                 (eql 2422 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"resume-tty\"")))
-(m48-imp1--check "tty--set-output-buffer-size-def-2515"
-                 (eql 2515 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty--set-output-buffer-size\"")))
-(m48-imp1--check "tty--output-buffer-size-def-2537"
-                 (eql 2537 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty--output-buffer-size\"")))
-(m48-imp1--check "tty-frame-at-def-2616"
-                 (eql 2616 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-frame-at\"")))
-(m48-imp1--check "gpm-mouse-start-def-2807"
-                 (eql 2807 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"gpm-mouse-start\"")))
-(m48-imp1--check "gpm-mouse-stop-def-2856"
-                 (eql 2856 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"gpm-mouse-stop\"")))
-(m48-imp1--check "tty-frame-geometry-def-4894"
-                 (eql 4894 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-frame-geometry\"")))
-(m48-imp1--check "tty-frame-edges-def-4902"
-                 (eql 4902 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-frame-edges\"")))
-(m48-imp1--check "tty-frame-list-z-order-def-4912"
-                 (eql 4912 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-frame-list-z-order\"")))
-(m48-imp1--check "tty-frame-restack-def-4923"
-                 (eql 4923 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-frame-restack\"")))
-(m48-imp1--check "tty-display-pixel-width-def-4963"
-                 (eql 4963 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-display-pixel-width\"")))
-(m48-imp1--check "tty-display-pixel-height-def-4974"
-                 (eql 4974 (m48-imp1--line-of
-                 "src/term.c" "DEFUN (\"tty-display-pixel-height\"")))
+(defconst m48-imp1--term-blocks
+  '("tty-display-color-p"
+    "tty-display-color-cells"
+    "tty-type"
+    "controlling-tty-p"
+    "tty-no-underline"
+    "tty-top-frame"
+    "suspend-tty"
+    "resume-tty"
+    "tty--set-output-buffer-size"
+    "tty--output-buffer-size"
+    "tty-frame-at"
+    "gpm-mouse-start"
+    "gpm-mouse-stop"
+    "tty-frame-geometry"
+    "tty-frame-edges"
+    "tty-frame-list-z-order"
+    "tty-frame-restack"
+    "tty-display-pixel-width"
+    "tty-display-pixel-height")
+  "The 19 src/term.c block names, in file order (section 3.1).")
 
-;; the three ref sites: the M33 imp-1 (emacs terminal) consumers
-(m48-imp1--check "term.c-ref-tty-menu-clear-help-3325"
-                 (eql 3325 (m48-imp1--line-of
-                 "src/term.c" "scm_c_public_ref (\"emacs terminal\", \"tty-menu-clear-help!\"")))
-(m48-imp1--check "term.c-ref-tty-menu-discard-mouse-events-3335"
-                 (eql 3335 (m48-imp1--line-of
-                 "src/term.c" "scm_c_public_ref (\"emacs terminal\", \"tty-menu-discard-mouse-events!\"")))
-(m48-imp1--check "term.c-ref-tty-menu-help-callback-3634"
-                 (eql 3634 (m48-imp1--line-of
-                 "src/term.c" "scm_c_public_ref (\"emacs terminal\", \"tty-menu-help-callback\"")))
+(defvar m48-imp1--term-defuns
+  (let ((found (m48-imp1--defun-names "src/term.c")))
+    ;; An absent tracked file folds to the empty list, so every position
+    ;; check below prints FAIL.  An absent src/ file is a real error.
+    (if (listp found) found '()))
+  "The DEFUN names read out of src/term.c, in file order.")
 
-;;; --- D3. The leaf-shape words (gitignored plan, brief.org section 6) --
+;; one check per block: the name AND its position must both hold.
+(let ((i 0))
+  (dolist (name m48-imp1--term-blocks)
+    (m48-imp1--check (format "block-%02d-%s" (1+ i) name)
+                     (equal name (nth i m48-imp1--term-defuns)))
+    (setq i (1+ i))))
 
-;; doc-check does not register a tracked-file check, but close the D2
-;; group so the D5 registration check and the guards count into no group.
-(setq m48-imp1--group nil)
+;; the whole list, so an EXTRA block is caught too.  A per-position
+;; check alone passes when a 20th DEFUN is appended.
+(m48-imp1--check "block-list-exact-19"
+                 (equal m48-imp1--term-blocks m48-imp1--term-defuns))
 
-(m48-imp1--doc-check "plan-module-emacs-terminal"
-                     "docs/m48-plan.org" "(emacs terminal)")
-(m48-imp1--doc-check "plan-leaf-plain-values"
-                     "docs/m48-plan.org" "plain values only")
-(m48-imp1--doc-check "plan-no-struct-across"
-                     "docs/m48-plan.org" "struct tty_display_info")
-;; the class table must carry a per-block MOVES / STAYS C verdict, so the
-;; movable list, the class table, and the decision agree.
-(m48-imp1--doc-check "plan-verdict-moves"
-                     "docs/m48-plan.org" "MOVES")
-(m48-imp1--doc-check "plan-verdict-stays-c"
-                     "docs/m48-plan.org" "STAYS C")
-
-;;; --- D4. The decision words (gitignored records) ----------------------
-
-(m48-imp1--doc-check "plan-base-18a7e3372"
-                     "docs/m48-plan.org" "#+base: HEAD = 18a7e3372")
-(m48-imp1--doc-check "plan-target-term.c"
-                     "docs/m48-plan.org" "#+target: src/term.c")
-(m48-imp1--doc-check "plan-decision-A1"
-                     "docs/m48-plan.org" "Decision: A1")
-(m48-imp1--doc-check "plan-normal-context-slice"
-                     "docs/m48-plan.org" "normal context")
-;; the kb needles must be M48-scoped.  A bare "IMP-1 LANDED" and
-;; "DECISION A1" each occur several times in docs/kb.org (the M42 .. M47
-;; nodes), so they pass while the M48 node is absent or stale.  Search
-;; the M48 sentence instead.  "term-os-boundary" is already unique.
-(m48-imp1--doc-check "kb-records-imp1-landed"
-                     "docs/kb.org"
-                     "IMP-1 LANDED (docs only, no C, no Scheme).  The audit is docs/m48-plan.org")
-(m48-imp1--doc-check "kb-records-decision-A1"
-                     "docs/kb.org"
-                     "DECISION A1: the src/term.c TTY terminal policy moves to Scheme in the existing module (emacs terminal)")
-(m48-imp1--doc-check "kb-layer-term-os-boundary"
-                     "docs/kb.org" "term-os-boundary")
-;; the durable decision record needs the ** M48 node itself, so pin the
-;; heading, not just its text.  An absent node is an INFO-skip.
-(m48-imp1--doc-check "kb-node-M48-heading"
-                     "docs/kb.org" "** M48\n  summary:")
-
-;;; --- D6. The live tracker (milestone.org) ----------------------------
-;;
-;; milestone.org is untracked, so these are advisory (INFO-skip when the
-;; tracker is absent or stale), but they guard against a recurrence.
-
-(m48-imp1--doc-check "tracker-base-18a7e3372"
-                     "milestone.org" "#+base: HEAD = 18a7e3372")
-(m48-imp1--doc-check "tracker-imp1-done"
-                     "milestone.org" "imp-1 is DONE")
-(m48-imp1--doc-absent-check "tracker-no-stale-M48-open"
-                            "milestone.org" "No imp has landed yet")
+;; the three ref sites: the M33 imp-1 (emacs terminal) consumers.
+;; Matched by the module name and the procedure name, not by line.
+(m48-imp1--check "term.c-ref-tty-menu-clear-help"
+                 (m48-imp1--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs terminal\", \"tty-menu-clear-help!\""))
+(m48-imp1--check "term.c-ref-tty-menu-discard-mouse-events"
+                 (m48-imp1--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs terminal\", \"tty-menu-discard-mouse-events!\""))
+(m48-imp1--check "term.c-ref-tty-menu-help-callback"
+                 (m48-imp1--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs terminal\", \"tty-menu-help-callback\""))
 
 ;;; --- D5. The group registration and the min-count guard --------------
+
+;; close the D2 group so the guards below count into no group.
+(setq m48-imp1--group nil)
 
 (m48-imp1--check "reg/m48-group-present"
                  (m48-imp1--tracked-p "tool/run-tests.scm"
                                       "test/m48/test-m48-imp1.el"))
 ;; `m48-imp1--tracked-p' must fold an absent tracked file to nil, so that
-;; `m48-imp1--check' prints FAIL for it (brief.org section 12: an absent
-;; src/ file is a real error).  A non-existent path stands in for an
-;; absent tracked file.
+;; `m48-imp1--check' prints FAIL for it: an absent src/ file is a real
+;; error.  A non-existent path stands in for an absent tracked file.
 (m48-imp1--check "reg/absent-tracked-file-fails"
                  (null (m48-imp1--tracked-p "src/m48-imp1-no-such-file.c"
                                             "needle")))
@@ -364,11 +290,12 @@ that a stale string is GONE, not that a current string is present."
 ;; checks really register.  These guards fail when the corpus body is
 ;; truncated or its core checks do not run.  The bound is per group, and
 ;; the counts are stable because every check is registered at load time.
-;; D1 holds 11 checks; D2 holds 22.
+;; D1 holds 11 checks; D2 holds 23 (19 block positions, the exact-list
+;; check, and the 3 ref sites).
 (m48-imp1--check "reg/min-d1-checks-11"
                  (>= m48-imp1--registered-d1 11))
-(m48-imp1--check "reg/min-d2-checks-22"
-                 (>= m48-imp1--registered-d2 22))
+(m48-imp1--check "reg/min-d2-checks-23"
+                 (>= m48-imp1--registered-d2 23))
 
 (princ (format "=== m48 imp-1 audit suite done (%d tracked checks: D1 %d, D2 %d) ===\n"
                m48-imp1--registered m48-imp1--registered-d1 m48-imp1--registered-d2))

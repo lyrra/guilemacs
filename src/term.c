@@ -4982,6 +4982,208 @@ See also `display-pixel-height'.  */)
   return make_fixnum (height);
 }
 
+/* FIX-20261005-guilemacs: M48 imp-2.  The typed C leaves over plain
+   values for the src/term.c TTY terminal boundary.  Each leaf returns
+   one plain value (a boolean, an integer, a string, or a list of plain
+   values) and holds the decision of its MOVES block; the caller passes
+   plain values in.  The mechanism (the struct tty_display_info and its
+   fields, the terminfo handle, the tputs output to the tty fd, and the
+   syscalls) stays in C.  imp-2 adds leaves only: it moves no policy.
+   imp-3 (G1) and imp-4 (G3) rewire the C hubs onto these leaves and
+   delete the inline policy.  See docs/m48-plan.org section 3.3 and
+   brief.org section 4.
+
+   Each leaf below ports an unguarded DEFUN of src/term.c, so its body
+   carries no #if guard.  A leaf returns plain values only: no char *,
+   FILE *, struct tty_display_info *, struct terminal *, or Lisp_Object
+   crosses the layer (the M42 rule).  The C hub owns the C-owned field
+   read, the frame fields, and the alist build (the symbol rule).  */
+
+/* --- G1: the terminal-capability policy ---------------------------- */
+
+DEFUN ("--term-display-color-p", Fc_term_display_color_p,
+       Sc_term_display_color_p, 1, 1, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return a *plain boolean*:
+t when the color count COLORS is a positive integer, else nil.  COLORS
+is a plain integer, or nil for "not a tty".  M48 imp-2, docs/m48-plan.org
+section 3.3.  */)
+  (Lisp_Object colors)
+{
+  return (FIXNUMP (colors) && 0 < XFIXNUM (colors)) ? Qt : Qnil;
+}
+
+DEFUN ("--term-display-color-cells", Fc_term_display_color_cells,
+       Sc_term_display_color_cells, 1, 1, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the color count
+COLORS as a *plain integer*; nil or a non-integer yields 0.  M48 imp-2,
+docs/m48-plan.org section 3.3.  */)
+  (Lisp_Object colors)
+{
+  return make_fixnum (FIXNUMP (colors) ? XFIXNUM (colors) : 0);
+}
+
+DEFUN ("--term-type", Fc_term_type, Sc_term_type, 1, 1, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the terminal type
+TYPE as a *plain string*, or nil.  M48 imp-2, docs/m48-plan.org
+section 3.3.  */)
+  (Lisp_Object type)
+{
+  return STRINGP (type) ? type : Qnil;
+}
+
+DEFUN ("--term-controlling-tty-p", Fc_term_controlling_tty_p,
+       Sc_term_controlling_tty_p, 2, 2, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return a *plain boolean*:
+t when the tty name NAME equals DEV-TTY, else nil.  Both names cross as
+plain strings (the string rule, docs/m48-plan.org section 3.3) and the
+leaf runs the compare, so no char * crosses the layer.  M48 imp-2,
+docs/m48-plan.org section 3.3.  */)
+  (Lisp_Object name, Lisp_Object dev_tty)
+{
+  return (STRINGP (name) && STRINGP (dev_tty)
+	  && SBYTES (name) == SBYTES (dev_tty)
+	  && memcmp (SSDATA (name), SSDATA (dev_tty), SBYTES (name)) == 0)
+	 ? Qt : Qnil;
+}
+
+/* --- G3: the query / geometry policy ------------------------------- */
+
+/* The pure geometry arithmetic shared by the two G3 leaves below.  It
+   runs in normal context over plain integers and writes the 11 derived
+   values of `--term-frame-geometry' into OUT.  The native edges equal
+   the outer edges, so they do not cross.  */
+
+static void
+term_frame_geometry_1 (EMACS_INT left, EMACS_INT top, EMACS_INT width,
+		       EMACS_INT height, EMACS_INT ibw,
+		       EMACS_INT menu_bar_height, EMACS_INT tab_bar_height,
+		       EMACS_INT tool_bar_height, bool tool_bar_on_top,
+		       EMACS_INT out[11])
+{
+  EMACS_INT outer_left = left;
+  EMACS_INT outer_top = top;
+  EMACS_INT outer_right = outer_left + width;
+  EMACS_INT outer_bottom = outer_top + height;
+  EMACS_INT inner_left = outer_left + ibw;
+  EMACS_INT inner_top = outer_top + ibw;
+  EMACS_INT inner_right = outer_right - ibw;
+  EMACS_INT inner_bottom = outer_bottom - ibw;
+
+  inner_top += menu_bar_height;
+  inner_top += tab_bar_height;
+  if (tool_bar_on_top)
+    inner_top += tool_bar_height;
+  else
+    inner_bottom -= tool_bar_height;
+
+  out[0] = outer_left;
+  out[1] = outer_top;
+  out[2] = outer_right;
+  out[3] = outer_bottom;
+  out[4] = inner_left;
+  out[5] = inner_top;
+  out[6] = inner_right;
+  out[7] = inner_bottom;
+  out[8] = menu_bar_height ? width : 0;
+  out[9] = tab_bar_height ? width - 2 * ibw : 0;
+  out[10] = tool_bar_height ? width - 2 * ibw : 0;
+}
+
+DEFUN ("--term-frame-geometry", Fc_term_frame_geometry,
+       Sc_term_frame_geometry, 9, MANY, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the derived tty
+frame geometry as a *plain list* of 11 integers:
+\(OUTER-LEFT OUTER-TOP OUTER-RIGHT OUTER-BOTTOM INNER-LEFT INNER-TOP
+INNER-RIGHT INNER-BOTTOM MENU-BAR-WIDTH TAB-BAR-WIDTH TOOL-BAR-WIDTH).
+usage: (--term-frame-geometry LEFT TOP WIDTH HEIGHT IBW MENU-BAR-HEIGHT
+TAB-BAR-HEIGHT TOOL-BAR-HEIGHT TOOL-BAR-ON-TOP?).  LEFT TOP is the outer
+position, WIDTH HEIGHT the pixel size, IBW the internal border width,
+MENU-BAR-HEIGHT TAB-BAR-HEIGHT TOOL-BAR-HEIGHT the bar heights, and
+TOOL-BAR-ON-TOP? a plain boolean.  The native edges equal the outer
+edges, so they do not cross.  The C hub owns the frame fields and the
+alist build (the symbol rule).  M48 imp-2, docs/m48-plan.org section
+3.3.  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  EMACS_INT vals[11];
+  Lisp_Object list[11];
+  int i;
+
+  (void) nargs;
+  term_frame_geometry_1 (FIXNUMP (args[0]) ? XFIXNUM (args[0]) : 0,
+			 FIXNUMP (args[1]) ? XFIXNUM (args[1]) : 0,
+			 FIXNUMP (args[2]) ? XFIXNUM (args[2]) : 0,
+			 FIXNUMP (args[3]) ? XFIXNUM (args[3]) : 0,
+			 FIXNUMP (args[4]) ? XFIXNUM (args[4]) : 0,
+			 FIXNUMP (args[5]) ? XFIXNUM (args[5]) : 0,
+			 FIXNUMP (args[6]) ? XFIXNUM (args[6]) : 0,
+			 FIXNUMP (args[7]) ? XFIXNUM (args[7]) : 0,
+			 !NILP (args[8]), vals);
+
+  for (i = 0; i < 11; i++)
+    list[i] = make_fixnum (vals[i]);
+  return Flist (11, list);
+}
+
+DEFUN ("--term-frame-edges", Fc_term_frame_edges,
+       Sc_term_frame_edges, 10, MANY, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return four edges of a
+tty frame as a *plain list* of 4 integers.  The first nine arguments
+are those of `--term-frame-geometry'.  EDGE-TYPE is a *plain string*:
+"outer" for the outer edges, "inner" for the inner edges, and any other
+value (or nil) for the native edges, which equal the outer edges.  The
+C hub owns the frame fields.  M48 imp-2, docs/m48-plan.org section
+3.3.  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  EMACS_INT vals[11];
+  int base;
+
+  (void) nargs;
+  term_frame_geometry_1 (FIXNUMP (args[0]) ? XFIXNUM (args[0]) : 0,
+			 FIXNUMP (args[1]) ? XFIXNUM (args[1]) : 0,
+			 FIXNUMP (args[2]) ? XFIXNUM (args[2]) : 0,
+			 FIXNUMP (args[3]) ? XFIXNUM (args[3]) : 0,
+			 FIXNUMP (args[4]) ? XFIXNUM (args[4]) : 0,
+			 FIXNUMP (args[5]) ? XFIXNUM (args[5]) : 0,
+			 FIXNUMP (args[6]) ? XFIXNUM (args[6]) : 0,
+			 FIXNUMP (args[7]) ? XFIXNUM (args[7]) : 0,
+			 !NILP (args[8]), vals);
+
+  base = (STRINGP (args[9])
+	  && SBYTES (args[9]) == 5
+	  && memcmp (SSDATA (args[9]), "inner", 5) == 0) ? 4 : 0;
+  return list4i (vals[base], vals[base + 1], vals[base + 2], vals[base + 3]);
+}
+
+DEFUN ("--term-display-pixel-width", Fc_term_display_pixel_width,
+       Sc_term_display_pixel_width, 2, 2, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the display width
+as a *plain integer*.  When INITIAL (a plain boolean) is non-nil the
+leaf returns 80, the output_initial constant; else it returns the plain
+integer WIDTH.  D-c: the FrameCols read and the abort stay C.  M48 imp-2,
+docs/m48-plan.org section 3.3.  */)
+  (Lisp_Object initial, Lisp_Object width)
+{
+  if (!NILP (initial))
+    return make_fixnum (80);
+  return make_fixnum (FIXNUMP (width) ? XFIXNUM (width) : 0);
+}
+
+DEFUN ("--term-display-pixel-height", Fc_term_display_pixel_height,
+       Sc_term_display_pixel_height, 2, 2, 0,
+       doc: /* FIX-20261005-guilemacs: Internal: return the display height
+as a *plain integer*.  When INITIAL (a plain boolean) is non-nil the
+leaf returns 25, the output_initial constant; else it returns the plain
+integer HEIGHT.  D-c: the FrameRows read and the abort stay C.  M48 imp-2,
+docs/m48-plan.org section 3.3.  */)
+  (Lisp_Object initial, Lisp_Object height)
+{
+  if (!NILP (initial))
+    return make_fixnum (25);
+  return make_fixnum (FIXNUMP (height) ? XFIXNUM (height) : 0);
+}
+
 void
 syms_of_term (void)
 {
