@@ -75,8 +75,8 @@
 (defelisp %--term-display-color-cells   --term-display-color-cells)
 (defelisp %--term-type                  --term-type)
 (defelisp %--term-controlling-tty-p     --term-controlling-tty-p)
-(defelisp %--term-frame-geometry        --term-frame-geometry)
-(defelisp %--term-frame-edges           --term-frame-edges)
+;; imp-6 deleted --term-frame-geometry and --term-frame-edges: the
+;; geometry arithmetic is Scheme now, so no leaf reference remains.
 (defelisp %--term-display-pixel-width   --term-display-pixel-width)
 (defelisp %--term-display-pixel-height  --term-display-pixel-height)
 
@@ -175,17 +175,89 @@ boolean #t for the same value; see (emacs command-loop)."
 (define (term-controlling-tty-p name dev-tty)
   ((force %--term-controlling-tty-p) name dev-tty))
 
+;;; --- M48 imp-6: the G3 geometry arithmetic, in Scheme --------------
+;;; Port of the static C helper term_frame_geometry_1 of src/term.c.
+;;; Until imp-6 the two wrappers below called the typed C leaves
+;;; --term-frame-geometry and --term-frame-edges, which called that C
+;;; helper: the decision never left C (docs/m48-port-review.org).  The
+;;; arithmetic is HERE now, and the C helper and both leaves are gone.
+;;;
+;;; The C hub keeps the mechanism: decode_live_frame, the
+;;; FRAME_INITIAL_P / FRAME_TTY guard, every C-owned frame field read,
+;;; the alist build, and the FRAME_TOOL_BAR_POSITION read (the symbol
+;;; rule).  Only plain integers, a plain boolean, and a plain string
+;;; cross the layer.
+;;;
+;;; The native edges equal the outer edges on a tty, so they are not
+;;; separate values: EDGE-TYPE "inner" selects the inner 4-tuple, and
+;;; every other value (including "outer" and nil) selects the outer one.
+
+(define (term--integer x)
+  "Fold a non-integer argument to 0.  The deleted C leaf did this with
+FIXNUMP, and the C hub passes fixnums only, so this keeps a direct
+Scheme caller from turning a bad argument into an error."
+  (if (integer? x) x 0))
+
+(define (term--true? x)
+  "Elisp truthiness for a flag that crosses the layer.  This differs
+from `truthy?' on one value: the Guile #f.  The C hub passes Qt or
+Qnil, but a Scheme caller may pass #f, and #f must read as false."
+  (not (or (eq? x #nil) (eq? x #f))))
+
+(define (term--frame-geometry-values left top width height ibw
+                                     menu-bar-height tab-bar-height
+                                     tool-bar-height tool-bar-on-top)
+  "The 11 derived geometry integers of a tty frame, as a plain list:
+ (OUTER-LEFT OUTER-TOP OUTER-RIGHT OUTER-BOTTOM
+  INNER-LEFT INNER-TOP INNER-RIGHT INNER-BOTTOM
+  MENU-BAR-WIDTH TAB-BAR-WIDTH TOOL-BAR-WIDTH).
+A bar contributes its width only when its height is not 0, and the
+tool bar moves the inner top or the inner bottom by its position."
+  (let* ((left   (term--integer left))
+         (top    (term--integer top))
+         (width  (term--integer width))
+         (height (term--integer height))
+         (ibw    (term--integer ibw))
+         (menu-bar-height (term--integer menu-bar-height))
+         (tab-bar-height  (term--integer tab-bar-height))
+         (tool-bar-height (term--integer tool-bar-height))
+         (on-top?         (term--true? tool-bar-on-top))
+         (outer-left   left)
+         (outer-top    top)
+         (outer-right  (+ left width))
+         (outer-bottom (+ top height))
+         (inner-left   (+ outer-left ibw))
+         (inner-right  (- outer-right ibw))
+         (inner-top    (+ outer-top ibw menu-bar-height tab-bar-height
+                          (if on-top? tool-bar-height 0)))
+         (inner-bottom (- outer-bottom ibw
+                          (if on-top? 0 tool-bar-height)))
+         ;; a tab bar and a tool bar span the native width inside the
+         ;; border; a menu bar spans the whole native width.
+         (bar-width    (- width (* 2 ibw))))
+    (list outer-left outer-top outer-right outer-bottom
+          inner-left inner-top inner-right inner-bottom
+          (if (zero? menu-bar-height) 0 width)
+          (if (zero? tab-bar-height)  0 bar-width)
+          (if (zero? tool-bar-height) 0 bar-width))))
+
 (define (term-frame-geometry left top width height ibw
                              menu-bar-height tab-bar-height
                              tool-bar-height tool-bar-on-top)
-  ((force %--term-frame-geometry) left top width height ibw
-   menu-bar-height tab-bar-height tool-bar-height tool-bar-on-top))
+  (term--frame-geometry-values left top width height ibw
+                               menu-bar-height tab-bar-height
+                               tool-bar-height tool-bar-on-top))
 
 (define (term-frame-edges left top width height ibw
                           menu-bar-height tab-bar-height
                           tool-bar-height tool-bar-on-top edge-type)
-  ((force %--term-frame-edges) left top width height ibw
-   menu-bar-height tab-bar-height tool-bar-height tool-bar-on-top edge-type))
+  (let* ((vals (term--frame-geometry-values left top width height ibw
+                                            menu-bar-height tab-bar-height
+                                            tool-bar-height tool-bar-on-top))
+         (inner? (and (string? edge-type) (string=? edge-type "inner")))
+         (edges  (if inner? (list-tail vals 4) vals)))
+    (list (list-ref edges 0) (list-ref edges 1)
+          (list-ref edges 2) (list-ref edges 3))))
 
 (define (term-display-pixel-width initial width)
   ((force %--term-display-pixel-width) initial width))

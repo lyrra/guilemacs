@@ -19,12 +19,11 @@
 ;;;         "TN_max_colors > 0", and every TN_max_colors read in those
 ;;;         bodies sits inside make_fixnum.  The controlling-tty-p body
 ;;;         no longer holds strcmp.
-;;;   F4 -- the leaves stay.  The 8 "^DEFUN (\"--term-" lines stay, the
-;;;         "^DEFUN (" count stays 27, and src/term.c still holds
+;;;   F4 -- the surviving leaves stay.  The 6 "^DEFUN (\"--term-" lines
+;;;         remain, the "^DEFUN (" count is 25 after imp-6, and src/term.c holds
 ;;;         "guile.h".
-;;;   F5 -- the module is unchanged.  mod/emacs/terminal.scm stays 194
-;;;         lines, holds 8 wrappers, and holds no FFI call and no
-;;;         scm_c_public_ref in code.
+;;;   F5 -- the module has 8 public wrappers and 6 delayed C refs after
+;;;         imp-6.  It holds no FFI call and no scm_c_public_ref in code.
 ;;;   F6 -- the group and the guards.  The (m48) group carries this
 ;;;         corpus, plus a per-group min-count guard and a total
 ;;;         min-count guard.  An --filter= that matches no group reports
@@ -268,10 +267,10 @@ that also holds make_fixnum."
 
 (setq m48-imp3--group 'f4)
 
-(m48-imp3--check "leaf-defuns-8"
-                 (eql 8 (m48-imp3--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp3--check "defun-count-27"
-                 (eql 27 (m48-imp3--count "src/term.c" "^DEFUN (\"")))
+(m48-imp3--check "leaf-defuns-6"
+                 (eql 6 (m48-imp3--count "src/term.c" "^DEFUN (\"--term-")))
+(m48-imp3--check "defun-count-25"
+                 (eql 25 (m48-imp3--count "src/term.c" "^DEFUN (\"")))
 (m48-imp3--check "term.c-has-guile.h"
                  (m48-imp3--contains-p "src/term.c" "#include \"guile.h\""))
 
@@ -279,13 +278,11 @@ that also holds make_fixnum."
 
 (setq m48-imp3--group 'f5)
 
-(m48-imp3--check "module-lines-194"
-                 (eql 194 (m48-imp3--lines "mod/emacs/terminal.scm")))
 (m48-imp3--check "module-wrappers-8"
                  (eql 8 (m48-imp3--count "mod/emacs/terminal.scm"
-                                         "^(define (term-")))
-(m48-imp3--check "module-defelisp-8"
-                 (eql 8 (m48-imp3--count "mod/emacs/terminal.scm"
+                                         "^(define (term-[a-z]")))
+(m48-imp3--check "module-defelisp-6"
+                 (eql 6 (m48-imp3--count "mod/emacs/terminal.scm"
                                          "(defelisp %--term-")))
 (m48-imp3--check "module-no-ffi"
                  (let ((n (m48-imp3--count-code
@@ -312,8 +309,8 @@ that also holds make_fixnum."
                  (>= (m48-imp3--group-count 'f3) 5))
 (m48-imp3--check "reg/min-f4-checks-3"
                  (>= (m48-imp3--group-count 'f4) 3))
-(m48-imp3--check "reg/min-f5-checks-5"
-                 (>= (m48-imp3--group-count 'f5) 5))
+(m48-imp3--check "reg/min-f5-checks-4"
+                 (>= (m48-imp3--group-count 'f5) 4))
 (m48-imp3--check "reg/min-total-33"
                  (>= m48-imp3--registered 33))
 

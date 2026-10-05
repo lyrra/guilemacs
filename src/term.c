@@ -5162,113 +5162,14 @@ docs/m48-plan.org section 3.3.  */)
 
 /* --- G3: the query / geometry policy ------------------------------- */
 
-/* The pure geometry arithmetic shared by the two G3 leaves below.  It
-   runs in normal context over plain integers and writes the 11 derived
-   values of `--term-frame-geometry' into OUT.  The native edges equal
-   the outer edges, so they do not cross.  */
-
-static void
-term_frame_geometry_1 (EMACS_INT left, EMACS_INT top, EMACS_INT width,
-		       EMACS_INT height, EMACS_INT ibw,
-		       EMACS_INT menu_bar_height, EMACS_INT tab_bar_height,
-		       EMACS_INT tool_bar_height, bool tool_bar_on_top,
-		       EMACS_INT out[11])
-{
-  EMACS_INT outer_left = left;
-  EMACS_INT outer_top = top;
-  EMACS_INT outer_right = outer_left + width;
-  EMACS_INT outer_bottom = outer_top + height;
-  EMACS_INT inner_left = outer_left + ibw;
-  EMACS_INT inner_top = outer_top + ibw;
-  EMACS_INT inner_right = outer_right - ibw;
-  EMACS_INT inner_bottom = outer_bottom - ibw;
-
-  inner_top += menu_bar_height;
-  inner_top += tab_bar_height;
-  if (tool_bar_on_top)
-    inner_top += tool_bar_height;
-  else
-    inner_bottom -= tool_bar_height;
-
-  out[0] = outer_left;
-  out[1] = outer_top;
-  out[2] = outer_right;
-  out[3] = outer_bottom;
-  out[4] = inner_left;
-  out[5] = inner_top;
-  out[6] = inner_right;
-  out[7] = inner_bottom;
-  out[8] = menu_bar_height ? width : 0;
-  out[9] = tab_bar_height ? width - 2 * ibw : 0;
-  out[10] = tool_bar_height ? width - 2 * ibw : 0;
-}
-
-DEFUN ("--term-frame-geometry", Fc_term_frame_geometry,
-       Sc_term_frame_geometry, 9, MANY, 0,
-       doc: /* FIX-20261005-guilemacs: Internal: return the derived tty
-frame geometry as a *plain list* of 11 integers:
-\(OUTER-LEFT OUTER-TOP OUTER-RIGHT OUTER-BOTTOM INNER-LEFT INNER-TOP
-INNER-RIGHT INNER-BOTTOM MENU-BAR-WIDTH TAB-BAR-WIDTH TOOL-BAR-WIDTH).
-usage: (--term-frame-geometry LEFT TOP WIDTH HEIGHT IBW MENU-BAR-HEIGHT
-TAB-BAR-HEIGHT TOOL-BAR-HEIGHT TOOL-BAR-ON-TOP?).  LEFT TOP is the outer
-position, WIDTH HEIGHT the pixel size, IBW the internal border width,
-MENU-BAR-HEIGHT TAB-BAR-HEIGHT TOOL-BAR-HEIGHT the bar heights, and
-TOOL-BAR-ON-TOP? a plain boolean.  The native edges equal the outer
-edges, so they do not cross.  The C hub owns the frame fields and the
-alist build (the symbol rule).  M48 imp-2, docs/m48-plan.org section
-3.3.  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  EMACS_INT vals[11];
-  Lisp_Object list[11];
-  int i;
-
-  (void) nargs;
-  term_frame_geometry_1 (FIXNUMP (args[0]) ? XFIXNUM (args[0]) : 0,
-			 FIXNUMP (args[1]) ? XFIXNUM (args[1]) : 0,
-			 FIXNUMP (args[2]) ? XFIXNUM (args[2]) : 0,
-			 FIXNUMP (args[3]) ? XFIXNUM (args[3]) : 0,
-			 FIXNUMP (args[4]) ? XFIXNUM (args[4]) : 0,
-			 FIXNUMP (args[5]) ? XFIXNUM (args[5]) : 0,
-			 FIXNUMP (args[6]) ? XFIXNUM (args[6]) : 0,
-			 FIXNUMP (args[7]) ? XFIXNUM (args[7]) : 0,
-			 !NILP (args[8]), vals);
-
-  for (i = 0; i < 11; i++)
-    list[i] = make_fixnum (vals[i]);
-  return Flist (11, list);
-}
-
-DEFUN ("--term-frame-edges", Fc_term_frame_edges,
-       Sc_term_frame_edges, 10, MANY, 0,
-       doc: /* FIX-20261005-guilemacs: Internal: return four edges of a
-tty frame as a *plain list* of 4 integers.  The first nine arguments
-are those of `--term-frame-geometry'.  EDGE-TYPE is a *plain string*:
-"outer" for the outer edges, "inner" for the inner edges, and any other
-value (or nil) for the native edges, which equal the outer edges.  The
-C hub owns the frame fields.  M48 imp-2, docs/m48-plan.org section
-3.3.  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  EMACS_INT vals[11];
-  int base;
-
-  (void) nargs;
-  term_frame_geometry_1 (FIXNUMP (args[0]) ? XFIXNUM (args[0]) : 0,
-			 FIXNUMP (args[1]) ? XFIXNUM (args[1]) : 0,
-			 FIXNUMP (args[2]) ? XFIXNUM (args[2]) : 0,
-			 FIXNUMP (args[3]) ? XFIXNUM (args[3]) : 0,
-			 FIXNUMP (args[4]) ? XFIXNUM (args[4]) : 0,
-			 FIXNUMP (args[5]) ? XFIXNUM (args[5]) : 0,
-			 FIXNUMP (args[6]) ? XFIXNUM (args[6]) : 0,
-			 FIXNUMP (args[7]) ? XFIXNUM (args[7]) : 0,
-			 !NILP (args[8]), vals);
-
-  base = (STRINGP (args[9])
-	  && SBYTES (args[9]) == 5
-	  && memcmp (SSDATA (args[9]), "inner", 5) == 0) ? 4 : 0;
-  return list4i (vals[base], vals[base + 1], vals[base + 2], vals[base + 3]);
-}
+/* FIX-20261005-guilemacs: M48 imp-6 -- the geometry arithmetic moved to
+   (emacs terminal).  The static helper term_frame_geometry_1 and the two
+   typed leaves --term-frame-geometry and --term-frame-edges are deleted:
+   each was reached through a Scheme pass-through, so the decision never
+   left C (docs/m48-port-review.org).  term_frame_geometry_scheme and
+   term_frame_edges_scheme now call the module procedure that holds the
+   arithmetic.  The C hub keeps decode_live_frame, the FRAME_INITIAL_P /
+   FRAME_TTY guard, every frame field read, and the alist build.  */
 
 DEFUN ("--term-display-pixel-width", Fc_term_display_pixel_width,
        Sc_term_display_pixel_width, 2, 2, 0,

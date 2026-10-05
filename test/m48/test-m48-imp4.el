@@ -1,10 +1,9 @@
 ;;; test-m48-imp4.el --- M48 imp-4 corpus (G3, the query / geometry policy).
 ;;;
-;;; M48 imp-4 moves the G3 query / geometry policy of src/term.c to
-;;; (emacs terminal) (brief.org section 2 and section 3).  It adds one
-;;; static *_scheme dispatch helper per hub, rewires the 2 shared G3
-;;; helpers onto the imp-2 leaves, and deletes the inline decision.  The
-;;; mechanism stays C.  imp-4 changes no Scheme.
+;;; M48 imp-4 moved the G3 query / geometry policy toward (emacs terminal).
+;;; Imp-6 moved the geometry arithmetic fully into Scheme and retired its
+;;; two C leaves.  The C hub still decodes frames, reads fields, and builds
+;;; the alist; the pixel-dimension dispatch leaves remain in C.
 ;;;
 ;;; The 4 hub DEFUNs share two static helpers: tty-frame-geometry and
 ;;; tty-frame-edges call tty_frame_geometry, and tty-display-pixel-width
@@ -26,19 +25,17 @@
 ;;;         no "native_width - 2 * internal_border_width"), and
 ;;;         tty_display_dimension holds no "*width = 80" and no
 ;;;         "*height = 25".
-;;;   F4 -- the leaves stay.  The 8 "^DEFUN (\"--term-" lines stay, the
-;;;         "^DEFUN (" count stays 27, and src/term.c still holds
-;;;         "guile.h".
-;;;   F5 -- the module is unchanged.  mod/emacs/terminal.scm stays 194
-;;;         lines, holds 8 wrappers and 8 delayed refs, and holds no FFI
-;;;         call and no scm_c_public_ref in code.
+;;;   F4 -- the 6 surviving "^DEFUN (\"--term-" leaves remain, the
+;;;         "^DEFUN (" count is 25 after imp-6, and src/term.c holds "guile.h".
+;;;   F5 -- the module has 8 public wrappers and 6 delayed refs after
+;;;         imp-6, with no FFI call and no scm_c_public_ref in code.
 ;;;   F6 -- the group and the guards.  The (m48) group carries this
 ;;;         corpus, plus a per-group min-count guard and a total
 ;;;         min-count guard.  An --filter= that matches no group reports
 ;;;         exit 0 and 0 tests, so the gate proves nothing until these
 ;;;         guards hold.
 ;;;   F7 -- the gated runtime probe.  Run the built src/emacs and call
-;;;         the 4 leaves with plain values.  An absent binary is an
+;;;         the two dimension leaves and Scheme geometry procedures.  An absent binary is an
 ;;;         INFO-skip.  A probe error is a FAIL, never a silent pass
 ;;;         (docs/kb.org m4x-probe-failure-must-not-read-as-a-skip).  Do
 ;;;         not probe the hubs tty-frame-geometry / tty-display-pixel-*
@@ -47,12 +44,9 @@
 ;;; A read error is a real error, never a silent pass.  An absent src/
 ;;; file is a real error.
 ;;;
-;;; Count note: the 4 G3 dispatch helpers carry one FIX-20261005-guilemacs
-;;; block comment.  That grows the src/term.c FIX-marker count from 10 to
-;;; 11, so test-m48-imp2.el "doc-marker-10" is re-pinned to 11 in this
-;;; commit (brief.org section 8).  The 4 new ref sites grow the term.c
-;;; ref count 7 -> 11 and the tree-wide count 223 -> 227, so
-;;; test-m48-imp1.el and test-m48-imp3.el are re-pinned too.
+;;; Current count note: imp-6 removes two geometry leaf docs and one
+;;; marker block.  The source has 10 FIX markers, six surviving imp-2 leaf
+;;; docs, 11 term.c refs, and 227 tree-wide refs.
 
 (princ "=== m48 imp-4 G3 suite ===\n")
 
@@ -248,10 +242,10 @@ anchored match finds the definition only."
 
 (setq m48-imp4--group 'f4)
 
-(m48-imp4--check "leaf-defuns-8"
-                 (eql 8 (m48-imp4--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp4--check "defun-count-27"
-                 (eql 27 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
+(m48-imp4--check "leaf-defuns-6"
+                 (eql 6 (m48-imp4--count "src/term.c" "^DEFUN (\"--term-")))
+(m48-imp4--check "defun-count-25"
+                 (eql 25 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
 (m48-imp4--check "term.c-has-guile.h"
                  (m48-imp4--contains-p "src/term.c" "#include \"guile.h\""))
 
@@ -259,13 +253,11 @@ anchored match finds the definition only."
 
 (setq m48-imp4--group 'f5)
 
-(m48-imp4--check "module-lines-194"
-                 (eql 194 (m48-imp4--lines "mod/emacs/terminal.scm")))
 (m48-imp4--check "module-wrappers-8"
                  (eql 8 (m48-imp4--count "mod/emacs/terminal.scm"
-                                         "^(define (term-")))
-(m48-imp4--check "module-defelisp-8"
-                 (eql 8 (m48-imp4--count "mod/emacs/terminal.scm"
+                                         "^(define (term-[a-z]")))
+(m48-imp4--check "module-defelisp-6"
+                 (eql 6 (m48-imp4--count "mod/emacs/terminal.scm"
                                          "(defelisp %--term-")))
 (m48-imp4--check "module-no-ffi"
                  (let ((n (m48-imp4--count-code
@@ -292,10 +284,10 @@ anchored match finds the definition only."
                  (>= (m48-imp4--group-count 'f3) 4))
 (m48-imp4--check "reg/min-f4-checks-3"
                  (>= (m48-imp4--group-count 'f4) 3))
-(m48-imp4--check "reg/min-f5-checks-5"
-                 (>= (m48-imp4--group-count 'f5) 5))
-(m48-imp4--check "reg/min-total-32"
-                 (>= m48-imp4--registered 32))
+(m48-imp4--check "reg/min-f5-checks-4"
+                 (>= (m48-imp4--group-count 'f5) 4))
+(m48-imp4--check "reg/min-total-31"
+                 (>= m48-imp4--registered 31))
 
 ;;; --- F7. The gated runtime probe (brief.org section 9 F7) -----------
 
@@ -308,8 +300,8 @@ anchored match finds the definition only."
 ;; never a silent pass; the error is printed so the cause is visible.  An
 ;; undefined leaf signals void-function, so it is a FAIL too.
 ;;
-;; The 4 G3 leaves take plain values, so the probe is deterministic in
-;; batch.  Do NOT probe the hubs tty-frame-geometry / tty-display-pixel-*
+;; The dimension leaves and Scheme geometry procedures take plain values,
+;; so these probes are deterministic in batch.  Do NOT probe the TTY hubs
 ;; here: batch may have no live tty.
 
 (defun m48-imp4--probe (tag thunk)
@@ -326,18 +318,18 @@ pass; the error is printed so the cause is visible."
 (if (not (file-exists-p (expand-file-name "src/emacs" m48-imp4--root)))
     (princ "INFO m48/imp4/runtime-probes skipped (no built src/emacs)\n")
   (progn
-    (m48-imp4--probe "geometry"
+(m48-imp4--probe "geometry"
                      (lambda ()
-                       (equal (--term-frame-geometry 10 20 100 50 1 2 0 0 t)
-                              '(10 20 110 70 11 23 109 69 100 0 0))))
+                       (eql 1 (eval-scheme
+                               "(begin (use-modules (emacs terminal)) (if (equal? ((module-ref (resolve-module '(emacs terminal)) 'term-frame-geometry) 10 20 100 50 1 2 0 0 #t) '(10 20 110 70 11 23 109 69 100 0 0)) 1 0))"))))
     (m48-imp4--probe "frame-edges-inner"
                      (lambda ()
-                       (equal (--term-frame-edges 10 20 100 50 1 2 0 0 t "inner")
-                              '(11 23 109 69))))
+                       (eql 1 (eval-scheme
+                               "(begin (use-modules (emacs terminal)) (if (equal? ((module-ref (resolve-module '(emacs terminal)) 'term-frame-edges) 10 20 100 50 1 2 0 0 #t \"inner\") '(11 23 109 69)) 1 0))"))))
     (m48-imp4--probe "frame-edges-outer"
                      (lambda ()
-                       (equal (--term-frame-edges 10 20 100 50 1 2 0 0 t "outer")
-                              '(10 20 110 70))))
+                       (eql 1 (eval-scheme
+                               "(begin (use-modules (emacs terminal)) (if (equal? ((module-ref (resolve-module '(emacs terminal)) 'term-frame-edges) 10 20 100 50 1 2 0 0 #t \"outer\") '(10 20 110 70)) 1 0))"))))
     (m48-imp4--probe "display-pixel-width-initial"
                      (lambda () (eql 80 (--term-display-pixel-width t nil))))
     (m48-imp4--probe "display-pixel-width-value"

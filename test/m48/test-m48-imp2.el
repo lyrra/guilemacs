@@ -1,24 +1,21 @@
 ;;; test-m48-imp2.el --- M48 imp-2 corpus (the typed C --term-* leaves).
 ;;;
-;;; M48 imp-2 adds the 8 typed C leaves over plain values for the TTY
-;;; terminal boundary of src/term.c (docs/m48-plan.org section 3.3 and
-;;; brief.org section 4), the thin wrappers in (emacs terminal) (brief
-;;; section 5), and this tracked corpus (brief section 6.1).  imp-2 adds
-;;; leaves only: it moves no policy.  imp-3 (G1) and imp-4 (G3) rewire
-;;; the C hubs onto these leaves and delete the inline policy.
+;;; M48 imp-2 added typed C leaves over plain values for the TTY terminal
+;;; boundary (docs/m48-plan.org section 3.3).  Imp-6 retired the two
+;;; geometry leaves after moving their arithmetic into Scheme.  This
+;;; corpus checks the six surviving leaves and the module wrappers.
 ;;;
 ;;; This corpus reads tracked files, and it runs one gated runtime probe.
 ;;; It pins:
-;;;   E1 -- the 8 leaf DEFUNs exist in src/term.c with the exact names of
-;;;         docs/m48-plan.org section 3.3; the ^DEFUN count is 27 (the 19
-;;;         policy blocks plus the 8 new leaves); the file holds
-;;;         "guile.h"; the block comment names the leaves over plain.
+;;;   E1 -- the 6 surviving leaf DEFUNs exist in src/term.c; the two
+;;;         retired geometry leaves are absent; the ^DEFUN count is 25;
+;;;         the file holds "guile.h" and the block comment names the leaves.
 ;;;   E2 -- the plain-value shape: each leaf doc string holds
 ;;;         FIX-20261005-guilemacs, "plain", and a shape word (a
 ;;;         "boolean", an "integer", a "string", or a "list").
-;;;   E3 -- mod/emacs/terminal.scm holds the 8 wrappers and the 8
-;;;         defelisp lines and no FFI / scm_c_public_ref; prelude/load.scm
-;;;         loads (emacs terminal).
+;;;   E3 -- mod/emacs/terminal.scm holds 8 public wrappers and 6
+;;;         defelisp lines, and no FFI / scm_c_public_ref;
+;;;         prelude/load.scm loads (emacs terminal).
 ;;;   E4 -- the boundary rules: the STAYS C mechanism (the terminfo
 ;;;         handle, tputs, ioctl, tcgetpgrp, setsid, emacs_open, the
 ;;;         hooks) is still present; the 3 (emacs terminal) ref sites are
@@ -124,9 +121,9 @@ real error, not a pass."
 (defvar m48-imp2--leaves
   '(;; G1 -- the terminal-capability policy
     "display-color-p" "display-color-cells" "type" "controlling-tty-p"
-    ;; G3 -- the query / geometry policy
-    "frame-geometry" "frame-edges" "display-pixel-width" "display-pixel-height")
-  "The 8 MOVES leaves of docs/m48-plan.org section 3.3.")
+    ;; G3 -- the surviving pixel-dimension leaves
+    "display-pixel-width" "display-pixel-height")
+  "The six surviving --term-* leaves.")
 
 (defun m48-imp2--leaf-body (block)
   "Return the source of the DEFUN (\"--term-BLOCK\") body, or nil."
@@ -139,7 +136,7 @@ real error, not a pass."
               (buffer-substring-no-properties start (match-beginning 0))
             (buffer-substring-no-properties start (point-max))))))))
 
-;;; --- E1. The 8 leaf DEFUNs (docs/m48-plan.org section 3.3) ----------
+;;; --- E1. The surviving leaf DEFUNs (docs/m48-plan.org section 3.3) ---
 
 (setq m48-imp2--group 'e1)
 
@@ -147,10 +144,15 @@ real error, not a pass."
   (m48-imp2--check (format "leaf-%s" leaf)
                    (m48-imp2--contains-p "src/term.c"
                                          (format "DEFUN (\"--term-%s\"" leaf))))
-(m48-imp2--check "leaf-defuns-8"
-                 (eql 8 (m48-imp2--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp2--check "defun-count-27"
-                 (eql 27 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
+(m48-imp2--check "leaf-defuns-6"
+                 (eql 6 (m48-imp2--count "src/term.c" "^DEFUN (\"--term-")))
+(m48-imp2--check "defun-count-25"
+                 (eql 25 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
+(m48-imp2--check "geometry-leaves-retired"
+                 (and (not (m48-imp2--contains-p
+                            "src/term.c" "DEFUN (\"--term-frame-geometry\""))
+                      (not (m48-imp2--contains-p
+                            "src/term.c" "DEFUN (\"--term-frame-edges\""))))
 (m48-imp2--check "term.c-has-guile.h"
                  (m48-imp2--contains-p "src/term.c" "#include \"guile.h\""))
 (m48-imp2--check "leaf-block-comment-m48"
@@ -178,15 +180,13 @@ real error, not a pass."
                                           body)
                           t))))
 
-;; The aggregate count proves every leaf doc really carries the marker
-;; (the block comment carries it once more, so the count was 9 at imp-2).
-;; imp-3 adds one FIX-20261005-guilemacs block comment over the 4 G1
-;; dispatch helpers, so the count grows to 10; imp-4 adds one over the 4
-;; G3 dispatch helpers, so the count grows to 11 (brief.org section 8).
-(m48-imp2--check "doc-marker-11"
-                 (eql 11 (m48-imp2--count "src/term.c" "FIX-20261005-guilemacs")))
-(m48-imp2--check "doc-m48-imp2-8"
-                 (eql 8 (m48-imp2--count "src/term.c" "M48 imp-2,")))
+;; Six typed leaves remain after imp-6 retired the two geometry leaves.
+;; The source currently has ten FIX markers and six M48 imp-2 leaf docs.
+(m48-imp2--check "doc-marker-count-10"
+                 (eql 10 (m48-imp2--count "src/term.c"
+                                           "FIX-20261005-guilemacs")))
+(m48-imp2--check "leaf-doc-count-6"
+                 (eql 6 (m48-imp2--count "src/term.c" "M48 imp-2,")))
 
 ;;; --- E3. The wrapper module (brief.org section 5) -------------------
 
@@ -196,12 +196,12 @@ real error, not a pass."
                  (not (eq (m48-imp2--contains-p "mod/emacs/terminal.scm"
                                                 "(define-module (emacs terminal)")
                           'm48-imp2-absent)))
-(m48-imp2--check "module-defelisp-8"
-                 (eql 8 (m48-imp2--count "mod/emacs/terminal.scm"
+(m48-imp2--check "module-defelisp-6"
+                 (eql 6 (m48-imp2--count "mod/emacs/terminal.scm"
                                          "(defelisp %--term-")))
 (m48-imp2--check "module-wrappers-8"
                  (eql 8 (m48-imp2--count "mod/emacs/terminal.scm"
-                                         "^(define (term-")))
+                                         "^(define (term-[a-z]")))
 (m48-imp2--check "module-exports-8"
                  (eql 8 (m48-imp2--count "mod/emacs/terminal.scm"
                                          "^            term-")))
@@ -259,10 +259,10 @@ real error, not a pass."
 (m48-imp2--check "reg/run-tests-m48-imp2"
                  (m48-imp2--contains-p "tool/run-tests.scm"
                                        "test/m48/test-m48-imp2.el"))
-(m48-imp2--check "reg/min-e1-checks-12"
-                 (>= (m48-imp2--group-count 'e1) 12))
-(m48-imp2--check "reg/min-e2-checks-24"
-                 (>= (m48-imp2--group-count 'e2) 24))
+(m48-imp2--check "reg/min-e1-checks-11"
+                 (>= (m48-imp2--group-count 'e1) 11))
+(m48-imp2--check "reg/min-e2-checks-20"
+                 (>= (m48-imp2--group-count 'e2) 20))
 (m48-imp2--check "reg/min-total-40"
                  (>= m48-imp2--registered 40))
 

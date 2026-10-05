@@ -7,9 +7,9 @@
 ;;;
 ;;; It pins:
 ;;;   S1 -- the surface of brief.org section 4, re-measured at HEAD:
-;;;         src/term.c (5,375 lines, 27 DEFUNs, 11 scm_c_public_ref
-;;;         sites, 8 --term-* leaves, 11 FIX-20261005-guilemacs marks,
-;;;         the guile.h include at :48); mod/emacs/terminal.scm (194);
+;;;         src/term.c (5,276 lines, 25 DEFUNs, 11 scm_c_public_ref
+;;;         sites, 6 --term-* leaves, 10 FIX-20261005-guilemacs marks,
+;;;         the guile.h include at :48); mod/emacs/terminal.scm (266);
 ;;;         the tree-wide scm_c_public_ref over src/*.[chm] (227);
 ;;;         src/keyboard.c (11,233 lines / 447 DEFUNs);
 ;;;         src/keyboard-globals.c (490); the combined keyboard surface
@@ -153,17 +153,18 @@ FAIL with no ERT test would leave the exit code 0."
                  (let ((lines (m48-imp5--lines "src/term.c"))
                        (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
                        (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 5375 lines)
-                        (integerp defuns) (eql 27 defuns)
+                   (and (integerp lines) (eql 5276 lines)
+                        (integerp defuns) (eql 25 defuns)
                         (integerp refs) (eql 11 refs))))
 (m48-imp5--check "term.c-guile.h-at-48"
                  (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))
-(m48-imp5--check "term.c-leaves-8"
-                 (eql 8 (m48-imp5--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp5--check "term.c-fix-marks-11"
-                 (eql 11 (m48-imp5--count "src/term.c" "FIX-20261005-guilemacs")))
-(m48-imp5--check "terminal.scm-lines-194"
-                 (eql 194 (m48-imp5--lines "mod/emacs/terminal.scm")))
+(m48-imp5--check "term.c-leaves-6"
+                 (eql 6 (m48-imp5--count "src/term.c" "^DEFUN (\"--term-")))
+(m48-imp5--check "term.c-fix-marks-10"
+                 (eql 10 (m48-imp5--count "src/term.c"
+                                          "FIX-20261005-guilemacs")))
+(m48-imp5--check "terminal.scm-lines-266"
+                 (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
 (m48-imp5--check "tree-wide-scm-public-ref-227"
                  (eql 227 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
