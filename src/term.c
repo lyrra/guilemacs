@@ -2185,6 +2185,66 @@ controlling_tty_p_scheme (Lisp_Object name, Lisp_Object dev)
   return SCM_CALL_2 (proc, name, dev);
 }
 
+/* FIX-20261005-guilemacs: M48 imp-4 -- the G3 dispatch helpers over the
+   query / geometry policy of (emacs terminal).  The hub reads the
+   C-owned frame fields; the module holds the arithmetic; the typed C
+   leaf of imp-2 holds the value shape.  Each helper resolves its module
+   procedure one time and passes plain values only.  */
+
+static Lisp_Object
+term_frame_geometry_scheme (Lisp_Object left, Lisp_Object top,
+			    Lisp_Object width, Lisp_Object height,
+			    Lisp_Object ibw, Lisp_Object menu_bar_height,
+			    Lisp_Object tab_bar_height,
+			    Lisp_Object tool_bar_height,
+			    Lisp_Object tool_bar_on_top)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM args[9];
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-frame-geometry");
+  args[0] = left; args[1] = top; args[2] = width; args[3] = height;
+  args[4] = ibw; args[5] = menu_bar_height; args[6] = tab_bar_height;
+  args[7] = tool_bar_height; args[8] = tool_bar_on_top;
+  return SCM_CALL_N (proc, args, 9);
+}
+
+static Lisp_Object
+term_frame_edges_scheme (Lisp_Object left, Lisp_Object top,
+			 Lisp_Object width, Lisp_Object height,
+			 Lisp_Object ibw, Lisp_Object menu_bar_height,
+			 Lisp_Object tab_bar_height,
+			 Lisp_Object tool_bar_height,
+			 Lisp_Object tool_bar_on_top, Lisp_Object edge_type)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM args[10];
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-frame-edges");
+  args[0] = left; args[1] = top; args[2] = width; args[3] = height;
+  args[4] = ibw; args[5] = menu_bar_height; args[6] = tab_bar_height;
+  args[7] = tool_bar_height; args[8] = tool_bar_on_top; args[9] = edge_type;
+  return SCM_CALL_N (proc, args, 10);
+}
+
+static Lisp_Object
+term_display_pixel_width_scheme (Lisp_Object initial, Lisp_Object width)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-display-pixel-width");
+  return SCM_CALL_2 (proc, initial, width);
+}
+
+static Lisp_Object
+term_display_pixel_height_scheme (Lisp_Object initial, Lisp_Object height)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs terminal", "term-display-pixel-height");
+  return SCM_CALL_2 (proc, initial, height);
+}
+
 /* Return non-zero if the terminal is capable to display colors.  */
 
 DEFUN ("tty-display-color-p", Ftty_display_color_p, Stty_display_color_p,
@@ -4871,55 +4931,56 @@ tty_frame_geometry (Lisp_Object frame, Lisp_Object attribute)
   eassert (FRAME_PARENT_FRAME (f) || (f->left_pos == 0 && f->top_pos == 0));
   int outer_left = f->left_pos;
   int outer_top = f->top_pos;
-  int outer_right = outer_left + native_width;
-  int outer_bottom = outer_top + native_height;
-
-  int native_left = outer_left;
-  int native_top = outer_top;
-  int native_right = outer_right;
-  int native_bottom = outer_bottom;
 
   int internal_border_width = FRAME_INTERNAL_BORDER_WIDTH (f);
-  int inner_left = native_left + internal_border_width;
-  int inner_top = native_top + internal_border_width;
-  int inner_right = native_right - internal_border_width;
-  int inner_bottom = native_bottom - internal_border_width;
-
   int menu_bar_height = FRAME_MENU_BAR_HEIGHT (f);
-  inner_top += menu_bar_height;
-  int menu_bar_width = menu_bar_height ? native_width : 0;
-
   int tab_bar_height = FRAME_TAB_BAR_HEIGHT (f);
-  int tab_bar_width = (tab_bar_height
-		       ? native_width - 2 * internal_border_width
-		       : 0);
-  inner_top += tab_bar_height;
-
   int tool_bar_height = FRAME_TOOL_BAR_HEIGHT (f);
-  int tool_bar_width = (tool_bar_height
-			? native_width - 2 * internal_border_width
-			: 0);
+  bool tool_bar_on_top = EQ (FRAME_TOOL_BAR_POSITION (f), Qtop);
 
-  /* Subtract or add to the inner dimensions based on the tool bar
-     position.  */
-  if (EQ (FRAME_TOOL_BAR_POSITION (f), Qtop))
-    inner_top += tool_bar_height;
-  else
-    inner_bottom -= tool_bar_height;
+  /* The geometry arithmetic is a decision of Group G3: the module
+     (emacs terminal) holds it.  The hub keeps the C-owned frame field
+     reads, the edge-type conversion, and the alist build (the symbol
+     rule); the leaf returns plain integers only.  */
+  if (EQ (attribute, Qouter_edges) || EQ (attribute, Qnative_edges)
+      || EQ (attribute, Qinner_edges))
+    return term_frame_edges_scheme (make_fixnum (outer_left),
+				    make_fixnum (outer_top),
+				    make_fixnum (native_width),
+				    make_fixnum (native_height),
+				    make_fixnum (internal_border_width),
+				    make_fixnum (menu_bar_height),
+				    make_fixnum (tab_bar_height),
+				    make_fixnum (tool_bar_height),
+				    tool_bar_on_top ? Qt : Qnil,
+				    EQ (attribute, Qinner_edges)
+				    ? build_string ("inner")
+				    : build_string ("outer"));
 
   /* Construct list.  */
-  if (EQ (attribute, Qouter_edges))
-    return list4i (outer_left, outer_top, outer_right, outer_bottom);
-  else if (EQ (attribute, Qnative_edges))
-    return list4i (native_left, native_top, native_right, native_bottom);
-  else if (EQ (attribute, Qinner_edges))
-    return list4i (inner_left, inner_top, inner_right, inner_bottom);
-  else
-    return list (Fcons (Qouter_position, Fcons (make_fixnum (outer_left),
-						make_fixnum (outer_top))),
+  {
+    Lisp_Object geometry
+      = term_frame_geometry_scheme (make_fixnum (outer_left),
+				    make_fixnum (outer_top),
+				    make_fixnum (native_width),
+				    make_fixnum (native_height),
+				    make_fixnum (internal_border_width),
+				    make_fixnum (menu_bar_height),
+				    make_fixnum (tab_bar_height),
+				    make_fixnum (tool_bar_height),
+				    tool_bar_on_top ? Qt : Qnil);
+    EMACS_INT vals[11];
+    Lisp_Object tail = geometry;
+    int i;
+
+    for (i = 0; i < 11 && CONSP (tail); i++, tail = XCDR (tail))
+      vals[i] = FIXNUMP (XCAR (tail)) ? XFIXNUM (XCAR (tail)) : 0;
+
+    return list (Fcons (Qouter_position, Fcons (make_fixnum (vals[0]),
+						make_fixnum (vals[1]))),
 		 Fcons (Qouter_size,
-			Fcons (make_fixnum (outer_right - outer_left),
-			       make_fixnum (outer_bottom - outer_top))),
+			Fcons (make_fixnum (vals[2] - vals[0]),
+			       make_fixnum (vals[3] - vals[1]))),
 		 Fcons (Qouter_border_width, make_fixnum (0)),
 		 Fcons (Qexternal_border_size,
 			Fcons (make_fixnum (0), make_fixnum (0))),
@@ -4927,18 +4988,19 @@ tty_frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 			Fcons (make_fixnum (0), make_fixnum (0))),
 		 Fcons (Qmenu_bar_external, Qnil),
 		 Fcons (Qmenu_bar_size,
-			Fcons (make_fixnum (menu_bar_width),
+			Fcons (make_fixnum (vals[8]),
 			       make_fixnum (menu_bar_height))),
 		 Fcons (Qtab_bar_size,
-			Fcons (make_fixnum (tab_bar_width),
+			Fcons (make_fixnum (vals[9]),
 			       make_fixnum (tab_bar_height))),
 		 Fcons (Qtool_bar_external, Qnil),
 		 Fcons (Qtool_bar_position, FRAME_TOOL_BAR_POSITION (f)),
 		 Fcons (Qtool_bar_size,
-			Fcons (make_fixnum (tool_bar_width),
+			Fcons (make_fixnum (vals[10]),
 			       make_fixnum (tool_bar_height))),
 		 Fcons (Qinternal_border_width,
 			make_fixnum (internal_border_width)));
+  }
 }
 
 DEFUN ("tty-frame-geometry", Ftty_frame_geometry, Stty_frame_geometry, 0, 1, 0,
@@ -4990,12 +5052,14 @@ tty_display_dimension (Lisp_Object frame, int *width, int *height)
   switch (f->output_method)
     {
     case output_initial:
-      *width = 80;
-      *height = 25;
+      *width = XFIXNUM (term_display_pixel_width_scheme (Qt, Qnil));
+      *height = XFIXNUM (term_display_pixel_height_scheme (Qt, Qnil));
       break;
     case output_termcap:
-      *width = FrameCols (FRAME_TTY (f));
-      *height = FrameRows (FRAME_TTY (f));
+      *width = XFIXNUM (term_display_pixel_width_scheme
+			(Qnil, make_fixnum (FrameCols (FRAME_TTY (f)))));
+      *height = XFIXNUM (term_display_pixel_height_scheme
+			 (Qnil, make_fixnum (FrameRows (FRAME_TTY (f)))));
       break;
     case output_x_window:
     case output_msdos_raw:

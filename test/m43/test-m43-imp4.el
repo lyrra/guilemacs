@@ -251,8 +251,8 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
                         (eql 490 kg)
                         (eql 11723 (+ k kg))
                         (<= (+ k kg) 11960))))
-(m43-imp4--check "surface/scm-c-public-ref-223"
-                 (eql 223 (m43-imp4--count-scm-ref)))
+(m43-imp4--check "surface/scm-c-public-ref-227"
+                 (eql 227 (m43-imp4--count-scm-ref)))
 
 ;;; --- P7. The pure policy corpus (brief.org section 11) ---------------
 ;;;

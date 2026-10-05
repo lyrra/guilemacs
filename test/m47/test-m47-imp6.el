@@ -10,7 +10,7 @@
 ;;;         src/fileio.c (7,575 lines, 78 DEFUNs, 27 scm_c_public_ref
 ;;;         sites, 26 --fileio-* leaves, 0 OPEN markers);
 ;;;         mod/emacs/fileio.scm (370); the tree-wide scm_c_public_ref
-;;;         over src/*.[chm] (223 after M48 imp-3); src/keyboard.c (11,233 / 447);
+;;;         over src/*.[chm] (227 after M48 imp-4); src/keyboard.c (11,233 / 447);
 ;;;         src/keyboard-globals.c (490); the combined keyboard surface
 ;;;         (11,723); the margin (237 under the 11,960 M31 budget);
 ;;;         and the budget itself.  The M31 keyboard surface did not
@@ -157,8 +157,8 @@ FAIL with no ERT test would leave the exit code 0 (cr.org finding
                  (eql 0 (m47-imp6--count "src/fileio.c" "OPEN (cr\\.org")))
 (m47-imp6--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp6--lines "mod/emacs/fileio.scm")))
-(m47-imp6--check "tree-wide-scm-public-ref-223"
-                 (eql 223 (m47-imp6--count-scm-ref)))
+(m47-imp6--check "tree-wide-scm-public-ref-227"
+                 (eql 227 (m47-imp6--count-scm-ref)))
 (m47-imp6--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp6--lines "src/keyboard.c")))
 (m47-imp6--check "keyboard.c-defuns-447"

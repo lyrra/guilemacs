@@ -181,9 +181,10 @@ real error, not a pass."
 ;; The aggregate count proves every leaf doc really carries the marker
 ;; (the block comment carries it once more, so the count was 9 at imp-2).
 ;; imp-3 adds one FIX-20261005-guilemacs block comment over the 4 G1
-;; dispatch helpers, so the count grows to 10 (brief.org section 8).
-(m48-imp2--check "doc-marker-10"
-                 (eql 10 (m48-imp2--count "src/term.c" "FIX-20261005-guilemacs")))
+;; dispatch helpers, so the count grows to 10; imp-4 adds one over the 4
+;; G3 dispatch helpers, so the count grows to 11 (brief.org section 8).
+(m48-imp2--check "doc-marker-11"
+                 (eql 11 (m48-imp2--count "src/term.c" "FIX-20261005-guilemacs")))
 (m48-imp2--check "doc-m48-imp2-8"
                  (eql 8 (m48-imp2--count "src/term.c" "M48 imp-2,")))
 
