@@ -245,6 +245,7 @@
   "test/m48/test-m48-imp2.el"                 ; M48 imp-2: the 8 typed C leaves (--term-display-color-p ... --term-display-pixel-height), the 8 wrappers of (emacs terminal), the guile.h include, the boundary rules, and the gated runtime probe (corpus reads tracked files, and runs the built src/emacs)
   "test/m48/test-m48-imp3.el"                 ; M48 imp-3: the G1 terminal-capability policy (tty-display-color-p / -cells, tty-type, controlling-tty-p) moves to (emacs terminal).  The 4 *_scheme dispatch helpers, the 4 rewired hubs with the inline decision gone, the 4 new ref sites, the boundary rules on the unchanged module, and the gated runtime probe (tracked files only, plus the built src/emacs)
   "test/m48/test-m48-imp4.el"                 ; M48 imp-4: the G3 query / geometry policy (tty-frame-geometry / -edges, tty-display-pixel-width / -height) moves to (emacs terminal).  The 4 *_scheme dispatch helpers over the 2 shared static helpers, the rewired hubs with the inline geometry arithmetic and the 80x25 pair gone, the 4 new ref sites, the boundary rules on the unchanged module, and the gated runtime probe (tracked files only, plus the built src/emacs)
+  "test/m48/test-m48-imp5.el"                 ; M48 imp-5 close-out: the re-measured surface, the (m48) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads tracked files only)
   )
 (group
   "test/src/eval-tests.el"
