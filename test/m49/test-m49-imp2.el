@@ -4,32 +4,37 @@
 ;;; directory / attribute boundary of src/dired.c (docs/m49-plan.org
 ;;; section 3.3 and brief.org section 3), the thin wrappers in (emacs
 ;;; dired) (brief section 5), and this tracked corpus (brief section 6).
-;;; imp-2 adds leaves only: it moves no policy.  imp-3 (G1 and G2) and
-;;; imp-4 (G3) rewire the C hubs onto these leaves and delete the inline
-;;; policy.
+;;; imp-2 adds leaves only: it moves no policy.
 ;;;
 ;;; imp-3 re-pins this corpus (brief.org section 9): the G1 listing leaf
-;;; is DELETED, so 3 --dired-* leaves remain and the ^DEFUN count is 11.
-;;; The two listing runtime probes now call the public hub
+;;; is DELETED, so 3 --dired-* leaves remained and the ^DEFUN count was
+;;; 11.  The two listing runtime probes now call the public hub
 ;;; `directory-files' (the leaf is gone).
+;;;
+;;; imp-4 re-pins this corpus again (brief.org section 9): the G3
+;;; attribute-predicate leaf is DELETED, so 2 --dired-* leaves remain
+;;; (both G2) and the ^DEFUN count is 10.  G2 returns A2 (brief.org
+;;; section 7.5), so the 2 G2 leaves stay and their decision stays in C.
+;;; The G3 probe now calls the public hub `file-attributes-lessp'.
 ;;;
 ;;; This corpus reads tracked files, and it runs one gated runtime probe.
 ;;; It pins:
-;;;   F1 -- the 3 surviving leaf DEFUNs exist in src/dired.c with the
+;;;   F1 -- the 2 surviving leaf DEFUNs exist in src/dired.c with the
 ;;;         exact names of docs/m49-plan.org section 3.3; the ^DEFUN
-;;;         count is 11; the file holds "guile.h"; the block comment
+;;;         count is 10; the file holds "guile.h"; the block comment
 ;;;         names the leaves over plain.
 ;;;   F2 -- the plain-value shape: each leaf doc string holds
 ;;;         FIX-20261005-guilemacs, "plain", and a shape word (a
 ;;;         "boolean", an "integer", a "string", or a "list").
-;;;   F3 -- mod/emacs/dired.scm holds the 4 wrappers and the 3 defelisp
+;;;   F3 -- mod/emacs/dired.scm holds the 4 wrappers and the 2 defelisp
 ;;;         --dired-* lines and no FFI / scm_c_public_ref; prelude/load.scm
 ;;;         loads (emacs dired).
 ;;;   F4 -- the boundary rules: the STAYS C mechanism (the readdir loop,
 ;;;         fdopendir, emacs_fstatat, sys_faccessat, getpwent, getgrent,
-;;;         filemodestring, scmp) is still present; src/dired.c holds 1
-;;;         scm_c_public_ref site (the imp-3 G1 dispatch); the G3 leaf
-;;;         takes two names.
+;;;         filemodestring, scmp) is still present; src/dired.c holds 2
+;;;         scm_c_public_ref sites (the imp-3 G1 dispatch and the imp-4 G3
+;;;         dispatch); the G3 hub keeps the Fcar extraction and calls the
+;;;         G3 Scheme predicate.
 ;;;   F5 -- the (m49) group carries this corpus, and a per-group
 ;;;         min-count guard fails when the corpus is truncated.  Pin F1,
 ;;;         F2, F3, and F4 separately.
@@ -130,13 +135,12 @@ real error, not a pass."
       (imp-register-bool-as-ert-test (format "m49-imp2/%s" name) (and ok t)))))
 
 (defvar m49-imp2--leaves
-  '(;; G2 -- the completion policy
-    "file-name-completion" "file-name-all-completions"
-    ;; G3 -- the attribute predicate
-    "file-attributes-lessp")
+  '(;; G2 -- the completion policy (A2: stays in C)
+    "file-name-completion" "file-name-all-completions")
   "The MOVES leaves of docs/m49-plan.org section 3.3 that survive
-imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
-(emacs dired) dired-listing-names.")
+imp-4.  imp-3 deleted the G1 listing leaf; imp-4 deleted the G3
+attribute-predicate leaf.  G2 returns A2 (brief.org section 7.5), so its
+2 leaves stay.")
 
 (defun m49-imp2--leaf-body (block)
   "Return the source of the DEFUN (\"--dired-BLOCK\") body, or nil."
@@ -174,11 +178,12 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
   (m49-imp2--check (format "leaf-%s" leaf)
                    (m49-imp2--contains-p "src/dired.c"
                                          (format "DEFUN (\"--dired-%s\"" leaf))))
-;; imp-3 deleted the G1 listing leaf, so 3 --dired-* leaves remain.
-(m49-imp2--check "leaf-defuns-3"
-                 (eql 3 (m49-imp2--count "src/dired.c" "^DEFUN (\"--dired-")))
-(m49-imp2--check "defun-count-11"
-                 (eql 11 (m49-imp2--count "src/dired.c" "^DEFUN (\"")))
+;; imp-3 deleted the G1 leaf and imp-4 deleted the G3 leaf, so 2 --dired-*
+;; leaves remain (both G2).
+(m49-imp2--check "leaf-defuns-2"
+                 (eql 2 (m49-imp2--count "src/dired.c" "^DEFUN (\"--dired-")))
+(m49-imp2--check "defun-count-10"
+                 (eql 10 (m49-imp2--count "src/dired.c" "^DEFUN (\"")))
 (m49-imp2--check "dired.c-has-guile.h"
                  (m49-imp2--contains-p "src/dired.c" "#include \"guile.h\""))
 (m49-imp2--check "leaf-block-comment-m49"
@@ -208,9 +213,9 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
 
 ;; The aggregate count proves every surviving leaf doc really carries the
 ;; marker (the include comment and the block comment carry it once each,
-;; and 3 leaf docs carry it, so the count is 5 at imp-3).
-(m49-imp2--check "doc-marker-5"
-                 (eql 5 (m49-imp2--count "src/dired.c" "FIX-20261005-guilemacs")))
+;; and 2 leaf docs carry it, so the count is 4 at imp-4).
+(m49-imp2--check "doc-marker-4"
+                 (eql 4 (m49-imp2--count "src/dired.c" "FIX-20261005-guilemacs")))
 
 ;;; --- F3. The wrapper module (brief.org section 5) -------------------
 
@@ -220,8 +225,10 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
                  (not (eq (m49-imp2--contains-p "mod/emacs/dired.scm"
                                                 "(define-module (emacs dired)")
                           'm49-imp2-absent)))
-(m49-imp2--check "module-defelisp-3"
-                 (eql 3 (m49-imp2--count "mod/emacs/dired.scm"
+;; imp-4 deleted the G3 leaf, so 2 --dired-* defelisp references remain
+;; (both G2).
+(m49-imp2--check "module-defelisp-2"
+                 (eql 2 (m49-imp2--count "mod/emacs/dired.scm"
                                          "^(defelisp %--dired-")))
 (m49-imp2--check "module-wrappers-4"
                  (eql 4 (m49-imp2--count "mod/emacs/dired.scm"
@@ -266,23 +273,26 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
                  (m49-imp2--contains-p "src/dired.c" "directory_files_internal ("))
 (m49-imp2--check "mech-scmp"
                  (m49-imp2--contains-p "src/dired.c" "scmp ("))
-;; imp-3 adds the one G1 dispatch scm_c_public_ref site, so the
-;; src/dired.c ref count moves 0 -> 1.
-(m49-imp2--check "dired.c-scm-ref-1"
-                 (eql 1 (m49-imp2--count "src/dired.c" "scm_c_public_ref")))
-;; The G3 leaf narrows the argument shape: it takes two plain names, and
-;; the C hub keeps the Fcar extraction (docs/kb.org
-;; leaf-may-narrow-the-argument-shape).
-(m49-imp2--check "g3-narrow-name1"
-                 (let ((body (m49-imp2--leaf-body "file-attributes-lessp")))
-                   (and (stringp body)
-                        (string-match-p "NAME1" body) t)))
-(m49-imp2--check "g3-narrow-name2"
-                 (let ((body (m49-imp2--leaf-body "file-attributes-lessp")))
-                   (and (stringp body)
-                        (string-match-p "NAME2" body) t)))
+;; imp-3 added the G1 dispatch site and imp-4 added the G3 dispatch site,
+;; so the src/dired.c ref count moves 1 -> 2.  G2 stays in C (A2), so it
+;; adds no site.
+(m49-imp2--check "dired.c-scm-ref-2"
+                 (eql 2 (m49-imp2--count "src/dired.c" "scm_c_public_ref")))
+;; The G3 hub narrows the argument shape: it extracts Fcar of each
+;; attribute list (docs/kb.org leaf-may-narrow-the-argument-shape) and
+;; passes the two plain names to the Scheme predicate.
 (m49-imp2--check "g3-hub-keeps-fcar"
-                 (m49-imp2--contains-p "src/dired.c" "Fcar"))
+                 (m49-imp2--contains-p "src/dired.c" "Fcar (f1), Fcar (f2)"))
+(m49-imp2--check "g3-hub-calls-scheme"
+                 (m49-imp2--contains-p "src/dired.c"
+                                       "dired_file_attributes_lessp_scheme"))
+(m49-imp2--check "g3-hub-policy-ref"
+                 (m49-imp2--contains-p
+                  "src/dired.c"
+                  "scm_c_public_ref (\"emacs dired\", \"dired-file-attributes-lessp\")"))
+(m49-imp2--check "g3-leaf-absent"
+                 (not (m49-imp2--contains-p "src/dired.c"
+                                            "--dired-file-attributes-lessp")))
 
 ;;; --- F5. The group and the guards -----------------------------------
 
@@ -291,10 +301,10 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
 (m49-imp2--check "reg/run-tests-m49-imp2"
                  (m49-imp2--contains-p "tool/run-tests.scm"
                                        "test/m49/test-m49-imp2.el"))
-(m49-imp2--check "reg/min-f1-checks-7"
-                 (>= (m49-imp2--group-count 'f1) 7))
-(m49-imp2--check "reg/min-f2-checks-10"
-                 (>= (m49-imp2--group-count 'f2) 10))
+(m49-imp2--check "reg/min-f1-checks-6"
+                 (>= (m49-imp2--group-count 'f1) 6))
+(m49-imp2--check "reg/min-f2-checks-7"
+                 (>= (m49-imp2--group-count 'f2) 7))
 (m49-imp2--check "reg/min-f3-checks-7"
                  (>= (m49-imp2--group-count 'f3) 7))
 (m49-imp2--check "reg/min-f4-checks-13"
@@ -311,8 +321,10 @@ imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
 ;; never a silent pass; the error is printed so the cause is visible.  An
 ;; undefined leaf signals void-function, so it is a FAIL too.
 ;;
-;; The two listing probes now call the public hub `directory-files'
-;; (imp-3 deleted the G1 leaf).
+;; The two listing probes call the public hub `directory-files' (imp-3
+;; deleted the G1 leaf).  The attributes probe calls the public hub
+;; `file-attributes-lessp' (imp-4 deleted the G3 leaf); the hub extracts
+;; Fcar of each argument, so the probe passes two one-element lists.
 
 (defun m49-imp2--probe (tag thunk)
   "Register the probe TAG from the value of THUNK, which calls a leaf.
@@ -374,8 +386,11 @@ pass; the error is printed so the cause is visible."
   (m49-imp2--probe
    "attributes-lessp"
    (lambda ()
-     (and (eq t (--dired-file-attributes-lessp "a" "b"))
-          (eq nil (--dired-file-attributes-lessp "b" "a"))))))
+     ;; The hub takes two attribute lists and extracts Fcar of each, so a
+     ;; one-element list carries one plain name.  The G3 decision now runs
+     ;; in Scheme (emacs dired); the hub keeps the Fcar extraction.
+     (and (eq t (file-attributes-lessp '("a") '("b")))
+          (eq nil (file-attributes-lessp '("b") '("a")))))))
 
 (princ (format "=== m49 imp-2 leaves suite done (%d tracked checks; f1 %d, f2 %d, f3 %d, f4 %d) ===\n"
                m49-imp2--registered

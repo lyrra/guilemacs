@@ -188,8 +188,8 @@ regression, and must not turn the gate red."
                        (kg (m44-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m44-imp1--check "scm-c-public-ref-228"
-                 (eql 228 (m44-imp1--count-scm-ref)))
+(m44-imp1--check "scm-c-public-ref-229"
+                 (eql 229 (m44-imp1--count-scm-ref)))
 (m44-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m44-imp1--lines "mod/emacs/tty-modes.scm")))
 

@@ -208,8 +208,8 @@ anchored match finds the definition only."
                             wrapper))))
 (m48-imp4--check "term.c-scm-ref-11"
                  (eql 11 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
-(m48-imp4--check "scm-c-public-ref-228"
-                 (eql 228 (m48-imp4--count-scm-ref)))
+(m48-imp4--check "scm-c-public-ref-229"
+                 (eql 229 (m48-imp4--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 4.4) --------
 

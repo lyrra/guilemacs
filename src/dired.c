@@ -1160,13 +1160,32 @@ file_attributes (int fd, char const *name,
 		INT_TO_INTEGER (s.st_dev));
 }
 
+/* FIX-20261006-guilemacs: M49 imp-4 -- the G3 dispatch helper over the
+   attribute predicate of (emacs dired).  The C hub `file-attributes-lessp'
+   extracts Fcar of each attribute list (an attribute list must not cross
+   the layer; docs/kb.org leaf-may-narrow-the-argument-shape) and passes
+   the two plain names.  The module computes the compare with
+   %string-lessp.  The delta is one dispatch-helper public-ref lookup.  */
+
+static Lisp_Object
+dired_file_attributes_lessp_scheme (Lisp_Object name1, Lisp_Object name2)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs dired", "dired-file-attributes-lessp");
+  return SCM_CALL_2 (proc, name1, name2);
+}
+
 DEFUN ("file-attributes-lessp", Ffile_attributes_lessp,
        Sfile_attributes_lessp, 2, 2, 0,
        doc: /* Return t if first arg file attributes list is less than second.
 Comparison is in lexicographic order and case is significant.  */)
   (Lisp_Object f1, Lisp_Object f2)
 {
-  return Fstring_lessp (Fcar (f1), Fcar (f2));
+  /* FIX-20261006-guilemacs: M49 imp-4.  The attribute predicate decision
+     (%string-lessp) moved to Scheme (emacs dired).  C keeps the Fcar
+     extraction and calls the module policy.  */
+  return dired_file_attributes_lessp_scheme (Fcar (f1), Fcar (f2));
 }
 
 
@@ -1220,12 +1239,18 @@ The value may be nil if not supported on this platform.  */)
    docs/m49-plan.org section 3.3 and brief.org section 4.
 
    M49 imp-3 DELETED the G1 leaf (the listing-names pass-through): the
-   listing decision moved into (emacs dired) dired-listing-names.  So 3
-   leaves remain: G2 (--dired-file-name-completion,
-   --dired-file-name-all-completions) and G3
-   (--dired-file-attributes-lessp).  The hub Fdirectory_files now calls
-   the static dired_read_names_1 (the raw readdir mechanism) and the G1
-   Scheme policy (brief.org section 7.3).
+   listing decision moved into (emacs dired) dired-listing-names.  The
+   hub Fdirectory_files now calls the static dired_read_names_1 (the raw
+   readdir mechanism) and the G1 Scheme policy (brief.org section 7.3).
+
+   M49 imp-4 DELETED the G3 attribute-predicate leaf: the attribute
+   predicate moved into (emacs dired) dired-file-attributes-lessp.  So 2
+   leaves remain, both G2
+   (--dired-file-name-completion, --dired-file-name-all-completions).
+   G2 returns A2 (brief.org section 7.5): the prefix match stays in the
+   C loop, because a Scheme match on decoded names cannot replace the
+   encoded scmp match at an acceptable delta (brief.org section 6).  So
+   the 2 G2 leaves and the 2 G2 hubs are unchanged.
 
    A leaf returns plain values only: no struct dirent *, struct stat *,
    DIR *, char *, struct passwd *, struct group *, Lisp_Object, or
@@ -1295,22 +1320,6 @@ docs/m49-plan.org section 3.3.  */)
   return CONSP (completions)
 	   ? CALLN (Fsort, completions, Qstring_lessp)
 	   : completions;
-}
-
-/* --- G3: the attribute predicate ----------------------------------- */
-
-DEFUN ("--dired-file-attributes-lessp", Fdired_file_attributes_lessp,
-       Sdired_file_attributes_lessp, 2, 2, 0,
-       doc: /* FIX-20261005-guilemacs: Internal: return a *plain boolean*:
-t when the plain file name NAME1 sorts before NAME2 with `string-lessp',
-else nil.  The hub `file-attributes-lessp' takes two attribute lists and
-extracts Fcar of each, so the C hub keeps the Fcar extraction and this
-leaf narrows the argument shape to two plain names (docs/kb.org
-leaf-may-narrow-the-argument-shape).  M49 imp-2, docs/m49-plan.org
-section 3.3.  */)
-  (Lisp_Object name1, Lisp_Object name2)
-{
-  return Fstring_lessp (name1, name2);
 }
 
 void

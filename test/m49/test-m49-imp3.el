@@ -183,19 +183,19 @@ the closing `\\n}' at column 0, or nil."
                  (m49-imp3--contains-p "src/dired.c"
                                        "dired_listing_names_scheme"))
 
-(m49-imp3--check "defun-count-11"
-                 (eql 11 (m49-imp3--count "src/dired.c" "^DEFUN (\"")))
-(m49-imp3--check "leaf-defuns-3"
-                 (eql 3 (m49-imp3--count "src/dired.c" "^DEFUN (\"--dired-")))
-(m49-imp3--check "dired.c-scm-ref-1"
-                 (eql 1 (m49-imp3--count "src/dired.c" "scm_c_public_ref")))
-(m49-imp3--check "dired.c-lines-1337"
+(m49-imp3--check "defun-count-10"
+                 (eql 10 (m49-imp3--count "src/dired.c" "^DEFUN (\"")))
+(m49-imp3--check "leaf-defuns-2"
+                 (eql 2 (m49-imp3--count "src/dired.c" "^DEFUN (\"--dired-")))
+(m49-imp3--check "dired.c-scm-ref-2"
+                 (eql 2 (m49-imp3--count "src/dired.c" "scm_c_public_ref")))
+(m49-imp3--check "dired.c-lines-1346"
                  (m49-imp3--with "src/dired.c"
                    (lambda ()
                      (goto-char (point-min))
                      (let ((n 0))
                        (while (search-forward "\n" nil t) (setq n (1+ n)))
-                       (eql 1337 n)))))
+                       (eql 1346 n)))))
 (m49-imp3--check "fix-marker-imp3"
                  (>= (m49-imp3--count "src/dired.c" "FIX-20261006-guilemacs") 3))
 
@@ -225,8 +225,10 @@ the closing `\\n}' at column 0, or nil."
                  (m49-imp3--contains-p "mod/emacs/dired.scm" "integer?"))
 (m49-imp3--check "policy-sort"
                  (m49-imp3--contains-p "mod/emacs/dired.scm" "string-lessp"))
-(m49-imp3--check "policy-defelisp-3"
-                 (eql 3 (m49-imp3--count "mod/emacs/dired.scm"
+;; The 2 G2 --dired-* defelisp leaves remain after imp-4 (G3 was
+;; deleted and returns A2 for G2).
+(m49-imp3--check "policy-defelisp-2"
+                 (eql 2 (m49-imp3--count "mod/emacs/dired.scm"
                                          "^(defelisp %--dired-")))
 (m49-imp3--check "policy-no-listing-leaf"
                  (not (m49-imp3--contains-p "mod/emacs/dired.scm"

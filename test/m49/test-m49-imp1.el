@@ -167,18 +167,21 @@ passes the raw symbol to reach it."
 ;;;; imp-3 re-pins these again: the deleted G1 leaf, the new static
 ;;; helper dired_read_names_1, and the one new scm_c_public_ref site move
 ;;; the line count, the DEFUN count, and the dired.c ref count.
-(m49-imp1--check "dired.c-lines-1337"
-                 (eql 1337 (m49-imp1--lines "src/dired.c")))
-(m49-imp1--check "dired.c-defuns-11"
-                 (eql 11 (m49-imp1--count "src/dired.c" "^DEFUN (\"")))
-(m49-imp1--check "dired.c-scm-ref-1"
-                 (eql 1 (m49-imp1--count "src/dired.c" "scm_c_public_ref")))
+;;; imp-4 re-pins these again: the deleted G3 leaf and the new G3 dispatch
+;;; helper move the line count, the DEFUN count, and the dired.c ref
+;;; count (G2 stays in C, so no other site moves).
+(m49-imp1--check "dired.c-lines-1346"
+                 (eql 1346 (m49-imp1--lines "src/dired.c")))
+(m49-imp1--check "dired.c-defuns-10"
+                 (eql 10 (m49-imp1--count "src/dired.c" "^DEFUN (\"")))
+(m49-imp1--check "dired.c-scm-ref-2"
+                 (eql 2 (m49-imp1--count "src/dired.c" "scm_c_public_ref")))
 (m49-imp1--check "dired.c-has-guile.h"
                  (m49-imp1--tracked-p "src/dired.c" "#include \"guile.h\""))
 (m49-imp1--check "dired-module-present"
                  (m49-imp1--exists-p "mod/emacs/dired.scm"))
-(m49-imp1--check "scm-c-public-ref-228"
-                 (eql 228 (m49-imp1--count-scm-ref)))
+(m49-imp1--check "scm-c-public-ref-229"
+                 (eql 229 (m49-imp1--count-scm-ref)))
 
 ;;; --- D2. The block map (docs/m49-plan.org section 3.1) ---------------
 ;;

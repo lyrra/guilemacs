@@ -5,7 +5,9 @@
 ;;; parts: the listing policy (G1), the completion policy (G2), and the
 ;;; attribute predicate (G3) (docs/m49-plan.org section 3.2).  M49 imp-2
 ;;; added one typed C leaf per part and thin wrappers.  M49 imp-3 moved
-;;; the G1 listing decision HERE; G2 and G3 still call their C leaves.
+;;; the G1 listing decision HERE.  M49 imp-4 moved the G3 attribute
+;;; predicate HERE; G2 returns A2 (brief.org section 7.5), so the
+;;; completion policy stays in C and G2 still calls its C leaves.
 ;;;
 ;;;   (dired-listing-names names directory full match nosort count)
 ;;;        -> the ordered name list of DIRECTORY as a plain list of
@@ -41,11 +43,11 @@
             dired-file-name-all-completions
             dired-file-attributes-lessp))
 
-;; The three C leaves that remain after imp-3 (src/dired.c).  imp-3
-;; deleted the G1 listing leaf; its decision is dired-listing-names.
+;; The 2 C leaves that remain after imp-4 (src/dired.c).  imp-3 deleted
+;; the G1 listing leaf; imp-4 deleted the G3 attribute-predicate leaf.
+;; Its decision is now dired-file-attributes-lessp.
 (defelisp %--dired-file-name-completion      --dired-file-name-completion)
 (defelisp %--dired-file-name-all-completions --dired-file-name-all-completions)
-(defelisp %--dired-file-attributes-lessp     --dired-file-attributes-lessp)
 
 ;; The elisp subrs the G1 policy uses.  `symbol-function' looks them up
 ;; by name, so the module needs no new C surface.
@@ -146,7 +148,9 @@
 (define (dired-file-name-all-completions directory file)
   ((force %--dired-file-name-all-completions) directory file))
 
-;; Return t when the plain file name NAME1 sorts before NAME2 with
-;; `string-lessp', else #f.
+;; Return t (#t) when the plain file name NAME1 sorts before NAME2 with
+;; `string-lessp', else nil (#nil).  The G3 attribute predicate decision
+;; runs HERE (M49 imp-4); the C hub keeps the Fcar extraction and passes
+;; the two plain names (brief.org section 7.4).
 (define (dired-file-attributes-lessp name1 name2)
-  ((force %--dired-file-attributes-lessp) name1 name2))
+  (if (dired--string-lessp name1 name2) #t #nil))
