@@ -254,6 +254,9 @@
   "test/m49/test-m49-imp4.el"                 ; M49 imp-4: the deleted G3 leaf, the static G3 dispatch helper, the (emacs dired) dired-file-attributes-lessp predicate over %string-lessp, the rewired file-attributes-lessp hub that keeps the Fcar extraction, the G2 A2 record, the boundary rules, and the gated runtime probe (sole exact match / longest common prefix / directory slash / sort key)
   "test/m49/test-m49-imp5.el"                 ; M49 imp-5 close-out: the re-measured surface, the (m49) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads tracked files only)
   )
+(group (m50) ; M50 imp-1 the src/emacs.c invocation / daemon boundary audit (docs/m50-plan.org)
+  "test/m50/test-m50-imp1.el"                 ; M50 imp-1 audit: the three-candidate base re-scan (D1), the src/emacs.c block map as the ordered DEFUN name list (the 5 block names, D2), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m50-plan-lint.sh, which this group does not run
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
