@@ -252,6 +252,7 @@
   "test/m49/test-m49-imp2.el"                 ; M49 imp-2: the 4 typed C --dired-* leaves (2 after imp-4; G2 returns A2), the guile.h include, the wrappers of (emacs dired), the boundary rules, and the gated runtime probe
   "test/m49/test-m49-imp3.el"                 ; M49 imp-3: the deleted G1 leaf, the static dired_read_names_1 mechanism, the (emacs dired) dired-listing-names policy (separator / join / match / count / sort), the rewired directory-files hub, the boundary rules, and one gated runtime probe (FULL / MATCH / NOSORT / COUNT)
   "test/m49/test-m49-imp4.el"                 ; M49 imp-4: the deleted G3 leaf, the static G3 dispatch helper, the (emacs dired) dired-file-attributes-lessp predicate over %string-lessp, the rewired file-attributes-lessp hub that keeps the Fcar extraction, the G2 A2 record, the boundary rules, and the gated runtime probe (sole exact match / longest common prefix / directory slash / sort key)
+  "test/m49/test-m49-imp5.el"                 ; M49 imp-5 close-out: the re-measured surface, the (m49) group registration, the per-group min-count guard, and the in-process group-total ert-deftest (corpus reads tracked files only)
   )
 (group
   "test/src/eval-tests.el"
