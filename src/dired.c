@@ -164,6 +164,41 @@ read_dirent (emacs_dir *dir, Lisp_Object dirname)
     }
 }
 
+/* FIX-20261006-guilemacs: M49 imp-3.  Return the RAW name list of
+   DIRECTORY as a plain list of strings, in readdir order.  It holds the
+   mechanism only: Fdirectory_file_name, ENCODE_FILE, open_directory, the
+   dynwind guard, the readdir loop, and maybe_quit.  It runs no match, no
+   separator, no full join, no count, and no sort.  The Scheme policy
+   (emacs dired) dired-listing-names computes that decision.  It must not
+   call Fdirectory_files or directory_files_internal, or a hub rewire
+   would recurse (docs/kb.org leaf-must-call-the-mechanism).  */
+
+static Lisp_Object
+dired_read_names_1 (Lisp_Object directory)
+{
+  Lisp_Object dirfilename = Fdirectory_file_name (directory);
+  Lisp_Object encoded_dirfilename = ENCODE_FILE (dirfilename);
+
+  int fd;
+  emacs_dir *d = open_directory (dirfilename, encoded_dirfilename, &fd);
+  (void) fd;
+
+  dynwind_begin ();
+  record_unwind_protect_ptr (directory_files_internal_unwind, d);
+
+  Lisp_Object names = Qnil;
+  for (struct dirent *dp; (dp = read_dirent (d, directory)); )
+    {
+      ptrdiff_t len = dirent_namelen (dp);
+      names = Fcons (scm_from_utf8_stringn (dp->d_name, len), names);
+      maybe_quit ();
+    }
+
+  dynwind_end ();
+
+  return Fnreverse (names);
+}
+
 /* Function shared by Fdirectory_files and Fdirectory_files_and_attributes.
    If not ATTRS, return a list of directory filenames;
    if ATTRS, return a list of directory filenames and their attributes.
@@ -332,6 +367,27 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   return list;
 }
 
+/* FIX-20261006-guilemacs: M49 imp-3 -- the G1 dispatch helper over the
+   listing policy of (emacs dired).  The C hub reads the raw names with
+   dired_read_names_1; the module computes the separator, the full join,
+   the match, the count, and the sort key.  It passes plain values only:
+   the name list, the directory string, and the four plain arguments of
+   `directory-files'.  */
+
+static Lisp_Object
+dired_listing_names_scheme (Lisp_Object names, Lisp_Object directory,
+			    Lisp_Object full, Lisp_Object match,
+			    Lisp_Object nosort, Lisp_Object count)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM args[6];
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs dired", "dired-listing-names");
+  args[0] = names; args[1] = directory; args[2] = full;
+  args[3] = match; args[4] = nosort; args[5] = count;
+  return SCM_CALL_N (proc, args, 6);
+}
+
 
 DEFUN ("directory-files", Fdirectory_files, Sdirectory_files, 1, 5, 0,
        doc: /* Return a list of names of files in DIRECTORY.
@@ -357,8 +413,13 @@ If COUNT is non-nil and a natural number, the function will return
     return call6 (handler, Qdirectory_files, directory,
                   full, match, nosort, count);
 
-  return directory_files_internal (directory, full, match, nosort,
-                                   false, Qnil, count);
+  /* FIX-20261006-guilemacs: M49 imp-3.  The G1 listing decision (the
+     separator, the full join, the match, the count, and the sort key)
+     moved to Scheme.  C reads the raw names and calls the module policy;
+     the readdir loop and the unwind guard stay in dired_read_names_1.  */
+  Lisp_Object names = dired_read_names_1 (directory);
+  return dired_listing_names_scheme (names, directory, full, match, nosort,
+                                     count);
 }
 
 DEFUN ("directory-files-and-attributes", Fdirectory_files_and_attributes,
@@ -1158,39 +1219,18 @@ The value may be nil if not supported on this platform.  */)
    C hubs onto these leaves and delete the inline policy.  See
    docs/m49-plan.org section 3.3 and brief.org section 4.
 
+   M49 imp-3 DELETED the G1 leaf (the listing-names pass-through): the
+   listing decision moved into (emacs dired) dired-listing-names.  So 3
+   leaves remain: G2 (--dired-file-name-completion,
+   --dired-file-name-all-completions) and G3
+   (--dired-file-attributes-lessp).  The hub Fdirectory_files now calls
+   the static dired_read_names_1 (the raw readdir mechanism) and the G1
+   Scheme policy (brief.org section 7.3).
+
    A leaf returns plain values only: no struct dirent *, struct stat *,
    DIR *, char *, struct passwd *, struct group *, Lisp_Object, or
    attribute list crosses the layer (the M42 rule).  A leaf calls the
    MECHANISM, never its own hub, so a later hub rewire cannot recurse.  */
-
-/* --- G1: the listing policy ---------------------------------------- */
-
-DEFUN ("--dired-listing-names", Fdired_listing_names,
-       Sdired_listing_names, 4, 5, 0,
-       doc: /* FIX-20261005-guilemacs: Internal: return the ordered name
-list of DIRECTORY as a *plain list* of strings.  DIRECTORY is a plain
-string; FULL, MATCH, NOSORT, and COUNT are the plain arguments of
-`directory-files'.  COUNT is an optional plain integer: when it is a
-natural number, return at most COUNT names.  The mechanism (the readdir
-loop, the scmp compare, the sort, and the DECODE_FILE call) stays in C
-(the M42 rule).  It serves both G1 hubs, `directory-files' and
-`directory-files-and-attributes' (attrs = false, and COUNT).  M49
-imp-2, docs/m49-plan.org section 3.3.  */)
-  (Lisp_Object directory, Lisp_Object full, Lisp_Object match,
-   Lisp_Object nosort, Lisp_Object count)
-{
-  directory = Fexpand_file_name (directory, Qnil);
-
-  /* If the file name has special constructs in it,
-     call the corresponding file name handler.  */
-  Lisp_Object handler = Ffind_file_name_handler (directory, Qdirectory_files);
-  if (!NILP (handler))
-    return call6 (handler, Qdirectory_files, directory,
-		  full, match, nosort, count);
-
-  return directory_files_internal (directory, full, match, nosort,
-				   false, Qnil, count);
-}
 
 /* --- G2: the completion policy ------------------------------------- */
 

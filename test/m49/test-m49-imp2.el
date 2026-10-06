@@ -8,22 +8,28 @@
 ;;; imp-4 (G3) rewire the C hubs onto these leaves and delete the inline
 ;;; policy.
 ;;;
+;;; imp-3 re-pins this corpus (brief.org section 9): the G1 listing leaf
+;;; is DELETED, so 3 --dired-* leaves remain and the ^DEFUN count is 11.
+;;; The two listing runtime probes now call the public hub
+;;; `directory-files' (the leaf is gone).
+;;;
 ;;; This corpus reads tracked files, and it runs one gated runtime probe.
 ;;; It pins:
-;;;   F1 -- the 4 leaf DEFUNs exist in src/dired.c with the exact names
-;;;         of docs/m49-plan.org section 3.3; the ^DEFUN count is 12 (the
-;;;         8 policy blocks plus the 4 new leaves); the file holds
-;;;         "guile.h"; the block comment names the leaves over plain.
+;;;   F1 -- the 3 surviving leaf DEFUNs exist in src/dired.c with the
+;;;         exact names of docs/m49-plan.org section 3.3; the ^DEFUN
+;;;         count is 11; the file holds "guile.h"; the block comment
+;;;         names the leaves over plain.
 ;;;   F2 -- the plain-value shape: each leaf doc string holds
 ;;;         FIX-20261005-guilemacs, "plain", and a shape word (a
 ;;;         "boolean", an "integer", a "string", or a "list").
-;;;   F3 -- mod/emacs/dired.scm holds the 4 wrappers and the 4 defelisp
-;;;         lines and no FFI / scm_c_public_ref; prelude/load.scm loads
-;;;         (emacs dired).
+;;;   F3 -- mod/emacs/dired.scm holds the 4 wrappers and the 3 defelisp
+;;;         --dired-* lines and no FFI / scm_c_public_ref; prelude/load.scm
+;;;         loads (emacs dired).
 ;;;   F4 -- the boundary rules: the STAYS C mechanism (the readdir loop,
 ;;;         fdopendir, emacs_fstatat, sys_faccessat, getpwent, getgrent,
-;;;         filemodestring, scmp) is still present; src/dired.c still
-;;;         holds 0 scm_c_public_ref sites; the G3 leaf takes two names.
+;;;         filemodestring, scmp) is still present; src/dired.c holds 1
+;;;         scm_c_public_ref site (the imp-3 G1 dispatch); the G3 leaf
+;;;         takes two names.
 ;;;   F5 -- the (m49) group carries this corpus, and a per-group
 ;;;         min-count guard fails when the corpus is truncated.  Pin F1,
 ;;;         F2, F3, and F4 separately.
@@ -124,13 +130,13 @@ real error, not a pass."
       (imp-register-bool-as-ert-test (format "m49-imp2/%s" name) (and ok t)))))
 
 (defvar m49-imp2--leaves
-  '(;; G1 -- the listing policy (one leaf serves both G1 hubs)
-    "listing-names"
-    ;; G2 -- the completion policy
+  '(;; G2 -- the completion policy
     "file-name-completion" "file-name-all-completions"
     ;; G3 -- the attribute predicate
     "file-attributes-lessp")
-  "The 4 MOVES leaves of docs/m49-plan.org section 3.3.")
+  "The MOVES leaves of docs/m49-plan.org section 3.3 that survive
+imp-3.  imp-3 deleted the G1 listing leaf; its decision moved to
+(emacs dired) dired-listing-names.")
 
 (defun m49-imp2--leaf-body (block)
   "Return the source of the DEFUN (\"--dired-BLOCK\") body, or nil."
@@ -160,7 +166,7 @@ real error, not a pass."
               (push (match-string 1) names)))
           (nreverse names))))))
 
-;;; --- F1. The 4 leaf DEFUNs (docs/m49-plan.org section 3.3) ----------
+;;; --- F1. The surviving leaf DEFUNs (docs/m49-plan.org section 3.3) --
 
 (setq m49-imp2--group 'f1)
 
@@ -168,17 +174,11 @@ real error, not a pass."
   (m49-imp2--check (format "leaf-%s" leaf)
                    (m49-imp2--contains-p "src/dired.c"
                                          (format "DEFUN (\"--dired-%s\"" leaf))))
-(m49-imp2--check "leaf-defuns-4"
-                 (eql 4 (m49-imp2--count "src/dired.c" "^DEFUN (\"--dired-")))
-;; R1 (cr.org section 6): the G1 leaf must carry the hub's COUNT
-;; argument, else the imp-3 rewire of `directory-files' loses COUNT.
-;; The leaf arity is `4, 5' (optional COUNT), so a 4-argument call still
-;; works.
-(m49-imp2--check "g1-leaf-arity-5"
-                 (m49-imp2--contains-p "src/dired.c"
-                                       "Sdired_listing_names, 4, 5, 0,"))
-(m49-imp2--check "defun-count-12"
-                 (eql 12 (m49-imp2--count "src/dired.c" "^DEFUN (\"")))
+;; imp-3 deleted the G1 listing leaf, so 3 --dired-* leaves remain.
+(m49-imp2--check "leaf-defuns-3"
+                 (eql 3 (m49-imp2--count "src/dired.c" "^DEFUN (\"--dired-")))
+(m49-imp2--check "defun-count-11"
+                 (eql 11 (m49-imp2--count "src/dired.c" "^DEFUN (\"")))
 (m49-imp2--check "dired.c-has-guile.h"
                  (m49-imp2--contains-p "src/dired.c" "#include \"guile.h\""))
 (m49-imp2--check "leaf-block-comment-m49"
@@ -206,11 +206,11 @@ real error, not a pass."
                                           body)
                           t))))
 
-;; The aggregate count proves every leaf doc really carries the marker
-;; (the include comment and the block comment carry it once each, so the
-;; count is 6 at imp-2).
-(m49-imp2--check "doc-marker-6"
-                 (eql 6 (m49-imp2--count "src/dired.c" "FIX-20261005-guilemacs")))
+;; The aggregate count proves every surviving leaf doc really carries the
+;; marker (the include comment and the block comment carry it once each,
+;; and 3 leaf docs carry it, so the count is 5 at imp-3).
+(m49-imp2--check "doc-marker-5"
+                 (eql 5 (m49-imp2--count "src/dired.c" "FIX-20261005-guilemacs")))
 
 ;;; --- F3. The wrapper module (brief.org section 5) -------------------
 
@@ -220,12 +220,12 @@ real error, not a pass."
                  (not (eq (m49-imp2--contains-p "mod/emacs/dired.scm"
                                                 "(define-module (emacs dired)")
                           'm49-imp2-absent)))
-(m49-imp2--check "module-defelisp-4"
-                 (eql 4 (m49-imp2--count "mod/emacs/dired.scm"
+(m49-imp2--check "module-defelisp-3"
+                 (eql 3 (m49-imp2--count "mod/emacs/dired.scm"
                                          "^(defelisp %--dired-")))
 (m49-imp2--check "module-wrappers-4"
                  (eql 4 (m49-imp2--count "mod/emacs/dired.scm"
-                                         "^(define (dired-")))
+                                         "^(define (dired-[a-z]")))
 (m49-imp2--check "module-exports-4"
                  (equal '("dired-listing-names"
                           "dired-file-name-completion"
@@ -266,10 +266,10 @@ real error, not a pass."
                  (m49-imp2--contains-p "src/dired.c" "directory_files_internal ("))
 (m49-imp2--check "mech-scmp"
                  (m49-imp2--contains-p "src/dired.c" "scmp ("))
-;; imp-2 adds no scm_c_public_ref site: the C -> Scheme dispatch is imp-3
-;; work, so the src/dired.c ref count stays 0.
-(m49-imp2--check "dired.c-scm-ref-0"
-                 (eql 0 (m49-imp2--count "src/dired.c" "scm_c_public_ref")))
+;; imp-3 adds the one G1 dispatch scm_c_public_ref site, so the
+;; src/dired.c ref count moves 0 -> 1.
+(m49-imp2--check "dired.c-scm-ref-1"
+                 (eql 1 (m49-imp2--count "src/dired.c" "scm_c_public_ref")))
 ;; The G3 leaf narrows the argument shape: it takes two plain names, and
 ;; the C hub keeps the Fcar extraction (docs/kb.org
 ;; leaf-may-narrow-the-argument-shape).
@@ -291,10 +291,10 @@ real error, not a pass."
 (m49-imp2--check "reg/run-tests-m49-imp2"
                  (m49-imp2--contains-p "tool/run-tests.scm"
                                        "test/m49/test-m49-imp2.el"))
-(m49-imp2--check "reg/min-f1-checks-8"
-                 (>= (m49-imp2--group-count 'f1) 8))
-(m49-imp2--check "reg/min-f2-checks-13"
-                 (>= (m49-imp2--group-count 'f2) 13))
+(m49-imp2--check "reg/min-f1-checks-7"
+                 (>= (m49-imp2--group-count 'f1) 7))
+(m49-imp2--check "reg/min-f2-checks-10"
+                 (>= (m49-imp2--group-count 'f2) 10))
 (m49-imp2--check "reg/min-f3-checks-7"
                  (>= (m49-imp2--group-count 'f3) 7))
 (m49-imp2--check "reg/min-f4-checks-13"
@@ -310,6 +310,9 @@ real error, not a pass."
 ;; An absent built binary is an INFO-skip.  A signalled error is a FAIL,
 ;; never a silent pass; the error is printed so the cause is visible.  An
 ;; undefined leaf signals void-function, so it is a FAIL too.
+;;
+;; The two listing probes now call the public hub `directory-files'
+;; (imp-3 deleted the G1 leaf).
 
 (defun m49-imp2--probe (tag thunk)
   "Register the probe TAG from the value of THUNK, which calls a leaf.
@@ -332,7 +335,7 @@ pass; the error is printed so the cause is visible."
            (progn
              (write-region "" nil (expand-file-name "aa" dir) nil 'silent)
              (write-region "" nil (expand-file-name "bb" dir) nil 'silent)
-             (let ((names (--dired-listing-names dir nil nil nil)))
+             (let ((names (directory-files dir)))
                (and (member "aa" names) (member "bb" names))))
          (delete-directory dir t)))))
   (m49-imp2--probe
@@ -343,9 +346,9 @@ pass; the error is printed so the cause is visible."
            (progn
              (write-region "" nil (expand-file-name "aa" dir) nil 'silent)
              (write-region "" nil (expand-file-name "bb" dir) nil 'silent)
-             ;; COUNT = 1: the leaf returns exactly one name, so the imp-3
-             ;; rewire of `directory-files' keeps the COUNT feature.
-             (let ((names (--dired-listing-names dir nil nil nil 1)))
+             ;; COUNT = 1: `directory-files' returns exactly one name, so
+             ;; the imp-3 rewire keeps the COUNT feature.
+             (let ((names (directory-files dir nil nil nil 1)))
                (and (consp names) (null (cdr names)))))
          (delete-directory dir t)))))
   (m49-imp2--probe

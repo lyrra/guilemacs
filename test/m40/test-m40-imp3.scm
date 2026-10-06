@@ -311,4 +311,4 @@ list."
               (+ acc (count-substr (slurp (repo (string-append "src/" (car fs))))
                                    "scm_c_public_ref"))))))
 
-(check "m40/imp3/static/tree-ref-sites-227" 227 tree-ref-sites)
+(check "m40/imp3/static/tree-ref-sites-228" 228 tree-ref-sites)

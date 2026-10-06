@@ -1,18 +1,18 @@
-;;; dired.scm --- M49 imp-2: the thin wrappers over the four typed C
-;;;                leaves of src/dired.c ((emacs dired))
+;;; dired.scm --- the directory / attribute policy of src/dired.c
+;;;                ((emacs dired))
 ;;;
-;;; The directory / attribute policy of src/dired.c has four movable
+;;; The directory / attribute boundary of src/dired.c has three movable
 ;;; parts: the listing policy (G1), the completion policy (G2), and the
-;;; attribute predicate (G3) (docs/m49-plan.org section 3.2).  M49
-;;; imp-2 adds one typed C leaf per part and this module of thin
-;;; wrappers.  It moves no policy; imp-3 (G1 and G2) and imp-4 (G3)
-;;; rewire the C hubs onto the leaves and move the choice into Scheme.
+;;; attribute predicate (G3) (docs/m49-plan.org section 3.2).  M49 imp-2
+;;; added one typed C leaf per part and thin wrappers.  M49 imp-3 moved
+;;; the G1 listing decision HERE; G2 and G3 still call their C leaves.
 ;;;
-;;;   (dired-listing-names directory full match nosort count)
+;;;   (dired-listing-names names directory full match nosort count)
 ;;;        -> the ordered name list of DIRECTORY as a plain list of
-;;;           strings.  It serves both G1 hubs, `directory-files' and
-;;;           `directory-files-and-attributes'.  COUNT is the optional
-;;;           `directory-files' COUNT argument.
+;;;           strings.  NAMES is the raw readdir-ordered name list from
+;;;           the C mechanism dired_read_names_1.  The module computes
+;;;           the separator, the full join, the match, the count, and
+;;;           the sort key (brief.org section 7.2).
 ;;;   (dired-file-name-completion directory file predicate)
 ;;;        -> one plain string, t, or #f.
 ;;;   (dired-file-name-all-completions directory file)
@@ -22,17 +22,12 @@
 ;;;
 ;;; Every value is plain: a string, a boolean, #f, or a list of plain
 ;;; strings.  No struct dirent *, struct stat *, DIR *, char *, struct
-;;; passwd *, struct group *, Lisp_Object, or attribute list crosses
-;;; the layer (the M42 rule).  The C leaf keeps the mechanism: the
-;;; readdir loop, the scmp compare, the sort, and the DECODE_FILE call.
-;;;
-;;; The G3 leaf narrows the argument shape: the block
-;;; file-attributes-lessp takes two attribute lists and extracts Fcar
-;;; of each, so the C hub keeps the Fcar extraction and the leaf takes
-;;; two plain file names (docs/kb.org leaf-may-narrow-the-argument-shape).
-;;;
-;;; This module holds no policy, no FFI call, and no raw syscall.  Each
-;;; wrapper is a one-line call to its leaf.
+;;; passwd *, struct group *, Lisp_Object, or attribute list crosses the
+;;; layer (the M42 rule).  The C hub keeps the mechanism: the readdir
+;;; loop (dired_read_names_1), the scmp compare, and the DECODE_FILE
+;;; call.  The G1 policy calls the elisp subrs `string-match' and
+;;; `string-lessp' by their function slots; it holds no FFI call and no
+;;; raw syscall.
 ;;;
 ;;; Conventions (identical to M9-M48): #nil is elisp nil; no
 ;;; module-level mutable state.
@@ -46,19 +41,100 @@
             dired-file-name-all-completions
             dired-file-attributes-lessp))
 
-;; The four C leaves (src/dired.c).
-(defelisp %--dired-listing-names             --dired-listing-names)
+;; The three C leaves that remain after imp-3 (src/dired.c).  imp-3
+;; deleted the G1 listing leaf; its decision is dired-listing-names.
 (defelisp %--dired-file-name-completion      --dired-file-name-completion)
 (defelisp %--dired-file-name-all-completions --dired-file-name-all-completions)
 (defelisp %--dired-file-attributes-lessp     --dired-file-attributes-lessp)
 
-;; Return the ordered name list of DIRECTORY as a plain list of
-;; strings.  DIRECTORY is a plain string; FULL, MATCH, NOSORT, and
-;; COUNT are the plain arguments of `directory-files'.  COUNT is a
-;; plain integer or nil: when it is a natural number, at most COUNT
-;; names are returned.
-(define (dired-listing-names directory full match nosort count)
-  ((force %--dired-listing-names) directory full match nosort count))
+;; The elisp subrs the G1 policy uses.  `symbol-function' looks them up
+;; by name, so the module needs no new C surface.
+(defelisp %string-match string-match)
+(defelisp %string-lessp  string-lessp)
+
+;; Elisp truthiness for a value that crosses the layer.  The C hub
+;; passes Qt or Qnil, but a Scheme caller may pass #f, and #f must read
+;; false.  Guile treats #nil as true, so fold it to #f here.
+(define (dired--true? x)
+  (not (or (eq? x #nil) (eq? x #f))))
+
+;; An elisp list terminator: the Guile empty list or the elisp nil.
+(define (dired--end? lst)
+  (or (null? lst) (eq? lst #nil)))
+
+;; Elisp `string-match-p': a true value when REGEXP matches STRING
+;; anywhere (the C code uses a search, fast_string_match_internal, so the
+;; match is not anchored).  The 4th argument INHIBIT-MODIFY is #t: the
+;; subr must NOT clobber the match data, exactly as the old C code did
+;; with fast_string_match_internal (src/search.c).  A 2-argument call
+;; would change the global match data (the D1 defect, cr.org section
+;; 5.1).  The runtime bridges #t to elisp t and #nil to elisp nil.
+(define (dired--string-match-p regexp string)
+  (dired--true? ((force %string-match) regexp string #nil #t)))
+
+;; Elisp `string-lessp': a Guile boolean, true when A sorts before B.
+(define (dired--string-lessp a b)
+  (dired--true? ((force %string-lessp) a b)))
+
+;; The separator / full join: DIRECTORY and NAME, with one separator
+;; only when DIRECTORY is empty or its last character is not a separator.
+(define (dired--join directory name)
+  (let* ((n (string-length directory))
+         (needsep (or (= n 0)
+                      (not (char=? (string-ref directory (- n 1)) #\/)))))
+    (if needsep
+        (string-append directory "/" name)
+        (string-append directory name))))
+
+;; A Guile ()-terminated copy of the list LST.
+(define (dired--proper lst)
+  (if (dired--end? lst)
+      '()
+      (cons (car lst) (dired--proper (cdr lst)))))
+
+;; Re-terminate a Guile ()-list with elisp #nil (the module convention).
+(define (dired--nil-terminate lst)
+  (if (null? lst)
+      #nil
+      (begin
+        (let loop ((tail lst))
+          (if (null? (cdr tail))
+              (set-cdr! tail #nil)
+              (loop (cdr tail))))
+        lst)))
+
+;; The first N elements of LST, in order, as a Guile ()-list.
+(define (dired--take lst n)
+  (if (or (<= n 0) (dired--end? lst))
+      '()
+      (cons (car lst) (dired--take (cdr lst) (- n 1)))))
+
+;; Compute the G1 listing decision.  NAMES is the raw readdir-ordered
+;; name list; DIRECTORY is the expanded directory string; FULL, MATCH,
+;; NOSORT, and COUNT are the plain `directory-files' arguments.  Return a
+;; plain list of plain strings: the names in readdir order, filtered by
+;; MATCH, truncated to COUNT names, joined to DIRECTORY when FULL, and
+;; sorted with `string-lessp' when NOSORT is nil.
+(define (dired-listing-names names directory full match nosort count)
+  (let* ((raw (dired--proper names))
+         ;; 2. Match: keep the names whose non-directory part matches the
+         ;;    regexp MATCH.  The raw name is the non-directory part.
+         (matched (if (dired--true? match)
+                      (filter (lambda (n) (dired--string-match-p match n)) raw)
+                      raw))
+         ;; 3. Count: keep the first COUNT names of the readdir order.
+         (counted (if (and (integer? count) (>= count 0))
+                      (dired--take matched count)
+                      matched))
+         ;; 1. Separator / full join.
+         (joined (if (dired--true? full)
+                     (map (lambda (n) (dired--join directory n)) counted)
+                     counted))
+         ;; 4. Sort key: sort with `string-lessp' when NOSORT is nil.
+         (ordered (if (dired--true? nosort)
+                      joined
+                      (sort joined dired--string-lessp))))
+    (dired--nil-terminate ordered)))
 
 ;; Complete FILE in directory DIRECTORY and return one plain string, t
 ;; for a sole exact match, or #f.
