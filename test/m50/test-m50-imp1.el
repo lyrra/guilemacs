@@ -13,12 +13,14 @@
 ;;; (m50) group does not run.  This corpus pins:
 ;;;   D1 -- the base numbers of docs/m50-plan.org section 3.  Each
 ;;;         candidate is lines / DEFUNs / scm_c_public_ref sites:
-;;;         src/sysdep.c 4,950 / 7 / 7; src/emacs.c 3,451 / 6 / 5 (at
+;;;         src/sysdep.c 4,950 / 7 / 7; src/emacs.c 3,441 / 5 / 6 (at
 ;;;         the imp-1 audit it was 3,414 / 5 / 5; M50 imp-2 adds the
 ;;;         typed --emacs-daemon-state leaf and its helper, so it
-;;;         re-pins the line and DEFUN counts);
+;;;         re-pinned the line and DEFUN counts; M50 imp-3 deletes
+;;;         the leaf and adds the daemonp bridge, so it re-pins them
+;;;         again);
 ;;;         src/coding.c 12,284 / 34 / 0.  The tree-wide scm_c_public_ref
-;;;         count over src/*.[chm] is 229.  Each of the three candidates
+;;;         count over src/*.[chm] is 230.  Each of the three candidates
 ;;;         holds #include "guile.h" already (brief.org section 4).
 ;;;         mod/emacs/emacs.scm is present (M50 imp-2 creates it; it was
 ;;;         absent at the imp-1 audit).  14 checks.
@@ -167,31 +169,32 @@ passes the raw symbol to reach it."
 
 (setq m50-imp1--group 'd1)
 
-;;; imp-2 creates the (emacs emacs) module and adds the typed --emacs-*
-;;; leaves to src/emacs.c, so it must re-pin these: the emacs.c line
+;;; imp-2 created the (emacs emacs) module and added the typed
+;;; --emacs-* leaf to src/emacs.c.  M50 imp-3 deletes that leaf and
+;;; adds the daemonp bridge, so it must re-pin these: the emacs.c line
 ;;; count, the DEFUN count, the guile.h fact, and the module fact.  A
 ;;; leaf that adds a scm_c_public_ref site moves the emacs.c ref count
-;;; and the tree-wide count too.
+;;; and the tree-wide count too; the bridge adds one ref site.
 (m50-imp1--check "sysdep.c-lines-4950"
                  (eql 4950 (m50-imp1--lines "src/sysdep.c")))
 (m50-imp1--check "sysdep.c-defuns-7"
                  (eql 7 (m50-imp1--count "src/sysdep.c" "^DEFUN (\"")))
 (m50-imp1--check "sysdep.c-scm-ref-7"
                  (eql 7 (m50-imp1--count "src/sysdep.c" "scm_c_public_ref")))
-(m50-imp1--check "emacs.c-lines-3451"
-                 (eql 3451 (m50-imp1--lines "src/emacs.c")))
-(m50-imp1--check "emacs.c-defuns-6"
-                 (eql 6 (m50-imp1--count "src/emacs.c" "^DEFUN (\"")))
-(m50-imp1--check "emacs.c-scm-ref-5"
-                 (eql 5 (m50-imp1--count "src/emacs.c" "scm_c_public_ref")))
+(m50-imp1--check "emacs.c-lines-3441"
+                 (eql 3441 (m50-imp1--lines "src/emacs.c")))
+(m50-imp1--check "emacs.c-defuns-5"
+                 (eql 5 (m50-imp1--count "src/emacs.c" "^DEFUN (\"")))
+(m50-imp1--check "emacs.c-scm-ref-6"
+                 (eql 6 (m50-imp1--count "src/emacs.c" "scm_c_public_ref")))
 (m50-imp1--check "coding.c-lines-12284"
                  (eql 12284 (m50-imp1--lines "src/coding.c")))
 (m50-imp1--check "coding.c-defuns-34"
                  (eql 34 (m50-imp1--count "src/coding.c" "^DEFUN (\"")))
 (m50-imp1--check "coding.c-scm-ref-0"
                  (eql 0 (m50-imp1--count "src/coding.c" "scm_c_public_ref")))
-(m50-imp1--check "scm-c-public-ref-229"
-                 (eql 229 (m50-imp1--count-scm-ref)))
+(m50-imp1--check "scm-c-public-ref-230"
+                 (eql 230 (m50-imp1--count-scm-ref)))
 (m50-imp1--check "emacs-module-present"
                  (m50-imp1--exists-p "mod/emacs/emacs.scm"))
 ;; brief.org section 4 states that each candidate holds #include "guile.h"

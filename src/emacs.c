@@ -3153,36 +3153,10 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
   return Fnreverse (lpath);
 }
 
-DEFUN ("daemonp", Fdaemonp, Sdaemonp, 0, 0, 0,
-       doc: /* Return non-nil if the current emacs process is a daemon.
-If the daemon was given a name argument, return that name. */)
-  (void)
-{
-  if (IS_DAEMON)
-    if (daemon_name)
-      return build_string (daemon_name);
-    else
-      return Qt;
-  else
-    return Qnil;
-}
-
-/* FIX-20261006-guilemacs: M50 imp-2.  The typed C --emacs-daemon-state
-   leaf over plain values for the MOVES daemonp block of src/emacs.c.
-   The leaf returns the RAW daemon facts as one *plain list* (FLAG NAME):
-   FLAG is Qt when IS_DAEMON, else Qnil; NAME is the daemon name as a
-   plain string, or Qnil.  It returns BOTH raw facts, so M50 imp-3 can
-   compute the daemonp selection in (emacs emacs) without a second leaf
-   cut.  Plain values only: no Lisp_Object, char *, or struct crosses the
-   layer (the M42 rule).  The mechanism stays in C, in
-   emacs_daemon_state_1.  imp-2 adds a leaf only: the daemonp decision
-   STAYS in C.  See docs/m50-plan.org section 3.3 and brief.org
-   section 3.  */
-
 /* FIX-20261006-guilemacs: M50 imp-2.  The mechanism of the daemonp
    block over plain values.  It reads IS_DAEMON and daemon_name and
-   returns the plain list (FLAG NAME).  The leaf
-   --emacs-daemon-state calls this helper.  */
+   returns the plain list (FLAG NAME).  The M50 imp-3 hub Fdaemonp and
+   its bridge emacs_daemonp_scheme call this helper.  */
 static Lisp_Object
 emacs_daemon_state_1 (void)
 {
@@ -3190,18 +3164,34 @@ emacs_daemon_state_1 (void)
 		daemon_name ? build_string (daemon_name) : Qnil);
 }
 
-DEFUN ("--emacs-daemon-state", Femacs_daemon_state, Semacs_daemon_state,
-       0, 0, 0,
-       doc: /* FIX-20261006-guilemacs: Internal: return the *plain list*
-(FLAG NAME) of the daemon facts of this process.  FLAG is t when
-IS_DAEMON, else nil.  NAME is the daemon name as a plain string, or nil.
-The leaf returns both raw facts, so the daemonp selection can move into
-Scheme.  It passes plain values only and calls the mechanism
-emacs_daemon_state_1, never its own hub.  M50 imp-2,
-docs/m50-plan.org section 3.3.  */)
+/* FIX-20261006-guilemacs: M50 imp-3.  The dispatch helper over the
+   daemonp selection of (emacs emacs).  The hub Fdaemonp splits the
+   plain list from emacs_daemon_state_1 IN C -- an Lisp_Object must not
+   cross the layer -- and passes the two plain values: a boolean and a
+   string (or nil).  The module computes the name selection.  It
+   resolves the module procedure one time with a public-ref lookup over
+   ("emacs emacs", "emacs-daemonp") and calls it with SCM_CALL_2 (the
+   M45 / M47 / M49 pattern).  */
+static Lisp_Object
+emacs_daemonp_scheme (Lisp_Object flag, Lisp_Object name)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs emacs", "emacs-daemonp");
+  return SCM_CALL_2 (proc, flag, name);
+}
+
+DEFUN ("daemonp", Fdaemonp, Sdaemonp, 0, 0, 0,
+       doc: /* Return non-nil if the current emacs process is a daemon.
+If the daemon was given a name argument, return that name. */)
   (void)
 {
-  return emacs_daemon_state_1 ();
+  /* FIX-20261006-guilemacs: M50 imp-3.  The daemonp decision now runs
+     in (emacs emacs).  The hub reads the two plain facts and delegates
+     the selection to emacs_daemonp_scheme.  It does not call itself,
+     so the hub cannot recurse.  */
+  Lisp_Object facts = emacs_daemon_state_1 ();
+  return emacs_daemonp_scheme (Fcar (facts), Fcar (Fcdr (facts)));
 }
 
 DEFUN ("daemon-initialized", Fdaemon_initialized, Sdaemon_initialized, 0, 0, 0,
