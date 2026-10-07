@@ -3167,6 +3167,43 @@ If the daemon was given a name argument, return that name. */)
     return Qnil;
 }
 
+/* FIX-20261006-guilemacs: M50 imp-2.  The typed C --emacs-daemon-state
+   leaf over plain values for the MOVES daemonp block of src/emacs.c.
+   The leaf returns the RAW daemon facts as one *plain list* (FLAG NAME):
+   FLAG is Qt when IS_DAEMON, else Qnil; NAME is the daemon name as a
+   plain string, or Qnil.  It returns BOTH raw facts, so M50 imp-3 can
+   compute the daemonp selection in (emacs emacs) without a second leaf
+   cut.  Plain values only: no Lisp_Object, char *, or struct crosses the
+   layer (the M42 rule).  The mechanism stays in C, in
+   emacs_daemon_state_1.  imp-2 adds a leaf only: the daemonp decision
+   STAYS in C.  See docs/m50-plan.org section 3.3 and brief.org
+   section 3.  */
+
+/* FIX-20261006-guilemacs: M50 imp-2.  The mechanism of the daemonp
+   block over plain values.  It reads IS_DAEMON and daemon_name and
+   returns the plain list (FLAG NAME).  The leaf
+   --emacs-daemon-state calls this helper.  */
+static Lisp_Object
+emacs_daemon_state_1 (void)
+{
+  return list2 (IS_DAEMON ? Qt : Qnil,
+		daemon_name ? build_string (daemon_name) : Qnil);
+}
+
+DEFUN ("--emacs-daemon-state", Femacs_daemon_state, Semacs_daemon_state,
+       0, 0, 0,
+       doc: /* FIX-20261006-guilemacs: Internal: return the *plain list*
+(FLAG NAME) of the daemon facts of this process.  FLAG is t when
+IS_DAEMON, else nil.  NAME is the daemon name as a plain string, or nil.
+The leaf returns both raw facts, so the daemonp selection can move into
+Scheme.  It passes plain values only and calls the mechanism
+emacs_daemon_state_1, never its own hub.  M50 imp-2,
+docs/m50-plan.org section 3.3.  */)
+  (void)
+{
+  return emacs_daemon_state_1 ();
+}
+
 DEFUN ("daemon-initialized", Fdaemon_initialized, Sdaemon_initialized, 0, 0, 0,
        doc: /* Mark the Emacs daemon as being initialized.
 This finishes the daemonization process by doing the other half of detaching

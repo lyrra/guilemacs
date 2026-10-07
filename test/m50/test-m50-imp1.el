@@ -13,11 +13,15 @@
 ;;; (m50) group does not run.  This corpus pins:
 ;;;   D1 -- the base numbers of docs/m50-plan.org section 3.  Each
 ;;;         candidate is lines / DEFUNs / scm_c_public_ref sites:
-;;;         src/sysdep.c 4,950 / 7 / 7; src/emacs.c 3,414 / 5 / 5;
+;;;         src/sysdep.c 4,950 / 7 / 7; src/emacs.c 3,451 / 6 / 5 (at
+;;;         the imp-1 audit it was 3,414 / 5 / 5; M50 imp-2 adds the
+;;;         typed --emacs-daemon-state leaf and its helper, so it
+;;;         re-pins the line and DEFUN counts);
 ;;;         src/coding.c 12,284 / 34 / 0.  The tree-wide scm_c_public_ref
 ;;;         count over src/*.[chm] is 229.  Each of the three candidates
 ;;;         holds #include "guile.h" already (brief.org section 4).
-;;;         mod/emacs/emacs.scm is absent.  14 checks.
+;;;         mod/emacs/emacs.scm is present (M50 imp-2 creates it; it was
+;;;         absent at the imp-1 audit).  14 checks.
 ;;;   D2 -- the block map of section 3.1 for the recommended target,
 ;;;         src/emacs.c, as the ORDERED DEFUN NAME LIST (the 5 block
 ;;;         names in file order).  6 checks in all.  These are facts in a
@@ -174,10 +178,10 @@ passes the raw symbol to reach it."
                  (eql 7 (m50-imp1--count "src/sysdep.c" "^DEFUN (\"")))
 (m50-imp1--check "sysdep.c-scm-ref-7"
                  (eql 7 (m50-imp1--count "src/sysdep.c" "scm_c_public_ref")))
-(m50-imp1--check "emacs.c-lines-3414"
-                 (eql 3414 (m50-imp1--lines "src/emacs.c")))
-(m50-imp1--check "emacs.c-defuns-5"
-                 (eql 5 (m50-imp1--count "src/emacs.c" "^DEFUN (\"")))
+(m50-imp1--check "emacs.c-lines-3451"
+                 (eql 3451 (m50-imp1--lines "src/emacs.c")))
+(m50-imp1--check "emacs.c-defuns-6"
+                 (eql 6 (m50-imp1--count "src/emacs.c" "^DEFUN (\"")))
 (m50-imp1--check "emacs.c-scm-ref-5"
                  (eql 5 (m50-imp1--count "src/emacs.c" "scm_c_public_ref")))
 (m50-imp1--check "coding.c-lines-12284"
@@ -188,8 +192,8 @@ passes the raw symbol to reach it."
                  (eql 0 (m50-imp1--count "src/coding.c" "scm_c_public_ref")))
 (m50-imp1--check "scm-c-public-ref-229"
                  (eql 229 (m50-imp1--count-scm-ref)))
-(m50-imp1--check "emacs-module-absent"
-                 (not (m50-imp1--exists-p "mod/emacs/emacs.scm")))
+(m50-imp1--check "emacs-module-present"
+                 (m50-imp1--exists-p "mod/emacs/emacs.scm"))
 ;; brief.org section 4 states that each candidate holds #include "guile.h"
 ;; already.  The M49 sibling corpus pinned its guile.h fact, so pin the
 ;; three M50 candidates too.  These are facts in tracked files, so a drift

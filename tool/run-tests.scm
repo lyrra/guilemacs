@@ -256,6 +256,7 @@
   )
 (group (m50) ; M50 imp-1 the src/emacs.c invocation / daemon boundary audit (docs/m50-plan.org)
   "test/m50/test-m50-imp1.el"                 ; M50 imp-1 audit: the three-candidate base re-scan (D1), the src/emacs.c block map as the ordered DEFUN name list (the 5 block names, D2), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m50-plan-lint.sh, which this group does not run
+  "test/m50/test-m50-imp2.el"                 ; M50 imp-2: the typed C --emacs-daemon-state leaf (the raw (FLAG NAME) plain list), the (emacs emacs) wrapper, the re-pinned imp-1 facts, the boundary rules, and the gated runtime probe
   )
 (group
   "test/src/eval-tests.el"

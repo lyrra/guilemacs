@@ -210,6 +210,9 @@
 ;; M49 imp-2 — the src/dired.c directory / attribute leaves in
 ;; (emacs dired).
 (use-modules (emacs dired))
+;; M50 imp-2 — the src/emacs.c invocation / daemon leaves in
+;; (emacs emacs).
+(use-modules (emacs emacs))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
