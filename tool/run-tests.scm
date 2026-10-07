@@ -261,6 +261,9 @@
   "test/m50/test-m50-imp4.el"                 ; M50 imp-4: the EMPTY finding.  The re-scan of src/emacs.c gives the 5-block map (G1), the verdict that no movable policy remains, and the settled audit ambiguity (a copy is not a decision, so the two invocation accessors STAY C); the re-measured surface (G2); the group registration and the per-group min-count guards (G3); and the gated runtime probe (the daemonp nil result).  C delta 0; Scheme delta 0
   "test/m50/test-m50-imp5.el"                 ; M50 imp-5 close-out: the re-measured surface of section 3 (S1), the (m50) group registration after imp-4 (S2), the per-group min-count guards and the in-process group-total ert-deftest (S3), and the gated runtime probe (the daemonp nil result).  Tracked files only (src/, mod/, prelude/, tool/); the record needles live in tool/m50-plan-lint.sh, which this group does not run.  C delta 0; Scheme delta 0
   )
+(group (m51) ; M51 imp-1 the src/image.c image file hop boundary audit (docs/m51-plan.org)
+  "test/m51/test-m51-imp1.el"                 ; M51 imp-1 audit: the six-candidate base re-scan (D1: lines / DEFUNs / scm_c_public_ref sites / guile.h per candidate, the tree-wide count 230, and the (emacs image) module-absent fact; 26 checks), the src/image.c block map as the ordered DEFUN name list (the 11 block names, D2; 12 checks), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m51-plan-lint.sh, which this group does not run
+  )
 (group
   "test/src/eval-tests.el"
   "test/src/timefns-tests.el"
