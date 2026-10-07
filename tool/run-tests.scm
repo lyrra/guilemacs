@@ -259,6 +259,7 @@
   "test/m50/test-m50-imp2.el"                 ; M50 imp-2: the (emacs emacs) module and the boundary facts that survive imp-3; the typed --emacs-daemon-state leaf is deleted by imp-3, so its decision, bridge, and policy live in the imp-3 corpus
   "test/m50/test-m50-imp3.el"                 ; M50 imp-3: the moved daemonp decision, the deleted --emacs-daemon-state leaf, the C bridge emacs_daemonp_scheme, the (emacs emacs) emacs-daemonp policy, the boundary rules, and the gated runtime probe (the daemonp nil result)
   "test/m50/test-m50-imp4.el"                 ; M50 imp-4: the EMPTY finding.  The re-scan of src/emacs.c gives the 5-block map (G1), the verdict that no movable policy remains, and the settled audit ambiguity (a copy is not a decision, so the two invocation accessors STAY C); the re-measured surface (G2); the group registration and the per-group min-count guards (G3); and the gated runtime probe (the daemonp nil result).  C delta 0; Scheme delta 0
+  "test/m50/test-m50-imp5.el"                 ; M50 imp-5 close-out: the re-measured surface of section 3 (S1), the (m50) group registration after imp-4 (S2), the per-group min-count guards and the in-process group-total ert-deftest (S3), and the gated runtime probe (the daemonp nil result).  Tracked files only (src/, mod/, prelude/, tool/); the record needles live in tool/m50-plan-lint.sh, which this group does not run.  C delta 0; Scheme delta 0
   )
 (group
   "test/src/eval-tests.el"
