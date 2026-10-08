@@ -22,10 +22,10 @@
 ;;;         image_find_image_fd callers, and the image_find_image_file
 ;;;         callers, each by the enclosing function name.  7 checks.
 ;;;   D3 -- the C delta: src/image.c holds no new `--image-*' leaf, its
-;;;         scm_c_public_ref count is 2 (M51 imp-4 adds the bridge and the
-;;;         resolve helper), and the tree-wide count over
-;;;         src/*.[chm] is 232.  This corpus is the imp-3 audit, re-pinned
-;;;         after M51 imp-4.  Plus the imp-4 line count and the unchanged
+;;;         scm_c_public_ref count is 5 (M51 imp-5 adds the Open-Stream,
+;;;         Handle-Read, and Close bridges), and the tree-wide count over
+;;;         src/*.[chm] is 235.  This corpus is the imp-3 audit, re-pinned
+;;;         after M51 imp-5.  Plus the imp-5 line count and the unchanged
 ;;;         DEFUN count.  5 checks.
 ;;;   D6 -- the `pfd == NULL' case.  The audit confirms that openp
 ;;;         cannot return -2 in the no-handle mode: image_find_image_fd
@@ -218,17 +218,18 @@ definition itself and not a column-0 forward declaration."
                           "image_find_image_fd")
                         (m51-imp3--callers "src/image.c" "openp")))
 
-;; The direct emacs_open sites: the -2 fallback in the hop, and the PNG /
-;; JPEG / GIF loaders (the GIF open only stat()s the file).
+;; The direct emacs_open sites: only the -2 file-name-handler fallback
+;; in the hop.  M51 imp-5 removes the PNG / JPEG / GIF sites: all three
+;; now read through (emacs image).
 (m51-imp3--check "map/emacs_open-callers"
-                 (equal '("image_find_image_fd" "png_load_body"
-                          "jpeg_load_body" "gif_load")
+                 (equal '("image_find_image_fd")
                         (m51-imp3--callers "src/image.c" "emacs_open")))
 
-;; The emacs_fdopen sites: slurp_file wraps an ordinary descriptor, and
-;; PNG / JPEG wrap their own descriptor.
+;; The emacs_fdopen sites: only slurp_file wraps an ordinary descriptor.
+;; M51 imp-5 removes the PNG / JPEG sites: both now stream from the
+;; Scheme-owned port.
 (m51-imp3--check "map/emacs_fdopen-callers"
-                 (equal '("slurp_file" "png_load_body" "jpeg_load_body")
+                 (equal '("slurp_file")
                         (m51-imp3--callers "src/image.c" "emacs_fdopen")))
 
 ;; The slurp_image callers: XBM, XPM, PBM, WebP.
@@ -262,32 +263,32 @@ definition itself and not a column-0 forward declaration."
                           "image_find_image_file")
                         (m51-imp3--callers "src/image.c" "image_find_image_fd")))
 
-;; The image_find_image_file callers: the filename-based loaders XPM,
-;; the native platform loader, PNG, JPEG, TIFF, GIF, and ImageMagick.
+;; The image_find_image_file callers: only the filename-based paths that
+;; STAY C -- the w32 GDI XPM loader and the native platform loader.  M51
+;; imp-5 removes the PNG / JPEG / TIFF / GIF / ImageMagick sites: all
+;; now resolve and read through (emacs image).
 (m51-imp3--check "map/find-image-file-callers"
-                 (equal '("xpm_load" "native_image_load" "png_load_body"
-                          "jpeg_load_body" "tiff_load" "gif_load"
-                          "imagemagick_load")
+                 (equal '("xpm_load" "native_image_load")
                         (m51-imp3--callers "src/image.c" "image_find_image_file")))
 
 ;;; --- D3. The C delta (brief.org section 8) ----------------------------
 
 (setq m51-imp3--group 'd3)
 
-;; M51 imp-4 adds two scm_c_public_ref sites (image_read_file_scheme and
-;; image_resolve_path_scheme), so the image.c count is 2 and the
-;; tree-wide count is 232.  The DEFUN count and the --image-* leaf count
-;; do not move.
+;; M51 imp-5 adds three scm_c_public_ref sites (image_open_stream_scheme,
+;; image_handle_read_scheme, image_close_scheme), so the image.c count is
+;; 5 and the tree-wide count is 235.  The DEFUN count and the --image-*
+;; leaf count do not move.
 (m51-imp3--check "c/no-image-leaf"
                  (eql 0 (m51-imp3--count-literal "src/image.c" "DEFUN (\"--image-")))
-(m51-imp3--check "c/image-c-scm-ref-2"
-                 (eql 2 (m51-imp3--count-literal "src/image.c" "scm_c_public_ref")))
-(m51-imp3--check "c/tree-wide-scm-ref-232"
-                 (eql 232 (m51-imp3--count-scm-ref)))
-;; The imp-4 C surface: the line count moves with the bridge and the two
-;; rewire sites; the DEFUN count does not.
-(m51-imp3--check "c/image-c-lines-13284"
-                 (eql 13284 (m51-imp3--lines "src/image.c")))
+(m51-imp3--check "c/image-c-scm-ref-5"
+                 (eql 5 (m51-imp3--count-literal "src/image.c" "scm_c_public_ref")))
+(m51-imp3--check "c/tree-wide-scm-ref-235"
+                 (eql 235 (m51-imp3--count-scm-ref)))
+;; The imp-5 C surface: the line count moves with the three bridges and
+;; the rewiring; the DEFUN count does not.
+(m51-imp3--check "c/image-c-lines-13447"
+                 (eql 13447 (m51-imp3--lines "src/image.c")))
 (m51-imp3--check "c/image-c-defuns-11"
                  (eql 11 (m51-imp3--defun-count "src/image.c")))
 

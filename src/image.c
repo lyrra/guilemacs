@@ -900,6 +900,10 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     return -1;
 
   filename = SSDATA (found);
+  /* FIX-20261008-guilemacs: M51 imp-5 STAYS C.  The X server opens the
+     bitmap by filename; XReadBitmapFile exposes no read callback or
+     memory entry point, so this path cannot use the Scheme handle
+     (brief.org section 4 W4).  */
 
   result = XReadBitmapFile (FRAME_X_DISPLAY (f),
 			    dpyinfo->root_window,
@@ -4566,6 +4570,82 @@ image_resolve_path_scheme (Lisp_Object filename)
   return name;
 }
 
+/* FIX-20261008-guilemacs: M51 imp-5 -- the streaming bridge.  Call
+   (emacs image) image-open-stream.  Return a Scheme-owned Guile port,
+   or SCM_BOOL_F on a miss or an open error.  C borrows the port for the
+   decode only; Scheme owns it and closes it.  The port never crosses to
+   emacs Lisp, and C never closes a borrowed handle directly: it calls
+   image_close_scheme (the Scheme close) through the unwind protection.
+   Same shape as image_read_file_scheme above.  */
+
+static SCM
+image_open_stream_scheme (Lisp_Object filename)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs image", "image-open-stream");
+
+  return SCM_CALL_1 (proc, filename);
+}
+
+/* FIX-20261008-guilemacs: M51 imp-5 -- call (emacs image) image-close on
+   PORT.  A #f port and an already-closed port are no-ops (the Scheme
+   close is idempotent), so this is safe both on the normal end and from
+   the unwind protection on a non-local exit.  */
+
+static void
+image_close_scheme (SCM port)
+{
+  static SCM proc = SCM_UNDEFINED;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs image", "image-close");
+
+  if (scm_is_true (port))
+    SCM_CALL_1 (proc, port);
+}
+
+/* FIX-20261008-guilemacs: M51 imp-5 -- the record_unwind_protect_ptr
+   handler that closes a borrowed Scheme port on a non-local exit (the
+   JPEG setjmp path, the TIFF error handler, or a Lisp signal).  PTR is
+   the SCM port.  */
+
+static void
+image_close_unwind (void *ptr)
+{
+  image_close_scheme ((SCM) ptr);
+}
+
+/* FIX-20261008-guilemacs: M51 imp-5 -- read up to COUNT bytes from the
+   Scheme-owned port PORT into BUF.  Return the number of bytes read (0
+   at EOF), or -1 on a non-retryable Scheme error.  A short read returns
+   fewer bytes and is not an error.  EINTR and EAGAIN are retried inside
+   the Scheme read, so they never cross the boundary.  This is the one
+   streaming callback shared by PNG and JPEG (brief.org section 4 W1). */
+
+static ptrdiff_t
+image_handle_read_scheme (SCM port, void *buf, size_t count)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM result;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs image", "image-handle-read");
+
+  result = SCM_CALL_2 (proc, port, scm_from_size_t (count));
+  if (scm_is_false (result))
+    return 0;			/* EOF */
+  if (!scm_is_bytevector (result))
+    return -1;			/* the Scheme `image--read-error' sentinel */
+
+  size_t len = scm_c_bytevector_length (result);
+  if (len > count)
+    len = count;
+  memcpy (buf, SCM_BYTEVECTOR_CONTENTS (result), len);
+  return len;
+}
+
 /* Like slurp_file above, but with added error handling.  Value is
    null if an error occurred.  Set SIZE to the size of the file.
    IMAGE_TYPE describes the image type (e.g. "PNG").  */
@@ -5964,6 +6044,10 @@ xpm_load (struct frame *f, struct image *img)
 	 need to re-encode it in ANSI.  */
       file = ansi_encode_filename (file);
 #endif
+      /* FIX-20261008-guilemacs: M51 imp-5 STAYS C.  XpmReadFileToImage
+	 is a filename API with no read callback, so the w32 GDI XPM path
+	 cannot use the Scheme handle (brief.org section 4 W4).  The
+	 generic XPM path uses slurp_image and MOVES.
       /* XpmReadFileToPixmap is not available in the Windows port of
 	 libxpm.  But XpmReadFileToImage almost does what we want.  */
       rc = XpmReadFileToImage (&hdc, SSDATA (file),
@@ -7959,6 +8043,11 @@ native_image_load (struct frame *f, struct image *img)
 {
   Lisp_Object image_file = image_spec_value (img->spec, QCfile, NULL);
 
+  /* FIX-20261008-guilemacs: M51 imp-5 STAYS C.  The NS / Haiku / NTGUI
+     native loaders (ns_load_image, haiku_load_image, w32_load_image)
+     take a filename and expose no read callback or memory entry point
+     in src/image.c, so this path cannot use the Scheme handle
+     (brief.org section 4 W4).  */
   if (STRINGP (image_file))
     image_file = image_find_image_file (image_file);
 
@@ -8243,17 +8332,26 @@ png_read_from_memory (png_structp png_ptr, png_bytep data, png_size_t length)
 }
 
 
-/* Function set as reader function when reading PNG image from a file.
-   PNG_PTR is a pointer to the PNG control structure.  Copy LENGTH
-   bytes from the input to DATA.  */
+/* Function set as reader function when reading PNG image from the
+   Scheme-owned image file handle (M51 imp-5).  PNG_PTR's io pointer
+   holds the Guile port.  Copy LENGTH bytes from the Scheme handle to
+   DATA.  A short read is not an error: loop until LENGTH bytes or EOF.
+   EOF before LENGTH, or a Scheme error, raises a PNG error.  */
 
 static void
-png_read_from_file (png_structp png_ptr, png_bytep data, png_size_t length)
+png_read_from_scheme (png_structp png_ptr, png_bytep data, png_size_t length)
 {
-  FILE *fp = png_get_io_ptr (png_ptr);
+  SCM port = (SCM) png_get_io_ptr (png_ptr);
+  png_size_t done = 0;
 
-  if (fread (data, 1, length, fp) < length)
-    png_error (png_ptr, "Read error");
+  while (done < length)
+    {
+      ptrdiff_t n = image_handle_read_scheme (port, data + done,
+					      length - done);
+      if (n <= 0)
+	png_error (png_ptr, "Read error");
+      done += n;
+    }
 }
 
 
@@ -8266,7 +8364,13 @@ struct png_load_context
   png_struct *png_ptr;
   png_info *info_ptr;
   png_info *end_info;
-  FILE *fp;
+  /* FIX-20261008-guilemacs: M51 imp-5.  PORT is the Scheme-owned
+     image file handle the decode borrows; C never opens or closes it
+     directly.  BORROWED is true while PORT must be closed through the
+     Scheme close on the way out, and CLOSE_COUNT is the specpdl index
+     of the unwind protection that runs that close.  */
+  SCM port;
+  bool borrowed;
   png_byte *pixels;
   png_byte **rows;
 };
@@ -8275,7 +8379,6 @@ static bool
 png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 {
   Lisp_Object specified_file, specified_data;
-  FILE *fp = NULL;
   int x, y;
   ptrdiff_t i;
   png_struct *png_ptr;
@@ -8295,34 +8398,46 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   /* Find out what file to load.  */
   specified_file = image_spec_value (img->spec, QCfile, NULL);
   specified_data = image_spec_value (img->spec, QCdata, NULL);
+  /* FIX-20261008-guilemacs: M51 imp-5.  The Scheme handle state.  */
+  c->port = SCM_BOOL_F;
+  c->borrowed = false;
 
   if (NILP (specified_data))
     {
-      int fd;
-      Lisp_Object file = image_find_image_file (specified_file);
-
-      if (!STRINGP (file)
-	  || (fd = emacs_open (SSDATA (ENCODE_FILE (file)),
-			       O_RDONLY, 0)) < 0)
+      /* FIX-20261008-guilemacs: M51 imp-5.  Scheme resolves the path,
+	 opens the file as a Guile port, and owns the handle; C borrows
+	 it for the decode only (brief.org section 4 W1).  C never opens
+	 or closes the file here.  */
+      c->port = image_open_stream_scheme (specified_file);
+      if (!scm_is_true (c->port))
 	{
 	  image_not_found_error (specified_file);
 	  return false;
 	}
 
-      /* Open the image file.  */
-      fp = emacs_fdopen (fd, "rb");
-      if (!fp)
-	{
-	  image_error ("Cannot open image file `%s'", file);
-	  return 0;
-	}
+      /* Register the Scheme close, so a decoder error or a Lisp
+	 non-local exit closes the borrowed handle.  C never closes it
+	 directly.  */
+      c->borrowed = true;
+      dynwind_begin ();
+      record_unwind_protect_ptr (image_close_unwind, (void *) c->port);
 
-      /* Check PNG signature.  */
-      if (fread (sig, 1, sizeof sig, fp) != sizeof sig
-	  || png_sig_cmp (sig, 0, sizeof sig))
+      /* Check the PNG signature through the Scheme handle.  A short
+	 read is not an error; only EOF before the full signature is.  */
+      ptrdiff_t got = 0;
+      while (got < sizeof sig)
 	{
-	  emacs_fclose (fp);
-	  image_error ("Not a PNG file: `%s'", file);
+	  ptrdiff_t n = image_handle_read_scheme (c->port, sig + got,
+						  sizeof sig - got);
+	  if (n <= 0)
+	    break;
+	  got += n;
+	}
+      if (got != sizeof sig || png_sig_cmp (sig, 0, sizeof sig))
+	{
+	  dynwind_end ();
+	  c->borrowed = false;
+	  image_error ("Not a PNG file: `%s'", specified_file);
 	  return 0;
 	}
     }
@@ -8364,7 +8479,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   c->png_ptr = png_ptr;
   c->info_ptr = info_ptr;
   c->end_info = end_info;
-  c->fp = fp;
   c->pixels = pixels;
   c->rows = rows;
 
@@ -8375,7 +8489,11 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
     }
   if (! png_ptr)
     {
-      if (fp) emacs_fclose (fp);
+      if (c->borrowed)
+	{
+	  dynwind_end ();
+	  c->borrowed = false;
+	}
       return 0;
     }
 
@@ -8391,8 +8509,11 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 	png_destroy_read_struct (&c->png_ptr, &c->info_ptr, &c->end_info);
       xfree (c->pixels);
       xfree (c->rows);
-      if (c->fp)
-	emacs_fclose (c->fp);
+      if (c->borrowed)
+	{
+	  dynwind_end ();
+	  c->borrowed = false;
+	}
       return 0;
     }
 
@@ -8400,14 +8521,13 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   /* These useless assignments pacify GCC 14.2.1 x86-64
      <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
   c = c_volatile;
-  fp = c->fp;
 #endif
 
   /* Read image info.  */
   if (!NILP (specified_data))
     png_set_read_fn (png_ptr, &tbr, png_read_from_memory);
   else
-    png_set_read_fn (png_ptr, fp, png_read_from_file);
+    png_set_read_fn (png_ptr, (png_voidp) c->port, png_read_from_scheme);
 
   png_set_sig_bytes (png_ptr, sizeof sig);
   png_read_info (png_ptr, info_ptr);
@@ -8521,10 +8641,10 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   /* Read the entire image.  */
   png_read_image (png_ptr, rows);
   png_read_end (png_ptr, info_ptr);
-  if (fp)
+  if (c->borrowed)
     {
-      emacs_fclose (fp);
-      c->fp = NULL;
+      dynwind_end ();
+      c->borrowed = false;
     }
 
   /* Create an image and pixmap serving as mask if the PNG image
@@ -8916,7 +9036,9 @@ struct jpeg_stdio_mgr
 {
   struct jpeg_source_mgr mgr;
   boolean finished;
-  FILE *file;
+  /* FIX-20261008-guilemacs: M51 imp-5.  The Scheme-owned image file
+     handle the decode borrows; C never opens or closes it directly.  */
+  SCM port;
   JOCTET *buffer;
 };
 
@@ -8939,7 +9061,10 @@ our_stdio_fill_input_buffer (j_decompress_ptr cinfo)
     {
       ptrdiff_t bytes;
 
-      bytes = fread (src->buffer, 1, JPEG_STDIO_BUFFER_SIZE, src->file);
+      bytes = image_handle_read_scheme (src->port, src->buffer,
+					JPEG_STDIO_BUFFER_SIZE);
+      if (bytes < 0)
+	ERREXIT (cinfo, JERR_INPUT_EOF);
       if (bytes > 0)
         src->mgr.bytes_in_buffer = bytes;
       else
@@ -8991,7 +9116,7 @@ our_stdio_skip_input_data (j_decompress_ptr cinfo, long int num_bytes)
    reading the image.  */
 
 static void
-jpeg_file_src (j_decompress_ptr cinfo, FILE *fp)
+jpeg_file_src (j_decompress_ptr cinfo, SCM port)
 {
   struct jpeg_stdio_mgr *src = (struct jpeg_stdio_mgr *) cinfo->src;
 
@@ -9006,7 +9131,7 @@ jpeg_file_src (j_decompress_ptr cinfo, FILE *fp)
 					     JPEG_STDIO_BUFFER_SIZE);
     }
 
-  src->file = fp;
+  src->port = port;
   src->finished = 0;
   src->mgr.init_source = our_common_init_source;
   src->mgr.fill_input_buffer = our_stdio_fill_input_buffer;
@@ -9025,7 +9150,8 @@ jpeg_load_body (struct frame *f, struct image *img,
 		struct my_jpeg_error_mgr *mgr)
 {
   Lisp_Object specified_file, specified_data;
-  FILE *fp = NULL;
+  SCM port = SCM_BOOL_F;
+  bool borrowed = false;
   JSAMPARRAY buffer;
   int row_stride, x, y;
   int width, height, ncomp;
@@ -9038,22 +9164,18 @@ jpeg_load_body (struct frame *f, struct image *img,
 
   if (NILP (specified_data))
     {
-      int fd;
-      Lisp_Object file = image_find_image_file (specified_file);
-      if (!STRINGP (file)
-	  || (fd = emacs_open (SSDATA (ENCODE_FILE (file)),
-			       O_RDONLY, 0)) < 0)
+      /* FIX-20261008-guilemacs: M51 imp-5.  Scheme resolves the path,
+	 opens the file as a Guile port, and owns the handle; C borrows
+	 it for the streaming decode only (brief.org section 4 W1).  */
+      port = image_open_stream_scheme (specified_file);
+      if (!scm_is_true (port))
 	{
 	  image_not_found_error (specified_file);
 	  return false;
 	}
-
-      fp = emacs_fdopen (fd, "rb");
-      if (fp == NULL)
-	{
-	  image_error ("Cannot open `%s'", file);
-	  return 0;
-	}
+      borrowed = true;
+      dynwind_begin ();
+      record_unwind_protect_ptr (image_close_unwind, (void *) port);
     }
   else if (!STRINGP (specified_data))
     {
@@ -9067,12 +9189,14 @@ jpeg_load_body (struct frame *f, struct image *img,
   mgr->pub.error_exit = my_error_exit;
   struct my_jpeg_error_mgr *volatile mgr_volatile = mgr;
   struct image *volatile img_volatile = img;
-  FILE *volatile fp_volatile = fp;
+  SCM volatile port_volatile = port;
+  bool volatile borrowed_volatile = borrowed;
   if (sys_setjmp (mgr->setjmp_buffer))
     {
       mgr = mgr_volatile;
       img = img_volatile;
-      fp = fp_volatile;
+      port = port_volatile;
+      borrowed = borrowed_volatile;
 
       switch (mgr->failure_code)
 	{
@@ -9093,9 +9217,13 @@ jpeg_load_body (struct frame *f, struct image *img,
 	  break;
 	}
 
-      /* Close the input file and destroy the JPEG object.  */
-      if (fp)
-	emacs_fclose (fp);
+      /* Close the borrowed Scheme handle and destroy the JPEG object.
+	 C closes through Scheme, never directly (imp-5).  */
+      if (borrowed)
+	{
+	  dynwind_end ();
+	  borrowed = false;
+	}
       jpeg_destroy_decompress (&mgr->cinfo);
 
       /* If we already have an XImage, free that.  */
@@ -9112,15 +9240,17 @@ jpeg_load_body (struct frame *f, struct image *img,
      <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
   mgr = mgr_volatile;
   img = img_volatile;
-  fp = fp_volatile;
+  port = port_volatile;
+  borrowed = borrowed_volatile;
 #endif
 
-  /* Create the JPEG decompression object.  Let it read from fp.
+  /* Create the JPEG decompression object.  Let it read from the
+	 Scheme-owned handle or the memory source.
 	 Read the JPEG image header.  */
   jpeg_CreateDecompress (&mgr->cinfo, JPEG_LIB_VERSION, sizeof *&mgr->cinfo);
 
   if (NILP (specified_data))
-    jpeg_file_src (&mgr->cinfo, fp);
+    jpeg_file_src (&mgr->cinfo, port);
   else
     jpeg_memory_src (&mgr->cinfo, SDATA (specified_data),
 		     SBYTES (specified_data));
@@ -9187,8 +9317,11 @@ jpeg_load_body (struct frame *f, struct image *img,
   /* Clean up.  */
   jpeg_finish_decompress (&mgr->cinfo);
   jpeg_destroy_decompress (&mgr->cinfo);
-  if (fp)
-    emacs_fclose (fp);
+  if (borrowed)
+    {
+      dynwind_end ();
+      borrowed = false;
+    }
 
   /* Maybe fill in the background field while we have ximg handy. */
   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
@@ -9488,6 +9621,7 @@ tiff_load (struct frame *f, struct image *img)
   int rc;
   Emacs_Pix_Container ximg;
   tiff_memory_source memsrc;
+  char *file_contents = NULL;
   Lisp_Object image;
 
   specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -9498,24 +9632,39 @@ tiff_load (struct frame *f, struct image *img)
 
   if (NILP (specified_data))
     {
-      /* Read from a file */
-      Lisp_Object file = image_find_image_file (specified_file);
-      if (!STRINGP (file))
+      /* FIX-20261008-guilemacs: M51 imp-5.  Scheme resolves the path,
+	 opens the file, reads all bytes, and closes the port; C feeds
+	 the library memory callback from the returned bytevector
+	 (brief.org section 4 W2).  C never opens the file.  */
+      ptrdiff_t file_size;
+      file_contents = image_read_file_scheme (specified_file, &file_size);
+      if (file_contents == NULL)
 	{
-	  image_not_found_error (specified_file);
+	  Lisp_Object resolved = image_resolve_path_scheme (specified_file);
+	  if (NILP (resolved))
+	    image_not_found_error (specified_file);
+	  else
+	    image_error ("Error loading TIFF image `%s'", resolved);
 	  return false;
 	}
 
-      Lisp_Object encoded_file = ENCODE_FILE (file);
-# ifdef WINDOWSNT
-      encoded_file = ansi_encode_filename (encoded_file);
-# endif
+      memsrc.bytes = (unsigned char *) file_contents;
+      memsrc.len = file_size;
+      memsrc.index = 0;
 
-      /* Try to open the image file.  */
-      tiff = TIFFOpen (SSDATA (encoded_file), "r");
+      tiff = TIFFClientOpen ("memory_source", "r", (thandle_t)&memsrc,
+			     tiff_read_from_memory,
+			     tiff_write_from_memory,
+			     tiff_seek_in_memory,
+			     tiff_close_memory,
+			     tiff_size_of_memory,
+			     tiff_mmap_memory,
+			     tiff_unmap_memory);
+
       if (tiff == NULL)
 	{
-	  image_error ("Cannot open `%s'", file);
+	  xfree (file_contents);
+	  image_error ("Cannot open `%s'", specified_file);
 	  return 0;
 	}
     }
@@ -9558,6 +9707,7 @@ tiff_load (struct frame *f, struct image *img)
 	  image_error ("Invalid image number `%s' in image `%s'",
 		       image, img->spec);
 	  TIFFClose (tiff);
+	xfree (file_contents);
 	  return 0;
 	}
     }
@@ -9571,6 +9721,7 @@ tiff_load (struct frame *f, struct image *img)
     {
       image_size_error ();
       TIFFClose (tiff);
+      xfree (file_contents);
       return 0;
     }
 
@@ -9580,6 +9731,7 @@ tiff_load (struct frame *f, struct image *img)
 					     &ximg, 0)))
     {
       TIFFClose (tiff);
+      xfree (file_contents);
       return 0;
     }
 
@@ -9597,6 +9749,7 @@ tiff_load (struct frame *f, struct image *img)
 				   img->lisp_data));
 
   TIFFClose (tiff);
+  xfree (file_contents);
   if (!rc)
     {
       image_error ("Error reading TIFF image `%s'", img->spec);
@@ -9905,6 +10058,7 @@ gif_load (struct frame *f, struct image *img)
   /* Which sub-image are we to display?  */
   Lisp_Object image_number = image_spec_value (img->spec, QCindex, NULL);
   int byte_size = 0;
+  char *file_contents = NULL;
 
   idx = FIXNUMP (image_number) ? XFIXNAT (image_number) : 0;
 
@@ -9928,49 +10082,49 @@ gif_load (struct frame *f, struct image *img)
     {
       if (NILP (specified_data))
 	{
-	  Lisp_Object file = image_find_image_file (specified_file);
-	  if (!STRINGP (file))
+	  /* FIX-20261008-guilemacs: M51 imp-5.  Scheme resolves the
+	     path, opens the file, reads all bytes, and closes the port;
+	     C feeds the library memory callback from the returned
+	     bytevector (brief.org section 4 W2).  C never opens the
+	     file.  */
+	  ptrdiff_t file_size;
+	  file_contents = image_read_file_scheme (specified_file,
+						  &file_size);
+	  if (file_contents == NULL)
 	    {
-	      image_not_found_error (specified_file);
+	      Lisp_Object resolved
+		= image_resolve_path_scheme (specified_file);
+	      if (NILP (resolved))
+		image_not_found_error (specified_file);
+	      else
+		image_error ("Error loading GIF image `%s'", resolved);
 	      return false;
 	    }
 
-	  Lisp_Object encoded_file = ENCODE_FILE (file);
-#ifdef WINDOWSNT
-	  encoded_file = ansi_encode_filename (encoded_file);
-#endif
+	  current_gif_memory_src = &memsrc;
+	  memsrc.bytes = (unsigned char *) file_contents;
+	  memsrc.len = file_size;
+	  memsrc.index = 0;
+	  byte_size = (int) memsrc.len;
 
-	  /* Open the GIF file.  */
 #if GIFLIB_MAJOR < 5
-	  gif = DGifOpenFileName (SSDATA (encoded_file));
+	  gif = DGifOpen (&memsrc, gif_read_from_memory);
 #else
-	  gif = DGifOpenFileName (SSDATA (encoded_file), &gif_err);
+	  gif = DGifOpen (&memsrc, gif_read_from_memory, &gif_err);
 #endif
 	  if (gif == NULL)
 	    {
 #if HAVE_GIFERRORSTRING
 	      const char *errstr = GifErrorString (gif_err);
 	      if (errstr)
-		image_error ("Cannot open `%s': %s", file,
+		image_error ("Cannot open `%s': %s", specified_file,
 			     build_string (errstr));
 	      else
 #endif
-		image_error ("Cannot open `%s'", file);
+		image_error ("Cannot open `%s'", specified_file);
+	      xfree (file_contents);
 	      return false;
 	    }
-
-	  /* Get the file size so that we can report it in
-	     `image-cache-size'.  */
-	  {
-	    struct stat st;
-	    int fd;
-
-	    fd = emacs_open (SSDATA (encoded_file), O_RDONLY,
-			     0);
-	    if (!sys_fstat (fd, &st))
-	      byte_size = st.st_size;
-	    emacs_close (fd);
-	  }
 	}
       else
 	{
@@ -10359,9 +10513,11 @@ gif_load (struct frame *f, struct image *img)
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
 
+  xfree (file_contents);
   return true;
 
  gif_error:
+  xfree (file_contents);
   if (pixmap)
     xfree (pixmap);
   gif_close (gif, NULL);
@@ -11562,17 +11718,24 @@ imagemagick_load (struct frame *f, struct image *img)
   file_name = image_spec_value (img->spec, QCfile, NULL);
   if (STRINGP (file_name))
     {
-      Lisp_Object file = image_find_image_file (file_name);
-      if (!STRINGP (file))
+      /* FIX-20261008-guilemacs: M51 imp-5.  Scheme resolves the path,
+	 opens the file, reads all bytes, and closes the port; C feeds
+	 MagickReadImageBlob from the returned bytevector (brief.org
+	 section 4 W2).  C never opens the file.  */
+      ptrdiff_t size;
+      char *contents = image_read_file_scheme (file_name, &size);
+      if (contents == NULL)
 	{
-	  image_not_found_error (file_name);
+	  Lisp_Object resolved = image_resolve_path_scheme (file_name);
+	  if (NILP (resolved))
+	    image_not_found_error (file_name);
+	  else
+	    image_error ("Error loading ImageMagick image `%s'", resolved);
 	  return false;
 	}
-      file = ENCODE_FILE (file);
-#ifdef WINDOWSNT
-      file = ansi_encode_filename (file);
-#endif
-      success_p = imagemagick_load_image (f, img, 0, 0, SSDATA (file));
+      success_p = imagemagick_load_image (f, img, (unsigned char *) contents,
+					  (unsigned int) size, NULL);
+      xfree (contents);
     }
   /* Else it's not a file, it's a Lisp object.  Load the image from a
      Lisp object rather than a file.  */

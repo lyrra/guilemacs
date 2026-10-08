@@ -1,10 +1,13 @@
 ;;; image.scm --- the image file resolution and handle policy of
 ;;;               src/image.c  ((emacs image))
 ;;;
-;;; M51 imp-4 moves the image file HANDLE from C to Scheme.  Scheme
+;;; M51 moves the image file HANDLE from C to Scheme.  Scheme
 ;;; resolves the image path, opens the file as a Guile port, reads the
 ;;; bytes, and closes the port.  C decodes the bytes.  C keeps the image
-;;; cache, struct image, the pixmaps, and the decoders.
+;;; cache, struct image, the pixmaps, and the decoders.  imp-4 moved the
+;;; whole-bytes family (XBM, XPM generic, PBM, WebP, SVG); imp-5 moved
+;;; the streaming loaders (PNG, JPEG) and the decoder libraries that
+;;; read whole bytes (TIFF, GIF, ImageMagick).
 ;;;
 ;;;   (image-resolve-path filename) -> the resolved path string, or #f.
 ;;;        Search data-directory/images (through expand-file-name) first,
@@ -12,8 +15,12 @@
 ;;;        image_find_image_fd (src/image.c).
 ;;;   (image-open path)             -> a Guile port open for binary
 ;;;        read, or #f.  Scheme opens with open-fdes plus fdopen.
+;;;   (image-open-stream filename)  -> a Guile port, or #f.  The
+;;;        streaming entry: resolve and open in one step.  C borrows
+;;;        the port for the decode and returns it to Scheme (imp-5).
 ;;;   (image-handle-read port n)    -> a bytevector of at most N bytes,
-;;;        or #f at EOF.  Retries EINTR and EAGAIN here.
+;;;        #f at EOF, or the symbol image--read-error on a
+;;;        non-retryable system error.  Retries EINTR and EAGAIN here.
 ;;;   (image-close port)            -> close the port.
 ;;;   (image-read-file filename)    -> a bytevector of all bytes, or #f.
 ;;;        The whole-bytes entry: resolve, open, read to EOF, and close
@@ -25,19 +32,25 @@
 ;;;
 ;;; Conventions: #nil is elisp nil; no module-level mutable state.
 ;;;
-;;; FIX-20261008-guilemacs: M51 imp-4 known limits, recorded here so the
-;;; whole-bytes family does not silently regress:
+;;; FIX-20261008-guilemacs: M51 imp-4 / imp-5 known limits, recorded
+;;; here so the loader family does not silently regress.  Each limit is
+;;; one STAYS C reason (brief.org section 4 W4):
 ;;;   - Android assets.  image_open uses open-fdes only.  An Android
 ;;;     asset is not a plain path, so the open fails and the read
 ;;;     returns #f.  The old C path used android_open_asset through
-;;;     image_find_image_fd.  The whole-bytes family therefore regresses
-;;;     on HAVE_ANDROID.  The asset branch STAYS C (it is native platform
-;;;     code); imp-5 records it with the other native paths.  This
-;;;     module is not built for Android in imp-4.
+;;;     image_find_image_fd.  The loader family therefore regresses on
+;;;     HAVE_ANDROID.  The asset branch STAYS C: it is native platform
+;;;     code (brief.org section 4 W4).  This module is not built for
+;;;     Android.
 ;;;   - Remote file-name handlers.  image_resolve_path runs the elisp
 ;;;     handler through locate-file-internal, but the open here is a
 ;;;     local open-fdes, so a handler that resolves to a non-local name
-;;;     fails and the read returns #f.
+;;;     fails and the read returns #f.  A remote name therefore STAYS C.
+;;;   - Native platform loaders (NS / Haiku / NTGUI), the w32 GDI XPM
+;;;     path (XpmReadFileToImage), and the X11 bitmap path
+;;;     (XReadBitmapFile) take a filename and expose no read callback or
+;;;     memory entry point in src/image.c.  They STAY C with one reason
+;;;     each (brief.org section 4 W4); this module does not serve them.
 
 (define-module (emacs image)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
@@ -47,6 +60,7 @@
   #:declarative? #t
   #:export (image-resolve-path
             image-open
+            image-open-stream
             image-handle-read
             image-close
             image-read-file))
@@ -94,6 +108,15 @@
     (lambda () (fdopen (open-fdes path O_RDONLY) "rb"))
     (lambda args #f)))
 
+;; The streaming entry (imp-5).  Resolve FILENAME and open it as a
+;; Scheme-owned port in one step, or return #f on a miss or an open
+;; error.  C borrows the port for a streaming decode (PNG, JPEG) and
+;; returns it to Scheme; Scheme owns the port and closes it.  C never
+;; opens a file for a moved loader and never closes a borrowed handle.
+(define (image-open-stream filename)
+  (let ((path (image-resolve-path filename)))
+    (and path (image-open path))))
+
 ;; The errno of a caught system error.  ARGS is the full argument list
 ;; the `system-error' handler received; system-error-errno reads the
 ;; errno slot.  Do not scan the list for any integer: an unrelated
@@ -109,22 +132,31 @@
     (and (integer? e) (or (= e EINTR) (= e EAGAIN)))))
 
 ;; Read at most COUNT bytes from PORT.  Return a bytevector of at most
-;; COUNT bytes, or #f at EOF.  A full read is normal.  A short read is
+;; COUNT bytes, #f at EOF, or the symbol `image--read-error' on a
+;; non-retryable system error.  A full read is normal.  A short read is
 ;; not an error.  Retry EINTR and EAGAIN here, so they never cross the
-;; boundary (the handle contract of docs/m51-plan.org).
+;; boundary (the handle contract of docs/m51-plan.org).  A
+;; non-retryable error becomes the failure code `image--read-error', so
+;; no Scheme error crosses to C; C aborts the decode and raises the
+;; image error (brief.org section 4 W1).
 (define (image-handle-read port count)
-  (let loop ()
-    (let ((r (catch 'system-error
-               (lambda () (get-bytevector-n port count))
-               (lambda args
-                 (if (image--retryable-errno? args)
-                     'image--retry
-                     (apply throw args))))))
-      (cond ((eq? r 'image--retry) (loop))
-            ((eof-object? r) #f)
-            (else r)))))
+  (catch #t
+    (lambda ()
+      (let loop ()
+        (let ((r (catch 'system-error
+                   (lambda () (get-bytevector-n port count))
+                   (lambda args
+                     (if (image--retryable-errno? args)
+                         'image--retry
+                         (apply throw args))))))
+          (cond ((eq? r 'image--retry) (loop))
+                ((eof-object? r) #f)
+                (else r)))))
+    (lambda args 'image--read-error)))
 
-;; Close PORT.  A #f port is a no-op.
+;; Close PORT.  A #f port is a no-op.  Guile `close-port' is idempotent,
+;; so a second close (the C unwind protection plus an explicit close) is
+;; safe.
 (define (image-close port)
   (when port (close-port port)))
 

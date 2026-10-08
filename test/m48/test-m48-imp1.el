@@ -185,8 +185,8 @@ passes the raw symbol to reach it."
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
-(m48-imp1--check "scm-c-public-ref-232"
-                 (eql 232 (m48-imp1--count-scm-ref)))
+(m48-imp1--check "scm-c-public-ref-235"
+                 (eql 235 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"
