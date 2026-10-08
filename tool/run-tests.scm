@@ -263,6 +263,7 @@
   )
 (group (m51) ; M51 imp-1 the src/image.c image file hop boundary audit (docs/m51-plan.org)
   "test/m51/test-m51-imp1.el"                 ; M51 imp-1 audit: the six-candidate base re-scan (D1: lines / DEFUNs / scm_c_public_ref sites / guile.h per candidate, the tree-wide count 230, and the (emacs image) module-absent fact; 26 checks), the src/image.c block map as the ordered DEFUN name list (the 11 block names, D2; 12 checks), and the per-group min-count guard (D5).  Tracked files only: the record needles live in tool/m51-plan-lint.sh, which this group does not run
+  "test/m51/test-m51-imp3.el"                 ; M51 imp-3 audit: the image file hop caller / ownership audit and the handle contract.  D1 the four hop functions by exact name and signature (4 checks); D2 the loader call map as an ordered caller-name list -- the openp / emacs_open / emacs_fdopen / slurp_image / slurp_file / image_find_image_fd / image_find_image_file sites (7 checks); D3 the C delta -- no --image-* leaf, image.c scm_c_public_ref stays 0, the tree-wide count stays 230, and the imp-1 line / DEFUN counts hold (5 checks); D6 the pfd == NULL case -- openp cannot return -2 for a fixnum predicate, so no unused descriptor opens (4 checks); D5 the group registration after imp-1 and the per-group minima (9 checks).  Tracked files only
   )
 (group
   "test/src/eval-tests.el"
