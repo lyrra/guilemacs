@@ -4427,9 +4427,19 @@ close_android_fd (void *ptr)
 /* Read FILE into memory.  Value is a pointer to a buffer allocated
    with xmalloc holding FILE's contents.  Value is null if an error
    occurred.  FD is a file descriptor open for reading FILE.  Set
-   *SIZE to the size of the file.  */
+   *SIZE to the size of the file.
 
-static char *
+   FIX-20261008-guilemacs: M51 imp-4.  The whole-bytes family no longer
+   calls this helper -- the XBM, XPM generic, PBM, and WebP loaders and
+   the SVG path now use image_read_file_scheme, and (emacs image)
+   resolves, opens, reads, and closes the file.  The helper STAYS
+   because the native-platform bitmap branches of
+   image_create_bitmap_from_file (HAVE_NTGUI / HAVE_NS / HAVE_PGTK /
+   HAVE_HAIKU / HAVE_ANDROID) still call it (brief.org section 2, imp-5
+   records them).  In a build without those platforms it has no caller,
+   so MAYBE_UNUSED keeps the build warning-free.  */
+
+MAYBE_UNUSED static char *
 slurp_file (image_fd fd, ptrdiff_t *size)
 {
 #if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
@@ -4498,6 +4508,64 @@ slurp_file (image_fd fd, ptrdiff_t *size)
   return buf;
 }
 
+/* FIX-20261008-guilemacs: M51 imp-4 -- the bridge to the Scheme-owned
+   image file handle in (emacs image).  Scheme resolves the image path,
+   opens the file as a Guile port, reads all bytes, and closes the port.
+   This helper copies the returned bytevector into an xmalloc buffer and
+   sets *SIZE.  It never returns a FILE * or a descriptor to C.  It
+   returns NULL on a Scheme error or a miss.  An EMPTY file yields a
+   non-NULL, 0-size buffer (the old slurp_file returned one), so the
+   decoder reports its own error.  Same shape as
+   dired_listing_names_scheme (src/dired.c).  */
+
+static char *
+image_read_file_scheme (Lisp_Object filename, ptrdiff_t *size)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM result;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs image", "image-read-file");
+
+  result = SCM_CALL_1 (proc, filename);
+  if (!scm_is_bytevector (result))
+    return NULL;
+
+  size_t len = scm_c_bytevector_length (result);
+  char *buf = xmalloc (len ? len : 1);
+  memcpy (buf, SCM_BYTEVECTOR_CONTENTS (result), len);
+  *size = len;
+  return buf;
+}
+
+/* FIX-20261008-guilemacs: M51 imp-4 -- call (emacs image)
+   image-resolve-path.  Return the resolved path as a Lisp string, or
+   nil on a miss.  The C caller uses this to tell a miss (report
+   image_not_found_error, as the old code did) from a read error, and to
+   keep the resolved name in the SVG base URI (review F3 / F4).  It runs
+   the same openp search as image_find_image_fd, so it honors the elisp
+   file-name handler.  */
+
+static Lisp_Object
+image_resolve_path_scheme (Lisp_Object filename)
+{
+  static SCM proc = SCM_UNDEFINED;
+  SCM result;
+
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs image", "image-resolve-path");
+
+  result = SCM_CALL_1 (proc, filename);
+  if (!scm_is_string (result))
+    return Qnil;
+
+  size_t len;
+  char *str = scm_to_utf8_stringn (result, &len);
+  Lisp_Object name = make_string_from_utf8 (str, len);
+  free (str);
+  return name;
+}
+
 /* Like slurp_file above, but with added error handling.  Value is
    null if an error occurred.  Set SIZE to the size of the file.
    IMAGE_TYPE describes the image type (e.g. "PNG").  */
@@ -4505,18 +4573,24 @@ slurp_file (image_fd fd, ptrdiff_t *size)
 static char *
 slurp_image (Lisp_Object filename, ptrdiff_t *size, const char *image_type)
 {
-  image_fd fd;
-  Lisp_Object file = image_find_image_fd (filename, &fd);
-  if (!STRINGP (file))
-    {
-      image_not_found_error (filename);
-      return NULL;
-    }
-  char *result = slurp_file (fd, size);
+  /* FIX-20261008-guilemacs: M51 imp-4.  Scheme resolves the path, opens
+     the file, reads all bytes, and closes the port in (emacs image); C
+     decodes the returned bytes.  C no longer opens or closes the file
+     for the whole-bytes family (XBM, XPM generic, PBM, WebP).  A miss
+     and a read error both yield NULL; image_resolve_path_scheme tells
+     them apart, so a miss keeps the old image_not_found_error report
+     (review F3).  */
+  char *result = image_read_file_scheme (filename, size);
   if (result == NULL)
-    image_error ("Error loading %s image `%s'",
-		 build_unibyte_string (image_type),
-		 file);
+    {
+      Lisp_Object resolved = image_resolve_path_scheme (filename);
+      if (NILP (resolved))
+	image_not_found_error (filename);
+      else
+	image_error ("Error loading %s image `%s'",
+		     build_unibyte_string (image_type),
+		     resolved);
+    }
   return result;
 }
 
@@ -11884,27 +11958,30 @@ svg_load (struct frame *f, struct image *img)
   base_uri = image_spec_value (img->spec, QCbase_uri, NULL);
   if (STRINGP (file_name))
     {
-      image_fd fd;
-      Lisp_Object file = image_find_image_fd (file_name, &fd);
-      if (!STRINGP (file))
-	{
-	  image_not_found_error (file_name);
-	  return false;
-	}
-
-      /* Read the entire file into memory.  */
+      /* FIX-20261008-guilemacs: M51 imp-4.  Scheme resolves the path,
+	 opens the file, reads all bytes, and closes the port.  C parses
+	 the returned bytes and never opens or closes the file.  */
       ptrdiff_t size;
-      char *contents = slurp_file (fd, &size);
+      char *contents = image_read_file_scheme (file_name, &size);
       if (contents == NULL)
 	{
-	  image_error ("Error loading SVG image `%s'", file);
+	  Lisp_Object resolved = image_resolve_path_scheme (file_name);
+	  if (NILP (resolved))
+	    image_not_found_error (file_name);
+	  else
+	    image_error ("Error loading SVG image `%s'", resolved);
 	  return false;
 	}
-      /* If the file was slurped into memory properly, parse it.  */
+      /* If the file was slurped into memory properly, parse it.  The
+	 base URI falls back to the RESOLVED name, as the old code used
+	 `file'; a relative reference inside the SVG then resolves
+	 against the directory the file was found in (review F4).  */
       if (!STRINGP (base_uri))
-        base_uri = file;
+        base_uri = image_resolve_path_scheme (file_name);
       success_p = svg_load_image (f, img, contents, size,
-                                  SSDATA (ENCODE_FILE (base_uri)));
+                                  (STRINGP (base_uri)
+                                   ? SSDATA (ENCODE_FILE (base_uri))
+                                   : NULL));
       xfree (contents);
     }
   /* Else it's not a file, it's a Lisp object.  Load the image from a

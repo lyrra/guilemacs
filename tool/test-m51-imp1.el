@@ -15,11 +15,11 @@
 ;;;   D1 -- the base numbers of docs/m51-plan.org section 3.  Each of the
 ;;;         six candidates is lines / DEFUNs / scm_c_public_ref sites /
 ;;;         the #include "guile.h" count: src/xterm.c 33,110 / 0 / 5 / 1;
-;;;         src/image.c 13,207 / 11 / 0 / 1; src/xfns.c 10,546 / 54 /
+;;;         src/image.c 13,284 / 11 / 2 / 1;  (re-pinned after M51 imp-4) src/xfns.c 10,546 / 54 /
 ;;;         0 / 0; src/pgtkterm.c 7,774 / 0 / 4 / 1; src/sysdep.c 4,950 /
 ;;;         7 / 7 / 1; src/lread.c 3,561 / 19 / 2 / 1.  The tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] is 230.  mod/emacs/
-;;;         image.scm is ABSENT at the audit (the module does not exist
+;;;         scm_c_public_ref count over src/*.[chm] is 232 (re-pinned after M51 imp-4).  mod/emacs/
+;;;         image.scm is ABSENT at the imp-1 audit; M51 imp-4 creates it
 ;;;         yet).  26 checks.
 ;;;   D2 -- the block map of section 3.1 for the recommended target,
 ;;;         src/image.c, as the ORDERED DEFUN NAME LIST (the 11 block
@@ -52,7 +52,7 @@
 
 (defvar m51-imp1--root
   (file-name-as-directory
-   (expand-file-name "../.." (file-name-directory (or load-file-name
+   (expand-file-name ".." (file-name-directory (or load-file-name
                                                        default-directory)))))
 
 (defvar m51-imp1--registered 0
@@ -197,15 +197,15 @@ passes the raw symbol to reach it."
 ;; scm_c_public_ref sites / the guile.h count.  The count form (rather
 ;; than `m51-imp1--tracked-p') keeps the guile.h fact absent-safe: an
 ;; absent file folds to the symbol, so `eql' fails and the check prints
-;; FAIL.  imp-2 adds the (emacs image) module and the typed --image-*
-;; leaf to src/image.c, so it must re-pin FOUR drifting facts:
-;;   - image.c-lines-13207, image.c-defuns-11, and image.c-guile.h-1
-;;     (the new leaf, its declaration, and the guile.h include);
-;;   - image.c-scm-ref-0, which drifts from 0 to >=1 (the new typed leaf
-;;     calls scm_c_public_ref);
-;;   - scm-c-public-ref-230, the tree-wide src/*.[chm] count, which
-;;     drifts from 230 to 231 (the same new include site).
-;; imp-2 or imp-5 must re-pin all of them, or the D1 check FAILs.
+;; FAIL.  imp-4 adds the bridge and the resolve helper to src/image.c, so
+;; it re-pins FOUR drifting facts:
+;;   - image.c-lines-13284 (the bridge, the resolve helper, and the two
+;;     rewire sites);
+;;   - image.c-scm-ref-2 (the two new scm_c_public_ref sites);
+;;   - scm-c-public-ref-232, the tree-wide src/*.[chm] count, which
+;;     drifts from 230 to 232;
+;;   - image.c-defuns-11 and image.c-guile.h-1, which do NOT move.
+;; imp-5 must re-pin all of them, or the D1 check FAILs.
 (m51-imp1--check "xterm.c-lines-33110"
                  (eql 33110 (m51-imp1--lines "src/xterm.c")))
 (m51-imp1--check "xterm.c-defuns-0"
@@ -214,12 +214,12 @@ passes the raw symbol to reach it."
                  (eql 5 (m51-imp1--count-literal "src/xterm.c" "scm_c_public_ref")))
 (m51-imp1--check "xterm.c-guile.h-1"
                  (eql 1 (m51-imp1--count-literal "src/xterm.c" "#include \"guile.h\"")))
-(m51-imp1--check "image.c-lines-13207"
-                 (eql 13207 (m51-imp1--lines "src/image.c")))
+(m51-imp1--check "image.c-lines-13284"
+                 (eql 13284 (m51-imp1--lines "src/image.c")))
 (m51-imp1--check "image.c-defuns-11"
                  (eql 11 (m51-imp1--defun-count "src/image.c")))
-(m51-imp1--check "image.c-scm-ref-0"
-                 (eql 0 (m51-imp1--count-literal "src/image.c" "scm_c_public_ref")))
+(m51-imp1--check "image.c-scm-ref-2"
+                 (eql 2 (m51-imp1--count-literal "src/image.c" "scm_c_public_ref")))
 (m51-imp1--check "image.c-guile.h-1"
                  (eql 1 (m51-imp1--count-literal "src/image.c" "#include \"guile.h\"")))
 (m51-imp1--check "xfns.c-lines-10546"
@@ -254,12 +254,12 @@ passes the raw symbol to reach it."
                  (eql 2 (m51-imp1--count-literal "src/lread.c" "scm_c_public_ref")))
 (m51-imp1--check "lread.c-guile.h-1"
                  (eql 1 (m51-imp1--count-literal "src/lread.c" "#include \"guile.h\"")))
-(m51-imp1--check "scm-c-public-ref-230"
-                 (eql 230 (m51-imp1--count-scm-ref)))
-;; The recommended target's new module does not exist yet (imp-2 creates
-;; it).  Pin the absence so a stray mod/emacs/image.scm fails here.
-(m51-imp1--check "image-module-absent"
-                 (null (m51-imp1--exists-p "mod/emacs/image.scm")))
+(m51-imp1--check "scm-c-public-ref-232"
+                 (eql 232 (m51-imp1--count-scm-ref)))
+;; M51 imp-4 creates the recommended target's module.  Pin its presence:
+;; the imp-1 module-absent fact flips once imp-4 lands.
+(m51-imp1--check "image-module-present"
+                 (m51-imp1--exists-p "mod/emacs/image.scm"))
 
 ;;; --- D2. The block map (docs/m51-plan.org section 3.1) ---------------
 ;;
@@ -310,7 +310,7 @@ passes the raw symbol to reach it."
 
 (m51-imp1--check "reg/m51-group-present"
                  (m51-imp1--tracked-p "tool/run-tests.scm"
-                                      "test/m51/test-m51-imp1.el"))
+                                      "test/m51/test-m51-imp4.el"))
 ;; The path needle above is weak: it proves only that SOME group loads
 ;; the file.  Pin the group NAME and its order too (brief.org section
 ;; 12.4): the corpus must register under the (m51) name, and that group

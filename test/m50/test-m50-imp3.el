@@ -16,7 +16,7 @@
 ;;; This corpus reads TRACKED files only (brief.org section 5).  It pins:
 ;;;   F1 -- the deleted leaf: --emacs-daemon-state and Femacs_daemon_state
 ;;;         are ABSENT from src/emacs.c; the ^DEFUN count is 5; the
-;;;         scm_c_public_ref count is 6; the tree-wide count is 230.
+;;;         scm_c_public_ref count is 6; the tree-wide count is 232.
 ;;;   F2 -- the bridge: the static helper emacs_daemonp_scheme is present,
 ;;;         it holds scm_c_public_ref ("emacs emacs", "emacs-daemonp")
 ;;;         and SCM_CALL_2; the Fdaemonp hub calls the bridge and does
@@ -206,8 +206,8 @@ to the closing `\\n}' at column 0, or nil."
                  (eql 5 (m50-imp3--count "src/emacs.c" "^DEFUN (\"")))
 (m50-imp3--check "emacs.c-scm-ref-6"
                  (eql 6 (m50-imp3--count "src/emacs.c" "scm_c_public_ref")))
-(m50-imp3--check "scm-c-public-ref-230"
-                 (eql 230 (m50-imp3--count-scm-ref)))
+(m50-imp3--check "scm-c-public-ref-232"
+                 (eql 232 (m50-imp3--count-scm-ref)))
 
 ;;; --- F2. The C bridge (brief.org section 3) -------------------------
 

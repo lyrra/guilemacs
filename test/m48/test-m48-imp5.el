@@ -165,8 +165,8 @@ FAIL with no ERT test would leave the exit code 0."
                                           "FIX-20261005-guilemacs")))
 (m48-imp5--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
-(m48-imp5--check "tree-wide-scm-public-ref-230"
-                 (eql 230 (m48-imp5--count-scm-ref)))
+(m48-imp5--check "tree-wide-scm-public-ref-232"
+                 (eql 232 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
                  (let ((lines (m48-imp5--lines "src/keyboard.c"))
                        (defuns (m48-imp5--count "src/keyboard.c" "^DEFUN (\"")))

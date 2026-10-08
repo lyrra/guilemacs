@@ -22,9 +22,11 @@
 ;;;         image_find_image_fd callers, and the image_find_image_file
 ;;;         callers, each by the enclosing function name.  7 checks.
 ;;;   D3 -- the C delta: src/image.c holds no new `--image-*' leaf, its
-;;;         scm_c_public_ref count stays 0, and the tree-wide count over
-;;;         src/*.[chm] stays 230.  This proves imp-3 moves no handle.
-;;;         Plus the imp-1 line and DEFUN counts, unchanged.  5 checks.
+;;;         scm_c_public_ref count is 2 (M51 imp-4 adds the bridge and the
+;;;         resolve helper), and the tree-wide count over
+;;;         src/*.[chm] is 232.  This corpus is the imp-3 audit, re-pinned
+;;;         after M51 imp-4.  Plus the imp-4 line count and the unchanged
+;;;         DEFUN count.  5 checks.
 ;;;   D6 -- the `pfd == NULL' case.  The audit confirms that openp
 ;;;         cannot return -2 in the no-handle mode: image_find_image_fd
 ;;;         passes a fixnum predicate then, and openp returns -2 only
@@ -45,7 +47,7 @@
 
 (defvar m51-imp3--root
   (file-name-as-directory
-   (expand-file-name "../.." (file-name-directory (or load-file-name
+   (expand-file-name ".." (file-name-directory (or load-file-name
                                                        default-directory)))))
 (defvar m51-imp3--registered 0
   "Total number of tracked-file checks this corpus has registered.")
@@ -234,19 +236,21 @@ definition itself and not a column-0 forward declaration."
                  (equal '("xbm_load" "xpm_load" "pbm_load" "webp_load")
                         (m51-imp3--callers "src/image.c" "slurp_image")))
 
-;; The slurp_file callers: the XBM bitmap loader (5 sites), slurp_image,
-;; and SVG.
+;; The slurp_file callers: the XBM bitmap loader (5 sites).  M51 imp-4
+;; removes the slurp_image and svg_load callers: both now read through
+;; image_read_file_scheme, so slurp_file serves only the native platform
+;; bitmap branches.
 (m51-imp3--check "map/slurp_file-callers"
                  (equal '("image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
-                          "image_create_bitmap_from_file"
-                          "slurp_image" "svg_load")
+                          "image_create_bitmap_from_file")
                         (m51-imp3--callers "src/image.c" "slurp_file")))
 
-;; The image_find_image_fd callers: the XBM bitmap loader (7 sites), the
-;; pfd == NULL wrapper image_find_image_file, slurp_image, and SVG.
+;; The image_find_image_fd callers: the XBM bitmap loader (7 sites) and
+;; the pfd == NULL wrapper image_find_image_file.  M51 imp-4 removes the
+;; slurp_image and svg_load callers: both now resolve and read in Scheme.
 (m51-imp3--check "map/find-image-fd-callers"
                  (equal '("image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
@@ -255,7 +259,7 @@ definition itself and not a column-0 forward declaration."
                           "image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
                           "image_create_bitmap_from_file"
-                          "image_find_image_file" "slurp_image" "svg_load")
+                          "image_find_image_file")
                         (m51-imp3--callers "src/image.c" "image_find_image_fd")))
 
 ;; The image_find_image_file callers: the filename-based loaders XPM,
@@ -270,17 +274,20 @@ definition itself and not a column-0 forward declaration."
 
 (setq m51-imp3--group 'd3)
 
-;; imp-3 adds no image leaf and one scm_c_public_ref site would break the
-;; imp-1 count.  Both must stay at the imp-1 value.
+;; M51 imp-4 adds two scm_c_public_ref sites (image_read_file_scheme and
+;; image_resolve_path_scheme), so the image.c count is 2 and the
+;; tree-wide count is 232.  The DEFUN count and the --image-* leaf count
+;; do not move.
 (m51-imp3--check "c/no-image-leaf"
                  (eql 0 (m51-imp3--count-literal "src/image.c" "DEFUN (\"--image-")))
-(m51-imp3--check "c/image-c-scm-ref-0"
-                 (eql 0 (m51-imp3--count-literal "src/image.c" "scm_c_public_ref")))
-(m51-imp3--check "c/tree-wide-scm-ref-230"
-                 (eql 230 (m51-imp3--count-scm-ref)))
-;; The imp-1 C surface holds: no C change means these do not move.
-(m51-imp3--check "c/image-c-lines-13207"
-                 (eql 13207 (m51-imp3--lines "src/image.c")))
+(m51-imp3--check "c/image-c-scm-ref-2"
+                 (eql 2 (m51-imp3--count-literal "src/image.c" "scm_c_public_ref")))
+(m51-imp3--check "c/tree-wide-scm-ref-232"
+                 (eql 232 (m51-imp3--count-scm-ref)))
+;; The imp-4 C surface: the line count moves with the bridge and the two
+;; rewire sites; the DEFUN count does not.
+(m51-imp3--check "c/image-c-lines-13284"
+                 (eql 13284 (m51-imp3--lines "src/image.c")))
 (m51-imp3--check "c/image-c-defuns-11"
                  (eql 11 (m51-imp3--defun-count "src/image.c")))
 
@@ -312,23 +319,22 @@ definition itself and not a column-0 forward declaration."
 
 (setq m51-imp3--group nil)
 
-(m51-imp3--check "reg/m51-imp3-registered"
+(m51-imp3--check "reg/m51-imp4-registered"
                  (m51-imp3--tracked-p "tool/run-tests.scm"
-                                      "test/m51/test-m51-imp3.el"))
+                                      "test/m51/test-m51-imp4.el"))
 (m51-imp3--check "reg/m51-group-name"
                  (m51-imp3--tracked-p "tool/run-tests.scm" "(group (m51)"))
 (m51-imp3--check "reg/m51-group-after-m50"
                  (let ((m50 (m51-imp3--line-of "tool/run-tests.scm" "(group (m50)"))
                        (m51 (m51-imp3--line-of "tool/run-tests.scm" "(group (m51)")))
                    (and (integerp m50) (integerp m51) (< m50 m51))))
-;; The imp-3 corpus must register AFTER the imp-1 corpus (brief.org
-;; section 7.2).
-(m51-imp3--check "reg/imp3-after-imp1"
-                 (let ((i1 (m51-imp3--line-of "tool/run-tests.scm"
-                                              "test/m51/test-m51-imp1.el"))
-                       (i3 (m51-imp3--line-of "tool/run-tests.scm"
-                                              "test/m51/test-m51-imp3.el")))
-                   (and (integerp i1) (integerp i3) (< i1 i3))))
+;; The current (m51) group carries the imp-4 corpus.  The imp-1 / imp-3
+;; audits are now advisory (tool/), so the old imp-3-after-imp-1 order
+;; no longer applies.
+(m51-imp3--check "reg/m51-group-carries-imp4"
+                 (let ((i4 (m51-imp3--line-of "tool/run-tests.scm"
+                                              "test/m51/test-m51-imp4.el")))
+                   (integerp i4)))
 (m51-imp3--check "reg/absent-tracked-file-fails"
                  (null (m51-imp3--tracked-p "src/m51-imp3-no-such-file.c"
                                             "needle")))

@@ -213,6 +213,8 @@
 ;; M50 imp-2 — the src/emacs.c invocation / daemon leaves in
 ;; (emacs emacs).
 (use-modules (emacs emacs))
+;; M51 imp-4 — the src/image.c image file hop in Scheme.
+(use-modules (emacs image))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
