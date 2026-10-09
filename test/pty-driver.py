@@ -9,6 +9,9 @@ same pty scaffolding and differed only in the child probe:
     test/m43/pty-driver-imp4.py  -> group  m43-imp4
     test/m43/pty-driver-imp5.py  -> group  m43-imp5
 
+M52 imp-3 uses the common driver to check the actual bytes written by
+the (emacs tty-output) leaves on the child terminal.
+
 The scaffolding is the hard part and is written once: pty allocation and
 the EACCES skip, the forked child, the controlling terminal, the FIFO
 gate, the report pipe, the timeout, and the cleanup.
@@ -65,6 +68,7 @@ Usage:
 """
 
 import argparse
+import errno
 import fcntl
 import inspect
 import os
@@ -477,9 +481,105 @@ M43_CASES = (
     },
 )
 
-CASES = M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES
+M52_OUTPUT_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (flush! (module-ref output 'tty-flush)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(77 53 50 45 87 82 73 84 69 45 66 69 71 73 78 33))
+      (flush! term)
+      (let* ((bytes #vu8(77 53 50 45 73 77 80 51 45 87 82 73 84 69 45 79 75 33))
+             (n (write! term bytes))
+             (flushed (flush! term)))
+        (write! term #vu8(77 53 50 45 87 82 73 84 69 45 69 78 68 33))
+        (let ((end-flushed (flush! term)))
+          (if (and (= n 18) (= flushed 0) (= end-flushed 0))
+              (number->string n)
+            "write-failed"))))))
+"""
 
-GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5")
+M52_CAP_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (emit! (module-ref output 'tty-emit-cap))
+       (flush! (module-ref output 'tty-flush)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(77 53 50 45 67 65 80 45 66 69 71 73 78 33))
+      (let ((before-flush (flush! term)))
+       (let ((n (emit! term "set-scroll-region" '(2 10))))
+        (write! term #vu8(77 53 50 45 67 65 80 45 69 78 68 33))
+        (let ((after-flush (flush! term)))
+          (if (and (= before-flush 0) (= after-flush 0))
+              (number->string n)
+            "flush-failed")))))))
+"""
+
+M52_SEQ_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (emit! (module-ref output 'tty-emit-seq))
+       (flush! (module-ref output 'tty-flush)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(77 53 50 45 83 69 81 45 66 69 71 73 78 33))
+      (let ((before-flush (flush! term)))
+       (let ((n (emit! term '(("set-scroll-region" 2 10)
+                              ("set-scroll-region" 4 8)))))
+        (write! term #vu8(77 53 50 45 83 69 81 45 69 78 68 33))
+        (let ((after-flush (flush! term)))
+          (if (and (= before-flush 0) (= after-flush 0))
+              (number->string n)
+            "flush-failed")))))))
+"""
+
+M52_CASES = (
+    {
+        "name": "m52-imp3/tty-write-bytes-e2e",
+        "group": "m52-imp3",
+        "probe": M52_OUTPUT_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!"),
+        "output_span_bytes": b"M52-IMP3-WRITE-OK!",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m52-imp3/tty-emit-cap-e2e",
+        "group": "m52-imp3",
+        "probe": M52_CAP_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-CAP-BEGIN!", b"M52-CAP-END!"),
+        "output_span_bytes": b"\x1b[3;11r",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m52-imp3/tty-emit-seq-e2e",
+        "group": "m52-imp3",
+        "probe": M52_SEQ_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-SEQ-BEGIN!", b"M52-SEQ-END!"),
+        "output_span_bytes": b"\x1b[3;11r\x1b[5;9r",
+        "env": {"TERM": "xterm"},
+    },
+)
+
+CASES = M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES
+
+GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
+          "m52-imp3")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -680,6 +780,14 @@ def verdict(case, got):
 
     Return (kind, detail) where kind is "PASS", "FAIL" or "INFO".
     """
+    if case.get("expect_decimal"):
+        try:
+            value = int(got)
+        except (TypeError, ValueError):
+            return ("FAIL", "measured %r, want a decimal byte count" % got)
+        if value >= 0:
+            return ("PASS", "measured %r" % got)
+        return ("FAIL", "measured negative byte count %r" % got)
     want = expect_string(case)
     if got == want:
         return ("PASS", "measured %r" % got)
@@ -690,6 +798,45 @@ def verdict(case, got):
         # unconditional skip.
         return ("INFO", "%s (measured %r)" % (case["env_gate"], got))
     return ("FAIL", "measured %r want %r" % (got, want))
+
+
+def output_complete(case, output):
+    """Whether every output marker requested by CASE reached the pty."""
+    needle = case.get("pty_contains")
+    if needle is not None and needle not in output:
+        return False
+    span = case.get("output_span")
+    if span is not None:
+        start, end = span
+        a = output.find(start)
+        return a >= 0 and output.find(end, a + len(start)) >= 0
+    return True
+
+
+def check_output(case, got, output):
+    """Check exact byte output or the reported size of a marked span."""
+    needle = case.get("pty_contains")
+    if needle is not None and needle not in output:
+        return "pty output did not contain %r" % needle
+    span = case.get("output_span")
+    if span is not None:
+        start, end = span
+        a = output.find(start)
+        b = output.find(end, a + len(start)) if a >= 0 else -1
+        if a < 0 or b < 0:
+            return "pty output did not contain ordered markers %r %r" % (start, end)
+        try:
+            reported = int(got)
+        except (TypeError, ValueError):
+            return "probe did not report a byte count: %r" % got
+        actual = b - (a + len(start))
+        expected = case.get("output_span_bytes")
+        if expected is not None and output[a + len(start):b] != expected:
+            return "pty output span was %r; want %r" % (
+                output[a + len(start):b], expected)
+        if actual != reported:
+            return "pty output span was %d bytes; leaf reported %d" % (actual, reported)
+    return None
 
 
 def child_session():
@@ -727,9 +874,11 @@ def run_case(case, emacs, timeout):
     child = None
     try:
         cmd = [emacs, "-Q", "-nw", "-l", tmp.name]
+        child_env = os.environ.copy()
+        child_env.update(case.get("env", {}))
         child = subprocess.Popen(
             cmd, stdin=slave, stdout=slave, stderr=wpipe,
-            close_fds=True, preexec_fn=child_session)
+            close_fds=True, preexec_fn=child_session, env=child_env)
         os.close(slave)
         os.close(wpipe)
         slave = wpipe = None
@@ -738,6 +887,7 @@ def run_case(case, emacs, timeout):
         # up the tty before sending bytes.  A fixed delay after Popen is
         # not sufficient: startup can still be flushing terminal input.
         report = b""
+        pty_output = b""
         ready_seen = False
         input_sent = False
         timed_out = False
@@ -747,8 +897,25 @@ def run_case(case, emacs, timeout):
             if remaining <= 0:
                 timed_out = True
                 break
-            ready, _, _ = select.select([rpipe], [], [], min(0.5, remaining))
-            if ready:
+            readers = [rpipe]
+            if master is not None:
+                readers.append(master)
+            ready, _, _ = select.select(readers, [], [], min(0.5, remaining))
+            if master is not None and master in ready:
+                try:
+                    chunk = os.read(master, 4096)
+                    if chunk:
+                        pty_output += chunk
+                    else:
+                        os.close(master)
+                        master = None
+                except OSError as err:
+                    # Linux pty masters report EIO after the slave closes.
+                    if err.errno != errno.EIO:
+                        raise
+                    os.close(master)
+                    master = None
+            if rpipe in ready:
                 chunk = os.read(rpipe, 4096)
                 if not chunk:
                     break
@@ -779,7 +946,8 @@ def run_case(case, emacs, timeout):
                 # require Emacs shutdown or pipe EOF after a valid report;
                 # cleanup below will stop a child that remains alive.
                 if ready_seen and parse_report(
-                        report.decode("utf-8", "replace")) is not None:
+                        report.decode("utf-8", "replace")) is not None \
+                        and output_complete(case, pty_output):
                     break
             elif child.poll() is not None:
                 break
@@ -823,6 +991,10 @@ def run_case(case, emacs, timeout):
         return (name, "FAIL", "no child report (raw %r)" % report[:200])
 
     kind, detail = verdict(case, got)
+    if kind == "PASS":
+        output_problem = check_output(case, got, pty_output)
+        if output_problem:
+            return (name, "FAIL", output_problem)
     return (name, kind, detail)
 
 
@@ -986,18 +1158,40 @@ def selftest():
                             % (case["name"], case["group"]))
         if not case.get("probe"):
             problems.append("case %s has no probe" % case["name"])
-        if "expect" not in case and "expect_calls" not in case:
+        if ("expect" not in case and "expect_calls" not in case
+                and not case.get("expect_decimal")):
             problems.append("case %s declares no expectation" % case["name"])
     for group in GROUPS:
         if not group_cases(group):
             problems.append("group %s has no case" % group)
-    # The merge must not drop a case: 2 + 7 from M42, 3 from M43.
+    # The merge must not drop a case: 2 + 7 from M42, 3 from M43,
+    # and 3 M52 output-path cases.
     check("m42-imp3-case-count", len(group_cases("m42-imp3")), 2)
     check("m42-imp4-case-count", len(group_cases("m42-imp4")), 7)
     check("m43-imp3-case-count", len(group_cases("m43-imp3")), 1)
     check("m43-imp4-case-count", len(group_cases("m43-imp4")), 1)
     check("m43-imp5-case-count", len(group_cases("m43-imp5")), 1)
-    check("total-case-count", len(CASES), 12)
+    check("m52-imp3-case-count", len(group_cases("m52-imp3")), 3)
+    check("total-case-count", len(CASES), 15)
+    write_case = _case("m52-imp3/tty-write-bytes-e2e")
+    for name, markers in (("m52-imp3/tty-write-bytes-e2e",
+                           (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
+                          ("m52-imp3/tty-emit-cap-e2e",
+                           (b"M52-CAP-BEGIN!", b"M52-CAP-END!")),
+                          ("m52-imp3/tty-emit-seq-e2e",
+                           (b"M52-SEQ-BEGIN!", b"M52-SEQ-END!"))):
+        case = _case(name)
+        check("%s-output-span" % name, case.get("output_span"), markers)
+        if not case.get("expect_decimal"):
+            problems.append("%s does not check a reported byte count" % name)
+    check("m52-cap-output-bytes",
+          _case("m52-imp3/tty-emit-cap-e2e").get("output_span_bytes"),
+          b"\x1b[3;11r")
+    check("m52-seq-output-bytes",
+          _case("m52-imp3/tty-emit-seq-e2e").get("output_span_bytes"),
+          b"\x1b[3;11r\x1b[5;9r")
+    check("m52-write-output-bytes",
+          write_case.get("output_span_bytes"), b"M52-IMP3-WRITE-OK!")
 
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")

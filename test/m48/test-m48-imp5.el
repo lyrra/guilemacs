@@ -7,9 +7,10 @@
 ;;;
 ;;; It pins:
 ;;;   S1 -- the surface of brief.org section 4, re-measured at HEAD:
-;;;         src/term.c (5,276 lines, 25 DEFUNs, 11 scm_c_public_ref
-;;;         sites, 6 --term-* leaves, 10 FIX-20261005-guilemacs marks,
-;;;         the guile.h include at :48); mod/emacs/terminal.scm (266);
+;;;         src/term.c (5,512 lines, 29 DEFUNs (25 M48 DEFUNs plus the
+;;;         4 M52 imp-3 --tty-* leaves), 11 scm_c_public_ref sites, 6
+;;;         --term-* leaves, 10 FIX-20261005-guilemacs marks, the guile.h
+;;;         include at :48); mod/emacs/terminal.scm (266);
 ;;;         the tree-wide scm_c_public_ref over src/*.[chm] (227);
 ;;;         src/keyboard.c (11,233 lines / 447 DEFUNs);
 ;;;         src/keyboard-globals.c (490); the combined keyboard surface
@@ -153,8 +154,8 @@ FAIL with no ERT test would leave the exit code 0."
                  (let ((lines (m48-imp5--lines "src/term.c"))
                        (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
                        (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 5276 lines)
-                        (integerp defuns) (eql 25 defuns)
+                   (and (integerp lines) (eql 5512 lines)
+                        (integerp defuns) (eql 29 defuns)
                         (integerp refs) (eql 11 refs))))
 (m48-imp5--check "term.c-guile.h-at-48"
                  (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))

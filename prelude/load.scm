@@ -215,6 +215,9 @@
 (use-modules (emacs emacs))
 ;; M51 imp-4 — the src/image.c image file hop in Scheme.
 (use-modules (emacs image))
+;; M52 imp-3 — the src/term.c TTY output boundary leaves in
+;; (emacs tty-output).
+(use-modules (emacs tty-output))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

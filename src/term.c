@@ -5199,6 +5199,242 @@ docs/m48-plan.org section 3.3.  */)
   return make_fixnum (FIXNUMP (height) ? XFIXNUM (height) : 0);
 }
 
+/* --- M52 imp-3: the TTY output boundary leaves --------------------- */
+
+/* FIX-20261009-guilemacs: M52 imp-3 -- the src/term.c TTY output
+   boundary.  These 4 typed leaves cross plain values only: an opaque
+   DEVICE handle, a plain capability KEY string, a plain fixnum ARGS
+   list, and a plain bytevector.  The C-owned struct tty_display_info
+   and its FILE *output / *termscript streams stay in C.  Each leaf
+   calls the write mechanism (tparam / fwrite), never a public hub
+   (docs/kb.org =leaf-must-call-the-mechanism=).  A leaf returns a
+   fixnum byte count, or a negative fixnum holding the negated errno
+   (docs/kb.org =leaf-return-shape-preserves-signal=).  C stays the
+   single writer of output / termscript; no Guile port owns a FILE *
+   (docs/kb.org =passthrough-leaf-is-not-a-port=).  imp-3 moves no
+   policy: the selection and the arithmetic stay in C until imp-4.
+
+   F3 (cr1.org, for imp-4): the real termcap output path is the OUTPUT
+   macro (src/term.c), which calls emacs_tputs and applies padding.
+   m52_tty_emit_cap_1 calls tparam and a raw fwrite, so it does NOT
+   apply padding.  imp-3 rewires nothing, so there is no regression
+   today.  imp-4 MUST NOT lose the padding behaviour: either call
+   emacs_tputs, or record the padding decision in docs/m52-plan.org.  */
+
+/* Resolve the plain DEVICE handle to its struct tty_display_info *, or
+   NULL.  m22_tty_of_terminal (src/keyboard.c) is static, so it is not
+   reachable here; this decodes through decode_tty_terminal, the same
+   mechanism (src/termhooks.h).  The name m52_tty_of_device_1 reuses no
+   existing static name (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static struct tty_display_info *
+m52_tty_of_device_1 (Lisp_Object device)
+{
+  struct terminal *t = decode_tty_terminal (device);
+  return t ? t->display_info.tty : NULL;
+}
+
+/* One entry of the capability table: the plain KEY string and the byte
+   offset of the matching tty->TS_<cap> member.  imp-3 lists the caps
+   the MOVES output blocks use (docs/m52-plan.org section 8.4).  */
+struct m52_cap_entry
+{
+  const char *key;
+  size_t offset;
+};
+
+#define M52_CAP(key, field) { key, offsetof (struct tty_display_info, field) }
+static const struct m52_cap_entry m52_caps[] =
+  {
+    M52_CAP ("bell", TS_bell),
+    M52_CAP ("visible-bell", TS_visible_bell),
+    M52_CAP ("clear-to-bottom", TS_clr_to_bottom),
+    M52_CAP ("clear-line", TS_clr_line),
+    M52_CAP ("clear-frame", TS_clr_frame),
+    M52_CAP ("set-scroll-region", TS_set_scroll_region),
+    M52_CAP ("set-scroll-region-1", TS_set_scroll_region_1),
+    M52_CAP ("set-window", TS_set_window),
+    M52_CAP ("insert-mode", TS_insert_mode),
+    M52_CAP ("end-insert-mode", TS_end_insert_mode),
+    M52_CAP ("standout-mode", TS_standout_mode),
+    M52_CAP ("end-standout-mode", TS_end_standout_mode),
+    M52_CAP ("cursor-normal", TS_cursor_normal),
+    M52_CAP ("cursor-visible", TS_cursor_visible),
+    M52_CAP ("cursor-invisible", TS_cursor_invisible),
+    M52_CAP ("termcap-modes", TS_termcap_modes),
+    M52_CAP ("end-termcap-modes", TS_end_termcap_modes),
+    M52_CAP ("keypad-mode", TS_keypad_mode),
+    M52_CAP ("end-keypad-mode", TS_end_keypad_mode),
+    M52_CAP ("orig-pair", TS_orig_pair),
+    M52_CAP ("ins-line", TS_ins_line),
+    M52_CAP ("del-line", TS_del_line),
+    M52_CAP ("ins-multi-lines", TS_ins_multi_lines),
+    M52_CAP ("del-multi-lines", TS_del_multi_lines),
+    M52_CAP ("ins-char", TS_ins_char),
+    M52_CAP ("ins-multi-chars", TS_ins_multi_chars),
+    M52_CAP ("del-char", TS_del_char),
+    M52_CAP ("del-multi-chars", TS_del_multi_chars),
+    M52_CAP ("delete-mode", TS_delete_mode),
+    M52_CAP ("end-delete-mode", TS_end_delete_mode)
+  };
+#undef M52_CAP
+
+/* Look CAP (a plain string, or nil) up in the table and return the
+   matching tty->TS_<cap> string, or NULL when TTY is NULL or CAP names
+   no known capability.  The absent case yields NULL, so the caller
+   emits nothing.  */
+static const char *
+m52_cap_string_1 (struct tty_display_info *tty, Lisp_Object cap)
+{
+  if (!tty || !STRINGP (cap))
+    return NULL;
+  for (size_t i = 0; i < ARRAYELTS (m52_caps); i++)
+    if (SBYTES (cap) == strlen (m52_caps[i].key)
+	&& memcmp (SSDATA (cap), m52_caps[i].key, SBYTES (cap)) == 0)
+      return *(const char **) ((char *) tty + m52_caps[i].offset);
+  return NULL;
+}
+
+/* Write LEN bytes at STR to tty->output and, when set, tty->termscript.
+   Return the number of bytes written, or the negated errno on a hard
+   failure, or -EINVAL when TTY holds no output stream.  C keeps the
+   =clearerr= after each write (the current C ignores the fwrite count
+   and clears the stream).  A short write is reported to Scheme as its
+   count, so Scheme decides retry / give-up (the imp-4 policy).  The
+   =FILE *= streams stay C (docs/kb.org
+   =passthrough-leaf-is-not-a-port=).  */
+static ptrdiff_t
+m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
+{
+  if (!tty || !tty->output)
+    return -EINVAL;
+  size_t written = fwrite (str, 1, len, tty->output);
+  if (tty->termscript)
+    fwrite (str, 1, len, tty->termscript);
+  if (written < len && ferror (tty->output))
+    {
+      int e = errno ? errno : EIO;
+      clearerr (tty->output);
+      return -e;
+    }
+  clearerr (tty->output);
+  return (ptrdiff_t) written;
+}
+
+/* Emit one capability of TTY.  CAP names a TS_* string; ARGS is a plain
+   fixnum list applied through =tparam=.  This is the shared mechanism
+   of --tty-emit-cap and --tty-emit-seq.  Return the byte count, or the
+   negated errno (-ENOMEM when tparam returns NULL).  */
+static ptrdiff_t
+m52_tty_emit_cap_1 (struct tty_display_info *tty, Lisp_Object cap,
+		    Lisp_Object args)
+{
+  if (!tty)
+    return -EINVAL;
+  const char *str = m52_cap_string_1 (tty, cap);
+  if (!str)
+    return 0;
+  int a[4] = { 0, 0, 0, 0 };
+  int n = 0;
+  for (Lisp_Object l = args; CONSP (l) && n < 4; l = XCDR (l))
+    {
+      Lisp_Object x = XCAR (l);
+      a[n++] = FIXNUMP (x) ? (int) XFIXNUM (x) : 0;
+    }
+  if (n == 0)
+    return m52_tty_write_1 (tty, str, strlen (str));
+  char *buf = tparam (str, 0, 0, a[0], a[1], a[2], a[3]);
+  ptrdiff_t rc = buf ? m52_tty_write_1 (tty, buf, strlen (buf)) : -ENOMEM;
+  xfree (buf);
+  return rc;
+}
+
+DEFUN ("--tty-emit-cap", Fc_tty_emit_cap, Sc_tty_emit_cap, 3, 3, 0,
+       doc: /* FIX-20261009-guilemacs: Internal: emit one termcap
+capability of DEVICE.  DEVICE is an opaque plain handle (a terminal
+object, a frame, or nil for the selected frame); CAP is a plain string
+naming one TS_* capability; ARGS is a plain fixnum list applied through
+=tparam=.  C looks up the TS_* string and writes it to the C-owned
+output and termscript streams; the char * and the FILE * stay in C
+(docs/kb.org =passthrough-leaf-is-not-a-port=).  Return a plain fixnum:
+the byte count, or a negative fixnum holding the negated errno (-EINVAL
+when DEVICE is nil / does not resolve to a tty, the same shape as
+--tty-write-bytes and --tty-flush).  A
+short write is reported as its count, so Scheme decides retry / give-up.
+M52 imp-3, brief.org section 5.1.  */)
+  (Lisp_Object device, Lisp_Object cap, Lisp_Object args)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  return make_fixnum (m52_tty_emit_cap_1 (tty, cap, args));
+}
+
+DEFUN ("--tty-write-bytes", Fc_tty_write_bytes, Sc_tty_write_bytes, 2, 2, 0,
+       doc: /* FIX-20261009-guilemacs: Internal: write the plain
+bytevector BYTES to the C-owned output and termscript streams of
+DEVICE (the bell / newline path).  DEVICE is an opaque plain handle.
+C owns the FILE * streams; a Guile port must not own them (docs/kb.org
+=passthrough-leaf-is-not-a-port=).  Return a plain fixnum: the byte
+count, or a negative fixnum holding the negated errno (-EINVAL when
+DEVICE holds no output stream).  M52 imp-3, brief.org section 5.1.  */)
+  (Lisp_Object device, Lisp_Object bytes)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  /* BYTES is a plain Guile bytevector (the same representation the M43
+     leaf --tty-get-mode uses for c_cc).  A Guile bytevector carries raw
+     bytes, so the bell / newline path never carries a Lisp_Object,
+     char *, or FILE * across the layer.  A non-bytevector is a
+     programming error.  */
+  if (!scm_is_bytevector (bytes))
+    return make_fixnum (-EINVAL);
+  return make_fixnum
+    (m52_tty_write_1 (tty, (const char *) SCM_BYTEVECTOR_CONTENTS (bytes),
+		      scm_c_bytevector_length (bytes)));
+}
+
+DEFUN ("--tty-flush", Fc_tty_flush, Sc_tty_flush, 1, 1, 0,
+       doc: /* FIX-20261009-guilemacs: Internal: flush the C-owned output
+stream of DEVICE (=fflush=).  DEVICE is an opaque plain handle.  Return
+a plain fixnum: 0 on success, or a negative fixnum holding the negated
+errno.  The =tcdrain= drain stays in src/sysdep.c; this leaf does not
+move it.  M52 imp-3, brief.org section 5.1.  */)
+  (Lisp_Object device)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  if (!tty || !tty->output)
+    return make_fixnum (-EINVAL);
+  if (fflush (tty->output) != 0)
+    return make_fixnum (-(errno ? errno : EIO));
+  return make_fixnum (0);
+}
+
+DEFUN ("--tty-emit-seq", Fc_tty_emit_seq, Sc_tty_emit_seq, 2, 2, 0,
+       doc: /* FIX-20261009-guilemacs: Internal: apply one ordered
+sequence SEQ of (CAP . ARGS) items to DEVICE.  DEVICE is an opaque
+plain handle; CAP is a plain string naming one TS_* capability and ARGS
+is its plain fixnum list.  This is the thin entry point: it runs the
+same mechanism as --tty-emit-cap for each item and adds no policy.  An
+item that names no known capability emits nothing.  Return a plain
+fixnum: the total byte count, or the negated errno of the first item
+that fails hard (-EINVAL when DEVICE is nil / does not resolve to a
+tty).  M52 imp-3, brief.org
+section 5.1.  */)
+  (Lisp_Object device, Lisp_Object seq)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  ptrdiff_t total = 0;
+  for (Lisp_Object l = seq; CONSP (l); l = XCDR (l))
+    {
+      Lisp_Object item = XCAR (l);
+      Lisp_Object cap = CONSP (item) ? XCAR (item) : item;
+      Lisp_Object args = CONSP (item) ? XCDR (item) : Qnil;
+      ptrdiff_t rc = m52_tty_emit_cap_1 (tty, cap, args);
+      if (rc < 0)
+	return make_fixnum (rc);
+      total += rc;
+    }
+  return make_fixnum (total);
+}
+
 void
 syms_of_term (void)
 {

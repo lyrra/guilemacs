@@ -11,8 +11,8 @@
 ;;; clone.  The docs needles live in tool/m48-plan-lint.sh, which the
 ;;; (m48) group does not run.  This corpus pins:
 ;;;   D1 -- the base numbers of docs/m48-plan.org section 3, re-pinned by
-;;;         imp-2, imp-3, imp-4, and imp-6.  src/term.c is 5,276 lines,
-;;;         25 DEFUNs (the two geometry leaves were retired in imp-6),
+;;;         imp-2, imp-3, imp-4, and imp-6.  src/term.c is 5,512 lines,
+;;;         29 DEFUNs (25 M48 DEFUNs plus the 4 M52 imp-3 --tty-* leaves),
 ;;;         11 scm_c_public_ref sites (3 old + 4 G1 + 4 G3 refs), and
 ;;;         includes guile.h; mod/emacs/terminal.scm is 266 lines (134 +
 ;;;         the 8 wrappers); scm_c_public_ref over src/*.[chm] is 227;
@@ -175,10 +175,10 @@ passes the raw symbol to reach it."
 ;;; two geometry leaves and their C arithmetic were removed; the Scheme
 ;;; module now owns the geometry arithmetic.  The current source has 25
 ;;; DEFUNs and 11 term.c refs.  The keyboard surface does not move.
-(m48-imp1--check "term.c-lines-5276"
-                 (eql 5276 (m48-imp1--lines "src/term.c")))
-(m48-imp1--check "term.c-defuns-25"
-                 (eql 25 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
+(m48-imp1--check "term.c-lines-5512"
+                 (eql 5512 (m48-imp1--lines "src/term.c")))
+(m48-imp1--check "term.c-defuns-29"
+                 (eql 29 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
 (m48-imp1--check "term.c-scm-ref-11"
                  (eql 11 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
 (m48-imp1--check "term.c-has-guile.h"

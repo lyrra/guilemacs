@@ -244,8 +244,8 @@ anchored match finds the definition only."
 
 (m48-imp4--check "leaf-defuns-6"
                  (eql 6 (m48-imp4--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp4--check "defun-count-25"
-                 (eql 25 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
+(m48-imp4--check "defun-count-29"
+                 (eql 29 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
 (m48-imp4--check "term.c-has-guile.h"
                  (m48-imp4--contains-p "src/term.c" "#include \"guile.h\""))
 

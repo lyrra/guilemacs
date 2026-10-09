@@ -43,6 +43,12 @@
     "m42-imp4/case-6-continuation")
   "The imp-4 case names.  Matches the driver's M42_IMP4_CASES table.")
 
+(defconst m52-imp3--cases
+  '("m52-imp3/tty-write-bytes-e2e"
+    "m52-imp3/tty-emit-cap-e2e"
+    "m52-imp3/tty-emit-seq-e2e")
+  "The M52 imp-3 observable output cases in test/pty-driver.py.")
+
 (defun m42-imp3--dir ()
   "Return the directory that holds pty-runner.el."
   (file-name-directory (or load-file-name
@@ -100,7 +106,7 @@ STATUS is the symbol PASS, (FAIL . DETAIL), or (INFO DETAIL)."
         (when pair (push pair results))))
     (nreverse results)))
 
-(defun m42-pty--run-driver (group cases)
+(defun m42-pty--run-driver (group cases &optional strict)
   "Run the pty driver for case GROUP, with CASE-names CASES.
 GROUP selects the driver's case table (\"m42-imp3\" or \"m42-imp4\").
 Return a list of (NAME . STATUS) pairs.  STATUS is the symbol PASS, a
@@ -125,7 +131,14 @@ a FAIL."
                     (error (cons 'ERROR err)))))
           (let ((results (m42-imp3--parse (buffer-string))))
             (if (null results)
-                (m42-pty--skip cases (format "driver produced no report (%S)" rc))
+                (if strict
+                    (mapcar (lambda (name)
+                              (cons name (cons 'FAIL
+                                               (format "driver produced no report (%S)"
+                                                       rc))))
+                            cases)
+                  (m42-pty--skip cases
+                                 (format "driver produced no report (%S)" rc)))
               results))))))))
 
 (defun m42-imp3-run-driver ()
@@ -139,6 +152,12 @@ gap (python3, src/emacs, pty) -- those return INFO pairs."
 Return a list of (NAME . STATUS) pairs.  Never a FAIL for an environment
 gap (python3, src/emacs, pty) -- those return INFO pairs."
   (m42-pty--run-driver "m42-imp4" m42-imp4--cases))
+
+(defun m52-imp3-run-driver ()
+  "Run the M52 imp-3 TTY output cases on the emacs under test.
+Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
+a started driver that produces no report is a FAIL."
+  (m42-pty--run-driver "m52-imp3" m52-imp3--cases t))
 
 (provide 'pty-runner)
 ;;; pty-runner.el ends here

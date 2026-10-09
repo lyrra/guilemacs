@@ -34,11 +34,11 @@
 ;;;         below it, so a line constant invalidates itself at the next
 ;;;         imp.  The ordered name list survives imp-2 and still catches a
 ;;;         deletion or a re-order.
-;;;   D5 -- the (m52) group is ABSENT from tool/run-tests.scm.  imp-1 adds
-;;;         no behaviour, so brief.org section 5 says create the (m52)
-;;;         group only when the first behaviour corpus lands (imp-2).  A
-;;;         group that exists early is a real FAIL.  This corpus registers
-;;;         a per-group minimum count.  That guard only proves the file
+;;;   D5 -- the (m52) group is PRESENT in tool/run-tests.scm.  imp-1 pinned
+;;;         the group ABSENT, because imp-1 adds no behaviour.  imp-3
+;;;         creates the (m52) group, so imp-3 re-pins this check to
+;;;         PRESENT (brief.org section 5.6).  This corpus registers a
+;;;         per-group minimum count.  That guard only proves the file
 ;;;         loaded past the guard line: it cannot catch a truncation that
 ;;;         removes a D1 or D2 check, because the guard sits below those
 ;;;         blocks (cr.org D4).  The advisory runner prints the real test
@@ -334,11 +334,11 @@ prints FAIL.  An absent src/ file is a real error."
 ;; close the D2 group so the guards below count into no group.
 (setq m52-imp1--group nil)
 
-;; imp-1 adds no behaviour, so brief.org section 5 says do NOT create the
-;; (m52) group yet.  A group that exists at imp-1 is a real FAIL.
-(m52-imp1--check "reg/m52-group-absent"
-                 (null (m52-imp1--contains-p "tool/run-tests.scm"
-                                             "(group (m52)")))
+;; imp-3 CREATES the (m52) group, so this check flips from ABSENT to
+;; PRESENT (brief.org section 5.6).  The group now registers the corpus.
+(m52-imp1--check "reg/m52-group-present"
+                 (m52-imp1--tracked-p "tool/run-tests.scm"
+                                      "(group (m52)"))
 ;; The (m51) group is the last milestone group and stays present.
 ;; `m52-imp1--tracked-p' folds an absent tracked file to nil, so this
 ;; prints FAIL (not the INFO of an absent file) if tool/run-tests.scm

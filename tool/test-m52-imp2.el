@@ -16,9 +16,12 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,276 lines and 25 ^DEFUN lines; src/termchar.h
+;;;         src/term.c 5,512 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
-;;;         cmputc :45; 8 fwrite lines in src/term.c; the 6 --term-* DEFUNs
+;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
+;;;         sites plus the 2 in the M52 imp-3 write mechanism); the 6
+;;;         --term-* DEFUNs
 ;;;         in src/term.c; the 5 OUTPUT macro definitions and the OUTPUT
 ;;;         macro line :87; the src/sysdep.c setup literals and their lines
 ;;;         :1114 :1200 :1404 :1437 :1443; and the raw ^tty_ line count 56
@@ -29,10 +32,10 @@
 ;;;         FAIL.  D8 pins NAMES, not line numbers: a new leaf moves every
 ;;;         line below it, so a line constant would invalidate itself at
 ;;;         the next imp; the ordered name list survives.  27 checks.
-;;;   D9 -- the (m52) group is ABSENT from tool/run-tests.scm.  imp-2 adds
-;;;         no behaviour, so brief.org section 10 says create the (m52)
-;;;         group only when the first behaviour corpus lands (imp-3).  A
-;;;         group that exists early is a real FAIL.
+;;;   D9 -- the (m52) group is PRESENT in tool/run-tests.scm.  imp-2 pinned
+;;;         the group ABSENT, because imp-2 adds no behaviour.  imp-3
+;;;         creates the (m52) group, so imp-3 re-pins this check to
+;;;         PRESENT (brief.org section 5.6).
 ;;;
 ;;; Each check is printed as a PASS/FAIL line and turned into an ERT test
 ;;; so the harness counts it.  A read error is a real error, never a
@@ -171,10 +174,10 @@ An absent src/ file prints FAIL, not a silent pass."
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5276"
-                 (eql 5276 (m52-imp2--lines "src/term.c")))
-(m52-imp2--check "term.c-defuns-25"
-                 (eql 25 (m52-imp2--defun-count "src/term.c")))
+(m52-imp2--check "term.c-lines-5512"
+                 (eql 5512 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-defuns-29"
+                 (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"
                  (eql 51 (m52-imp2--line-of "src/termchar.h" "FILE *input;")))
 (m52-imp2--check "termchar.h-output-53"
@@ -183,8 +186,8 @@ An absent src/ file prints FAIL, not a silent pass."
                  (eql 61 (m52-imp2--line-of "src/termchar.h" "FILE *termscript;")))
 (m52-imp2--check "cm.c-cmputc-45"
                  (eql 45 (m52-imp2--line-of "src/cm.c" "cmputc (int c)")))
-(m52-imp2--check "term.c-fwrite-8"
-                 (eql 8 (m52-imp2--count-lines "src/term.c" "fwrite (")))
+(m52-imp2--check "term.c-fwrite-10"
+                 (eql 10 (m52-imp2--count-lines "src/term.c" "fwrite (")))
 (m52-imp2--check "term.c-term-defuns-6"
                  (eql 6 (m52-imp2--count-literal "src/term.c" "DEFUN (\"--term-")))
 ;; the raw ^tty_ line count.  It is NOT the output path: it counts 56
@@ -303,11 +306,11 @@ An absent tracked file folds to nil, so every position check prints FAIL."
 ;; close the D8 group so the guards below count into no group.
 (setq m52-imp2--group nil)
 
-;; imp-2 adds no behaviour, so brief.org section 10 says do NOT create
-;; the (m52) group yet.  A group that exists at imp-2 is a real FAIL.
-(m52-imp2--check "reg/m52-group-absent"
-                 (null (m52-imp2--contains-p "tool/run-tests.scm"
-                                             "(group (m52)")))
+;; imp-3 CREATES the (m52) group, so this check flips from ABSENT to
+;; PRESENT (brief.org section 5.6).  The group now registers the corpus.
+(m52-imp2--check "reg/m52-group-present"
+                 (m52-imp2--tracked-p "tool/run-tests.scm"
+                                      "(group (m52)"))
 ;; The (m51) group is the last milestone group and stays present.
 (m52-imp2--check "reg/m51-group-present"
                  (m52-imp2--tracked-p "tool/run-tests.scm"
