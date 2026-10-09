@@ -16,7 +16,7 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,512 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         src/term.c 5,607 lines and 29 ^DEFUN lines (25 M48 DEFUNs
 ;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
 ;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
@@ -174,8 +174,8 @@ An absent src/ file prints FAIL, not a silent pass."
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5512"
-                 (eql 5512 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-lines-5607"
+                 (eql 5607 (m52-imp2--lines "src/term.c")))
 (m52-imp2--check "term.c-defuns-29"
                  (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"

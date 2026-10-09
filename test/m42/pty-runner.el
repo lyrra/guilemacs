@@ -49,6 +49,10 @@
     "m52-imp3/tty-emit-seq-e2e")
   "The M52 imp-3 observable output cases in test/pty-driver.py.")
 
+(defconst m52-imp4--cases
+  '("m52-imp4/policy-key-e2e")
+  "The M52 imp-4 policy -> key -> bytes case in test/pty-driver.py.")
+
 (defun m42-imp3--dir ()
   "Return the directory that holds pty-runner.el."
   (file-name-directory (or load-file-name
@@ -158,6 +162,12 @@ gap (python3, src/emacs, pty) -- those return INFO pairs."
 Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
 a started driver that produces no report is a FAIL."
   (m42-pty--run-driver "m52-imp3" m52-imp3--cases t))
+
+(defun m52-imp4-run-driver ()
+  "Run the M52 imp-4 policy -> key -> bytes case on the emacs under test.
+Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
+a started driver that produces no report is a FAIL."
+  (m42-pty--run-driver "m52-imp4" m52-imp4--cases t))
 
 (provide 'pty-runner)
 ;;; pty-runner.el ends here

@@ -21,7 +21,7 @@
 ;;;         src/xfns.c 10,546 / 54 / 0 / 0; src/pgtkterm.c 7,774 / 0 / 4 /
 ;;;         1; src/sysdep.c 4,950 / 7 / 7 / 1; src/lread.c 3,561 / 19 / 2 /
 ;;;         1.  The tree-wide scm_c_public_ref count over src/*.[chm] is
-;;;         235.  21 checks.
+;;;         240.  21 checks.
 ;;;   D2 -- the block map of section 3.1 for the two candidates whose
 ;;;         blocks carry the A2 argument: src/sysdep.c (the 7-name ordered
 ;;;         DEFUN list) and src/lread.c (the 19-name ordered DEFUN list).
@@ -251,8 +251,8 @@ the same reason.  An absent src/ file is a real error, not a pass."
                  (eql 2 (m52-imp1--count-literal "src/lread.c" "scm_c_public_ref")))
 (m52-imp1--check "lread.c-guile.h-1"
                  (eql 1 (m52-imp1--count-literal "src/lread.c" "#include \"guile.h\"")))
-(m52-imp1--check "scm-c-public-ref-235"
-                 (eql 235 (m52-imp1--count-scm-ref)))
+(m52-imp1--check "scm-c-public-ref-240"
+                 (eql 240 (m52-imp1--count-scm-ref)))
 
 ;;; --- D2. The block map (docs/m52-plan.org section 3.1) ---------------
 ;;

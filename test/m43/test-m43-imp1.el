@@ -155,8 +155,8 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 38990 (m43-imp1--lines "src/xdisp.c")))
 (m43-imp1--check "xdisp.c-defuns-24"
                  (eql 24 (m43-imp1--count "src/xdisp.c" "^DEFUN (\"")))
-(m43-imp1--check "scm-c-public-ref-235"
-                 (eql 235 (m43-imp1--count-scm-ref)))
+(m43-imp1--check "scm-c-public-ref-240"
+                 (eql 240 (m43-imp1--count-scm-ref)))
 (m43-imp1--check "gobble.scm-lines-303"
                  (eql 303 (m43-imp1--lines "mod/emacs/gobble.scm")))
 

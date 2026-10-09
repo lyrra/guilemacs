@@ -267,6 +267,7 @@
   )
 (group (m52) ; M52 imp-3 the src/term.c TTY output boundary leaves + the (emacs tty-output) module (docs/m52-plan.org)
   "test/m52/test-m52-imp3.el"                 ; M52 imp-3 behavior: runs the built src/emacs on a pty and calls the Scheme tty-write-bytes, tty-emit-cap, and tty-emit-seq wrappers.  The driver reads bytes from the pty master and compares each marked output span with the expected bytes and the leaf's reported count.  No source-layout checks run in test/.  A pty allocation failure is an explicit INFO skip; a child or output mismatch is a FAIL.
+  "test/m52/test-m52-imp4.el"                 ; M52 imp-4 behavior: the 5 insert / highlight policy procedures of (emacs tty-output).  Headless checks resolve the module through eval-scheme and call each procedure for both flags (the policy table and the #nil rule).  One pty case drives the built src/emacs through the policy -> key -> bytes chain.  No source-layout checks run in test/.  A pty allocation failure is an explicit INFO skip.
   )
 (group
   "test/src/eval-tests.el"

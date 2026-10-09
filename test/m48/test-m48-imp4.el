@@ -19,7 +19,7 @@
 ;;;   F2 -- the 4 new ref sites.  src/term.c holds the 4
 ;;;         scm_c_public_ref ("emacs terminal", "term-<block>") strings,
 ;;;         the term.c ref count is 11 (3 old + 4 G1 + 4 G3), and the
-;;;         tree-wide count over src/*.[chm] is 227.
+;;;         tree-wide count over src/*.[chm] is 240.
 ;;;   F3 -- the inline decision is gone.  The tty_frame_geometry helper
 ;;;         holds no geometry arithmetic (no outer_right, no inner_bottom,
 ;;;         no "native_width - 2 * internal_border_width"), and
@@ -46,7 +46,7 @@
 ;;;
 ;;; Current count note: imp-6 removes two geometry leaf docs and one
 ;;; marker block.  The source has 10 FIX markers, six surviving imp-2 leaf
-;;; docs, 11 term.c refs, and 227 tree-wide refs.
+;;; docs, 16 term.c refs, and 240 tree-wide refs.
 
 (princ "=== m48 imp-4 G3 suite ===\n")
 
@@ -206,10 +206,10 @@ anchored match finds the definition only."
                     "src/term.c"
                     (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                             wrapper))))
-(m48-imp4--check "term.c-scm-ref-11"
-                 (eql 11 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
-(m48-imp4--check "scm-c-public-ref-235"
-                 (eql 235 (m48-imp4--count-scm-ref)))
+(m48-imp4--check "term.c-scm-ref-16"
+                 (eql 16 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
+(m48-imp4--check "scm-c-public-ref-240"
+                 (eql 240 (m48-imp4--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 4.4) --------
 

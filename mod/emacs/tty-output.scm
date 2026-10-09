@@ -55,7 +55,10 @@
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
-  #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq))
+  #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
+            tty-turn-on-insert-cap tty-turn-off-insert-cap
+            tty-turn-off-highlight-cap tty-turn-on-highlight-cap
+            tty-toggle-highlight-cap))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -86,3 +89,35 @@
 ;; fixnum: the total byte count, or a negated errno.
 (define (tty-emit-seq device seq)
   ((force %--tty-emit-seq) device seq))
+
+;; --- M52 imp-4: the insert / highlight state-flip policy --------------
+;;
+;; Each procedure holds the DECISION of one src/term.c hub: given the
+;; plain C state flag (a fixnum, 0 or 1) it returns the plain capability
+;; KEY string to emit, or #nil when the hub must emit nothing.  The
+;; selection is pure: a procedure calls no leaf and emits nothing
+;; (docs/kb.org =leaf-must-call-the-mechanism=).  Each returned key MUST
+;; match a m52_caps key byte for byte; a key that does not match makes
+;; m52_cap_string_1 return NULL, so the hub emits nothing (a silent byte
+;; change).  C owns the state write and the OUTPUT / OUTPUT_IF call.
+
+;; tty_turn_on_insert: emit only when insert-mode is off.
+(define (tty-turn-on-insert-cap insert-mode)
+  (if (zero? insert-mode) "insert-mode" #nil))
+
+;; tty_turn_off_insert: emit only when insert-mode is on.
+(define (tty-turn-off-insert-cap insert-mode)
+  (if (zero? insert-mode) #nil "end-insert-mode"))
+
+;; tty_turn_off_highlight: emit only when standout-mode is on.
+(define (tty-turn-off-highlight-cap standout-mode)
+  (if (zero? standout-mode) #nil "end-standout-mode"))
+
+;; tty_turn_on_highlight: emit only when standout-mode is off.
+(define (tty-turn-on-highlight-cap standout-mode)
+  (if (zero? standout-mode) "standout-mode" #nil))
+
+;; tty_toggle_highlight: the two-way flip.  Choose the direction from the
+;; plain flag and return that direction's key (never #nil).
+(define (tty-toggle-highlight-cap standout-mode)
+  (if (zero? standout-mode) "standout-mode" "end-standout-mode"))

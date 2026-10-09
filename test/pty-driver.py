@@ -576,10 +576,56 @@ M52_CASES = (
     },
 )
 
-CASES = M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES
+# M52 imp-4: the insert / highlight state-flip policy.  The child calls
+# the 5 pure policy procedures of (emacs tty-output) through module-ref
+# and emits the returned key through --tty-emit-cap.  This proves the
+# policy -> key -> bytes chain.  It does NOT reach the rewired C hubs
+# (they have no deterministic elisp trigger), so the corpus header
+# states that limitation.
+M52_IMP4_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (emit! (module-ref output 'tty-emit-cap))
+       (flush! (module-ref output 'tty-flush))
+       (on-ins (module-ref output 'tty-turn-on-insert-cap))
+       (off-ins (module-ref output 'tty-turn-off-insert-cap))
+       (off-hl (module-ref output 'tty-turn-off-highlight-cap))
+       (on-hl (module-ref output 'tty-turn-on-highlight-cap))
+       (tog-hl (module-ref output 'tty-toggle-highlight-cap)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(77 53 50 45 73 77 80 52 45 66 69 71 73 78 33))
+      (flush! term)
+      (let ((keys (list (on-ins 1) (on-ins 0) (off-ins 0) (off-ins 1)
+                        (off-hl 0) (off-hl 1) (on-hl 1) (on-hl 0)
+                        (tog-hl 0) (tog-hl 1)))
+            (n 0))
+        (for-each (lambda (k) (set! n (+ n (emit! term k '())))) keys)
+        (write! term #vu8(77 53 50 45 73 77 80 52 45 69 78 68 33))
+        (let ((f (flush! term)))
+          (if (= f 0) (number->string n) "flush-failed"))))))
+"""
+
+M52_IMP4_CASES = (
+    {
+        "name": "m52-imp4/policy-key-e2e",
+        "group": "m52-imp4",
+        "probe": M52_IMP4_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-IMP4-BEGIN!", b"M52-IMP4-END!"),
+        "output_span_bytes": b"\x1b[4h\x1b[4l\x1b[27m\x1b[7m\x1b[7m\x1b[27m",
+        "env": {"TERM": "xterm"},
+    },
+)
+
+CASES = M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES + M52_IMP4_CASES
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
-          "m52-imp3")
+          "m52-imp3", "m52-imp4")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1165,21 +1211,24 @@ def selftest():
         if not group_cases(group):
             problems.append("group %s has no case" % group)
     # The merge must not drop a case: 2 + 7 from M42, 3 from M43,
-    # and 3 M52 output-path cases.
+    # 3 M52 imp-3 output-path cases, and 1 M52 imp-4 policy case.
     check("m42-imp3-case-count", len(group_cases("m42-imp3")), 2)
     check("m42-imp4-case-count", len(group_cases("m42-imp4")), 7)
     check("m43-imp3-case-count", len(group_cases("m43-imp3")), 1)
     check("m43-imp4-case-count", len(group_cases("m43-imp4")), 1)
     check("m43-imp5-case-count", len(group_cases("m43-imp5")), 1)
     check("m52-imp3-case-count", len(group_cases("m52-imp3")), 3)
-    check("total-case-count", len(CASES), 15)
+    check("m52-imp4-case-count", len(group_cases("m52-imp4")), 1)
+    check("total-case-count", len(CASES), 16)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
                           ("m52-imp3/tty-emit-cap-e2e",
                            (b"M52-CAP-BEGIN!", b"M52-CAP-END!")),
                           ("m52-imp3/tty-emit-seq-e2e",
-                           (b"M52-SEQ-BEGIN!", b"M52-SEQ-END!"))):
+                           (b"M52-SEQ-BEGIN!", b"M52-SEQ-END!")),
+                          ("m52-imp4/policy-key-e2e",
+                           (b"M52-IMP4-BEGIN!", b"M52-IMP4-END!"))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
         if not case.get("expect_decimal"):
@@ -1192,6 +1241,9 @@ def selftest():
           b"\x1b[3;11r\x1b[5;9r")
     check("m52-write-output-bytes",
           write_case.get("output_span_bytes"), b"M52-IMP3-WRITE-OK!")
+    check("m52-imp4-output-bytes",
+          _case("m52-imp4/policy-key-e2e").get("output_span_bytes"),
+          b"\x1b[4h\x1b[4l\x1b[27m\x1b[7m\x1b[7m\x1b[27m")
 
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")

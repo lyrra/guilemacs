@@ -290,19 +290,38 @@ tty_set_scroll_region (struct frame *f, int start, int stop)
 }
 
 
+/* M52 imp-4: the insert / highlight state-flip dispatchers.  They are
+   defined with the imp-3 block (near the m52_caps table) and call the
+   pure policy procedures of (emacs tty-output).  These forward
+   declarations keep the hubs below independent of the definition
+   order; the m52_cap_string_1 prototype lets the rewired hubs resolve
+   the KEY before that imp-3 helper is defined.  The m52_ / _scheme name
+   reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static Lisp_Object m52_tty_turn_on_insert_scheme (Lisp_Object);
+static Lisp_Object m52_tty_turn_off_insert_scheme (Lisp_Object);
+static Lisp_Object m52_tty_turn_off_highlight_scheme (Lisp_Object);
+static Lisp_Object m52_tty_turn_on_highlight_scheme (Lisp_Object);
+static Lisp_Object m52_tty_toggle_highlight_scheme (Lisp_Object);
+static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
+
 static void
 tty_turn_on_insert (struct tty_display_info *tty)
 {
-  if (!tty->insert_mode)
-    OUTPUT (tty, tty->TS_insert_mode);
+  Lisp_Object key
+    = m52_tty_turn_on_insert_scheme (make_fixnum (tty->insert_mode));
+  if (!NILP (key))
+    OUTPUT (tty, m52_cap_string_1 (tty, key));
   tty->insert_mode = 1;
 }
 
 void
 tty_turn_off_insert (struct tty_display_info *tty)
 {
-  if (tty->insert_mode)
-    OUTPUT (tty, tty->TS_end_insert_mode);
+  Lisp_Object key
+    = m52_tty_turn_off_insert_scheme (make_fixnum (tty->insert_mode));
+  if (!NILP (key))
+    OUTPUT (tty, m52_cap_string_1 (tty, key));
   tty->insert_mode = 0;
 }
 
@@ -311,26 +330,45 @@ tty_turn_off_insert (struct tty_display_info *tty)
 static void
 tty_turn_off_highlight (struct tty_display_info *tty)
 {
-  if (tty->standout_mode)
-    OUTPUT_IF (tty, tty->TS_end_standout_mode);
+  Lisp_Object key
+    = m52_tty_turn_off_highlight_scheme (make_fixnum (tty->standout_mode));
+  if (!NILP (key))
+    OUTPUT_IF (tty, m52_cap_string_1 (tty, key));
   tty->standout_mode = 0;
 }
 
 static void
 tty_turn_on_highlight (struct tty_display_info *tty)
 {
-  if (!tty->standout_mode)
-    OUTPUT_IF (tty, tty->TS_standout_mode);
+  Lisp_Object key
+    = m52_tty_turn_on_highlight_scheme (make_fixnum (tty->standout_mode));
+  if (!NILP (key))
+    OUTPUT_IF (tty, m52_cap_string_1 (tty, key));
   tty->standout_mode = 1;
 }
 
 static void
 tty_toggle_highlight (struct tty_display_info *tty)
 {
-  if (tty->standout_mode)
-    tty_turn_off_highlight (tty);
+  /* The direction decision runs in Scheme: the returned KEY is either
+     the "on" key or the "off" key.  C routes on that key and keeps the
+     two-way shape (one OUTPUT_IF and one state write per direction).  */
+  Lisp_Object key
+    = m52_tty_toggle_highlight_scheme (make_fixnum (tty->standout_mode));
+  if (NILP (key))
+    return;
+  const char *cap = m52_cap_string_1 (tty, key);
+  if (scm_is_true (scm_string_equal_p (key,
+				       scm_from_utf8_string ("standout-mode"))))
+    {
+      OUTPUT_IF (tty, cap);
+      tty->standout_mode = 1;
+    }
   else
-    tty_turn_on_highlight (tty);
+    {
+      OUTPUT_IF (tty, cap);
+      tty->standout_mode = 0;
+    }
 }
 
 
@@ -5433,6 +5471,63 @@ section 5.1.  */)
       total += rc;
     }
   return make_fixnum (total);
+}
+
+/* --- M52 imp-4: the insert / highlight state-flip dispatchers ------- */
+
+/* FIX-20261009-guilemacs: M52 imp-4 -- call the pure policy procedures
+   of (emacs tty-output) that hold the DECISION of the 5 insert /
+   highlight hubs.  Each dispatcher resolves its module procedure one
+   time (the M48 imp-4 idiom), caches it in a static SCM, and passes a
+   plain fixnum flag only.  The returned value is a plain KEY string, or
+   nil, which the hub tests with NILP.  The C state write, the FILE *
+   streams, and the OUTPUT / OUTPUT_IF padding stay in C.  The m52_ /
+   _scheme name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+
+static Lisp_Object
+m52_tty_turn_on_insert_scheme (Lisp_Object insert_mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-turn-on-insert-cap");
+  return SCM_CALL_1 (proc, insert_mode);
+}
+
+static Lisp_Object
+m52_tty_turn_off_insert_scheme (Lisp_Object insert_mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-turn-off-insert-cap");
+  return SCM_CALL_1 (proc, insert_mode);
+}
+
+static Lisp_Object
+m52_tty_turn_off_highlight_scheme (Lisp_Object standout_mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-turn-off-highlight-cap");
+  return SCM_CALL_1 (proc, standout_mode);
+}
+
+static Lisp_Object
+m52_tty_turn_on_highlight_scheme (Lisp_Object standout_mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-turn-on-highlight-cap");
+  return SCM_CALL_1 (proc, standout_mode);
+}
+
+static Lisp_Object
+m52_tty_toggle_highlight_scheme (Lisp_Object standout_mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-toggle-highlight-cap");
+  return SCM_CALL_1 (proc, standout_mode);
 }
 
 void

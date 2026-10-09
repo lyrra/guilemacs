@@ -297,8 +297,8 @@ real error, not a pass."
                  (eql 2387 (m45-imp3--lines "src/callproc.c")))
 (m45-imp3--check "callproc.c-defuns-7"
                  (eql 7 (m45-imp3--count "src/callproc.c" "^DEFUN (\"")))
-(m45-imp3--check "scm-c-public-ref-235"
-                 (eql 235 (m45-imp3--count-scm-ref)))
+(m45-imp3--check "scm-c-public-ref-240"
+                 (eql 240 (m45-imp3--count-scm-ref)))
 (m45-imp3--check "margin-under-budget-237"
                  (let ((kb (m45-imp3--lines "src/keyboard.c"))
                        (kg (m45-imp3--lines "src/keyboard-globals.c")))
