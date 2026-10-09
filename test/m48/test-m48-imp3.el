@@ -13,7 +13,7 @@
 ;;;   F2 -- the 4 new ref sites.  src/term.c holds the 4
 ;;;         scm_c_public_ref ("emacs terminal", "term-<block>") strings,
 ;;;         the term.c ref count is 11 (3 old + 4 G1 + 4 G3), and the
-;;;         tree-wide count over src/*.[chm] is 240.
+;;;         tree-wide count over src/*.[chm] is 246.
 ;;;   F3 -- the inline decision is gone.  The tty-display-color-p and
 ;;;         tty-display-color-cells bodies no longer hold
 ;;;         "TN_max_colors > 0", and every TN_max_colors read in those
@@ -219,10 +219,10 @@ mechanism helpers, whose TN_max_colors reads are not the hub policy."
                       "src/term.c"
                       (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                               wrapper)))))
-(m48-imp3--check "term.c-scm-ref-16"
-                 (eql 16 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
-(m48-imp3--check "scm-c-public-ref-240"
-                 (eql 240 (m48-imp3--count-scm-ref)))
+(m48-imp3--check "term.c-scm-ref-22"
+                 (eql 22 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
+(m48-imp3--check "scm-c-public-ref-246"
+                 (eql 246 (m48-imp3--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 3.2) --------
 

@@ -16,7 +16,7 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,607 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         src/term.c 5,735 lines and 29 ^DEFUN lines (25 M48 DEFUNs
 ;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
 ;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
@@ -36,6 +36,13 @@
 ;;;         the group ABSENT, because imp-2 adds no behaviour.  imp-3
 ;;;         creates the (m52) group, so imp-3 re-pins this check to
 ;;;         PRESENT (brief.org section 5.6).
+;;;   D10 -- the tree-wide re-pin consistency guard (added with the M52
+;;;         imp-5 review follow-up).  It re-measures the tree-wide
+;;;         scm_c_public_ref line count and checks every labeled pin in
+;;;         the tracked M-corpus and tool/ files against it, so a re-pin
+;;;         that misses a corpus (the imp-5 F1 defect) is caught here.
+;;;         1 check per pinned corpus + a measured-positive and a
+;;;         min-pinned-files guard.
 ;;;
 ;;; Each check is printed as a PASS/FAIL line and turned into an ERT test
 ;;; so the harness counts it.  A read error is a real error, never a
@@ -54,13 +61,16 @@
   "Total number of tracked-file checks this corpus has registered.")
 
 (defvar m52-imp2--group nil
-  "The group that `m52-imp2--check' counts into: `d7', `d8', or nil.")
+  "The group that `m52-imp2--check' counts into: `d7', `d8', `d10', or nil.")
 
 (defvar m52-imp2--registered-d7 0
   "Number of D7 measured-surface checks registered.  D9 pins a minimum.")
 
 (defvar m52-imp2--registered-d8 0
   "Number of D8 block-map checks registered.  D9 pins a minimum.")
+
+(defvar m52-imp2--registered-d10 0
+  "Number of D10 re-pin consistency checks registered.  D10 pins a minimum.")
 
 (defun m52-imp2--with (rel fn)
   "Call FN in a temp buffer holding REL (repo-root-relative), or return
@@ -167,15 +177,17 @@ An absent src/ file prints FAIL, not a silent pass."
       (cond ((eq m52-imp2--group 'd7)
              (setq m52-imp2--registered-d7 (1+ m52-imp2--registered-d7)))
             ((eq m52-imp2--group 'd8)
-             (setq m52-imp2--registered-d8 (1+ m52-imp2--registered-d8))))
+             (setq m52-imp2--registered-d8 (1+ m52-imp2--registered-d8)))
+            ((eq m52-imp2--group 'd10)
+             (setq m52-imp2--registered-d10 (1+ m52-imp2--registered-d10))))
       (imp-register-bool-as-ert-test (format "m52-imp2/%s" name) (and ok t)))))
 
 ;;; --- D7. The measured surface (docs/m52-plan.org section 8.2) --------
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5607"
-                 (eql 5607 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-lines-5735"
+                 (eql 5735 (m52-imp2--lines "src/term.c")))
 (m52-imp2--check "term.c-defuns-29"
                  (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"
@@ -207,7 +219,7 @@ An absent src/ file prints FAIL, not a silent pass."
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT1_IF(tty, a)"))
 ;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87).
 (m52-imp2--check "term.c-macro-output-line-87"
-                 (eql 87 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
+                 (eql 100 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
 ;; the write mechanism is the C callback + the C-owned streams.
 (m52-imp2--check "cm.c-cmputc-writes-output"
                  (m52-imp2--tracked-p "src/cm.c" "putc (c & 0177, current_tty->output)"))
@@ -329,5 +341,79 @@ An absent tracked file folds to nil, so every position check prints FAIL."
 (m52-imp2--check "reg/min-d8-checks-27"
                  (>= m52-imp2--registered-d8 27))
 
-(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d) ===\n"
-               m52-imp2--registered m52-imp2--registered-d7 m52-imp2--registered-d8))
+;;; --- D10. The tree-wide re-pin consistency guard ---------------------
+;;
+;; The tree-wide scm_c_public_ref count is pinned in ~36 tracked corpora
+;; (test/m40 ... test/m52 and tool/).  The RE-PINS list is hand-
+;; maintained, so a re-pin that misses a corpus drifts.  The M52 imp-5
+;; F1 defect is the example: the 4 test/m40/*.scm copies kept 240 while
+;; the tree held 246, and only their own group went red.  This guard
+;; re-measures the count and checks EVERY labeled pin against it, so a
+;; missed corpus is a real FAIL here too, not only in its own group.  It
+;; reads tracked files only.
+
+(setq m52-imp2--group 'd10)
+
+(defconst m52-imp2--tree-ref-pin-re
+  "\\(?:tree-wide-scm-public-ref\\|tree-wide-scm-ref\\|tree-ref-sites\\|scm-c-public-ref\\)-\\([0-9]+\\)"
+  "The labeled tree-wide scm_c_public_ref pin patterns, one capture group.")
+
+(defun m52-imp2--tree-ref-lines ()
+  "The tree-wide line count: `scm_c_public_ref' lines summed over src/*.[chm].
+This is `grep -c' per file then summed (LINES, not occurrences), the
+same shape as the M52 imp-1 D1 measure."
+  (let ((total 0))
+    (dolist (f (directory-files (expand-file-name "src" m52-imp2--root)
+                                t "\\.[chm]\\'"))
+      (setq total (+ total
+                     (or (m52-imp2--count-lines (file-relative-name
+                                                 f m52-imp2--root)
+                                                "scm_c_public_ref")
+                         0))))
+    total))
+
+(defun m52-imp2--corpus-files ()
+  "The tracked M-corpus files (test/m*/ and tool/, .el and .scm), root-relative.
+A missing tool/ (untracked on a fresh clone) contributes no files."
+  (let ((files '())
+        (test (expand-file-name "test" m52-imp2--root)))
+    (when (file-directory-p test)
+      (dolist (d (directory-files test t "^m[0-9]"))
+        (dolist (f (directory-files-recursively d "\\.\\(?:el\\|scm\\)\\'"))
+          (push (file-relative-name f m52-imp2--root) files))))
+    (let ((dir (expand-file-name "tool" m52-imp2--root)))
+      (when (file-directory-p dir)
+        (dolist (f (directory-files-recursively dir "\\.\\(?:el\\|scm\\)\\'"))
+          (push (file-relative-name f m52-imp2--root) files))))
+    (nreverse files)))
+
+(defun m52-imp2--tree-ref-pins (rel)
+  "The labeled tree-wide pin numbers REL holds, as a list of integers."
+  (m52-imp2--with rel
+    (lambda ()
+      (let ((pins '()))
+        (goto-char (point-min))
+        (while (re-search-forward m52-imp2--tree-ref-pin-re nil t)
+          (push (string-to-number (match-string 1)) pins))
+        (nreverse pins)))))
+
+(let* ((measured (m52-imp2--tree-ref-lines))
+       (files (m52-imp2--corpus-files))
+       (pinned 0))
+  ;; sanity: a broken walk yields 0, so the measured-positive check fails.
+  (m52-imp2--check "repin/measured-positive" (> measured 0))
+  (dolist (f files)
+    (let ((pins (m52-imp2--tree-ref-pins f)))
+      (when (and (listp pins) pins)
+        (setq pinned (1+ pinned))
+        (m52-imp2--check (format "repin/%s" f)
+                         (let ((ok t))
+                           (dolist (n pins)
+                             (unless (eql n measured) (setq ok nil)))
+                           ok)))))
+  ;; a discovery break must FAIL: ~36 corpora carry the pin.
+  (m52-imp2--check "repin/min-pinned-files-30" (>= pinned 30)))
+
+(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d, D10 %d) ===\n"
+               m52-imp2--registered m52-imp2--registered-d7 m52-imp2--registered-d8
+               m52-imp2--registered-d10))

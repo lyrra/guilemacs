@@ -70,6 +70,19 @@ static void turn_on_face (struct frame *f, struct face *face);
 static void turn_off_face (struct frame *f, struct face *face);
 static void tty_turn_off_highlight (struct tty_display_info *);
 static void tty_background_highlight (struct tty_display_info *tty);
+/* M52 imp-5: the bell / cursor / update-end dispatchers.  tty_ring_bell
+   and tty_update_end sit above the imp-4 forward-declaration block, so
+   their dispatchers (and the m52_cap_string_1 prototype they resolve
+   their key with) must be declared here, before the hubs.  The m52_ /
+   _scheme name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static Lisp_Object m52_tty_ring_bell_scheme (Lisp_Object, Lisp_Object);
+static Lisp_Object m52_tty_hide_cursor_scheme (Lisp_Object);
+static Lisp_Object m52_tty_show_cursor_scheme (Lisp_Object, Lisp_Object);
+static Lisp_Object m52_tty_background_highlight_scheme (Lisp_Object);
+static Lisp_Object m52_tty_highlight_if_desired_scheme (Lisp_Object);
+static Lisp_Object m52_tty_update_end_scheme (Lisp_Object);
+static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
 static void set_tty_hooks (struct terminal *terminal);
 static void dissociate_if_controlling_tty (int fd);
@@ -157,9 +170,14 @@ tty_ring_bell (struct frame *f)
 
   if (tty->output)
     {
-      OUTPUT (tty, (tty->TS_visible_bell && visible_bell
-                    ? tty->TS_visible_bell
-                    : tty->TS_bell));
+      /* The bell selection runs in Scheme: the returned KEY is either
+         "visible-bell" or "bell".  C resolves the key and keeps the
+         OUTPUT call and the fflush.  */
+      Lisp_Object key
+        = m52_tty_ring_bell_scheme (make_fixnum (visible_bell),
+                                    make_fixnum (tty->TS_visible_bell != NULL));
+      if (!NILP (key))
+        OUTPUT (tty, m52_cap_string_1 (tty, key));
       fflush (tty->output);
     }
 }
@@ -249,10 +267,22 @@ tty_update_end (struct frame *f)
 {
   struct tty_display_info *tty = FRAME_TTY (f);
 
-  if (!XWINDOW (selected_window)->cursor_off_p)
-    tty_show_cursor (tty);
-  tty_turn_off_insert (tty);
-  tty_background_highlight (tty);
+  /* The step selection runs in Scheme: the returned list holds the
+     ordered step tags.  C routes each step to its hub and keeps the
+     fflush.  The plain cursor_off_p boolean crosses the layer, never
+     the window.  */
+  Lisp_Object steps
+    = m52_tty_update_end_scheme (make_fixnum (XWINDOW (selected_window)->cursor_off_p));
+  for (; CONSP (steps); steps = XCDR (steps))
+    {
+      Lisp_Object s = XCAR (steps);
+      if (scm_is_true (scm_string_equal_p (s, scm_from_utf8_string ("show-cursor"))))
+        tty_show_cursor (tty);
+      else if (scm_is_true (scm_string_equal_p (s, scm_from_utf8_string ("off-insert"))))
+        tty_turn_off_insert (tty);
+      else if (scm_is_true (scm_string_equal_p (s, scm_from_utf8_string ("background"))))
+        tty_background_highlight (tty);
+    }
   fflush (tty->output);
 }
 
@@ -377,15 +407,27 @@ tty_toggle_highlight (struct tty_display_info *tty)
 void
 tty_hide_cursor (struct tty_display_info *tty)
 {
+#ifdef WINDOWSNT
+  /* FIX-20261009-guilemacs: the MS-Windows console cursor arm is out of
+     scope; it stays C.  */
   if (tty->cursor_hidden == 0)
     {
       tty->cursor_hidden = 1;
-#ifdef WINDOWSNT
       w32con_hide_cursor ();
-#else
-      OUTPUT_IF (tty, tty->TS_cursor_invisible);
-#endif
     }
+#else
+  /* The hide decision runs in Scheme: the returned list holds the
+     "cursor-invisible" key, or nil when the cursor is already hidden.
+     C tests the whole list, keeps the state write, and keeps the
+     OUTPUT_IF call.  */
+  Lisp_Object keys
+    = m52_tty_hide_cursor_scheme (make_fixnum (tty->cursor_hidden));
+  if (NILP (keys))
+    return;
+  tty->cursor_hidden = 1;
+  for (; CONSP (keys); keys = XCDR (keys))
+    OUTPUT_IF (tty, m52_cap_string_1 (tty, XCAR (keys)));
+#endif
 }
 
 
@@ -394,17 +436,28 @@ tty_hide_cursor (struct tty_display_info *tty)
 void
 tty_show_cursor (struct tty_display_info *tty)
 {
+#ifdef WINDOWSNT
+  /* FIX-20261009-guilemacs: the MS-Windows console cursor arm is out of
+     scope; it stays C.  */
   if (tty->cursor_hidden)
     {
       tty->cursor_hidden = 0;
-#ifdef WINDOWSNT
       w32con_show_cursor ();
-#else
-      OUTPUT_IF (tty, tty->TS_cursor_normal);
-      if (visible_cursor)
-        OUTPUT_IF (tty, tty->TS_cursor_visible);
-#endif
     }
+#else
+  /* The show decision runs in Scheme: the returned list holds
+     "cursor-normal", and "cursor-visible" when visible_cursor is on,
+     or nil when the cursor is already shown.  C tests the whole list,
+     keeps the state write, and keeps each OUTPUT_IF call.  */
+  Lisp_Object keys
+    = m52_tty_show_cursor_scheme (make_fixnum (tty->cursor_hidden),
+                                  make_fixnum (visible_cursor));
+  if (NILP (keys))
+    return;
+  tty->cursor_hidden = 0;
+  for (; CONSP (keys); keys = XCDR (keys))
+    OUTPUT_IF (tty, m52_cap_string_1 (tty, XCAR (keys)));
+#endif
 }
 
 
@@ -415,7 +468,13 @@ tty_show_cursor (struct tty_display_info *tty)
 static void
 tty_background_highlight (struct tty_display_info *tty)
 {
-  if (inverse_video)
+  /* The direction decision runs in Scheme: the returned KEY is either
+     the "on" key or the "off" key.  C routes on that key and keeps the
+     two-way call to the imp-4 hub.  */
+  Lisp_Object key
+    = m52_tty_background_highlight_scheme (make_fixnum (inverse_video));
+  if (scm_is_true (scm_string_equal_p (key,
+				       scm_from_utf8_string ("standout-mode"))))
     tty_turn_on_highlight (tty);
   else
     tty_turn_off_highlight (tty);
@@ -426,7 +485,13 @@ tty_background_highlight (struct tty_display_info *tty)
 static void
 tty_highlight_if_desired (struct tty_display_info *tty)
 {
-  if (inverse_video)
+  /* The direction decision runs in Scheme: the returned KEY is either
+     the "on" key or the "off" key.  C routes on that key and keeps the
+     two-way call to the imp-4 hub.  */
+  Lisp_Object key
+    = m52_tty_highlight_if_desired_scheme (make_fixnum (inverse_video));
+  if (scm_is_true (scm_string_equal_p (key,
+				       scm_from_utf8_string ("standout-mode"))))
     tty_turn_on_highlight (tty);
   else
     tty_turn_off_highlight (tty);
@@ -5519,6 +5584,69 @@ m52_tty_turn_on_highlight_scheme (Lisp_Object standout_mode)
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs tty-output", "tty-turn-on-highlight-cap");
   return SCM_CALL_1 (proc, standout_mode);
+}
+
+/* M52 imp-5: the bell / cursor / update-end dispatchers.  Each resolves
+   its module procedure one time (the M48 imp-4 idiom) and passes plain
+   fixnum flags only.  ring_bell returns a plain KEY string; hide_cursor
+   and show_cursor return an ordered KEY list, or nil; background and
+   highlight_if_desired return a plain KEY string; update_end returns an
+   ordered step-tag list.  The C state writes, the FILE * streams, and
+   the OUTPUT / OUTPUT_IF padding stay in C.  The m52_ / _scheme name
+   reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static Lisp_Object
+m52_tty_ring_bell_scheme (Lisp_Object vis_bell, Lisp_Object has_vis_bell)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-ring-bell-cap");
+  return SCM_CALL_2 (proc, vis_bell, has_vis_bell);
+}
+
+static Lisp_Object
+m52_tty_hide_cursor_scheme (Lisp_Object cursor_hidden)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-hide-cursor-cap");
+  return SCM_CALL_1 (proc, cursor_hidden);
+}
+
+static Lisp_Object
+m52_tty_show_cursor_scheme (Lisp_Object cursor_hidden, Lisp_Object vis_cursor)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-show-cursor-cap");
+  return SCM_CALL_2 (proc, cursor_hidden, vis_cursor);
+}
+
+static Lisp_Object
+m52_tty_background_highlight_scheme (Lisp_Object inv_video)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-background-highlight-cap");
+  return SCM_CALL_1 (proc, inv_video);
+}
+
+static Lisp_Object
+m52_tty_highlight_if_desired_scheme (Lisp_Object inv_video)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-highlight-if-desired-cap");
+  return SCM_CALL_1 (proc, inv_video);
+}
+
+static Lisp_Object
+m52_tty_update_end_scheme (Lisp_Object cursor_off_p)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-update-end-steps");
+  return SCM_CALL_1 (proc, cursor_off_p);
 }
 
 static Lisp_Object

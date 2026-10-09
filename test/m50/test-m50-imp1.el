@@ -20,7 +20,7 @@
 ;;;         the leaf and adds the daemonp bridge, so it re-pins them
 ;;;         again);
 ;;;         src/coding.c 12,284 / 34 / 0.  The tree-wide scm_c_public_ref
-;;;         count over src/*.[chm] is 240.  Each of the three candidates
+;;;         count over src/*.[chm] is 246.  Each of the three candidates
 ;;;         holds #include "guile.h" already (brief.org section 4).
 ;;;         mod/emacs/emacs.scm is present (M50 imp-2 creates it; it was
 ;;;         absent at the imp-1 audit).  14 checks.
@@ -193,8 +193,8 @@ passes the raw symbol to reach it."
                  (eql 34 (m50-imp1--count "src/coding.c" "^DEFUN (\"")))
 (m50-imp1--check "coding.c-scm-ref-0"
                  (eql 0 (m50-imp1--count "src/coding.c" "scm_c_public_ref")))
-(m50-imp1--check "scm-c-public-ref-240"
-                 (eql 240 (m50-imp1--count-scm-ref)))
+(m50-imp1--check "scm-c-public-ref-246"
+                 (eql 246 (m50-imp1--count-scm-ref)))
 (m50-imp1--check "emacs-module-present"
                  (m50-imp1--exists-p "mod/emacs/emacs.scm"))
 ;; brief.org section 4 states that each candidate holds #include "guile.h"

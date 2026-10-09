@@ -58,7 +58,10 @@
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
             tty-turn-on-insert-cap tty-turn-off-insert-cap
             tty-turn-off-highlight-cap tty-turn-on-highlight-cap
-            tty-toggle-highlight-cap))
+            tty-toggle-highlight-cap
+            tty-ring-bell-cap tty-hide-cursor-cap tty-show-cursor-cap
+            tty-background-highlight-cap tty-highlight-if-desired-cap
+            tty-update-end-steps))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -121,3 +124,54 @@
 ;; plain flag and return that direction's key (never #nil).
 (define (tty-toggle-highlight-cap standout-mode)
   (if (zero? standout-mode) "standout-mode" "end-standout-mode"))
+
+;; --- M52 imp-5: the bell / cursor / update-end policy -----------------
+;;
+;; Each procedure holds the DECISION of one src/term.c hub.  The shape is
+;; the imp-4 shape: a pure procedure over plain fixnum flags returns a
+;; plain capability KEY (or an ordered KEY list, or #nil).  A procedure
+;; calls no leaf and emits nothing (docs/kb.org
+;; =leaf-must-call-the-mechanism=).  Every returned KEY MUST match a
+;; m52_caps key byte for byte; a key that does not match makes
+;; m52_cap_string_1 return NULL, so the hub emits nothing (a silent byte
+;; change).  C owns the state write and the OUTPUT / OUTPUT_IF call.
+
+;; tty_ring_bell: pick "visible-bell" when the user option visible_bell
+;; is on AND the terminal holds a visible-bell capability; else "bell".
+;; It never returns #nil.
+(define (tty-ring-bell-cap visible-bell has-visible-bell)
+  (if (and (not (zero? visible-bell)) (not (zero? has-visible-bell)))
+      "visible-bell" "bell"))
+
+;; tty_hide_cursor: hide only when the cursor is not already hidden.  The
+;; #nil case means "emit nothing" (the C hub tests the whole list).
+(define (tty-hide-cursor-cap cursor-hidden)
+  (if (zero? cursor-hidden) (list "cursor-invisible") #nil))
+
+;; tty_show_cursor: show only when the cursor is hidden.  "cursor-normal"
+;; always; add "cursor-visible" when the user option visible_cursor is on.
+;; The #nil case means "emit nothing".
+(define (tty-show-cursor-cap cursor-hidden visible-cursor)
+  (if (zero? cursor-hidden)
+      #nil
+      (if (zero? visible-cursor)
+          (list "cursor-normal")
+          (list "cursor-normal" "cursor-visible"))))
+
+;; tty_background_highlight: the standout direction for empty space.
+;; Never #nil.
+(define (tty-background-highlight-cap inverse-video)
+  (if (zero? inverse-video) "end-standout-mode" "standout-mode"))
+
+;; tty_highlight_if_desired: the standout direction for the text.  Never
+;; #nil.
+(define (tty-highlight-if-desired-cap inverse-video)
+  (if (zero? inverse-video) "end-standout-mode" "standout-mode"))
+
+;; tty_update_end: the ordered step list.  The "show-cursor" step is
+;; present only when the selected window's cursor_off_p is 0; the two
+;; other steps are always present.
+(define (tty-update-end-steps cursor-off-p)
+  (if (zero? cursor-off-p)
+      (list "show-cursor" "off-insert" "background")
+      (list "off-insert" "background")))
