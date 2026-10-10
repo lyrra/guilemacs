@@ -35,5 +35,6 @@ extern uint64_t c_to_scheme_crossings;
 #define SCM_CALL_3(fn,a,b,c)        (c_to_scheme_crossings++, (scm_call_3)(fn,a,b,c))
 #define SCM_CALL_4(fn,a,b,c,d)      (c_to_scheme_crossings++, (scm_call_4)(fn,a,b,c,d))
 #define SCM_CALL_5(fn,a,b,c,d,e)    (c_to_scheme_crossings++, (scm_call_5)(fn,a,b,c,d,e))
+#define SCM_CALL_6(fn,a,b,c,d,e,f)  (c_to_scheme_crossings++, (scm_call_6)(fn,a,b,c,d,e,f))
 #define SCM_CALL_7(fn,a,b,c,d,e,f,g) (c_to_scheme_crossings++, (scm_call_7)(fn,a,b,c,d,e,f,g))
 #define SCM_CALL_N(fn,args,n)       (c_to_scheme_crossings++, (scm_call_n)(fn,args,n))

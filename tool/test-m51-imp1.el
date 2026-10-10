@@ -18,7 +18,7 @@
 ;;;         src/image.c 13,447 / 11 / 5 / 1;  (re-pinned after M51 imp-5) src/xfns.c 10,546 / 54 /
 ;;;         0 / 0; src/pgtkterm.c 7,774 / 0 / 4 / 1; src/sysdep.c 4,950 /
 ;;;         7 / 7 / 1; src/lread.c 3,561 / 19 / 2 / 1.  The tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] is 246 (re-pinned after M52 imp-5).  mod/emacs/
+;;;         scm_c_public_ref count over src/*.[chm] is 250 (re-pinned after M52 imp-5).  mod/emacs/
 ;;;         image.scm is ABSENT at the imp-1 audit; M51 imp-4 creates it
 ;;;         yet).  26 checks.
 ;;;   D2 -- the block map of section 3.1 for the recommended target,
@@ -202,8 +202,8 @@ passes the raw symbol to reach it."
 ;;   - image.c-lines-13447 (the three bridges and the rewiring);
 ;;   - image.c-scm-ref-5 (the five scm_c_public_ref sites: imp-4's two
 ;;     plus the Open-Stream, Handle-Read, and Close bridges);
-;;   - scm-c-public-ref-246, the tree-wide src/*.[chm] count, which
-;;     drifts from 232 to 246;
+;;   - scm-c-public-ref-250, the tree-wide src/*.[chm] count, which
+;;     drifts from 232 to 250;
 ;;   - image.c-defuns-11 and image.c-guile.h-1, which do NOT move.
 ;; imp-5 must re-pin all of them, or the D1 check FAILs.
 (m51-imp1--check "xterm.c-lines-33110"
@@ -254,8 +254,8 @@ passes the raw symbol to reach it."
                  (eql 2 (m51-imp1--count-literal "src/lread.c" "scm_c_public_ref")))
 (m51-imp1--check "lread.c-guile.h-1"
                  (eql 1 (m51-imp1--count-literal "src/lread.c" "#include \"guile.h\"")))
-(m51-imp1--check "scm-c-public-ref-246"
-                 (eql 246 (m51-imp1--count-scm-ref)))
+(m51-imp1--check "scm-c-public-ref-250"
+                 (eql 250 (m51-imp1--count-scm-ref)))
 ;; M51 imp-4 creates the recommended target's module.  Pin its presence:
 ;; the imp-1 module-absent fact flips once imp-4 lands.
 (m51-imp1--check "image-module-present"

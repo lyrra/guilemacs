@@ -338,12 +338,12 @@ the forbidden hub.")
                  (eql 27 (m47-imp3--count "src/fileio.c" "scm_c_public_ref")))
 (m47-imp3--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp3--lines "mod/emacs/fileio.scm")))
-(m47-imp3--check "tree-wide-scm-public-ref-246"
+(m47-imp3--check "tree-wide-scm-public-ref-250"
                  (let ((total 0)
                        (dir (expand-file-name "src" m47-imp3--root)))
                    (dolist (f (directory-files dir t "\\.[chm]\\'"))
                      (setq total (+ total (or (m47-imp3--count f "scm_c_public_ref") 0))))
-                   (eql 246 total)))
+                   (eql 250 total)))
 (m47-imp3--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp3--lines "src/keyboard.c")))
 (m47-imp3--check "keyboard-globals.c-lines-490"

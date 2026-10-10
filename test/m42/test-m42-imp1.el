@@ -151,13 +151,13 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 (m42-imp1--check "tty-input-is-FILE-star"
                  (m42-imp1--contains-p "src/termchar.h" "FILE *input;"))
-(m42-imp1--check "tty-input-opened-by-fdopen-at-2674"
-                 (eql 2674 (m42-imp1--line-of "src/term.c" "emacs_fdopen")))
-(m42-imp1--check "initial-tty-input-is-stdin-at-4735"
-                 (eql 4735 (m42-imp1--line-of "src/term.c"
+(m42-imp1--check "tty-input-opened-by-fdopen-at-2731"
+                 (eql 2731 (m42-imp1--line-of "src/term.c" "emacs_fdopen")))
+(m42-imp1--check "initial-tty-input-is-stdin-at-4792"
+                 (eql 4792 (m42-imp1--line-of "src/term.c"
                                               "tty->input = stdin;")))
-(m42-imp1--check "delete-tty-fcloses-input-at-5004"
-                 (eql 5004 (m42-imp1--line-of "src/term.c"
+(m42-imp1--check "delete-tty-fcloses-input-at-5061"
+                 (eql 5061 (m42-imp1--line-of "src/term.c"
                                               "emacs_fclose (tty->input);")))
 (m42-imp1--check "read-bypasses-stdio-via-emacs-read"
                  (m42-imp1--contains-p "src/keyboard.c"

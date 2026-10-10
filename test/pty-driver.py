@@ -677,11 +677,66 @@ M52_IMP5_CASES = (
     },
 )
 
+M52_IMP6_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (emit! (module-ref output 'tty-emit-cap))
+       (flush! (module-ref output 'tty-flush))
+       (set-modes (module-ref output 'tty-set-terminal-modes-steps))
+       (reset-modes (module-ref output 'tty-reset-terminal-modes-steps))
+       (cur (module-ref output 'tty-cursor-to-steps))
+       (raw (module-ref output 'tty-raw-cursor-to-steps)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      ;; Walk every returned step list and emit ONLY the KEY (string)
+      ;; steps through --tty-emit-cap.  The marker steps (the "newlines"
+      ;; / "raw-cr" / "move" / "background" / "off-insert" lists) carry
+      ;; fixnum data and a C mechanism, so the probe skips them.  The
+      ;; two cursor procedures return only markers, so they add no bytes
+      ;; here; their step lists are checked headlessly instead.
+      (write! term #vu8(77 53 50 45 73 77 80 54 45 66 69 71 73 78 33))
+      (let ((steps (append (set-modes 1 24 0)
+                           (reset-modes)
+                           (cur 0 0 5 7 0 0)
+                           (raw 0 0 5 7 0 0)))
+            (n 0))
+        (for-each (lambda (s)
+                    (if (string? s)
+                        (set! n (+ n (emit! term s '())))
+                        #f))
+                  steps)
+        (write! term #vu8(77 53 50 45 73 77 80 54 45 69 78 68 33))
+        (let ((f (flush! term)))
+          (if (= f 0) (number->string n) "flush-failed"))))))
+"""
+
+M52_IMP6_CASES = (
+    {
+        "name": "m52-imp6/policy-key-e2e",
+        "group": "m52-imp6",
+        "probe": M52_IMP6_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-IMP6-BEGIN!", b"M52-IMP6-END!"),
+        # NO output_span_bytes.  brief.org section 9 forbids hard-coded
+        # provisional bytes from the TERM=xterm terminfo: the span MUST be
+        # derived from a real pty run, or INFO-skip.  This sandbox denies
+        # pty allocation ("out of pty devices"), so the case INFO-skips
+        # here.  When a pty is present the driver checks that the reported
+        # byte count equals the real span length; the exact bytes stay
+        # unverified until a host with a pty derives them.
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES
-         + M52_IMP4_CASES + M52_IMP5_CASES)
+         + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
-          "m52-imp3", "m52-imp4", "m52-imp5")
+          "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1277,7 +1332,8 @@ def selftest():
     check("m52-imp3-case-count", len(group_cases("m52-imp3")), 3)
     check("m52-imp4-case-count", len(group_cases("m52-imp4")), 1)
     check("m52-imp5-case-count", len(group_cases("m52-imp5")), 1)
-    check("total-case-count", len(CASES), 17)
+    check("m52-imp6-case-count", len(group_cases("m52-imp6")), 1)
+    check("total-case-count", len(CASES), 18)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -1288,7 +1344,9 @@ def selftest():
                           ("m52-imp4/policy-key-e2e",
                            (b"M52-IMP4-BEGIN!", b"M52-IMP4-END!")),
                           ("m52-imp5/policy-key-e2e",
-                           (b"M52-IMP5-BEGIN!", b"M52-IMP5-END!"))):
+                           (b"M52-IMP5-BEGIN!", b"M52-IMP5-END!")),
+                          ("m52-imp6/policy-key-e2e",
+                           (b"M52-IMP6-BEGIN!", b"M52-IMP6-END!"))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
         if not case.get("expect_decimal"):
@@ -1309,6 +1367,10 @@ def selftest():
           b"\x07\x1b[?25l\x1b[?12l\x1b[?25h"
           b"\x1b[?12l\x1b[?25h\x1b[?12;25h"
           b"\x1b[27m\x1b[7m\x1b[27m\x1b[7m")
+    # m52-imp6 pins NO output_span_bytes (brief.org section 9): the span
+    # must come from a real pty run or INFO-skip, so assert its absence.
+    check("m52-imp6-output-bytes-unpinned",
+          "output_span_bytes" in _case("m52-imp6/policy-key-e2e"), False)
 
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")

@@ -61,7 +61,9 @@
             tty-toggle-highlight-cap
             tty-ring-bell-cap tty-hide-cursor-cap tty-show-cursor-cap
             tty-background-highlight-cap tty-highlight-if-desired-cap
-            tty-update-end-steps))
+            tty-update-end-steps
+            tty-set-terminal-modes-steps tty-reset-terminal-modes-steps
+            tty-cursor-to-steps tty-raw-cursor-to-steps))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -175,3 +177,53 @@
   (if (zero? cursor-off-p)
       (list "show-cursor" "off-insert" "background")
       (list "off-insert" "background")))
+
+;; --- M52 imp-6: the terminal-mode / cursor-motion policy -------------
+;;
+;; Each procedure holds the DECISION of one src/term.c hub.  A procedure
+;; returns an ordered step list, or #nil.  Two step kinds exist; C tells
+;; them apart with STRINGP:
+;;
+;;   - KEY step: a plain string.  It names one m52_caps key.  C resolves
+;;     it with m52_cap_string_1 and emits it through OUTPUT_IF.
+;;   - MARKER step: a plain list (TAG ARG...).  TAG is a plain string;
+;;     C runs the matching mechanism.  A marker carries plain fixnum data
+;;     only, so the newline count and the cmgoto target cross the layer.
+;;
+;; A procedure calls no leaf and emits nothing (docs/kb.org
+;; =leaf-must-call-the-mechanism=).  Every KEY string MUST match a
+;; m52_caps key byte for byte; a key that does not match makes
+;; m52_cap_string_1 return NULL, so the hub emits nothing (a silent byte
+;; change).  C owns the state write, the FILE * streams, and the
+;; OUTPUT / OUTPUT_IF padding.
+
+;; tty_set_terminal_modes: the setup order.  termcap-modes OR newlines,
+;; then the cursor key, then the keypad key.
+(define (tty-set-terminal-modes-steps has-termcap-modes total-lines visible-cursor)
+  (list (if (zero? has-termcap-modes)
+            (list "newlines" total-lines)   ; MARKER
+            "termcap-modes")                ; KEY
+        (if (zero? visible-cursor) "cursor-normal" "cursor-visible")
+        "keypad-mode"))
+
+;; tty_reset_terminal_modes: the fixed reset order.  No flag.
+(define (tty-reset-terminal-modes-steps)
+  (list "end-keypad-mode" "cursor-normal" "end-termcap-modes" "orig-pair"
+        (list "raw-cr")))
+
+;; tty_cursor_to: #nil on no move, else the conditional resets plus the
+;; move marker.
+(define (tty-cursor-to-steps cur-y cur-x vpos hpos standout-motion insmode-motion)
+  (if (and (= cur-y vpos) (= cur-x hpos))
+      #nil
+      (append (if (zero? standout-motion) (list (list "background")) '())
+              (if (zero? insmode-motion) (list (list "off-insert")) '())
+              (list (list "move" vpos hpos)))))
+
+;; tty_raw_cursor_to: the same shape, with the target ROW / COL.
+(define (tty-raw-cursor-to-steps cur-y cur-x row col standout-motion insmode-motion)
+  (if (and (= cur-y row) (= cur-x col))
+      #nil
+      (append (if (zero? standout-motion) (list (list "background")) '())
+              (if (zero? insmode-motion) (list (list "off-insert")) '())
+              (list (list "move" row col)))))

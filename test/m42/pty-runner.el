@@ -57,6 +57,10 @@
   '("m52-imp5/policy-key-e2e")
   "The M52 imp-5 bell / cursor policy -> key -> bytes case in test/pty-driver.py.")
 
+(defconst m52-imp6--cases
+  '("m52-imp6/policy-key-e2e")
+  "The M52 imp-6 terminal-mode / cursor-motion policy -> key -> bytes case.")
+
 (defun m42-imp3--dir ()
   "Return the directory that holds pty-runner.el."
   (file-name-directory (or load-file-name
@@ -178,6 +182,12 @@ a started driver that produces no report is a FAIL."
 Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
 a started driver that produces no report is a FAIL."
   (m42-pty--run-driver "m52-imp5" m52-imp5--cases t))
+
+(defun m52-imp6-run-driver ()
+  "Run the M52 imp-6 terminal-mode / cursor-motion policy case.
+Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
+a started driver that produces no report is a FAIL."
+  (m42-pty--run-driver "m52-imp6" m52-imp6--cases t))
 
 (provide 'pty-runner)
 ;;; pty-runner.el ends here

@@ -16,7 +16,7 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,735 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         src/term.c 5,864 lines and 29 ^DEFUN lines (25 M48 DEFUNs
 ;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
 ;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
@@ -71,6 +71,9 @@
 
 (defvar m52-imp2--registered-d10 0
   "Number of D10 re-pin consistency checks registered.  D10 pins a minimum.")
+
+(defvar m52-imp2--registered-d11 0
+  "Number of D11 marker-routing checks registered.  D11 pins a minimum.")
 
 (defun m52-imp2--with (rel fn)
   "Call FN in a temp buffer holding REL (repo-root-relative), or return
@@ -179,15 +182,17 @@ An absent src/ file prints FAIL, not a silent pass."
             ((eq m52-imp2--group 'd8)
              (setq m52-imp2--registered-d8 (1+ m52-imp2--registered-d8)))
             ((eq m52-imp2--group 'd10)
-             (setq m52-imp2--registered-d10 (1+ m52-imp2--registered-d10))))
+             (setq m52-imp2--registered-d10 (1+ m52-imp2--registered-d10)))
+            ((eq m52-imp2--group 'd11)
+             (setq m52-imp2--registered-d11 (1+ m52-imp2--registered-d11))))
       (imp-register-bool-as-ert-test (format "m52-imp2/%s" name) (and ok t)))))
 
 ;;; --- D7. The measured surface (docs/m52-plan.org section 8.2) --------
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5735"
-                 (eql 5735 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-lines-5864"
+                 (eql 5864 (m52-imp2--lines "src/term.c")))
 (m52-imp2--check "term.c-defuns-29"
                  (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"
@@ -219,7 +224,7 @@ An absent src/ file prints FAIL, not a silent pass."
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT1_IF(tty, a)"))
 ;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87).
 (m52-imp2--check "term.c-macro-output-line-87"
-                 (eql 100 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
+                 (eql 109 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
 ;; the write mechanism is the C callback + the C-owned streams.
 (m52-imp2--check "cm.c-cmputc-writes-output"
                  (m52-imp2--tracked-p "src/cm.c" "putc (c & 0177, current_tty->output)"))
@@ -414,6 +419,82 @@ A missing tool/ (untracked on a fresh clone) contributes no files."
   ;; a discovery break must FAIL: ~36 corpora carry the pin.
   (m52-imp2--check "repin/min-pinned-files-30" (>= pinned 30)))
 
-(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d, D10 %d) ===\n"
+;;; --- D11. The M52 imp-6 marker routing (cr.org section 8) ------------
+;;
+;; cr.org section 8 flags the strongest residual risk: no behaviour corpus can
+;; force a redisplay step, so the C routing of a MARKER step (the
+;; "newlines" loop, the raw CR, and the cursor "background" / "off-insert"
+;; / "move" mechanisms) runs in no test.  A behaviour corpus cannot prove
+;; a call, but the tool/ audit path may pin the SOURCE FACT (the imp-1 /
+;; imp-2 rule): each of the 4 rewired hubs must route its markers to the
+;; right C mechanism.  These checks read src/term.c only.  They are
+;; advisory and go through no group.
+
+(setq m52-imp2--group 'd11)
+
+;; the 4 imp-6 hubs walk the returned step list.  The imp-5
+;; tty_update_end hub uses the same loop shape, so the file holds 5.
+(m52-imp2--check "imp6/list-walk-5"
+                 (eql 5 (m52-imp2--count-literal
+                         "src/term.c" "for (; CONSP (steps); steps = XCDR (steps))")))
+;; a KEY step goes to m52_cap_string_1 through the ORIGINAL OUTPUT_IF.
+;; Two sites: tty_set_terminal_modes and tty_reset_terminal_modes.
+(m52-imp2--check "imp6/key-output-if-2"
+                 (eql 2 (m52-imp2--count-literal
+                         "src/term.c"
+                         "OUTPUT_IF (tty, m52_cap_string_1 (tty, step));")))
+;; tty_set_terminal_modes: the "newlines" marker runs the cmputc loop.
+(m52-imp2--check "imp6/set-modes-newlines-marker"
+                 (m52-imp2--tracked-p "src/term.c"
+                                      "m52_tty_step_tag_p (step, \"newlines\")"))
+(m52-imp2--check "imp6/set-modes-newline-loop-1"
+                 (eql 1 (m52-imp2--count-literal "src/term.c" "cmputc ('\\n')")))
+;; tty_reset_terminal_modes: the "raw-cr" marker emits the raw CR.
+(m52-imp2--check "imp6/reset-modes-raw-cr-marker"
+                 (m52-imp2--tracked-p "src/term.c"
+                                      "m52_tty_step_tag_p (step, \"raw-cr\")"))
+(m52-imp2--check "imp6/reset-modes-raw-cr-1"
+                 (eql 1 (m52-imp2--count-literal "src/term.c" "cmputc ('\\r')")))
+;; the two cursor hubs route "background" -> tty_background_highlight,
+;; "off-insert" -> tty_turn_off_insert, and "move" -> cmgoto.  Each
+;; tag test appears once per cursor hub.
+(m52-imp2--check "imp6/cursor-background-marker-2"
+                 (eql 2 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"background\")")))
+(m52-imp2--check "imp6/cursor-off-insert-marker-2"
+                 (eql 2 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"off-insert\")")))
+(m52-imp2--check "imp6/cursor-move-marker-2"
+                 (eql 2 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"move\")")))
+(m52-imp2--check "imp6/cursor-cmgoto-2"
+                 (eql 2 (m52-imp2--count-literal
+                         "src/term.c"
+                         "cmgoto (tty, XFIXNUM (XCAR (XCDR (step))),")))
+;; the two cursor hubs return on the #nil list with NILP.
+(m52-imp2--check "imp6/cursor-nilp-2"
+                 (eql 2 (m52-imp2--count-literal "src/term.c" "if (NILP (steps))")))
+;; each of the 4 dispatchers resolves its module procedure one time.
+(m52-imp2--check "imp6/dispatch-ref-set-modes"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-set-terminal-modes-steps\")"))
+(m52-imp2--check "imp6/dispatch-ref-reset-modes"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-reset-terminal-modes-steps\")"))
+(m52-imp2--check "imp6/dispatch-ref-cursor-to"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-cursor-to-steps\")"))
+(m52-imp2--check "imp6/dispatch-ref-raw-cursor-to"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-raw-cursor-to-steps\")"))
+;; a truncation guard: the D11 block holds at least 14 checks.
+(m52-imp2--check "imp6/min-d11-checks-14"
+                 (>= m52-imp2--registered-d11 14))
+
+(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d, D10 %d, D11 %d) ===\n"
                m52-imp2--registered m52-imp2--registered-d7 m52-imp2--registered-d8
-               m52-imp2--registered-d10))
+               m52-imp2--registered-d10 m52-imp2--registered-d11))

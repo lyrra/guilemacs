@@ -82,6 +82,15 @@ static Lisp_Object m52_tty_show_cursor_scheme (Lisp_Object, Lisp_Object);
 static Lisp_Object m52_tty_background_highlight_scheme (Lisp_Object);
 static Lisp_Object m52_tty_highlight_if_desired_scheme (Lisp_Object);
 static Lisp_Object m52_tty_update_end_scheme (Lisp_Object);
+static Lisp_Object m52_tty_set_terminal_modes_scheme (Lisp_Object, Lisp_Object,
+						      Lisp_Object);
+static Lisp_Object m52_tty_reset_terminal_modes_scheme (void);
+static Lisp_Object m52_tty_cursor_to_scheme (Lisp_Object, Lisp_Object, Lisp_Object,
+					     Lisp_Object, Lisp_Object, Lisp_Object);
+static Lisp_Object m52_tty_raw_cursor_to_scheme (Lisp_Object, Lisp_Object,
+						 Lisp_Object, Lisp_Object,
+						 Lisp_Object, Lisp_Object);
+static bool m52_tty_step_tag_p (Lisp_Object, const char *);
 static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
 static void set_tty_hooks (struct terminal *terminal);
@@ -217,20 +226,35 @@ tty_set_terminal_modes (struct terminal *terminal)
 
   if (tty->output)
     {
-      if (tty->TS_termcap_modes)
-        OUTPUT (tty, tty->TS_termcap_modes);
-      else
-        {
-          /* Output enough newlines to scroll all the old screen contents
-             off the screen, so it won't be overwritten and lost.  */
-          int i;
-          current_tty = tty;
-          for (i = 0; i < FRAME_TOTAL_LINES (XFRAME (selected_frame)); i++)
-            cmputc ('\n');
-        }
-
-      OUTPUT_IF (tty, visible_cursor ? tty->TS_cursor_visible : tty->TS_cursor_normal);
-      OUTPUT_IF (tty, tty->TS_keypad_mode);
+      /* The setup step selection runs in Scheme: the returned list holds
+	 the ordered steps.  A KEY step is a plain string; the "newlines"
+	 marker is a plain list.  C routes each step to its mechanism,
+	 keeps the output stream, and keeps the fflush.  */
+      /* Read the frame line count only when the newline fallback runs,
+	 as the original C did, so the termcap-modes branch never reads
+	 the count explicitly; OUTPUT_IF still computes it for padding.  */
+      Lisp_Object steps
+	= m52_tty_set_terminal_modes_scheme
+	    (make_fixnum (tty->TS_termcap_modes != NULL),
+	     make_fixnum (tty->TS_termcap_modes
+			  ? 0 : FRAME_TOTAL_LINES (XFRAME (selected_frame))),
+	     make_fixnum (visible_cursor));
+      for (; CONSP (steps); steps = XCDR (steps))
+	{
+	  Lisp_Object step = XCAR (steps);
+	  if (STRINGP (step))
+	    OUTPUT_IF (tty, m52_cap_string_1 (tty, step));
+	  else if (m52_tty_step_tag_p (step, "newlines"))
+	    {
+	      /* Output enough newlines to scroll all the old screen
+		 contents off the screen, so it won't be overwritten and
+		 lost.  */
+	      EMACS_INT i, n = XFIXNUM (XCAR (XCDR (step)));
+	      current_tty = tty;
+	      for (i = 0; i < n; i++)
+		cmputc ('\n');
+	    }
+	}
       losecursor (tty);
       tty_send_additional_strings (terminal, Qtty_mode_set_strings);
       fflush (tty->output);
@@ -249,13 +273,22 @@ tty_reset_terminal_modes (struct terminal *terminal)
       tty_send_additional_strings (terminal, Qtty_mode_reset_strings);
       tty_turn_off_highlight (tty);
       tty_turn_off_insert (tty);
-      OUTPUT_IF (tty, tty->TS_end_keypad_mode);
-      OUTPUT_IF (tty, tty->TS_cursor_normal);
-      OUTPUT_IF (tty, tty->TS_end_termcap_modes);
-      OUTPUT_IF (tty, tty->TS_orig_pair);
-      /* Output raw CR so kernel can track the cursor hpos.  */
-      current_tty = tty;
-      cmputc ('\r');
+      /* The fixed reset steps run in Scheme: the returned list holds the
+	 4 KEY steps and the "raw-cr" marker.  C routes each step to its
+	 mechanism and keeps the output stream and the fflush.  */
+      Lisp_Object steps = m52_tty_reset_terminal_modes_scheme ();
+      for (; CONSP (steps); steps = XCDR (steps))
+	{
+	  Lisp_Object step = XCAR (steps);
+	  if (STRINGP (step))
+	    OUTPUT_IF (tty, m52_cap_string_1 (tty, step));
+	  else if (m52_tty_step_tag_p (step, "raw-cr"))
+	    {
+	      /* Output raw CR so kernel can track the cursor hpos.  */
+	      current_tty = tty;
+	      cmputc ('\r');
+	    }
+	}
       fflush (tty->output);
     }
 }
@@ -511,14 +544,27 @@ tty_cursor_to (struct frame *f, int vpos, int hpos)
   if (! tty->costs_set)
     return;
 
-  if (curY (tty) == vpos
-      && curX (tty) == hpos)
+  /* The move / no-move decision and the conditional resets run in
+     Scheme: the returned list is nil on no move, else the ordered
+     steps.  C routes each step to its mechanism and keeps the cmgoto.  */
+  Lisp_Object steps
+    = m52_tty_cursor_to_scheme (make_fixnum (curY (tty)), make_fixnum (curX (tty)),
+				make_fixnum (vpos), make_fixnum (hpos),
+				make_fixnum (tty->TF_standout_motion),
+				make_fixnum (tty->TF_insmode_motion));
+  if (NILP (steps))
     return;
-  if (!tty->TF_standout_motion)
-    tty_background_highlight (tty);
-  if (!tty->TF_insmode_motion)
-    tty_turn_off_insert (tty);
-  cmgoto (tty, vpos, hpos);
+  for (; CONSP (steps); steps = XCDR (steps))
+    {
+      Lisp_Object step = XCAR (steps);
+      if (m52_tty_step_tag_p (step, "background"))
+	tty_background_highlight (tty);
+      else if (m52_tty_step_tag_p (step, "off-insert"))
+	tty_turn_off_insert (tty);
+      else if (m52_tty_step_tag_p (step, "move"))
+	cmgoto (tty, XFIXNUM (XCAR (XCDR (step))),
+		XFIXNUM (XCAR (XCDR (XCDR (step)))));
+    }
 }
 
 /* Similar but don't take any account of the wasted characters.  */
@@ -528,14 +574,25 @@ tty_raw_cursor_to (struct frame *f, int row, int col)
 {
   struct tty_display_info *tty = FRAME_TTY (f);
 
-  if (curY (tty) == row
-      && curX (tty) == col)
+  /* The same shape as tty_cursor_to, with the target ROW / COL.  */
+  Lisp_Object steps
+    = m52_tty_raw_cursor_to_scheme (make_fixnum (curY (tty)), make_fixnum (curX (tty)),
+				    make_fixnum (row), make_fixnum (col),
+				    make_fixnum (tty->TF_standout_motion),
+				    make_fixnum (tty->TF_insmode_motion));
+  if (NILP (steps))
     return;
-  if (!tty->TF_standout_motion)
-    tty_background_highlight (tty);
-  if (!tty->TF_insmode_motion)
-    tty_turn_off_insert (tty);
-  cmgoto (tty, row, col);
+  for (; CONSP (steps); steps = XCDR (steps))
+    {
+      Lisp_Object step = XCAR (steps);
+      if (m52_tty_step_tag_p (step, "background"))
+	tty_background_highlight (tty);
+      else if (m52_tty_step_tag_p (step, "off-insert"))
+	tty_turn_off_insert (tty);
+      else if (m52_tty_step_tag_p (step, "move"))
+	cmgoto (tty, XFIXNUM (XCAR (XCDR (step))),
+		XFIXNUM (XCAR (XCDR (XCDR (step)))));
+    }
 }
 
 /* Erase operations */
@@ -5656,6 +5713,78 @@ m52_tty_toggle_highlight_scheme (Lisp_Object standout_mode)
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs tty-output", "tty-toggle-highlight-cap");
   return SCM_CALL_1 (proc, standout_mode);
+}
+
+/* --- M52 imp-6: the terminal-mode / cursor-motion dispatchers ------- */
+
+/* FIX-20261010-guilemacs: M52 imp-6 -- call the pure policy procedures
+   of (emacs tty-output) that hold the DECISION of the 4 terminal-mode /
+   cursor-motion hubs (tty_set_terminal_modes, tty_reset_terminal_modes,
+   tty_cursor_to, tty_raw_cursor_to).  Each dispatcher resolves its
+   module procedure one time (the M48 imp-4 idiom), caches it in a
+   static SCM, and passes plain fixnums only.  The returned value is an
+   ordered step list, or nil.  A KEY step is a plain string; a
+   marker step is a plain list.  The C state write, the FILE * streams,
+   the OUTPUT / OUTPUT_IF padding, and the cmgoto / newline / raw-CR
+   mechanisms stay in C.  The m52_ / _scheme name reuses no static
+   helper (docs/kb.org =term-hub-helper-name-collision=).  */
+
+/* Return true when STEP is a plain marker list (TAG ARG...) whose TAG
+   equals the plain string TAG.  Used to tell a KEY step (a string)
+   apart from a marker step (a list).  */
+static bool
+m52_tty_step_tag_p (Lisp_Object step, const char *tag)
+{
+  /* Compare the tag bytes directly, as m52_cap_string_1 does, so the
+     redisplay path allocates no Scheme string per step.  Every tag is an
+     ASCII literal, so a byte compare equals a string compare.  */
+  size_t len = strlen (tag);
+  return (CONSP (step) && STRINGP (XCAR (step))
+	  && SBYTES (XCAR (step)) == len
+	  && memcmp (SSDATA (XCAR (step)), tag, len) == 0);
+}
+
+static Lisp_Object
+m52_tty_set_terminal_modes_scheme (Lisp_Object has_termcap, Lisp_Object total_lines,
+				   Lisp_Object vis_cursor)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-set-terminal-modes-steps");
+  return SCM_CALL_3 (proc, has_termcap, total_lines, vis_cursor);
+}
+
+static Lisp_Object
+m52_tty_reset_terminal_modes_scheme (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-reset-terminal-modes-steps");
+  return SCM_CALL_0 (proc);
+}
+
+static Lisp_Object
+m52_tty_cursor_to_scheme (Lisp_Object cur_y, Lisp_Object cur_x, Lisp_Object vpos,
+			  Lisp_Object hpos, Lisp_Object standout_motion,
+			  Lisp_Object insmode_motion)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-cursor-to-steps");
+  return SCM_CALL_6 (proc, cur_y, cur_x, vpos, hpos, standout_motion,
+		     insmode_motion);
+}
+
+static Lisp_Object
+m52_tty_raw_cursor_to_scheme (Lisp_Object cur_y, Lisp_Object cur_x, Lisp_Object row,
+			      Lisp_Object col, Lisp_Object standout_motion,
+			      Lisp_Object insmode_motion)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-raw-cursor-to-steps");
+  return SCM_CALL_6 (proc, cur_y, cur_x, row, col, standout_motion,
+		     insmode_motion);
 }
 
 void
