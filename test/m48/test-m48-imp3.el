@@ -219,10 +219,10 @@ mechanism helpers, whose TN_max_colors reads are not the hub policy."
                       "src/term.c"
                       (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                               wrapper)))))
-(m48-imp3--check "term.c-scm-ref-26"
-                 (eql 26 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
-(m48-imp3--check "scm-c-public-ref-250"
-                 (eql 250 (m48-imp3--count-scm-ref)))
+(m48-imp3--check "term.c-scm-ref-29"
+                 (eql 29 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
+(m48-imp3--check "scm-c-public-ref-253"
+                 (eql 253 (m48-imp3--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 3.2) --------
 

@@ -193,8 +193,8 @@ passes the raw symbol to reach it."
                  (eql 34 (m50-imp1--count "src/coding.c" "^DEFUN (\"")))
 (m50-imp1--check "coding.c-scm-ref-0"
                  (eql 0 (m50-imp1--count "src/coding.c" "scm_c_public_ref")))
-(m50-imp1--check "scm-c-public-ref-250"
-                 (eql 250 (m50-imp1--count-scm-ref)))
+(m50-imp1--check "scm-c-public-ref-253"
+                 (eql 253 (m50-imp1--count-scm-ref)))
 (m50-imp1--check "emacs-module-present"
                  (m50-imp1--exists-p "mod/emacs/emacs.scm"))
 ;; brief.org section 4 states that each candidate holds #include "guile.h"

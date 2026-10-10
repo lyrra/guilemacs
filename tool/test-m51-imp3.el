@@ -277,14 +277,14 @@ definition itself and not a column-0 forward declaration."
 
 ;; M51 imp-5 adds three scm_c_public_ref sites (image_open_stream_scheme,
 ;; image_handle_read_scheme, image_close_scheme), so the image.c count is
-;; 5 and the tree-wide count is 250.  The DEFUN count and the --image-*
+;; 5 and the tree-wide count is 253.  The DEFUN count and the --image-*
 ;; leaf count do not move.
 (m51-imp3--check "c/no-image-leaf"
                  (eql 0 (m51-imp3--count-literal "src/image.c" "DEFUN (\"--image-")))
 (m51-imp3--check "c/image-c-scm-ref-5"
                  (eql 5 (m51-imp3--count-literal "src/image.c" "scm_c_public_ref")))
-(m51-imp3--check "c/tree-wide-scm-ref-250"
-                 (eql 250 (m51-imp3--count-scm-ref)))
+(m51-imp3--check "c/tree-wide-scm-ref-253"
+                 (eql 253 (m51-imp3--count-scm-ref)))
 ;; The imp-5 C surface: the line count moves with the three bridges and
 ;; the rewiring; the DEFUN count does not.
 (m51-imp3--check "c/image-c-lines-13447"

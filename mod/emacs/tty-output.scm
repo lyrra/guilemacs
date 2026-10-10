@@ -63,7 +63,9 @@
             tty-background-highlight-cap tty-highlight-if-desired-cap
             tty-update-end-steps
             tty-set-terminal-modes-steps tty-reset-terminal-modes-steps
-            tty-cursor-to-steps tty-raw-cursor-to-steps))
+            tty-cursor-to-steps tty-raw-cursor-to-steps
+            tty-clear-to-end-steps tty-clear-frame-steps
+            tty-clear-end-of-line-steps))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -227,3 +229,43 @@
       (append (if (zero? standout-motion) (list (list "background")) '())
               (if (zero? insmode-motion) (list (list "off-insert")) '())
               (list (list "move" row col)))))
+
+;; --- M52 imp-7: the clear policy -------------------------------------
+;;
+;; Each procedure holds the DECISION of one src/term.c clear hub.  A
+;; procedure returns ONE step, or #nil for "do nothing".  The two step
+;; kinds match imp-6:
+;;
+;;   - KEY step: a plain string that names one m52_caps key.  C resolves
+;;     it with m52_cap_string_1 and emits it through OUTPUT / OUTPUT1.
+;;   - MARKER step: a plain list (TAG ARG...).  TAG is a plain string; C
+;;     runs the matching mechanism.
+;;
+;; A procedure calls no leaf and emits nothing (docs/kb.org
+;; =leaf-must-call-the-mechanism=).  Every KEY string MUST match a
+;; m52_caps key byte for byte; a key that does not match makes
+;; m52_cap_string_1 return NULL, so the hub emits nothing (a silent byte
+;; change).  The 3 keys below are already in the table.  C keeps the
+;; C-owned state, the FILE * streams, and the OUTPUT / OUTPUT1 padding.
+
+;; tty_clear_to_end: prefer the whole-screen-bottom capability; else the
+;; per-row loop.
+(define (tty-clear-to-end-steps has-clr-to-bottom)
+  (if (zero? has-clr-to-bottom)
+      (list "clear-loop")               ; MARKER
+      "clear-to-bottom"))               ; KEY
+
+;; tty_clear_frame: prefer the whole-frame capability; else the fallback.
+(define (tty-clear-frame-steps has-clr-frame)
+  (if (zero? has-clr-frame)
+      (list "clear-frame-fallback")     ; MARKER
+      "clear-frame"))                   ; KEY
+
+;; tty_clear_end_of_line: #nil when a guard holds; else the capability or
+;; the hard way.  The guard stops the erase of a 0-width region.
+(define (tty-clear-end-of-line-steps costs-set cur-x first-unused-hpos has-clr-line)
+  (if (or (zero? costs-set) (>= cur-x first-unused-hpos))
+      #nil
+      (if (zero? has-clr-line)
+          (list "clear-line-hard")      ; MARKER
+          "clear-line")))               ; KEY

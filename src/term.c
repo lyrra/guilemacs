@@ -90,6 +90,10 @@ static Lisp_Object m52_tty_cursor_to_scheme (Lisp_Object, Lisp_Object, Lisp_Obje
 static Lisp_Object m52_tty_raw_cursor_to_scheme (Lisp_Object, Lisp_Object,
 						 Lisp_Object, Lisp_Object,
 						 Lisp_Object, Lisp_Object);
+static Lisp_Object m52_tty_clear_to_end_scheme (Lisp_Object);
+static Lisp_Object m52_tty_clear_frame_scheme (Lisp_Object);
+static Lisp_Object m52_tty_clear_end_of_line_scheme (Lisp_Object, Lisp_Object,
+						     Lisp_Object, Lisp_Object);
 static bool m52_tty_step_tag_p (Lisp_Object, const char *);
 static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
@@ -605,12 +609,17 @@ tty_clear_to_end (struct frame *f)
   register int i;
   struct tty_display_info *tty = FRAME_TTY (f);
 
-  if (tty->TS_clr_to_bottom)
+  /* The selection runs in Scheme: the returned step is the KEY
+     "clear-to-bottom", or the MARKER ("clear-loop").  C keeps the
+     background highlight, OUTPUT, and the per-row loop.  */
+  Lisp_Object step
+    = m52_tty_clear_to_end_scheme (make_fixnum (tty->TS_clr_to_bottom != NULL));
+  if (STRINGP (step))
     {
       tty_background_highlight (tty);
-      OUTPUT (tty, tty->TS_clr_to_bottom);
+      OUTPUT (tty, m52_cap_string_1 (tty, step));
     }
-  else
+  else if (m52_tty_step_tag_p (step, "clear-loop"))
     {
       for (i = curY (tty); i < FRAME_TOTAL_LINES (f); i++)
 	{
@@ -627,13 +636,18 @@ tty_clear_frame (struct frame *f)
 {
   struct tty_display_info *tty = FRAME_TTY (f);
 
-  if (tty->TS_clr_frame)
+  /* The selection runs in Scheme: the returned step is the KEY
+     "clear-frame", or the MARKER ("clear-frame-fallback").  C keeps the
+     background highlight, OUTPUT, cmat, and the fallback.  */
+  Lisp_Object step
+    = m52_tty_clear_frame_scheme (make_fixnum (tty->TS_clr_frame != NULL));
+  if (STRINGP (step))
     {
       tty_background_highlight (tty);
-      OUTPUT (tty, tty->TS_clr_frame);
+      OUTPUT (tty, m52_cap_string_1 (tty, step));
       cmat (tty, 0, 0);
     }
-  else
+  else if (m52_tty_step_tag_p (step, "clear-frame-fallback"))
     {
       cursor_to (f, 0, 0);
       clear_to_end (f);
@@ -650,19 +664,24 @@ tty_clear_end_of_line (struct frame *f, int first_unused_hpos)
   register int i;
   struct tty_display_info *tty = FRAME_TTY (f);
 
-  /* Detect the case where we are called from reset_sys_modes
-     and the costs have never been calculated.  Do nothing.  */
-  if (! tty->costs_set)
-    return;
-
-  if (curX (tty) >= first_unused_hpos)
+  /* The 2 guards and the capability selection run in Scheme: the
+     returned step is #nil when a guard holds, else the KEY "clear-line"
+     or the MARKER ("clear-line-hard").  C reads the state before the
+     background highlight (the original order), keeps the background
+     highlight, OUTPUT1, the AutoWrap edge, the putc loop, and cmplus.  */
+  Lisp_Object step
+    = m52_tty_clear_end_of_line_scheme (make_fixnum (tty->costs_set),
+					make_fixnum (curX (tty)),
+					make_fixnum (first_unused_hpos),
+					make_fixnum (tty->TS_clr_line != NULL));
+  if (NILP (step))
     return;
   tty_background_highlight (tty);
-  if (tty->TS_clr_line)
+  if (STRINGP (step))
     {
-      OUTPUT1 (tty, tty->TS_clr_line);
+      OUTPUT1 (tty, m52_cap_string_1 (tty, step));
     }
-  else
+  else if (m52_tty_step_tag_p (step, "clear-line-hard"))
     {			/* have to do it the hard way */
       tty_turn_off_insert (tty);
 
@@ -5785,6 +5804,47 @@ m52_tty_raw_cursor_to_scheme (Lisp_Object cur_y, Lisp_Object cur_x, Lisp_Object 
     proc = scm_c_public_ref ("emacs tty-output", "tty-raw-cursor-to-steps");
   return SCM_CALL_6 (proc, cur_y, cur_x, row, col, standout_motion,
 		     insmode_motion);
+}
+
+/* --- M52 imp-7: the clear dispatchers ------------------------------- */
+
+/* FIX-20261010-guilemacs: M52 imp-7 -- call the pure policy procedures
+   of (emacs tty-output) that hold the DECISION of the 3 clear hubs
+   (tty_clear_to_end, tty_clear_frame, tty_clear_end_of_line).  Each
+   dispatcher resolves its module procedure one time (the M48 imp-4
+   idiom), caches it in a static SCM, and passes plain fixnums only.  The
+   returned value is ONE step, or nil.  A KEY step is a plain string; a
+   marker step is a plain list.  The C state, the FILE * streams, and the
+   OUTPUT / OUTPUT1 padding stay in C.  The m52_ / _scheme name reuses no
+   static helper (docs/kb.org =term-hub-helper-name-collision=).  */
+
+static Lisp_Object
+m52_tty_clear_to_end_scheme (Lisp_Object has_clr_to_bottom)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-clear-to-end-steps");
+  return SCM_CALL_1 (proc, has_clr_to_bottom);
+}
+
+static Lisp_Object
+m52_tty_clear_frame_scheme (Lisp_Object has_clr_frame)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-clear-frame-steps");
+  return SCM_CALL_1 (proc, has_clr_frame);
+}
+
+static Lisp_Object
+m52_tty_clear_end_of_line_scheme (Lisp_Object costs_set, Lisp_Object cur_x,
+				  Lisp_Object first_unused_hpos,
+				  Lisp_Object has_clr_line)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-clear-end-of-line-steps");
+  return SCM_CALL_4 (proc, costs_set, cur_x, first_unused_hpos, has_clr_line);
 }
 
 void

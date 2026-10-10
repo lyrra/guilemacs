@@ -14,7 +14,7 @@
 ;;;         the 4 public wrappers of the module (dired-listing-names,
 ;;;         dired-file-name-completion, dired-file-name-all-completions,
 ;;;         dired-file-attributes-lessp); and the tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] (250).  The 14 checks
+;;;         scm_c_public_ref count over src/*.[chm] (253).  The 14 checks
 ;;;         come from the 10 value rows of brief.org section 4: row 4
 ;;;         pins the 2 G2 leaves by name and line (2 checks), row 9 pins
 ;;;         the 4 public wrapper names (4 checks), and every other row
@@ -221,9 +221,9 @@ FAIL with no ERT test would leave the exit code 0."
 (m49-imp5--check "export-dired-file-attributes-lessp"
                  (m49-imp5--export-p "mod/emacs/dired.scm"
                                      "dired-file-attributes-lessp"))
-;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 250.
-(m49-imp5--check "tree-wide-scm-public-ref-250"
-                 (eql 250 (m49-imp5--count-scm-ref)))
+;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 253.
+(m49-imp5--check "tree-wide-scm-public-ref-253"
+                 (eql 253 (m49-imp5--count-scm-ref)))
 
 ;;; --- S2. The corpus is registered (brief.org section 6) -------------
 

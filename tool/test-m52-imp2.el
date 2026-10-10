@@ -16,7 +16,7 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,864 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         src/term.c 5,924 lines and 29 ^DEFUN lines (25 M48 DEFUNs
 ;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
 ;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
@@ -191,8 +191,8 @@ An absent src/ file prints FAIL, not a silent pass."
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5864"
-                 (eql 5864 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-lines-5924"
+                 (eql 5924 (m52-imp2--lines "src/term.c")))
 (m52-imp2--check "term.c-defuns-29"
                  (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"
@@ -223,8 +223,8 @@ An absent src/ file prints FAIL, not a silent pass."
 (m52-imp2--check "term.c-macro-output1-if"
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT1_IF(tty, a)"))
 ;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87).
-(m52-imp2--check "term.c-macro-output-line-87"
-                 (eql 109 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
+(m52-imp2--check "term.c-macro-output-line-113"
+                 (eql 113 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
 ;; the write mechanism is the C callback + the C-owned streams.
 (m52-imp2--check "cm.c-cmputc-writes-output"
                  (m52-imp2--tracked-p "src/cm.c" "putc (c & 0177, current_tty->output)"))
