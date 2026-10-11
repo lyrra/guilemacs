@@ -303,7 +303,7 @@ scan over src/*.c and src/*.h."
 
 (check "m40/imp2/static/process.c-holds-the-new-site" #t
        (contains? proc-c "scm_c_public_ref (\"emacs process-io\""))
-(check "m40/imp2/static/tree-ref-sites-253" 253 tree-ref-sites)
+(check "m40/imp2/static/tree-ref-sites-257" 257 tree-ref-sites)
 
 ;;; --- 9. Static: the durable records name the imp-2 commit ------------
 ;;;

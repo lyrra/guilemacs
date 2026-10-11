@@ -46,7 +46,7 @@
 ;;;
 ;;; Current count note: imp-6 removes two geometry leaf docs and one
 ;;; marker block.  The source has 10 FIX markers, six surviving imp-2 leaf
-;;; docs, 29 term.c refs, and 253 tree-wide refs.
+;;; docs, 33 term.c refs, and 257 tree-wide refs.
 
 (princ "=== m48 imp-4 G3 suite ===\n")
 
@@ -206,10 +206,10 @@ anchored match finds the definition only."
                     "src/term.c"
                     (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                             wrapper))))
-(m48-imp4--check "term.c-scm-ref-29"
-                 (eql 29 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
-(m48-imp4--check "scm-c-public-ref-253"
-                 (eql 253 (m48-imp4--count-scm-ref)))
+(m48-imp4--check "term.c-scm-ref-33"
+                 (eql 33 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
+(m48-imp4--check "scm-c-public-ref-257"
+                 (eql 257 (m48-imp4--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 4.4) --------
 

@@ -65,6 +65,10 @@
   '("m52-imp7/policy-key-e2e")
   "The M52 imp-7 clear-selection policy -> key -> bytes case.")
 
+(defconst m52-imp8--cases
+  '("m52-imp8/policy-key-e2e")
+  "The M52 imp-8 scroll / window / glyph policy -> key -> bytes case.")
+
 (defun m42-imp3--dir ()
   "Return the directory that holds pty-runner.el."
   (file-name-directory (or load-file-name
@@ -198,6 +202,12 @@ a started driver that produces no report is a FAIL."
 Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
 a started driver that produces no report is a FAIL."
   (m42-pty--run-driver "m52-imp7" m52-imp7--cases t))
+
+(defun m52-imp8-run-driver ()
+  "Run the M52 imp-8 scroll / window / glyph policy case.
+Return a list of (NAME . STATUS) pairs.  Environment gaps return INFO;
+a started driver that produces no report is a FAIL."
+  (m42-pty--run-driver "m52-imp8" m52-imp8--cases t))
 
 (provide 'pty-runner)
 ;;; pty-runner.el ends here

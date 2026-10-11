@@ -16,9 +16,9 @@
 ;;;         tty-read-avail-input! uses them while Scheme owns the policy.
 ;;;   D3 -- the descriptor facts of brief.org §5 task 2 hold in the
 ;;;         tree: tty->input is a FILE * (src/termchar.h:51), opened by
-;;;         emacs_fdopen (src/term.c:2609), reuses stdin for the initial
-;;;         terminal (src/term.c:4670), is closed by delete_tty
-;;;         (src/term.c:4939), and the read bypasses stdio through
+;;;         emacs_fdopen (src/term.c:2821), reuses stdin for the initial
+;;;         terminal (src/term.c:4882), is closed by delete_tty
+;;;         (src/term.c:5151), and the read bypasses stdio through
 ;;;         emacs_read (src/sysdep.c:2664).
 ;;;   D4 -- the decision words and the imp-1 findings appear in the
 ;;;         gitignored records docs/m42-plan.org and docs/kb.org.  docs/
@@ -151,13 +151,13 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 (m42-imp1--check "tty-input-is-FILE-star"
                  (m42-imp1--contains-p "src/termchar.h" "FILE *input;"))
-(m42-imp1--check "tty-input-opened-by-fdopen-at-2750"
-                 (eql 2750 (m42-imp1--line-of "src/term.c" "emacs_fdopen")))
-(m42-imp1--check "initial-tty-input-is-stdin-at-4811"
-                 (eql 4811 (m42-imp1--line-of "src/term.c"
+(m42-imp1--check "tty-input-opened-by-fdopen-at-2821"
+                 (eql 2821 (m42-imp1--line-of "src/term.c" "emacs_fdopen")))
+(m42-imp1--check "initial-tty-input-is-stdin-at-4882"
+                 (eql 4882 (m42-imp1--line-of "src/term.c"
                                               "tty->input = stdin;")))
-(m42-imp1--check "delete-tty-fcloses-input-at-5080"
-                 (eql 5080 (m42-imp1--line-of "src/term.c"
+(m42-imp1--check "delete-tty-fcloses-input-at-5151"
+                 (eql 5151 (m42-imp1--line-of "src/term.c"
                                               "emacs_fclose (tty->input);")))
 (m42-imp1--check "read-bypasses-stdio-via-emacs-read"
                  (m42-imp1--contains-p "src/keyboard.c"

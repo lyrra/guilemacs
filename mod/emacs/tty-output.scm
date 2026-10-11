@@ -65,7 +65,9 @@
             tty-set-terminal-modes-steps tty-reset-terminal-modes-steps
             tty-cursor-to-steps tty-raw-cursor-to-steps
             tty-clear-to-end-steps tty-clear-frame-steps
-            tty-clear-end-of-line-steps))
+            tty-clear-end-of-line-steps
+            tty-set-terminal-window-steps tty-set-scroll-region-steps
+            tty-delete-glyphs-steps tty-ins-del-lines-steps))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -269,3 +271,73 @@
       (if (zero? has-clr-line)
           (list "clear-line-hard")      ; MARKER
           "clear-line")))               ; KEY
+
+;; --- M52 imp-8: the scroll / window / glyph arithmetic ----------------
+;;
+;; Each procedure holds the DECISION of one src/term.c arithmetic hub.  A
+;; procedure takes plain fixnums and returns a plain ordered step list, a
+;; single plain step, or #nil.  The two step kinds match imp-6 / imp-7:
+;;
+;;   - KEY step: a plain string that names one m52_caps key.  C resolves
+;;     it with m52_cap_string_1 and emits it through the original macro.
+;;   - MARKER step: a plain list (TAG ARG...).  TAG is a plain string;
+;;     C matches it with m52_tty_step_tag_p and runs its own mechanism.
+;;
+;; A procedure calls no leaf and emits nothing (docs/kb.org
+;; =leaf-must-call-the-mechanism=).  Every KEY string MUST match a
+;; m52_caps key byte for byte; a key that does not match makes
+;; m52_cap_string_1 return NULL, so the hub emits nothing (a silent byte
+;; change).  C keeps the C-owned state, the FILE * streams, tparam, and
+;; the OUTPUT / OUTPUT1 / OUTPUTL / OUTPUT_IF padding.
+
+;; tty_set_terminal_window: the window height, and the scroll-region call.
+;; The MARKER ("set-window" w) HERE means "write tty->specified_window =
+;; w".  It is NOT the "set-window" capability KEY that
+;; tty-set-scroll-region-steps uses; C tells the two apart with STRINGP
+;; against m52_tty_step_tag_p.
+(define (tty-set-terminal-window-steps size total-lines scroll-ok)
+  (let ((w (if (zero? size) total-lines size)))
+    (if (zero? scroll-ok)
+        (list (list "set-window" w))
+        (list (list "set-window" w) (list "scroll-region" 0 w)))))
+
+;; tty_set_scroll_region: the form choice and the tparam args.  The
+;; returned list is ONE MARKER.  A trailing arg that the form does not
+;; use stays 0 in C, because the router zeroes the arg array first.
+(define (tty-set-scroll-region-steps start stop total-lines cols
+                                     has-sr has-sr1 has-window)
+  (cond ((not (zero? has-sr))
+         (list "scroll-region" start (- stop 1)))
+        ((not (zero? has-sr1))
+         (list "scroll-region-1" total-lines start
+               (- total-lines stop) total-lines))
+        (else
+         (list "set-window" start 0 stop cols))))
+
+;; tty_delete_glyphs: the insert-mode branch, the delete form, and the
+;; end-delete-mode step.  Returns the ordered step list.  The list is
+;; FLAT: each mechanism step is a MARKER (a nested list); each capability
+;; step is a KEY (a bare string).
+(define (tty-delete-glyphs-steps n delete-in-insert-mode has-del-multi-chars)
+  (append (if (zero? delete-in-insert-mode)
+              (list (list "off-insert") "delete-mode")
+              (list (list "on-insert")))
+          (if (zero? has-del-multi-chars)
+              (list (list "del-char" n))
+              (list (list "del-multi" n)))
+          (if (zero? delete-in-insert-mode)
+              (list "end-delete-mode")
+              '())))
+
+;; tty_ins_del_lines: #nil when a guard holds, else the form and the args.
+;; i = eabs (n); (- specified-window vpos) is the OUTPUTL line count.
+(define (tty-ins-del-lines-steps vpos n specified-window total-lines
+                                 scroll-ok memory-below
+                                 has-multi has-single has-scroll)
+  (let ((i (abs n)))
+    (if (or (and (not (zero? scroll-ok)) (>= (+ vpos i) specified-window))
+            (and (zero? memory-below) (>= (+ vpos i) total-lines)))
+        #nil
+        (cond ((not (zero? has-multi))  (list "multi" i))
+              ((not (zero? has-single)) (list "single" i))
+              (else (list "scroll" i (- specified-window vpos)))))))

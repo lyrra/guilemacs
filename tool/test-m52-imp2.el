@@ -16,14 +16,14 @@
 ;;; needles live in tool/m52-plan-lint.sh, which no group runs.  This
 ;;; corpus pins:
 ;;;   D7 -- the measured surface of docs/m52-plan.org section 8.2:
-;;;         src/term.c 5,924 lines and 29 ^DEFUN lines (25 M48 DEFUNs
+;;;         src/term.c 6,078 lines and 29 ^DEFUN lines (25 M48 DEFUNs
 ;;;         plus the 4 M52 imp-3 --tty-* leaves re-pinned at imp-3);
 ;;;         FILE *input :51, *output :53, *termscript :61; src/cm.c
 ;;;         cmputc :45; 10 fwrite lines in src/term.c (the 8 output-path
 ;;;         sites plus the 2 in the M52 imp-3 write mechanism); the 6
 ;;;         --term-* DEFUNs
 ;;;         in src/term.c; the 5 OUTPUT macro definitions and the OUTPUT
-;;;         macro line :87; the src/sysdep.c setup literals and their lines
+;;;         macro line :127; the src/sysdep.c setup literals and their lines
 ;;;         :1114 :1200 :1404 :1437 :1443; and the raw ^tty_ line count 56
 ;;;         (which is NOT the output path).  27 checks.
 ;;;   D8 -- the block map of section 8.3: the first 26 ^tty_ names in
@@ -74,6 +74,9 @@
 
 (defvar m52-imp2--registered-d11 0
   "Number of D11 marker-routing checks registered.  D11 pins a minimum.")
+
+(defvar m52-imp2--registered-d12 0
+  "Number of D12 imp-8 marker-routing checks registered.  D12 pins a minimum.")
 
 (defun m52-imp2--with (rel fn)
   "Call FN in a temp buffer holding REL (repo-root-relative), or return
@@ -184,15 +187,17 @@ An absent src/ file prints FAIL, not a silent pass."
             ((eq m52-imp2--group 'd10)
              (setq m52-imp2--registered-d10 (1+ m52-imp2--registered-d10)))
             ((eq m52-imp2--group 'd11)
-             (setq m52-imp2--registered-d11 (1+ m52-imp2--registered-d11))))
+             (setq m52-imp2--registered-d11 (1+ m52-imp2--registered-d11)))
+            ((eq m52-imp2--group 'd12)
+             (setq m52-imp2--registered-d12 (1+ m52-imp2--registered-d12))))
       (imp-register-bool-as-ert-test (format "m52-imp2/%s" name) (and ok t)))))
 
 ;;; --- D7. The measured surface (docs/m52-plan.org section 8.2) --------
 
 (setq m52-imp2--group 'd7)
 
-(m52-imp2--check "term.c-lines-5924"
-                 (eql 5924 (m52-imp2--lines "src/term.c")))
+(m52-imp2--check "term.c-lines-6078"
+                 (eql 6078 (m52-imp2--lines "src/term.c")))
 (m52-imp2--check "term.c-defuns-29"
                  (eql 29 (m52-imp2--defun-count "src/term.c")))
 (m52-imp2--check "termchar.h-input-51"
@@ -222,9 +227,10 @@ An absent src/ file prints FAIL, not a silent pass."
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT_IF(tty, a)"))
 (m52-imp2--check "term.c-macro-output1-if"
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT1_IF(tty, a)"))
-;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87).
-(m52-imp2--check "term.c-macro-output-line-113"
-                 (eql 113 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
+;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87, re-pinned
+;; after M52 imp-8 added the 4 dispatcher forward declarations).
+(m52-imp2--check "term.c-macro-output-line-127"
+                 (eql 127 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
 ;; the write mechanism is the C callback + the C-owned streams.
 (m52-imp2--check "cm.c-cmputc-writes-output"
                  (m52-imp2--tracked-p "src/cm.c" "putc (c & 0177, current_tty->output)"))
@@ -433,9 +439,10 @@ A missing tool/ (untracked on a fresh clone) contributes no files."
 (setq m52-imp2--group 'd11)
 
 ;; the 4 imp-6 hubs walk the returned step list.  The imp-5
-;; tty_update_end hub uses the same loop shape, so the file holds 5.
-(m52-imp2--check "imp6/list-walk-5"
-                 (eql 5 (m52-imp2--count-literal
+;; tty_update_end hub uses the same loop shape; M52 imp-8 adds 2 more
+;; (tty_set_terminal_window and tty_delete_glyphs), so the file holds 7.
+(m52-imp2--check "imp6-imp8/list-walk-7"
+                 (eql 7 (m52-imp2--count-literal
                          "src/term.c" "for (; CONSP (steps); steps = XCDR (steps))")))
 ;; a KEY step goes to m52_cap_string_1 through the ORIGINAL OUTPUT_IF.
 ;; Two sites: tty_set_terminal_modes and tty_reset_terminal_modes.
@@ -495,6 +502,102 @@ A missing tool/ (untracked on a fresh clone) contributes no files."
 (m52-imp2--check "imp6/min-d11-checks-14"
                  (>= m52-imp2--registered-d11 14))
 
-(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d, D10 %d, D11 %d) ===\n"
+;;; --- D12. The M52 imp-8 marker routing -------------------------------
+;;
+;; Same rationale as D11: no behaviour corpus can force a redisplay step,
+;; so the C routing of the imp-8 MARKER and KEY steps runs in no test.
+;; This block pins the SOURCE FACT (the imp-1 / imp-2 rule): each of the
+;; 4 rewired arithmetic hubs routes its steps to the right C mechanism.
+;; It reads src/term.c only.  Advisory; goes through no group.
+
+(setq m52-imp2--group 'd12)
+
+;; each of the 4 dispatchers resolves its module procedure one time.
+(m52-imp2--check "imp8/dispatch-ref-set-terminal-window"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-set-terminal-window-steps\")"))
+(m52-imp2--check "imp8/dispatch-ref-set-scroll-region"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-set-scroll-region-steps\")"))
+(m52-imp2--check "imp8/dispatch-ref-delete-glyphs"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-delete-glyphs-steps\")"))
+(m52-imp2--check "imp8/dispatch-ref-ins-del-lines"
+                 (m52-imp2--tracked-p
+                  "src/term.c"
+                  "scm_c_public_ref (\"emacs tty-output\", \"tty-ins-del-lines-steps\")"))
+;; the "set-window" / "scroll-region" tags each appear once with the s
+;; walk (tty_set_terminal_window) and once with the step form choice
+;; (tty_set_scroll_region).  "scroll-region-1" appears once.
+(m52-imp2--check "imp8/set-window-marker-s-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "m52_tty_step_tag_p (s, \"set-window\")")))
+(m52-imp2--check "imp8/set-window-marker-step-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "m52_tty_step_tag_p (step, \"set-window\")")))
+(m52-imp2--check "imp8/scroll-region-marker-s-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "m52_tty_step_tag_p (s, \"scroll-region\")")))
+(m52-imp2--check "imp8/scroll-region-marker-step-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "m52_tty_step_tag_p (step, \"scroll-region\")")))
+(m52-imp2--check "imp8/scroll-region-1-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "m52_tty_step_tag_p (step, \"scroll-region-1\")")))
+;; tty_delete_glyphs: the "on-insert" / "off-insert" markers call the
+;; imp-4 state-flip hubs; the "del-multi" / "del-char" markers choose the
+;; delete form.  The 2 capability KEY steps go through OUTPUT_IF.
+(m52-imp2--check "imp8/on-insert-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (s, \"on-insert\")")))
+(m52-imp2--check "imp8/off-insert-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (s, \"off-insert\")")))
+(m52-imp2--check "imp8/del-multi-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (s, \"del-multi\")")))
+(m52-imp2--check "imp8/del-char-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (s, \"del-char\")")))
+(m52-imp2--check "imp8/key-output-if-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c"
+                         "OUTPUT_IF (tty, m52_cap_string_1 (tty, s));")))
+;; tty_ins_del_lines: the multi / single / scroll markers, and the NILP
+;; guard route (the 2 early returns run in Scheme).
+(m52-imp2--check "imp8/multi-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"multi\")")))
+(m52-imp2--check "imp8/single-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"single\")")))
+(m52-imp2--check "imp8/scroll-marker-1"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_tag_p (step, \"scroll\")")))
+(m52-imp2--check "imp8/guard-route-1"
+                 (eql 1 (m52-imp2--count-literal "src/term.c" "/* the guard route */")))
+;; the shared marker-arg helper.  imp-8 adds no m52_caps row: the scroll
+;; direction stays a C variable in tty_ins_del_lines, so the rev-scroll /
+;; fwd-scroll keys are not in the table.
+(m52-imp2--check "imp8/helper-step-args"
+                 (eql 1 (m52-imp2--count-literal
+                         "src/term.c" "m52_tty_step_args_1 (Lisp_Object step")))
+;; the 9-arg dispatcher uses the existing SCM_CALL_N form.
+(m52-imp2--check "imp8/scm-call-n"
+                 (m52-imp2--tracked-p "src/term.c" "SCM_CALL_N (proc, args, 9)"))
+;; a truncation guard: the D12 block holds at least 16 checks.
+(m52-imp2--check "imp8/min-d12-checks-16"
+                 (>= m52-imp2--registered-d12 16))
+
+(princ (format "=== m52 imp-2 audit suite done (%d tracked checks: D7 %d, D8 %d, D10 %d, D11 %d, D12 %d) ===\n"
                m52-imp2--registered m52-imp2--registered-d7 m52-imp2--registered-d8
-               m52-imp2--registered-d10 m52-imp2--registered-d11))
+               m52-imp2--registered-d10 m52-imp2--registered-d11
+               m52-imp2--registered-d12))

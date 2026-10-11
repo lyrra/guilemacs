@@ -68,12 +68,14 @@ Usage:
 """
 
 import argparse
+import atexit
 import errno
 import fcntl
 import inspect
 import os
 import re
 import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -785,11 +787,175 @@ M52_IMP7_CASES = (
     },
 )
 
+M52_IMP8_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (emit! (module-ref output 'tty-emit-cap))
+       (flush! (module-ref output 'tty-flush))
+       (win (module-ref output 'tty-set-terminal-window-steps))
+       (sr (module-ref output 'tty-set-scroll-region-steps))
+       (del (module-ref output 'tty-delete-glyphs-steps))
+       (idl (module-ref output 'tty-ins-del-lines-steps)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      ;; The 4 arithmetic procedures return a single step, an ordered
+      ;; step list, or #nil.  A KEY step is a plain string that names one
+      ;; m52_caps key; the probe emits it through --tty-emit-cap.  A
+      ;; MARKER step (a list) carries a C mechanism, so the probe skips
+      ;; it.  The bytes are NOT pinned (brief.org section 5).
+      (write! term #vu8(77 53 50 45 73 77 80 56 45 66 69 71 73 78 33))
+      (let ((steps (append
+                    (win 0 40 1)
+                    (win 40 40 0)
+                    (list (sr 3 11 40 80 1 0 0))
+                    (del 3 0 1)
+                    (del 3 1 1)
+                    (list (idl 5 3 40 40 1 1 1 0 1))))
+            (n 0))
+        (for-each (lambda (s)
+                    (if (string? s)
+                        (set! n (+ n (emit! term s '())))
+                        #f))
+                  steps)
+        (write! term #vu8(77 53 50 45 73 77 80 56 45 69 78 68 33))
+        (let ((f (flush! term)))
+          ;; tty-flush returns 0 on success.  Return the byte count when
+          ;; the flush succeeded, the sentinel "flush-failed" when it did
+          ;; not.
+          ;;
+          ;; A zero byte count means a missing m52_caps row (the emit
+          ;; returned 0).  The fixture TERM of this case defines smdc /
+          ;; rmdc, so a correct row does emit bytes; a 0 count is then a
+          ;; real gap, not a terminal that lacks the capability.  Return
+          ;; a non-decimal string, so the driver's expect_decimal verdict
+          ;; FAILS (int() raises).  The plain count "0" would PASS, so it
+          ;; is not a signal.
+          (if (= f 0)
+              (if (>= n 1) (number->string n) "no-bytes")
+            "flush-failed"))))))
+"""
+
+# --- the M52 imp-8 terminfo fixture -----------------------------------
+#
+# The imp-8 group has 2 KEY steps only: "delete-mode" and
+# "end-delete-mode".  m52_caps maps them to tty->TS_delete_mode and
+# tty->TS_end_delete_mode, which C reads from the terminfo strings smdc
+# (enter delete mode) and rmdc (exit delete mode).  No terminfo entry in
+# a normal installation defines those 2 ("infocmp xterm" holds no smdc /
+# rmdc), so on TERM=xterm --tty-emit-cap returns 0 bytes for both keys.
+# The zero-count sentinel would then FAIL, and the case could not tell a
+# correct m52_caps row from a missing one.
+#
+# The case therefore runs a controlled terminfo entry that defines the 2
+# strings.  The base is the host xterm entry, so the child keeps a normal
+# terminal and only the 2 strings are added.  The case still pins NO byte
+# span: the driver compares the reported count with the real pty span.
+# When tic or infocmp is missing, the case INFO-skips, never a PASS.
+M52_IMP8_TERM = "m52-imp8"
+M52_IMP8_FIXTURE_CAPS = "\tsmdc=\\E[4h, rmdc=\\E[4l,\n"
+# The fallback entry is complete on its own: it is used only when infocmp
+# cannot read the host xterm entry.
+M52_IMP8_FALLBACK_ENTRY = (
+    "m52-imp8|M52 imp-8 delete-mode fixture,\n"
+    "\tam, xenl, cols#80, lines#24,\n"
+    "\tcsr=\\E[%i%p1%d;%p2%dr, el=\\E[K, clear=\\E[H\\E[2J,\n"
+    + M52_IMP8_FIXTURE_CAPS)
+
+_m52_imp8_fixture_env = None
+_m52_imp8_fixture_tried = False
+
+
+def _m52_imp8_entry_source():
+    """Return the fixture terminfo source text."""
+    infocmp = shutil.which("infocmp")
+    if infocmp is None:
+        return M52_IMP8_FALLBACK_ENTRY
+    try:
+        out = subprocess.run([infocmp, "-L", "xterm"],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return M52_IMP8_FALLBACK_ENTRY
+    text = out.stdout.decode("utf-8", "replace")
+    # Drop infocmp's own comment lines, so the first comma is the one that
+    # ends the name field.  Replace that field with the fixture name and
+    # insert the 2 strings there; the rest of the entry is untouched.
+    text = "\n".join(line for line in text.splitlines()
+                     if not line.startswith("#"))
+    head, sep, tail = text.partition(",")
+    if not sep or "xterm" not in head.split("\n")[0]:
+        return M52_IMP8_FALLBACK_ENTRY
+    return M52_IMP8_TERM + ",\n" + M52_IMP8_FIXTURE_CAPS + tail.lstrip("\n")
+
+
+def m52_imp8_env():
+    """Return the child env for the imp-8 terminfo fixture, or None.
+
+    Compile M52_IMP8_TERM with tic into a private TERMINFO directory.  A
+    missing tic, a tic failure, or a missing compiled entry yields None,
+    so the caller reports an explicit INFO skip.
+    """
+    global _m52_imp8_fixture_env, _m52_imp8_fixture_tried
+    if _m52_imp8_fixture_tried:
+        return _m52_imp8_fixture_env
+    _m52_imp8_fixture_tried = True
+    tic = shutil.which("tic")
+    if tic is None:
+        return None
+    source = _m52_imp8_entry_source()
+    try:
+        outdir = tempfile.mkdtemp(prefix="m52-imp8-terminfo-")
+        atexit.register(shutil.rmtree, outdir, True)
+        src = os.path.join(outdir, M52_IMP8_TERM + ".src")
+        with open(src, "w") as entry_file:
+            entry_file.write(source)
+        rc = subprocess.run([tic, "-o", outdir, src],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode
+        compiled = None
+        for root, dirs, files in os.walk(outdir):
+            if M52_IMP8_TERM in files:
+                compiled = os.path.join(root, M52_IMP8_TERM)
+                break
+        if rc != 0 or compiled is None:
+            return None
+        _m52_imp8_fixture_env = {"TERM": M52_IMP8_TERM, "TERMINFO": outdir}
+    except OSError:
+        return None
+    return _m52_imp8_fixture_env
+
+
+TERMINFO_FIXTURES = {M52_IMP8_TERM: m52_imp8_env}
+
+M52_IMP8_CASES = (
+    {
+        "name": "m52-imp8/policy-key-e2e",
+        "group": "m52-imp8",
+        "probe": M52_IMP8_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M52-IMP8-BEGIN!", b"M52-IMP8-END!"),
+        # NO output_span_bytes.  brief.org section 5 forbids a hard-coded
+        # TERM=xterm span: the span MUST come from a real pty run, or
+        # INFO-skip.  The count the probe reports IS checked against the
+        # real pty span (check_output).
+        #
+        # The fixture TERM gives the 2 KEY steps of this group their live
+        # terminfo strings (see the fixture note above).
+        "terminfo_fixture": M52_IMP8_TERM,
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES
-         + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES)
+         + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
+         + M52_IMP8_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
-          "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7")
+          "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
+          "m52-imp8")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1060,6 +1226,19 @@ def child_session():
 def run_case(case, emacs, timeout):
     """Run one case on a fresh pty.  Return (name, kind, detail)."""
     name = case["name"]
+    # A case may ask for a controlled terminfo entry (see
+    # TERMINFO_FIXTURES).  Resolve it before the pty and the temp files,
+    # so a missing fixture tool exits here with an explicit INFO skip.
+    fixture = None
+    if case.get("terminfo_fixture") is not None:
+        builder = TERMINFO_FIXTURES.get(case["terminfo_fixture"])
+        if builder is None:
+            return (name, "INFO", "unknown terminfo fixture %r"
+                    % case["terminfo_fixture"])
+        fixture = builder()
+        if fixture is None:
+            return (name, "INFO", "no terminfo fixture %r: tic or infocmp missing"
+                    % case["terminfo_fixture"])
     try:
         master, slave = os.openpty()
     except OSError as err:
@@ -1086,6 +1265,7 @@ def run_case(case, emacs, timeout):
         cmd = [emacs, "-Q", "-nw", "-l", tmp.name]
         child_env = os.environ.copy()
         child_env.update(case.get("env", {}))
+        child_env.update(fixture or {})
         child = subprocess.Popen(
             cmd, stdin=slave, stdout=slave, stderr=wpipe,
             close_fds=True, preexec_fn=child_session, env=child_env)
@@ -1387,7 +1567,8 @@ def selftest():
     check("m52-imp5-case-count", len(group_cases("m52-imp5")), 1)
     check("m52-imp6-case-count", len(group_cases("m52-imp6")), 1)
     check("m52-imp7-case-count", len(group_cases("m52-imp7")), 1)
-    check("total-case-count", len(CASES), 19)
+    check("m52-imp8-case-count", len(group_cases("m52-imp8")), 1)
+    check("total-case-count", len(CASES), 20)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -1402,7 +1583,9 @@ def selftest():
                           ("m52-imp6/policy-key-e2e",
                            (b"M52-IMP6-BEGIN!", b"M52-IMP6-END!")),
                           ("m52-imp7/policy-key-e2e",
-                           (b"M52-IMP7-BEGIN!", b"M52-IMP7-END!"))):
+                           (b"M52-IMP7-BEGIN!", b"M52-IMP7-END!")),
+                          ("m52-imp8/policy-key-e2e",
+                           (b"M52-IMP8-BEGIN!", b"M52-IMP8-END!"))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
         if not case.get("expect_decimal"):
@@ -1430,6 +1613,22 @@ def selftest():
     # m52-imp7 pins NO output_span_bytes (brief.org section 5): same rule.
     check("m52-imp7-output-bytes-unpinned",
           "output_span_bytes" in _case("m52-imp7/policy-key-e2e"), False)
+    # m52-imp8 pins NO output_span_bytes (brief.org section 5): same rule.
+    check("m52-imp8-output-bytes-unpinned",
+          "output_span_bytes" in _case("m52-imp8/policy-key-e2e"), False)
+    # A zero byte count must FAIL, not pass as the count "0".
+    # The probe returns the sentinel "no-bytes" on a zero count, and the
+    # expect_decimal verdict rejects a non-decimal value.  This pins that
+    # wiring, because the pty case itself INFO-skips on this host.
+    check("m52-imp8-zero-count-fails",
+          verdict(_case("m52-imp8/policy-key-e2e"), "no-bytes")[0], "FAIL")
+    # The imp-8 case needs a live smdc / rmdc terminfo string for its 2
+    # KEY steps, so it names a controlled terminfo fixture.  A typo here
+    # would silently run TERM=xterm and measure the same 0 bytes as a
+    # missing m52_caps row.
+    check("m52-imp8-terminfo-fixture",
+          _case("m52-imp8/policy-key-e2e").get("terminfo_fixture")
+          in TERMINFO_FIXTURES, True)
 
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")

@@ -11,11 +11,11 @@
 ;;; clone.  The docs needles live in tool/m48-plan-lint.sh, which the
 ;;; (m48) group does not run.  This corpus pins:
 ;;;   D1 -- the base numbers of docs/m48-plan.org section 3, re-pinned by
-;;;         imp-2, imp-3, imp-4, imp-6, and imp-7.  src/term.c is 5,924 lines,
+;;;         imp-2, imp-3, imp-4, imp-6, imp-7, and imp-8.  src/term.c is 6,078 lines,
 ;;;         29 DEFUNs (25 M48 DEFUNs plus the 4 M52 imp-3 --tty-* leaves),
-;;;         29 scm_c_public_ref sites (3 old + 4 G1 + 4 G3 + 5 M52 imp-4 + 6 M52 imp-5 + 4 M52 imp-6 + 3 M52 imp-7 refs), and
+;;;         33 scm_c_public_ref sites (3 old + 4 G1 + 4 G3 + 5 M52 imp-4 + 6 M52 imp-5 + 4 M52 imp-6 + 3 M52 imp-7 + 4 M52 imp-8 refs), and
 ;;;         includes guile.h; mod/emacs/terminal.scm is 266 lines (134 +
-;;;         the 8 wrappers); scm_c_public_ref over src/*.[chm] is 253;
+;;;         the 8 wrappers); scm_c_public_ref over src/*.[chm] is 257;
 ;;;         src/keyboard.c is 11,233 lines and 447 DEFUNs;
 ;;;         src/keyboard-globals.c is 490 lines; the combined keyboard
 ;;;         surface is 11,723 (margin 237 under the 11,960 M31 budget).
@@ -174,19 +174,19 @@ passes the raw symbol to reach it."
 ;;; D1 was re-pinned after each M48 implementation step.  At imp-6 the
 ;;; two geometry leaves and their C arithmetic were removed; the Scheme
 ;;; module now owns the geometry arithmetic.  The current source has 29
-;;; DEFUNs and 29 term.c refs.  The keyboard surface does not move.
-(m48-imp1--check "term.c-lines-5924"
-                 (eql 5924 (m48-imp1--lines "src/term.c")))
+;;; DEFUNs and 33 term.c refs.  The keyboard surface does not move.
+(m48-imp1--check "term.c-lines-6078"
+                 (eql 6078 (m48-imp1--lines "src/term.c")))
 (m48-imp1--check "term.c-defuns-29"
                  (eql 29 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
-(m48-imp1--check "term.c-scm-ref-29"
-                 (eql 29 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
+(m48-imp1--check "term.c-scm-ref-33"
+                 (eql 33 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
 (m48-imp1--check "term.c-has-guile.h"
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
-(m48-imp1--check "scm-c-public-ref-253"
-                 (eql 253 (m48-imp1--count-scm-ref)))
+(m48-imp1--check "scm-c-public-ref-257"
+                 (eql 257 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"

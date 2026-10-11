@@ -94,6 +94,20 @@ static Lisp_Object m52_tty_clear_to_end_scheme (Lisp_Object);
 static Lisp_Object m52_tty_clear_frame_scheme (Lisp_Object);
 static Lisp_Object m52_tty_clear_end_of_line_scheme (Lisp_Object, Lisp_Object,
 						     Lisp_Object, Lisp_Object);
+static Lisp_Object m52_tty_set_terminal_window_scheme (Lisp_Object, Lisp_Object,
+						       Lisp_Object);
+static Lisp_Object m52_tty_set_scroll_region_scheme (Lisp_Object, Lisp_Object,
+						     Lisp_Object, Lisp_Object,
+						     Lisp_Object, Lisp_Object,
+						     Lisp_Object);
+static Lisp_Object m52_tty_delete_glyphs_scheme (Lisp_Object, Lisp_Object,
+						 Lisp_Object);
+static Lisp_Object m52_tty_ins_del_lines_scheme (Lisp_Object, Lisp_Object,
+						 Lisp_Object, Lisp_Object,
+						 Lisp_Object, Lisp_Object,
+						 Lisp_Object, Lisp_Object,
+						 Lisp_Object);
+static bool m52_tty_step_args_1 (Lisp_Object, int *, int);
 static bool m52_tty_step_tag_p (Lisp_Object, const char *);
 static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
@@ -329,10 +343,30 @@ static void
 tty_set_terminal_window (struct frame *f, int size)
 {
   struct tty_display_info *tty = FRAME_TTY (f);
-
-  tty->specified_window = size ? size : FRAME_TOTAL_LINES (f);
-  if (FRAME_SCROLL_REGION_OK (f))
-    tty_set_scroll_region (f, 0, tty->specified_window);
+  int a[4];
+  Lisp_Object steps
+    = m52_tty_set_terminal_window_scheme (make_fixnum (size),
+					  make_fixnum (FRAME_TOTAL_LINES (f)),
+					  make_fixnum (FRAME_SCROLL_REGION_OK (f) != 0));
+  /* M52 imp-8: the height and the scroll-region choice run in Scheme.
+     A MARKER "set-window" HERE means "write tty->specified_window = w";
+     it is NOT the "set-window" capability key.  C keeps the state
+     write and the tty_set_scroll_region call.  */
+  for (; CONSP (steps); steps = XCDR (steps))
+    {
+      Lisp_Object s = XCAR (steps);
+      a[0] = a[1] = a[2] = a[3] = 0;
+      if (m52_tty_step_tag_p (s, "set-window"))
+	{
+	  m52_tty_step_args_1 (s, a, 1);
+	  tty->specified_window = a[0];   /* C keeps the state write */
+	}
+      else if (m52_tty_step_tag_p (s, "scroll-region"))
+	{
+	  m52_tty_step_args_1 (s, a, 2);
+	  tty_set_scroll_region (f, a[0], a[1]);  /* keep this C call */
+	}
+    }
 }
 
 static void
@@ -340,17 +374,36 @@ tty_set_scroll_region (struct frame *f, int start, int stop)
 {
   char *buf;
   struct tty_display_info *tty = FRAME_TTY (f);
-
-  if (tty->TS_set_scroll_region)
-    buf = tparam (tty->TS_set_scroll_region, 0, 0, start, stop - 1, 0, 0);
-  else if (tty->TS_set_scroll_region_1)
-    buf = tparam (tty->TS_set_scroll_region_1, 0, 0,
-		  FRAME_TOTAL_LINES (f), start,
-		  FRAME_TOTAL_LINES (f) - stop,
-		  FRAME_TOTAL_LINES (f));
+  int a[4];
+  const char *str;
+  Lisp_Object step
+    = m52_tty_set_scroll_region_scheme (make_fixnum (start), make_fixnum (stop),
+					make_fixnum (FRAME_TOTAL_LINES (f)),
+					make_fixnum (FRAME_COLS (f)),
+					make_fixnum (tty->TS_set_scroll_region != NULL),
+					make_fixnum (tty->TS_set_scroll_region_1 != NULL),
+					make_fixnum (tty->TS_set_window != NULL));
+  /* M52 imp-8: the form choice runs in Scheme.  The MARKER carries the
+     tparam args; a trailing arg that the form does not use stays 0,
+     because C zeroes A first.  C keeps tparam, OUTPUT, xfree, and
+     losecursor.  */
+  a[0] = a[1] = a[2] = a[3] = 0;
+  if (m52_tty_step_tag_p (step, "scroll-region") && tty->TS_set_scroll_region)
+    str = tty->TS_set_scroll_region;
+  else if (m52_tty_step_tag_p (step, "scroll-region-1") && tty->TS_set_scroll_region_1)
+    str = tty->TS_set_scroll_region_1;
+  else if (m52_tty_step_tag_p (step, "set-window"))
+    str = tty->TS_set_window;
   else
-    buf = tparam (tty->TS_set_window, 0, 0, start, 0, stop, FRAME_COLS (f));
-
+    /* Defensive fallback, not a new policy guard: the Scheme procedure
+       returns only the 3 tags above, so this arm is dead today.  It
+       keeps STR set, so an unexpected tag cannot reach tparam with an
+       uninitialised STR, which is undefined behaviour.  Keep the line:
+       it costs nothing and it keeps the guarantee in one place.  Do
+       not remove it without a replacement.  */
+    return;
+  m52_tty_step_args_1 (step, a, 4);
+  buf = tparam (str, 0, 0, a[0], a[1], a[2], a[3]);
   OUTPUT (tty, buf);
   xfree (buf);
   losecursor (tty);
@@ -1157,28 +1210,39 @@ tty_delete_glyphs (struct frame *f, int n)
   register int i;
 
   struct tty_display_info *tty = FRAME_TTY (f);
-
-  if (tty->delete_in_insert_mode)
+  int a[4];
+  Lisp_Object steps
+    = m52_tty_delete_glyphs_scheme (make_fixnum (n),
+				    make_fixnum (tty->delete_in_insert_mode != 0),
+				    make_fixnum (tty->TS_del_multi_chars != NULL));
+  /* M52 imp-8: the insert-mode branch, the delete form, and the
+     end-delete-mode step run in Scheme.  C keeps tty_turn_on_insert /
+     tty_turn_off_insert, OUTPUT_IF, tparam, OUTPUT1, and the del_char
+     loop.  */
+  for (; CONSP (steps); steps = XCDR (steps))
     {
-      tty_turn_on_insert (tty);
+      Lisp_Object s = XCAR (steps);
+      a[0] = a[1] = a[2] = a[3] = 0;
+      if (STRINGP (s))
+	OUTPUT_IF (tty, m52_cap_string_1 (tty, s));   /* the KEY route */
+      else if (m52_tty_step_tag_p (s, "on-insert"))
+	tty_turn_on_insert (tty);                     /* keep this C call */
+      else if (m52_tty_step_tag_p (s, "off-insert"))
+	tty_turn_off_insert (tty);                    /* keep this C call */
+      else if (m52_tty_step_tag_p (s, "del-multi"))
+	{
+	  m52_tty_step_args_1 (s, a, 1);
+	  buf = tparam (tty->TS_del_multi_chars, 0, 0, a[0], 0, 0, 0);
+	  OUTPUT1 (tty, buf);
+	  xfree (buf);
+	}
+      else if (m52_tty_step_tag_p (s, "del-char"))
+	{
+	  m52_tty_step_args_1 (s, a, 1);
+	  for (i = 0; i < a[0]; i++)
+	    OUTPUT1 (tty, tty->TS_del_char);          /* keep the loop */
+	}
     }
-  else
-    {
-      tty_turn_off_insert (tty);
-      OUTPUT_IF (tty, tty->TS_delete_mode);
-    }
-
-  if (tty->TS_del_multi_chars)
-    {
-      buf = tparam (tty->TS_del_multi_chars, 0, 0, n, 0, 0, 0);
-      OUTPUT1 (tty, buf);
-      xfree (buf);
-    }
-  else
-    for (i = 0; i < n; i++)
-      OUTPUT1 (tty, tty->TS_del_char);
-  if (!tty->delete_in_insert_mode)
-    OUTPUT_IF (tty, tty->TS_end_delete_mode);
 }
 
 /* An implementation of ins_del_lines for termcap frames. */
@@ -1192,50 +1256,57 @@ tty_ins_del_lines (struct frame *f, int vpos, int n)
   const char *single = n > 0 ? tty->TS_ins_line : tty->TS_del_line;
   const char *scroll = n > 0 ? tty->TS_rev_scroll : tty->TS_fwd_scroll;
 
-  int i = eabs (n);
   char *buf;
-
-  /* If the lines below the insertion are being pushed
-     into the end of the window, this is the same as clearing;
-     and we know the lines are already clear, since the matching
-     deletion has already been done.  So can ignore this.  */
-  /* If the lines below the deletion are blank lines coming
-     out of the end of the window, don't bother,
-     as there will be a matching inslines later that will flush them. */
-  if (FRAME_SCROLL_REGION_OK (f)
-      && vpos + i >= tty->specified_window)
-    return;
-  if (!FRAME_MEMORY_BELOW_FRAME (f)
-      && vpos + i >= FRAME_TOTAL_LINES (f))
-    return;
-
-  if (multi)
+  int a[4];
+  /* M52 imp-8: eabs and the 2 guards run in Scheme (pure arithmetic);
+     C keeps the guard EFFECT through the NILP route.  The multi /
+     single / scroll choice and the args run in Scheme.  C keeps
+     raw_cursor_to, tty_background_highlight, tparam, OUTPUT, OUTPUTL,
+     the 2 tty_set_scroll_region calls, the TF_teleray curX reset, and
+     the trailing cursor_to + clear_to_end.  The a[1] arg is
+     specified_window - vpos, the OUTPUTL line count.  */
+  Lisp_Object step
+    = m52_tty_ins_del_lines_scheme (make_fixnum (vpos), make_fixnum (n),
+				    make_fixnum (tty->specified_window),
+				    make_fixnum (FRAME_TOTAL_LINES (f)),
+				    make_fixnum (FRAME_SCROLL_REGION_OK (f) != 0),
+				    make_fixnum (FRAME_MEMORY_BELOW_FRAME (f) != 0),
+				    make_fixnum (multi != NULL),
+				    make_fixnum (single != NULL),
+				    make_fixnum (scroll != NULL));
+  if (NILP (step))
+    return;                                   /* the guard route */
+  a[0] = a[1] = a[2] = a[3] = 0;
+  m52_tty_step_args_1 (step, a, 2);
+  if (m52_tty_step_tag_p (step, "multi"))
     {
       raw_cursor_to (f, vpos, 0);
       tty_background_highlight (tty);
-      buf = tparam (multi, 0, 0, i, 0, 0, 0);
+      buf = tparam (multi, 0, 0, a[0], 0, 0, 0);
       OUTPUT (tty, buf);
       xfree (buf);
     }
-  else if (single)
+  else if (m52_tty_step_tag_p (step, "single"))
     {
+      int k = a[0];
       raw_cursor_to (f, vpos, 0);
       tty_background_highlight (tty);
-      while (--i >= 0)
+      while (--k >= 0)
         OUTPUT (tty, single);
       if (tty->TF_teleray)
         curX (tty) = 0;
     }
-  else
+  else if (m52_tty_step_tag_p (step, "scroll"))
     {
+      int k = a[0];
       tty_set_scroll_region (f, vpos, tty->specified_window);
       if (n < 0)
         raw_cursor_to (f, tty->specified_window - 1, 0);
       else
         raw_cursor_to (f, vpos, 0);
       tty_background_highlight (tty);
-      while (--i >= 0)
-        OUTPUTL (tty, scroll, tty->specified_window - vpos);
+      while (--k >= 0)
+        OUTPUTL (tty, scroll, a[1]);
       tty_set_scroll_region (f, 0, tty->specified_window);
     }
 
@@ -5845,6 +5916,89 @@ m52_tty_clear_end_of_line_scheme (Lisp_Object costs_set, Lisp_Object cur_x,
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs tty-output", "tty-clear-end-of-line-steps");
   return SCM_CALL_4 (proc, costs_set, cur_x, first_unused_hpos, has_clr_line);
+}
+
+/* --- M52 imp-8: the scroll / window / glyph arithmetic dispatchers --- */
+
+/* FIX-20261010-guilemacs: M52 imp-8 -- call the pure policy procedures
+   of (emacs tty-output) that hold the DECISION of the 4 arithmetic hubs
+   (tty_set_terminal_window, tty_set_scroll_region, tty_delete_glyphs,
+   tty_ins_del_lines).  Each dispatcher resolves its module procedure one
+   time (the M48 imp-4 idiom), caches it in a static SCM, and passes
+   plain fixnums only.  A returned KEY step is a plain string; a MARKER
+   step is a plain list.  C keeps the C-owned state, the FILE * streams,
+   tparam, and the OUTPUT / OUTPUT1 / OUTPUTL / OUTPUT_IF padding.  No
+   hub emits through --tty-emit-cap (that leaf loses the padding).  The
+   m52_ / _scheme name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+
+/* Fill A[0 .. MAX-1] from the fixnum args of the marker STEP.  The caller
+   zeroes A first, so an arg that the form does not use stays 0.  Return
+   true when STEP is a list.  */
+static bool
+m52_tty_step_args_1 (Lisp_Object step, int *a, int max)
+{
+  int n = 0;
+  if (!CONSP (step))
+    return false;
+  for (Lisp_Object l = XCDR (step); CONSP (l) && n < max; l = XCDR (l))
+    {
+      Lisp_Object x = XCAR (l);
+      a[n++] = FIXNUMP (x) ? (int) XFIXNUM (x) : 0;
+    }
+  return true;
+}
+
+static Lisp_Object
+m52_tty_set_terminal_window_scheme (Lisp_Object size, Lisp_Object total_lines,
+				    Lisp_Object scroll_ok)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-set-terminal-window-steps");
+  return SCM_CALL_3 (proc, size, total_lines, scroll_ok);
+}
+
+static Lisp_Object
+m52_tty_set_scroll_region_scheme (Lisp_Object start, Lisp_Object stop,
+				  Lisp_Object total_lines, Lisp_Object cols,
+				  Lisp_Object has_sr, Lisp_Object has_sr1,
+				  Lisp_Object has_window)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-set-scroll-region-steps");
+  return SCM_CALL_7 (proc, start, stop, total_lines, cols, has_sr, has_sr1,
+		     has_window);
+}
+
+static Lisp_Object
+m52_tty_delete_glyphs_scheme (Lisp_Object n, Lisp_Object delete_in_insert_mode,
+			      Lisp_Object has_del_multi_chars)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-delete-glyphs-steps");
+  return SCM_CALL_3 (proc, n, delete_in_insert_mode, has_del_multi_chars);
+}
+
+static Lisp_Object
+m52_tty_ins_del_lines_scheme (Lisp_Object vpos, Lisp_Object n,
+			      Lisp_Object specified_window,
+			      Lisp_Object total_lines, Lisp_Object scroll_ok,
+			      Lisp_Object memory_below, Lisp_Object has_multi,
+			      Lisp_Object has_single, Lisp_Object has_scroll)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-ins-del-lines-steps");
+  /* The tree uses no SCM_CALL_9 form, so pass the 9 plain fixnums through
+     the existing SCM_CALL_N (scm_call_n) form.  */
+  SCM args[9];
+  args[0] = vpos;          args[1] = n;           args[2] = specified_window;
+  args[3] = total_lines;   args[4] = scroll_ok;   args[5] = memory_below;
+  args[6] = has_multi;     args[7] = has_single;  args[8] = has_scroll;
+  return SCM_CALL_N (proc, args, 9);
 }
 
 void
