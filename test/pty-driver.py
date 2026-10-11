@@ -77,6 +77,7 @@ import re
 import select
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -296,6 +297,121 @@ SIZE_PROBE = r"""
                                  (number->string (cdr after)))))))))
 """
 
+# M53 imp-3: the PTY terminal VERTICAL SLICE.  This is the CHECK 2
+# smaller step (brief.org section 3).  ONE integrated probe runs the
+# whole slice in the built src/emacs on the pty, in this order:
+#
+#   (a) start  -- the child is already terminal Emacs on the pty.
+#   (b) load   -- the child loads a real Elisp file through the elisp
+#                 `load' primitive and reads the `setq' side effect back
+#                 with (emacs-elisp runtime) `symbol-value'.  A missing
+#                 cell or a failed load is "FAIL".
+#   (c) read   -- the driver writes input bytes to the master; the child
+#                 runs the (emacs gobble) read path once and reports
+#                 "<return>,<stored>".  The events order is NOT reported:
+#                 the m42-imp3 events-order observation is a separate
+#                 pre-existing defect (the store calls the defelisp macro
+#                 directly, so the probe's module-set! no longer
+#                 intercepts it); the slice pins the read and store
+#                 counts, which are the load-bearing observables.
+#   (d) write  -- the child writes a BEGIN marker, the out bytes, an END
+#                 marker; the driver reads the master and checks the span
+#                 between the markers against the reported count and the
+#                 pinned out bytes (the m52 output_span mechanism).
+#   (e) resize -- the driver resizes the pty (TIOCSWINSZ) after READY;
+#                 the child reads tty-size after the gate and reports
+#                 "<width>x<height>".  A size that follows the resize
+#                 proves a LIVE resize.
+#   (f) exit / restore -- the driver captures the pty mode BEFORE Popen,
+#                 waits for the child to EXIT, asserts the exit status is
+#                 0, and reads the mode back.  The child also judges its
+#                 own init/reset round trip here ("RESTORED").
+#
+# The report is ONE string, one line:
+#
+#   "load:<OK|FAIL> read:<ret>,<stored> out:<n> size:<W>x<H> mode:<RESTORED|other>"
+#
+# The child-side load and restore judgement stays in the child, where
+# only the child can see both sides (MODE_PROBE, line 230).  The size,
+# read counts, and out bytes are judged by the driver, which knows what
+# it asked for.
+M53_IMP3_BEGIN = b"M53-BEGIN!"
+M53_IMP3_END = b"M53-END!"
+M53_IMP3_OUT_BYTES = b"M53-IMP3-SLICE-OK!"
+M53_IMP3_ROWS = 30
+M53_IMP3_COLS = 100
+
+M53_IMP3_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (modes (resolve-module '(emacs tty-modes)))
+       (rt (resolve-module '(emacs-elisp runtime)))
+       (sv (module-ref rt 'symbol-value))
+       (loadf (module-ref rt 'symbol-function))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the newest terminal is the
+       ;; last element (see READ_PATH_PROBE).
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (nr (module-ref gobble '%--kbd-buffer-nr-stored))
+       (read! (module-ref gobble 'tty-read-avail-input!))
+       (write! (module-ref output 'tty-write-bytes))
+       (flush! (module-ref output 'tty-flush))
+       (get-size (module-ref modes 'tty-size))
+       (get-mode (module-ref modes 'tty-get-mode))
+       (init (module-ref modes 'init-tty-mode))
+       (reset (module-ref modes 'reset-tty-mode))
+       (flags (list @@FLAGS@@)))
+@@MODE_HELPERS@@
+  (let* ((readstr
+         ;; Read input FIRST, right after the gate, before the load:
+         ;; Emacs's own input poll can move pending tty bytes into
+         ;; kbd_buffer during a longer step, and then FIONREAD reads 0.
+          (if (not term)
+              "no-terminal"
+            (let* ((prev ((force nr)))
+                   (ret (read! term))
+                   (n1 ((force nr))))
+              (string-append
+               (if (number? ret) (number->string ret) "no-terminal")
+               "," (number->string (- n1 prev))))))
+         (loaded (catch #t
+                   (lambda ()
+                     ((loadf 'load) "@@LOADFILE@@" #nil #nil)
+                     (equal? (sv 'm53-imp3-loaded) 4242))
+                   (lambda (k . a) #f)))
+         (outstr
+          (if (not term)
+              "no-terminal"
+            (begin
+              (write! term #vu8(77 53 51 45 66 69 71 73 78 33))
+              (let ((n (write! term #vu8(@@OUTBYTES@@))))
+                (flush! term)
+                (write! term #vu8(77 53 51 45 69 78 68 33))
+                (flush! term)
+                (if (number? n) (number->string n) "write-failed")))))
+         (sizestr
+          (if (not term)
+              "no-terminal"
+            (let ((sz (get-size 0)))
+              (if (not (pair? sz))
+                  "no-size"
+                (string-append (number->string (car sz)) "x"
+                               (number->string (cdr sz)))))))
+         (modestr
+          (let ((saved (get-mode 0)))
+            (if (not saved)
+                "no-base-mode"
+              (let* ((_i (init 0 saved flags))
+                     (_r (reset 0 saved))
+                     (after (get-mode 0)))
+                (if (and after (mode=? after saved)) "RESTORED" "other"))))))
+    (string-append "load:" (if loaded "OK" "FAIL")
+                   " read:" readstr
+                   " out:" outstr
+                   " size:" sizestr
+                   " mode:" modestr)))
+"""
+
 
 # --------------------------------------------------------------------
 # The case tables.  Case NAMES are the driver's contract with the ERT
@@ -480,6 +596,44 @@ M43_CASES = (
         "probe": SIZE_PROBE,
         "subst": {"HEIGHT": str(SIZE_HEIGHT), "WIDTH": str(SIZE_WIDTH)},
         "expect": "%d %d" % (SIZE_WIDTH, SIZE_HEIGHT),
+    },
+)
+
+# M53 imp-3: the PTY terminal vertical-slice case (see M53_IMP3_PROBE).
+# It lives here, after TTY_FLAGS and MODE_HELPERS are defined, because
+# its `subst' reads both at import time.
+M53_IMP3_CASES = (
+    {
+        "name": "m53-imp3/vertical-slice-e2e",
+        "group": "m53-imp3",
+        "probe": M53_IMP3_PROBE,
+        "subst": {"FLAGS": TTY_FLAGS,
+                  "MODE_HELPERS": MODE_HELPERS,
+                  "OUTBYTES": " ".join(str(b) for b in M53_IMP3_OUT_BYTES)},
+        "bytes": b"AB",
+        "expect": "load:OK read:2,2 out:18 size:%dx%d mode:RESTORED"
+                  % (M53_IMP3_COLS, M53_IMP3_ROWS),
+        # The driver resizes the pty after READY, before the gate; the
+        # child reads the size after the gate.  30x100 is NOT the pty
+        # default, so the report proves the change.
+        "resize": (M53_IMP3_ROWS, M53_IMP3_COLS),
+        # Capture the pty mode before Popen and read it back after exit
+        # (brief.org section 5: the ISIG trap means the capture point
+        # MUST be before deliver_raw clears ISIG).
+        "capture_mode": True,
+        # Wait for the real exit status; today run_case SIGKILLs a live
+        # child on a complete report.
+        "wait_exit": True,
+        # A real Elisp fixture the child loads; its setq is the side
+        # effect the child reads back with symbol-value.
+        "load_fixture": "(setq m53-imp3-loaded 4242)\n",
+        "output_span": (M53_IMP3_BEGIN, M53_IMP3_END),
+        # The span bytes are OUR OWN written bytes, not a terminfo span,
+        # so pinning them is allowed (brief.org section 4(d)).
+        "output_span_bytes": M53_IMP3_OUT_BYTES,
+        # The report is composite, so the driver extracts the out count.
+        "output_count_re": r"out:(\d+)",
+        "env": {"TERM": "xterm"},
     },
 )
 
@@ -949,11 +1103,13 @@ M52_IMP8_CASES = (
     },
 )
 
-CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M52_CASES
+CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
+         + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
+          "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
           "m52-imp8")
 
@@ -1136,6 +1292,14 @@ def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     # double quote; a probe uses double-quoted strings (the report
     # tokens) but no backslash.
     gate = '"%s"' % gate_path.replace("\\", "\\\\").replace('"', '\\"')
+    # A probe may load a real Elisp fixture (M53 imp-3): the driver
+    # writes it next to the gate file, and its path is spliced in as the
+    # BODY of a Scheme string literal (the probe supplies the quotes).
+    load_path = gate_path + ".load.el"
+    load_literal = load_path.replace("\\", "\\\\").replace('"', '\\"')
+    subst = dict(case.get("subst", {}))
+    subst.setdefault("LOADFILE", load_literal)
+    case = dict(case, subst=subst)
     scheme_probe = "(begin (call-with-input-file %s read-char) %s)" % (
         gate, build_probe(case).strip())
     probe = scheme_probe.replace("\\", "\\\\").replace('"', '\\"')
@@ -1201,10 +1365,20 @@ def check_output(case, got, output):
         b = output.find(end, a + len(start)) if a >= 0 else -1
         if a < 0 or b < 0:
             return "pty output did not contain ordered markers %r %r" % (start, end)
-        try:
-            reported = int(got)
-        except (TypeError, ValueError):
-            return "probe did not report a byte count: %r" % got
+        # A composite report (M53 imp-3) embeds its byte count in a
+        # larger string; `output_count_re' extracts it.  A bare-count
+        # report (m52) has no regex and is parsed whole.
+        count_re = case.get("output_count_re")
+        if count_re is not None:
+            match = re.search(count_re, got)
+            if match is None:
+                return "probe did not report a byte count: %r" % got
+            reported = int(match.group(1))
+        else:
+            try:
+                reported = int(got)
+            except (TypeError, ValueError):
+                return "probe did not report a byte count: %r" % got
         actual = b - (a + len(start))
         expected = case.get("output_span_bytes")
         if expected is not None and output[a + len(start):b] != expected:
@@ -1221,6 +1395,31 @@ def child_session():
     # Popen has already connected the slave to stdin.  Acquiring it here
     # makes /dev/tty refer to the same terminal inside Emacs.
     fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+
+def resize_pty(fd, rows, cols):
+    """Resize the pty FD to ROWS x COLS through TIOCSWINSZ.
+
+    A `struct winsize' holds 4 unsigned shorts: rows, cols, xpixel,
+    ypixel.  The driver resizes the MASTER after READY; the kernel
+    shares the size with the slave, so the child's tty-size call sees
+    the new value -- a live resize (brief.org section 4(e)).
+    """
+    packed = struct.pack("HHHH", rows, cols, 0, 0)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, packed)
+
+
+def modes_equal(a, b):
+    """Whether two termios.tcgetattr lists hold the same terminal mode.
+
+    The list is [iflag, oflag, cflag, lflag, ispeed, ospeed, cc]; the
+    mode is the four flags plus the control-char array.  The speeds are
+    not part of the restore check.
+    """
+    if a is None or b is None:
+        return False
+    return (a[0] == b[0] and a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+            and list(a[6]) == list(b[6]))
 
 
 def run_case(case, emacs, timeout):
@@ -1246,6 +1445,18 @@ def run_case(case, emacs, timeout):
         # into the INFO skip path.
         return (name, "INFO", "no pty: errno %d %s" % (err.errno, err.strerror))
 
+    # Capture the pty mode BEFORE Popen (brief.org section 5).  Emacs
+    # saves the startup tty mode and restores it on exit, so the
+    # before/after compare holds even when the case delivers bytes and
+    # deliver_raw later clears ISIG.  Reading the mode back only AFTER
+    # the clear would report a false FAIL.
+    mode_before = None
+    if case.get("capture_mode"):
+        try:
+            mode_before = termios.tcgetattr(master)
+        except (OSError, termios.error):
+            mode_before = None
+
     rpipe, wpipe = os.pipe()
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix="-pty-child.el", delete=False)
@@ -1259,6 +1470,14 @@ def run_case(case, emacs, timeout):
     # Keep both FIFO ends open.  This makes the driver's write immediate
     # even if the child has not reached call-with-input-file yet.
     gate_fd = os.open(gate_path, os.O_RDWR | os.O_NONBLOCK)
+
+    # A case may load a real Elisp fixture (M53 imp-3).
+    # build_child_source splices its path (GATE_PATH + ".load.el"); write
+    # the fixture there so the child's `load' finds it.
+    load_path = gate_path + ".load.el"
+    if case.get("load_fixture"):
+        with open(load_path, "w") as fixture_file:
+            fixture_file.write(case["load_fixture"])
 
     child = None
     try:
@@ -1281,6 +1500,10 @@ def run_case(case, emacs, timeout):
         ready_seen = False
         input_sent = False
         timed_out = False
+        report_done = False
+        pty_eof = False
+        mode_after = None
+        exit_status = None
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
@@ -1288,23 +1511,27 @@ def run_case(case, emacs, timeout):
                 timed_out = True
                 break
             readers = [rpipe]
-            if master is not None:
+            if master is not None and not pty_eof:
                 readers.append(master)
             ready, _, _ = select.select(readers, [], [], min(0.5, remaining))
-            if master is not None and master in ready:
+            if master is not None and not pty_eof and master in ready:
                 try:
                     chunk = os.read(master, 4096)
                     if chunk:
                         pty_output += chunk
                     else:
-                        os.close(master)
-                        master = None
+                        pty_eof = True
+                        if not case.get("capture_mode"):
+                            os.close(master)
+                            master = None
                 except OSError as err:
                     # Linux pty masters report EIO after the slave closes.
                     if err.errno != errno.EIO:
                         raise
-                    os.close(master)
-                    master = None
+                    pty_eof = True
+                    if not case.get("capture_mode"):
+                        os.close(master)
+                        master = None
             if rpipe in ready:
                 chunk = os.read(rpipe, 4096)
                 if not chunk:
@@ -1330,17 +1557,44 @@ def run_case(case, emacs, timeout):
                             return (name, "INFO",
                                     "ISIG clear on the pty failed: %s" % raw_reason)
                         os.write(master, case["bytes"])
+                    if case.get("resize") and master is not None:
+                        # M53 imp-3 step (e): resize the pty AFTER READY and
+                        # BEFORE the gate, so the child reads the new size
+                        # -- a live resize (brief.org section 4(e)).
+                        try:
+                            resize_pty(master, *case["resize"])
+                        except (OSError, termios.error):
+                            pass
                     os.write(gate_fd, b"G")
                     input_sent = True
                 # The result is complete once its line arrives.  Do not
                 # require Emacs shutdown or pipe EOF after a valid report;
                 # cleanup below will stop a child that remains alive.
+                # A wait_exit case (M53 imp-3 step (f)) keeps reading until
+                # the child exits, so the driver can assert its status.
                 if ready_seen and parse_report(
                         report.decode("utf-8", "replace")) is not None \
                         and output_complete(case, pty_output):
-                    break
+                    report_done = True
+                    if not case.get("wait_exit"):
+                        break
             elif child.poll() is not None:
                 break
+        # Read the pty mode back after the run, while the master is still
+        # open (a capture_mode case keeps it open past EOF).  Emacs
+        # restores the mode it saved at startup on exit.
+        if case.get("capture_mode") and master is not None:
+            try:
+                mode_after = termios.tcgetattr(master)
+            except (OSError, termios.error):
+                mode_after = None
+        # M53 imp-3 step (f): wait for the real exit status.
+        if case.get("wait_exit") and report_done:
+            try:
+                exit_status = child.wait(
+                    timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                exit_status = None
     except OSError as err:
         # openpty already succeeded, so this is a live tty whose read or
         # write failed -- a harness error, not an environment gap.  Report
@@ -1360,7 +1614,7 @@ def run_case(case, emacs, timeout):
             except OSError:
                 pass
             child.wait()
-        for path in (tmp_path, gate_path):
+        for path in (tmp_path, gate_path, load_path):
             try:
                 os.unlink(path)
             except OSError:
@@ -1385,6 +1639,17 @@ def run_case(case, emacs, timeout):
         output_problem = check_output(case, got, pty_output)
         if output_problem:
             return (name, "FAIL", output_problem)
+        # M53 imp-3 step (f): the real exit status.
+        if case.get("wait_exit") and exit_status != 0:
+            return (name, "FAIL", "child exit status %r (want 0)" % (exit_status,))
+        # M53 imp-3 step (f): the pty mode read-back.
+        if case.get("capture_mode"):
+            if mode_before is None or mode_after is None:
+                return (name, "FAIL", "could not capture/read back the pty mode")
+            if not modes_equal(mode_before, mode_after):
+                return (name, "FAIL",
+                        "pty mode not restored: before=%r after=%r"
+                        % (mode_before, mode_after))
     return (name, kind, detail)
 
 
@@ -1568,7 +1833,8 @@ def selftest():
     check("m52-imp6-case-count", len(group_cases("m52-imp6")), 1)
     check("m52-imp7-case-count", len(group_cases("m52-imp7")), 1)
     check("m52-imp8-case-count", len(group_cases("m52-imp8")), 1)
-    check("total-case-count", len(CASES), 20)
+    check("m53-imp3-case-count", len(group_cases("m53-imp3")), 1)
+    check("total-case-count", len(CASES), 21)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -1629,6 +1895,45 @@ def selftest():
     check("m52-imp8-terminfo-fixture",
           _case("m52-imp8/policy-key-e2e").get("terminfo_fixture")
           in TERMINFO_FIXTURES, True)
+
+    # --- the M53 imp-3 vertical slice ----------------------------------
+    # The slice carries the resize, the mode capture/read-back, the exit
+    # wait, and the load fixture.  These pins hold the wiring on a host
+    # with no pty.
+    m53 = _case("m53-imp3/vertical-slice-e2e")
+    check("m53-imp3-expect", expect_string(m53),
+          "load:OK read:2,2 out:18 size:100x30 mode:RESTORED")
+    check("m53-imp3-output-span", m53.get("output_span"),
+          (M53_IMP3_BEGIN, M53_IMP3_END))
+    check("m53-imp3-output-bytes", m53.get("output_span_bytes"),
+          M53_IMP3_OUT_BYTES)
+    check("m53-imp3-resize", m53.get("resize"),
+          (M53_IMP3_ROWS, M53_IMP3_COLS))
+    if not m53.get("wait_exit"):
+        problems.append("m53-imp3 does not wait for the child exit status")
+    if not m53.get("capture_mode"):
+        problems.append("m53-imp3 does not capture the pty mode")
+    m53_src = build_child_source(m53)
+    for needle, label in (
+            ("TIOCSWINSZ", "resize uses TIOCSWINSZ"),
+            ("tcgetattr", "run_case reads the pty mode back"),
+            ("resize_pty(master", "run_case resizes the pty"),
+            ("child.wait(", "run_case waits for the child exit status"),
+            ("modes_equal", "run_case compares the pty modes")):
+        if needle not in inspect.getsource(run_case) \
+                and needle not in inspect.getsource(resize_pty) \
+                and needle not in inspect.getsource(modes_equal):
+            problems.append("m53-imp3 wiring missing: %s" % label)
+    if "symbol-value" not in m53_src:
+        problems.append("m53-imp3 probe does not read the load side effect")
+    if "tty-read-avail-input!" not in m53_src:
+        problems.append("m53-imp3 probe does not run the read path")
+    if "tty-write-bytes" not in m53_src:
+        problems.append("m53-imp3 probe does not run the write path")
+    if "tty-size" not in m53_src:
+        problems.append("m53-imp3 probe does not read the tty size")
+    if "@@LOADFILE@@" in m53_src or "@@OUTBYTES@@" in m53_src:
+        problems.append("m53-imp3 probe left a placeholder unresolved")
 
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")

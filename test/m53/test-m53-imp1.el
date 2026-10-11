@@ -28,7 +28,7 @@
 ;;;         checks.
 ;;;   S4 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm, and test/pty-driver.py holds
-;;;         the 20-case total pin and the --selftest entry.  S4 holds 4
+;;;         the 21-case total pin and the --selftest entry.  S4 holds 4
 ;;;         checks.
 ;;;   S5 -- the guards: a per-group min-count guard for S1 .. S4, and
 ;;;         the group-total `ert-deftest'.  S5 holds 4 checks.
@@ -272,9 +272,12 @@ probe: the loader must read and evaluate a real Elisp file."
 
 ;;; --- S3. CHECK 2, the PTY terminal path -----------------------------
 
-;; A PTY-only row is NOT PROVEN on this host (brief.org section 9): a
-;; PTY allocation is denied.  These pins record the path and its
-;; handles.  The live PTY slice is the imp-3 work.
+;; A PTY allocation now WORKS on this host (cr.org F4, brief.org section
+;; 2): =os.openpty()= returns 2 file descriptors and no =errno 13=, and
+;; =python3 test/pty-driver.py --selftest= prints =SELFTEST OK=.  The old
+;; comment said the PTY allocation is denied; that host limit is GONE.
+;; These pins record the path and its handles.  The live PTY slice is the
+;; imp-3 work.
 
 (setq m53-imp1--group 's3)
 
@@ -287,6 +290,7 @@ probe: the loader must read and evaluate a real Elisp file."
                                       '("\"m42-imp3\"" "\"m42-imp4\""
                                         "\"m43-imp3\"" "\"m43-imp4\""
                                         "\"m43-imp5\""
+                                        "\"m53-imp3\""
                                         "\"m52-imp3\"" "\"m52-imp4\""
                                         "\"m52-imp5\"" "\"m52-imp6\""
                                         "\"m52-imp7\"" "\"m52-imp8\"")))
@@ -302,10 +306,10 @@ probe: the loader must read and evaluate a real Elisp file."
                                        "test/m53/test-m53-imp1.el"))
 (m53-imp1--check "run-tests-m53-group"
                  (m53-imp1--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp1--check "pty-driver-total-20"
+(m53-imp1--check "pty-driver-total-21"
                  (m53-imp1--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 20"))
+                  "\"total-case-count\", len(CASES), 21"))
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 
