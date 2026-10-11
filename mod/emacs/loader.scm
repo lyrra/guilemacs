@@ -237,7 +237,7 @@ This replicates the file path processing logic from Fload (lines 979-1020).
 Returns: (file-to-search . suffixes-list)
 - file-to-search: the file name to search for
 - suffixes-list: list of suffixes to try, or #nil"
-  (when (= ((symbol-function 'length) file) 0)
+  (when (= (elisp-string-length-for-load file) 0)
     (error "Cannot load empty filename"))
   (let ((suffixes #nil))
     (unless (eq? must-suffix #nil)
@@ -384,6 +384,18 @@ This replicates the call4 logic from Fload (lines 1065-1067)."
 ;;; File Validation
 ;;;
 
+(define (elisp-string-length-for-load file)
+  "Length of FILE for the empty-filename check in `elisp-validate-load-file'.
+FIX-20261011-guilemacs: a plain `guile' process has no Emacs C core, so
+the elisp `length' cell is EMPTY and the old `((symbol-function 'length)
+file)' apply raised `wrong-type-arg'.  This is the FIRST blocked cell on
+the real load path, reached before the file-name handler.  The loader
+POLICY tolerates the empty cell (brief.org section 4, option (a)): use
+the Scheme string primitive instead.  No C fallback is added."
+  (if (symbol-fbound? 'length)
+      ((symbol-function 'length) file)
+      (string-length file)))
+
 (define (elisp-validate-load-file file)
   "Validate file argument for loading.
 This replicates the validation logic from Fload (lines 966, 976-977).
@@ -391,7 +403,7 @@ Returns #t if valid, signals error if invalid."
   (unless (string? file)
     ((symbol-function 'signal) (elisp-intern "wrong-type-argument" #nil)
      ((symbol-function 'list) (elisp-intern "stringp" #nil) file)))
-  (when (= ((symbol-function 'length) file) 0)
+  (when (= (elisp-string-length-for-load file) 0)
     ((symbol-function 'signal) (elisp-intern "file-error" #nil)
      ((symbol-function 'list) "Cannot load empty filename")))
   #t)
@@ -778,12 +790,24 @@ Returns: handler result if handler found, #f if should continue with normal load
   "Check for magic file name handler and call it if found.
   This replicates the handler check from Fload lines 973-977.
   Returns handler result or #f if no handler."
-  (let ((handler ((symbol-function 'find-file-name-handler) file 'load)))
-    (if handler
-        ;; Call the handler with all arguments
-        ((symbol-function 'funcall) handler 'load file noerror nomessage nosuffix must-suffix)
-        ; No handler found
-        #f)))
+  ;; FIX-20261011-guilemacs: the Emacs C bootstrap installs
+  ;; find-file-name-handler.  In a plain `guile' process the cell is
+  ;; empty, so the apply `((symbol-function 'find-file-name-handler) ...)'
+  ;; raised `wrong-type-arg "Wrong type to apply: #nil"' FIRST, inside the
+  ;; `let' binding -- before the `(if handler ...)' test ever ran.  (Guile
+  ;; treats `#nil' as FALSEY at the Scheme `if': `(if #nil ...)' takes the
+  ;; else branch.  The C `scm_is_true' accepts `#nil', but the loader uses
+  ;; the Scheme `if', not the C function.)  Guard the call with the Scheme
+  ;; predicate `symbol-fbound?' and test the Elisp nil explicitly: an
+  ;; empty cell means "no handler", so take the no-handler branch.
+  (if (not (symbol-fbound? 'find-file-name-handler))
+      #f
+      (let ((handler ((symbol-function 'find-file-name-handler) file 'load)))
+        (if (not (eq? handler #nil))
+            ;; Call the handler with all arguments
+            ((symbol-function 'funcall) handler 'load file noerror nomessage nosuffix must-suffix)
+            ; No handler found
+            #f))))
 
 
 (define (fresh-go? go src)
