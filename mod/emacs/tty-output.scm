@@ -67,6 +67,7 @@
   #:declarative? #t
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
             tty-write-verdict tty-termscript-copy-handle
+            tty-tab-verdict
             make-tty-out-handle tty-out-handle? tty-out-handle-bytes
             tty-out-handle-short-writes tty-out-handle-hard-errors
             tty-turn-on-insert-cap tty-turn-off-insert-cap
@@ -187,6 +188,27 @@
    (if (and (< copied len) (not (zero? err))
             (not (= err EINTR)) (not (= err EAGAIN)))
        1 0)))
+
+;; --- M54 imp-4: the input stream TAB policy ---------------------------
+;;
+;; imp-4 moves ONE decision of the src/termchar.h INPUT stream
+;; (src/termchar.h :51): the terminal TAB policy UseTabs of ONE tty init
+;; (src/term.c :5030).  C keeps the mechanism: it calls
+;; tabs_safe_p (fileno (tty->input)) (the termios read on the C
+;; descriptor) and it reads TabWidth (tty) (a plain fixnum).  It passes
+;; the two PLAIN values to Scheme; Scheme owns the pure DECISION.  C
+;; stores the result in UseTabs (tty).  No FILE * and no port crosses the
+;; seam (docs/kb.org =passthrough-leaf-is-not-a-port=).
+
+;; The terminal TAB policy DECISION of ONE tty init.  TABS-SAFE? is the
+;; plain C tabs_safe_p result; TAB-WIDTH is the plain C TabWidth.  Return
+;; the plain string "tabs" when the tty may use hard tabs, else "spaces".
+;; The procedure is pure: it calls no leaf and emits nothing
+;; (docs/kb.org =leaf-must-call-the-mechanism=).  The plain string, not a
+;; Scheme boolean, removes the #f / elisp nil ambiguity of a nil verdict
+;; (the C seam uses nil for "no Scheme runtime").
+(define (tty-tab-verdict tabs-safe? tab-width)
+  (if (and tabs-safe? (= tab-width 8)) "tabs" "spaces"))
 
 ;; --- M52 imp-4: the insert / highlight state-flip policy --------------
 ;;

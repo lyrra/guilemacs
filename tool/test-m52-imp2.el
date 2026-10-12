@@ -228,9 +228,11 @@ An absent src/ file prints FAIL, not a silent pass."
 (m52-imp2--check "term.c-macro-output1-if"
                  (m52-imp2--tracked-p "src/term.c" "#define OUTPUT1_IF(tty, a)"))
 ;; the OUTPUT macro line of docs/m52-plan.org section 8.2 (:87, re-pinned
-;; after M52 imp-8 added the 4 dispatcher forward declarations).
-(m52-imp2--check "term.c-macro-output-line-127"
-                 (eql 127 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
+;; after M52 imp-8 added the 4 dispatcher forward declarations, and after
+;; M54 imp-4 added the TAB policy seam: 6 lines at the forward-declaration
+;; block, so the anchor moves +6, 127 -> 133).
+(m52-imp2--check "term.c-macro-output-line-133"
+                 (eql 133 (m52-imp2--line-of "src/term.c" "#define OUTPUT(tty, a)")))
 ;; the write mechanism is the C callback + the C-owned streams.
 (m52-imp2--check "cm.c-cmputc-writes-output"
                  (m52-imp2--tracked-p "src/cm.c" "putc (c & 0177, current_tty->output)"))

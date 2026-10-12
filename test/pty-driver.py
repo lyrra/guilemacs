@@ -1200,16 +1200,74 @@ M54_IMP3_CASES = (
     },
 )
 
+# M54 imp-4: the input stream TAB policy.  The child runs on a real PTY
+# with a tab-capable TERM (xterm) and a TabWidth of 8.  The seam runs on
+# every tty init.  The probe drives a real horizontal CURSOR MOVE over a
+# space run: the display engine's cmgoto path emits a hard-tab byte
+# (0x09) when the decision is "tabs".  The case checks the observable
+# byte, NOT a module load.  The BEGIN / END markers are our own bytes.
+M54_IMP4_BEGIN = b"M54-IMP4-BEGIN!"
+M54_IMP4_END = b"M54-IMP4-END!"
+
+M54_IMP4_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms)))))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      ((c 'send-string-to-terminal) "M54-IMP4-BEGIN!")
+      ;; Drive a cursor move over a space run: fill the current line with
+      ;; spaces, put point past a tab stop, and force a redisplay.  On a
+      ;; tab-capable TERM the terminal path emits a hard-tab byte; the
+      ;; driver checks that byte INSIDE this case's own BEGIN .. END span.
+      ;; A tab-capable host that emits no byte FAILS; only a host whose
+      ;; terminfo holds no "ht" capability INFO-skips (span_requires).
+      ((c 'goto-char) ((c 'point-min)))
+      ((c 'delete-region) ((c 'point-min)) ((c 'point-max)))
+      ((c 'insert) "                                                                  ")
+      ((c 'goto-char) 41)
+      ((c 'redisplay) #t)
+      ((c 'send-string-to-terminal) "M54-IMP4-END!")
+      "ok")))
+"""
+
+M54_IMP4_CASES = (
+    {
+        "name": "m54-imp4/tab-policy-e2e",
+        "group": "m54-imp4",
+        "probe": M54_IMP4_PROBE,
+        "expect": "ok",
+        # The END marker proves the probe ran to completion on the real
+        # terminal.  The hard-tab byte MUST appear INSIDE the case's own
+        # BEGIN .. END span (the whole transcript is not the evidence).
+        # The byte needs a tab-capable TERM: the terminfo "ht" string.
+        # When the host terminfo defines "ht" the byte MUST be present,
+        # else the case FAILS.  Only a host whose terminfo holds no "ht"
+        # (so no HT byte can appear) is an explicit INFO skip
+        # (brief.org section 7.2, cr.org F2).
+        "pty_contains": M54_IMP4_END,
+        "span_requires": {
+            "span": (M54_IMP4_BEGIN, M54_IMP4_END),
+            "needles": (b"\x09",),
+            "capability": "ht",
+        },
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
-         + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES)
+         + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
           "m52-imp8",
-          "m54-imp2", "m54-imp3")
+          "m54-imp2", "m54-imp3", "m54-imp4")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1518,6 +1576,62 @@ def check_termscript(case, output, ts_bytes):
     return None
 
 
+def terminfo_capability(term, cap):
+    """Return the terminfo string CAP for TERM, or None when undefined.
+
+    Load the terminfo entry for TERM and read one capability through the
+    standard-library curses binding.  Return None when the entry defines
+    no CAP, when TERM is empty, or when terminfo cannot be loaded at all.
+    A None result means the host cannot supply the capability, so no byte
+    that CAP describes can appear.
+    """
+    if not term:
+        return None
+    try:
+        import curses
+    except ImportError:
+        return None
+    try:
+        curses.setupterm(term)
+    except (curses.error, OSError):
+        return None
+    return curses.tigetstr(cap)
+
+
+def span_required_problem(case, output):
+    """Check a case's required bytes INSIDE its own marked span.
+
+    A case's `span_requires' names a BEGIN / END marker pair, a set of
+    needles, and the terminfo capability the host needs to emit them.
+    Return (kind, detail): ("INFO", evidence) when the host terminfo
+    cannot supply the capability (so no byte can appear), ("FAIL", reason)
+    when the span or a needle is missing, or None when the span holds
+    every needle.  The needle is scoped to the span, so a byte elsewhere
+    in the transcript does NOT satisfy the check.
+    """
+    spec = case.get("span_requires")
+    if spec is None:
+        return None
+    term = (case.get("env") or {}).get("TERM")
+    cap = spec.get("capability")
+    if cap is not None and terminfo_capability(term, cap) is None:
+        return ("INFO",
+                "terminfo %s holds no %r capability: no byte can appear"
+                % (term, cap))
+    start, end = spec["span"]
+    a = output.find(start)
+    b = output.find(end, a + len(start)) if a >= 0 else -1
+    if a < 0 or b < 0:
+        return ("FAIL", "pty output did not contain ordered markers %r %r"
+                % (start, end))
+    inner = output[a + len(start):b]
+    for needle in spec["needles"]:
+        if needle not in inner:
+            return ("FAIL", "pty span held no %r (measured %r)"
+                    % (needle, inner))
+    return None
+
+
 def child_session():
     """Start a session and make the pty slave the controlling terminal."""
     os.setsid()
@@ -1782,6 +1896,14 @@ def run_case(case, emacs, timeout):
 
     kind, detail = verdict(case, got)
     if kind == "PASS":
+        # M54 imp-4: a case may require a byte only a capable host can
+        # produce (the hard-tab 0x09 needs a tab-capable TERM).  The byte
+        # is scoped to the case's own BEGIN .. END span: a capable host
+        # that emits no byte FAILS.  Only a host whose terminfo holds no
+        # capability for the byte is an explicit INFO skip.
+        span_problem = span_required_problem(case, pty_output)
+        if span_problem is not None:
+            return (name,) + span_problem
         output_problem = check_output(case, got, pty_output)
         if output_problem:
             return (name, "FAIL", output_problem)
@@ -1989,7 +2111,8 @@ def selftest():
     check("m53-imp3-case-count", len(group_cases("m53-imp3")), 1)
     check("m54-imp2-case-count", len(group_cases("m54-imp2")), 1)
     check("m54-imp3-case-count", len(group_cases("m54-imp3")), 1)
-    check("total-case-count", len(CASES), 23)
+    check("m54-imp4-case-count", len(group_cases("m54-imp4")), 1)
+    check("total-case-count", len(CASES), 24)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -2030,6 +2153,48 @@ def selftest():
         problems.append("m54-imp3 run_case does not compare the termscript file")
     if "@@TSPATH@@" in build_child_source(_case("m54-imp3/termscript-copy-e2e")):
         problems.append("m54-imp3 probe left the TSPATH placeholder unresolved")
+    # M54 imp-4 (cr.org F2): the hard-tab byte is scoped to the case's own
+    # BEGIN .. END span and the case FAILS when a tab-capable host emits no
+    # byte.  Only a host whose terminfo holds no "ht" string INFO-skips.
+    # These pins hold the wiring on a host with no pty.
+    tab_case = _case("m54-imp4/tab-policy-e2e")
+    check("m54-imp4-span-requires", tab_case.get("span_requires"),
+          {"span": (M54_IMP4_BEGIN, M54_IMP4_END),
+           "needles": (b"\x09",),
+           "capability": "ht"})
+    if "info_if_missing" in tab_case:
+        problems.append("m54-imp4 still uses the weak info_if_missing key")
+    if "span_required_problem" not in inspect.getsource(run_case):
+        problems.append("m54-imp4 run_case does not check the required span byte")
+    # The check has teeth: a missing in-span byte is a FAIL, a byte OUTSIDE
+    # the span is a FAIL, the span with the byte passes, and only an absent
+    # capability is an INFO skip.
+    span_case = {"name": "span-probe",
+                 "span_requires": {"span": (M54_IMP4_BEGIN, M54_IMP4_END),
+                                   "needles": (b"\x09",)}}
+    check("m54-imp4-span-missing-fails",
+          span_required_problem(span_case, M54_IMP4_BEGIN + M54_IMP4_END)[0],
+          "FAIL")
+    check("m54-imp4-span-outside-fails",
+          span_required_problem(
+              span_case, b"\x09" + M54_IMP4_BEGIN + M54_IMP4_END)[0],
+          "FAIL")
+    check("m54-imp4-span-present-passes",
+          span_required_problem(span_case,
+                                M54_IMP4_BEGIN + b"\x09" + M54_IMP4_END),
+          None)
+    check("m54-imp4-capability-absent-skips",
+          span_required_problem(
+              {"name": "cap-probe",
+               "span_requires": {"span": (M54_IMP4_BEGIN, M54_IMP4_END),
+                                 "needles": (b"\x09",),
+                                 "capability": "zzzz"},
+               "env": {"TERM": "xterm"}},
+              M54_IMP4_BEGIN + M54_IMP4_END)[0],
+          "INFO")
+    tab_cap = terminfo_capability("xterm", "ht")
+    if tab_cap is not None and tab_cap != b"\t":
+        problems.append("xterm ht capability is %r, want b'\\t'" % (tab_cap,))
     check("m52-cap-output-bytes",
           _case("m52-imp3/tty-emit-cap-e2e").get("output_span_bytes"),
           b"\x1b[3;11r")

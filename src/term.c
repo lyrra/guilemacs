@@ -110,6 +110,12 @@ static Lisp_Object m52_tty_ins_del_lines_scheme (Lisp_Object, Lisp_Object,
 static bool m52_tty_step_args_1 (Lisp_Object, int *, int);
 static bool m52_tty_step_tag_p (Lisp_Object, const char *);
 static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
+/* M54 imp-4: the input stream TAB policy dispatcher.  The call site
+   (init_tty, src/term.c :5030) sits above the M54 imp-2 / imp-3
+   dispatcher block, so the prototype must be declared here, before the
+   call site.  The m54_tty_tabs_ name reuses no static helper
+   (docs/kb.org =term-hub-helper-name-collision=).  */
+static Lisp_Object m54_tty_tabs_verdict_scheme (Lisp_Object, Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
 static void set_tty_hooks (struct terminal *terminal);
 static void dissociate_if_controlling_tty (int fd);
@@ -5027,7 +5033,22 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
     = tty->TS_delete_mode && tty->TS_insert_mode
     && !strcmp (tty->TS_delete_mode, tty->TS_insert_mode);
 
-  UseTabs (tty) = tabs_safe_p (fileno (tty->input)) && TabWidth (tty) == 8;
+  /* FIX-20261012-guilemacs: M54 imp-4 -- the terminal TAB policy runs
+     in Scheme; C keeps the termios query and the state write.  Read the
+     plain C value FIRST and keep it, so a nil verdict (no Scheme
+     runtime) falls back to the present C behavior and does not force
+     UseTabs to 0.  */
+  {
+    bool tabs_safe = tabs_safe_p (fileno (tty->input));
+    Lisp_Object verdict
+      = m54_tty_tabs_verdict_scheme (tabs_safe ? Qt : Qnil,
+				     make_fixnum (TabWidth (tty)));
+    UseTabs (tty)
+      = NILP (verdict)
+	? (tabs_safe && TabWidth (tty) == 8)
+	: (STRINGP (verdict) && SBYTES (verdict) == 4
+	   && memcmp (SSDATA (verdict), "tabs", 4) == 0);
+  }
 
   tty->scroll_region_ok
     = (tty->Wcm->cm_abs
@@ -5621,6 +5642,31 @@ m54_tty_termscript_verdict (size_t copied, size_t len, bool failed)
   m54_tty_termscript_handle_scheme (make_fixnum (copied), make_fixnum (len),
                                     make_fixnum (e));
   (void) verdict;
+}
+
+/* --- M54 imp-4: the input stream TAB policy dispatcher --------------- */
+
+/* FIX-20261012-guilemacs: M54 imp-4 -- the terminal TAB policy UseTabs
+   of ONE tty init (src/term.c :5030).  ONE decision of the
+   src/termchar.h INPUT stream (src/termchar.h :51) moves to Scheme.  C
+   keeps the mechanism: it calls tabs_safe_p (fileno (tty->input)) (the
+   termios read on the C descriptor) and it reads TabWidth (tty) (a plain
+   fixnum).  It passes the two PLAIN values (a boolean and a fixnum) to
+   Scheme; Scheme owns the pure DECISION and returns the plain string
+   "tabs" or "spaces".  C stores the result in UseTabs (tty).  No FILE *,
+   no struct tty_display_info *, and no port crosses the seam
+   (docs/kb.org =passthrough-leaf-is-not-a-port=).  The dispatcher
+   resolves the module procedure one time (the M52 imp-4 idiom), caches
+   it in a static SCM, and passes plain values only.  The m54_tty_tabs_
+   name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static Lisp_Object
+m54_tty_tabs_verdict_scheme (Lisp_Object tabs_safe, Lisp_Object tab_width)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-tab-verdict");
+  return SCM_CALL_2 (proc, tabs_safe, tab_width);
 }
 
 /* Write LEN bytes at STR to tty->output and, when set, tty->termscript.
