@@ -12,10 +12,10 @@
 ;;; It pins these groups:
 ;;;
 ;;;   S1 -- the measured surface of brief.org section 5, re-measured at
-;;;         base HEAD fa11385b3: src/term.c (6,078 lines, 29 ^DEFUN (,
-;;;         4 --tty-* leaf DEFUNs, 33 scm_c_public_ref sites); the 343
+;;;         base HEAD fa11385b3: src/term.c (6,116 lines, 29 ^DEFUN (,
+;;;         4 --tty-* leaf DEFUNs, 34 scm_c_public_ref sites); the 404
 ;;;         lines of mod/emacs/tty-output.scm; and the tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] (257).  S1 holds 6
+;;;         scm_c_public_ref count over src/*.[chm] (258).  S1 holds 6
 ;;;         checks.
 ;;;   S2 -- CHECK 1, the standalone loader.  A plain `guile' process
 ;;;         (no Emacs C core) loads (emacs loader) and (emacs reader);
@@ -28,7 +28,7 @@
 ;;;         checks.
 ;;;   S4 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm, and test/pty-driver.py holds
-;;;         the 21-case total pin and the --selftest entry.  S4 holds 4
+;;;         the 22-case total pin and the --selftest entry.  S4 holds 4
 ;;;         checks.
 ;;;   S5 -- the guards: a per-group min-count guard for S1 .. S4, and
 ;;;         the group-total `ert-deftest'.  S5 holds 4 checks.
@@ -224,24 +224,24 @@ probe: the loader must read and evaluate a real Elisp file."
 
 (setq m53-imp1--group 's1)
 
-;; Row 1: src/term.c lines = 6,078.
-(m53-imp1--check "term.c-lines-6078"
-                 (eql 6078 (m53-imp1--lines "src/term.c")))
+;; Row 1: src/term.c lines = 6,116.
+(m53-imp1--check "term.c-lines-6116"
+                 (eql 6116 (m53-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m53-imp1--check "term.c-defun-count-29"
                  (eql 29 (m53-imp1--count "src/term.c" "^DEFUN (")))
 ;; Row 3: the 4 --tty-* leaf DEFUNs.
 (m53-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m53-imp1--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 33.
-(m53-imp1--check "term.c-scm-ref-33"
-                 (eql 33 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 343.
-(m53-imp1--check "tty-output.scm-lines-343"
-                 (eql 343 (m53-imp1--lines "mod/emacs/tty-output.scm")))
-;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 257.
-(m53-imp1--check "tree-wide-scm-ref-257"
-                 (eql 257 (m53-imp1--count-scm-ref)))
+;; Row 4: src/term.c scm_c_public_ref sites = 34.
+(m53-imp1--check "term.c-scm-ref-34"
+                 (eql 34 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
+;; Row 5: mod/emacs/tty-output.scm lines = 404.
+(m53-imp1--check "tty-output.scm-lines-404"
+                 (eql 404 (m53-imp1--lines "mod/emacs/tty-output.scm")))
+;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 258.
+(m53-imp1--check "tree-wide-scm-ref-258"
+                 (eql 258 (m53-imp1--count-scm-ref)))
 
 ;;; --- S2. CHECK 1, the standalone loader -----------------------------
 
@@ -306,10 +306,10 @@ probe: the loader must read and evaluate a real Elisp file."
                                        "test/m53/test-m53-imp1.el"))
 (m53-imp1--check "run-tests-m53-group"
                  (m53-imp1--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp1--check "pty-driver-total-21"
+(m53-imp1--check "pty-driver-total-22"
                  (m53-imp1--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 21"))
+                  "\"total-case-count\", len(CASES), 22"))
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 

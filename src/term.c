@@ -5545,14 +5545,47 @@ m52_cap_string_1 (struct tty_display_info *tty, Lisp_Object cap)
   return NULL;
 }
 
+/* --- M54 imp-2: the output after-write verdict dispatcher ------------ */
+
+/* FIX-20261012-guilemacs: M54 imp-2 -- call the pure verdict procedure
+   of (emacs tty-output) that holds the after-write DECISION of ONE
+   output write: "done" / "retry" / "give-up".  It resolves the module
+   procedure one time (the M52 imp-4 idiom), caches it in a static SCM,
+   and passes plain fixnums only.  C owns the FILE *, the =fwrite=, the
+   =clearerr=, and the return shape; C stays the single writer.  The
+   m54_ / _scheme name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+
+static Lisp_Object
+m54_tty_write_verdict_scheme (Lisp_Object written, Lisp_Object len,
+			      Lisp_Object err)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-write-verdict");
+  return SCM_CALL_3 (proc, written, len, err);
+}
+
+/* True when the plain verdict string is "give-up".  A nil verdict (the
+   dispatcher returned elisp nil) is handled by the caller, which keeps
+   the present C behavior.  */
+static bool
+m54_tty_write_gives_up_p (Lisp_Object verdict)
+{
+  return (STRINGP (verdict)
+	  && SBYTES (verdict) == sizeof "give-up" - 1
+	  && memcmp (SSDATA (verdict), "give-up", sizeof "give-up" - 1) == 0);
+}
+
 /* Write LEN bytes at STR to tty->output and, when set, tty->termscript.
    Return the number of bytes written, or the negated errno on a hard
    failure, or -EINVAL when TTY holds no output stream.  C keeps the
-   =clearerr= after each write (the current C ignores the fwrite count
-   and clears the stream).  A short write is reported to Scheme as its
-   count, so Scheme decides retry / give-up (the imp-4 policy).  The
-   =FILE *= streams stay C (docs/kb.org
-   =passthrough-leaf-is-not-a-port=).  */
+   =clearerr= after each write.  The after-write verdict of a short write
+   runs in Scheme (M54 imp-2): tty-write-verdict decides done / retry /
+   give-up from the plain counts, so only a "give-up" verdict returns the
+   negated errno and a "retry" reports the short count.  With no Scheme
+   runtime (a nil verdict) the present C behavior holds.  The =FILE *=
+   streams stay C (docs/kb.org =passthrough-leaf-is-not-a-port=).  */
 static ptrdiff_t
 m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
 {
@@ -5564,8 +5597,13 @@ m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
   if (written < len && ferror (tty->output))
     {
       int e = errno ? errno : EIO;
+      Lisp_Object verdict
+	= m54_tty_write_verdict_scheme (make_fixnum (written),
+					make_fixnum (len), make_fixnum (e));
       clearerr (tty->output);
-      return -e;
+      if (NILP (verdict) || m54_tty_write_gives_up_p (verdict))
+	return -e;
+      return (ptrdiff_t) written;
     }
   clearerr (tty->output);
   return (ptrdiff_t) written;

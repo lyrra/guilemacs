@@ -47,6 +47,16 @@
 ;;; it MUST NOT lose the padding behaviour: either call emacs_tputs, or
 ;;; record the padding decision in docs/m52-plan.org.
 ;;;
+;;; M54 imp-2 (the output stream, one operation, one owner).  This
+;;; module holds the after-write DECISION of one output write:
+;;; tty-write-verdict decides done / retry / give-up from the plain
+;;; counts (written len err).  It is pure and emits nothing.  C keeps
+;;; the FILE *output, the fwrite, the clearerr, and the return shape; C
+;;; stays the single writer.  Scheme borrows the DECISION only.  The
+;;; plain record tty-out-handle is the safe handle of milestone.org
+;;; section 5: a plain value box, not a FILE * and not a port over one.
+;;; The state is *C owned, Scheme borrowed* (docs/m54-plan.org sect. 6).
+;;;
 ;;; Conventions (identical to M9-M51): defelisp delayed references for
 ;;; every C DEFUN ((force %--foo)); elisp nil is #nil; no module-level
 ;;; mutable state.
@@ -56,6 +66,9 @@
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
+            tty-write-verdict
+            make-tty-out-handle tty-out-handle? tty-out-handle-bytes
+            tty-out-handle-short-writes tty-out-handle-hard-errors
             tty-turn-on-insert-cap tty-turn-off-insert-cap
             tty-turn-off-highlight-cap tty-turn-on-highlight-cap
             tty-toggle-highlight-cap
@@ -98,6 +111,54 @@
 ;; fixnum: the total byte count, or a negated errno.
 (define (tty-emit-seq device seq)
   ((force %--tty-emit-seq) device seq))
+
+;; --- M54 imp-2: the output after-write verdict ------------------------
+;;
+;; M54 moves the ownership of the 3 src/termchar.h FILE * streams behind
+;; explicit Guile interfaces, one path at a time.  imp-2 moves ONE
+;; operation of the OUTPUT stream: the after-write DECISION of one output
+;; write.  C keeps the FILE *, the =fwrite=, the =clearerr=, and the
+;; return shape; C stays the single writer.  Scheme borrows the DECISION
+;; only, so no FILE * crosses the seam (docs/kb.org
+;; =passthrough-leaf-is-not-a-port=).  The state is *C owned, Scheme
+;; borrowed* (docs/m54-plan.org section 6).
+
+;; The safe handle of milestone.org section 5: a plain value box, NOT a
+;; FILE * and NOT a Guile port over a C stream.  It holds 3 plain
+;; counters only: the total byte count, the short-write count, and the
+;; hard-error count.  Scheme owns this record; C does not read it.
+;;
+;; FIX-20261012-guilemacs: implement the record as a plain TAGGED VECTOR,
+;; not with (srfi srfi-9) define-record-type.  In the guilemacs module
+;; load path a srfi-9 record exposed its constructor as a syntax object
+;; through module-ref (a wrong-type-arg on call), so the record shape
+;; would not cross the module interface.  A tagged vector is a plain
+;; value box: no C struct, no FILE *, and no port can hide in it.
+(define tty-out-handle-tag 'tty-out-handle)
+
+(define (make-tty-out-handle bytes short-writes hard-errors)
+  (vector tty-out-handle-tag bytes short-writes hard-errors))
+
+(define (tty-out-handle? x)
+  (and (vector? x)
+       (= 4 (vector-length x))
+       (eq? tty-out-handle-tag (vector-ref x 0))))
+
+(define (tty-out-handle-bytes h) (vector-ref h 1))
+(define (tty-out-handle-short-writes h) (vector-ref h 2))
+(define (tty-out-handle-hard-errors h) (vector-ref h 3))
+
+;; The after-write DECISION of ONE output write.  WRITTEN is the plain
+;; count that =fwrite= returned; LEN is the plain requested count; ERR is
+;; the plain errno of the write (0 when there is no error).  Return a
+;; plain string: "done" when every byte went out, "retry" on =EINTR= /
+;; =EAGAIN=, else "give-up".  The procedure is pure: it calls no leaf and
+;; emits nothing (docs/kb.org =leaf-must-call-the-mechanism=).  C runs one
+;; write and one decision.
+(define (tty-write-verdict written len err)
+  (cond ((>= written len)                                  "done")
+        ((or (zero? err) (= err EINTR) (= err EAGAIN))     "retry")
+        (else                                              "give-up")))
 
 ;; --- M52 imp-4: the insert / highlight state-flip policy --------------
 ;;

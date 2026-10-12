@@ -12,10 +12,10 @@
 ;;; It pins these groups:
 ;;;
 ;;;   S1 -- the re-measured surface of brief.org section 4.3, re-measured
-;;;         at base HEAD c5245cc6e: src/term.c (6,078 lines, 29 ^DEFUN (,
-;;;         4 --tty-* leaf DEFUNs, 33 scm_c_public_ref sites); the 343
+;;;         at base HEAD c5245cc6e: src/term.c (6,116 lines, 29 ^DEFUN (,
+;;;         4 --tty-* leaf DEFUNs, 34 scm_c_public_ref sites); the 404
 ;;;         lines of mod/emacs/tty-output.scm; and the tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] (257).  S1 holds 6
+;;;         scm_c_public_ref count over src/*.[chm] (258).  S1 holds 6
 ;;;         checks.
 ;;;   S2 -- the 3 stream fields of src/termchar.h: input :51, output
 ;;;         :53, termscript :61 (name, FILE * type, and line), plus the
@@ -187,24 +187,24 @@ pass."
 
 (setq m54-imp1--group 's1)
 
-;; Row 1: src/term.c lines = 6,078.
-(m54-imp1--check "term.c-lines-6078"
-                 (eql 6078 (m54-imp1--lines "src/term.c")))
+;; Row 1: src/term.c lines = 6,116.
+(m54-imp1--check "term.c-lines-6116"
+                 (eql 6116 (m54-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m54-imp1--check "term.c-defun-count-29"
                  (eql 29 (m54-imp1--count "src/term.c" "^DEFUN (")))
 ;; Row 3: the 4 --tty-* leaf DEFUNs.
 (m54-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m54-imp1--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 33.
-(m54-imp1--check "term.c-scm-ref-33"
-                 (eql 33 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 343.
-(m54-imp1--check "tty-output.scm-lines-343"
-                 (eql 343 (m54-imp1--lines "mod/emacs/tty-output.scm")))
-;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 257.
-(m54-imp1--check "tree-wide-scm-ref-257"
-                 (eql 257 (m54-imp1--count-scm-ref)))
+;; Row 4: src/term.c scm_c_public_ref sites = 34.
+(m54-imp1--check "term.c-scm-ref-34"
+                 (eql 34 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
+;; Row 5: mod/emacs/tty-output.scm lines = 404.
+(m54-imp1--check "tty-output.scm-lines-404"
+                 (eql 404 (m54-imp1--lines "mod/emacs/tty-output.scm")))
+;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 258.
+(m54-imp1--check "tree-wide-scm-ref-258"
+                 (eql 258 (m54-imp1--count-scm-ref)))
 
 ;;; --- S2. The 3 stream fields and the boundary rule ------------------
 

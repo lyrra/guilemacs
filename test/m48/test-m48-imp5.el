@@ -7,11 +7,11 @@
 ;;;
 ;;; It pins:
 ;;;   S1 -- the surface of brief.org section 4, re-measured at HEAD:
-;;;         src/term.c (6,078 lines, 29 DEFUNs (25 M48 DEFUNs plus the
-;;;         4 M52 imp-3 --tty-* leaves), 33 scm_c_public_ref sites, 6
+;;;         src/term.c (6,116 lines, 29 DEFUNs (25 M48 DEFUNs plus the
+;;;         4 M52 imp-3 --tty-* leaves), 34 scm_c_public_ref sites, 6
 ;;;         --term-* leaves, 10 FIX-20261005-guilemacs marks, the guile.h
 ;;;         include at :48); mod/emacs/terminal.scm (266);
-;;;         the tree-wide scm_c_public_ref over src/*.[chm] (257);
+;;;         the tree-wide scm_c_public_ref over src/*.[chm] (258);
 ;;;         src/keyboard.c (11,233 lines / 447 DEFUNs);
 ;;;         src/keyboard-globals.c (490); the combined keyboard surface
 ;;;         (11,723); the margin (237 under the 11,960 M31 budget); and
@@ -154,9 +154,9 @@ FAIL with no ERT test would leave the exit code 0."
                  (let ((lines (m48-imp5--lines "src/term.c"))
                        (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
                        (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 6078 lines)
+                   (and (integerp lines) (eql 6116 lines)
                         (integerp defuns) (eql 29 defuns)
-                        (integerp refs) (eql 33 refs))))
+                        (integerp refs) (eql 34 refs))))
 (m48-imp5--check "term.c-guile.h-at-48"
                  (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))
 (m48-imp5--check "term.c-leaves-6"
@@ -166,8 +166,8 @@ FAIL with no ERT test would leave the exit code 0."
                                           "FIX-20261005-guilemacs")))
 (m48-imp5--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
-(m48-imp5--check "tree-wide-scm-public-ref-257"
-                 (eql 257 (m48-imp5--count-scm-ref)))
+(m48-imp5--check "tree-wide-scm-public-ref-258"
+                 (eql 258 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
                  (let ((lines (m48-imp5--lines "src/keyboard.c"))
                        (defuns (m48-imp5--count "src/keyboard.c" "^DEFUN (\"")))

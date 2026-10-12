@@ -1103,15 +1103,57 @@ M52_IMP8_CASES = (
     },
 )
 
+# M54 imp-2: the output after-write verdict.  The child resolves the
+# (emacs tty-output) module, takes the last terminal of (emacs gobble),
+# writes a marked span through tty-write-bytes, and flushes.  This
+# proves the seam in m52_tty_write_1 does not drop, reorder, or
+# duplicate a byte, and that the reported count equals the span length
+# (so the after-write verdict path returned "done").  The span bytes are
+# OUR OWN written bytes, so pinning them is allowed.
+M54_IMP2_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (flush! (module-ref output 'tty-flush)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(77 53 52 45 73 77 80 50 45 66 69 71 73 78 33))
+      (flush! term)
+      (let* ((bytes #vu8(77 53 52 45 73 77 80 50 45 87 82 73 84 69 79 75 33))
+             (n (write! term bytes))
+             (flushed (flush! term)))
+        (write! term #vu8(77 53 52 45 73 77 80 50 45 69 78 68 33))
+        (let ((end-flushed (flush! term)))
+          (if (and (= n 17) (= flushed 0) (= end-flushed 0))
+              (number->string n)
+            "write-failed"))))))
+"""
+
+M54_IMP2_CASES = (
+    {
+        "name": "m54-imp2/output-write-verdict-e2e",
+        "group": "m54-imp2",
+        "probe": M54_IMP2_PROBE,
+        "expect_decimal": True,
+        "output_span": (b"M54-IMP2-BEGIN!", b"M54-IMP2-END!"),
+        "output_span_bytes": b"M54-IMP2-WRITEOK!",
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
-         + M52_IMP8_CASES)
+         + M52_IMP8_CASES + M54_IMP2_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
-          "m52-imp8")
+          "m52-imp8",
+          "m54-imp2")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1820,8 +1862,9 @@ def selftest():
         if not group_cases(group):
             problems.append("group %s has no case" % group)
     # The merge must not drop a case: 2 + 7 from M42, 3 from M43,
-    # 3 M52 imp-3 output-path cases, 1 M52 imp-4 policy case, and
-    # 1 M52 imp-5 bell / cursor policy case.
+    # 3 M52 imp-3 output-path cases, 1 M52 imp-4 policy case,
+    # 1 M52 imp-5 bell / cursor policy case, and 1 M54 imp-2
+    # output-write-verdict case.
     check("m42-imp3-case-count", len(group_cases("m42-imp3")), 2)
     check("m42-imp4-case-count", len(group_cases("m42-imp4")), 7)
     check("m43-imp3-case-count", len(group_cases("m43-imp3")), 1)
@@ -1834,7 +1877,8 @@ def selftest():
     check("m52-imp7-case-count", len(group_cases("m52-imp7")), 1)
     check("m52-imp8-case-count", len(group_cases("m52-imp8")), 1)
     check("m53-imp3-case-count", len(group_cases("m53-imp3")), 1)
-    check("total-case-count", len(CASES), 21)
+    check("m54-imp2-case-count", len(group_cases("m54-imp2")), 1)
+    check("total-case-count", len(CASES), 22)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -1851,11 +1895,16 @@ def selftest():
                           ("m52-imp7/policy-key-e2e",
                            (b"M52-IMP7-BEGIN!", b"M52-IMP7-END!")),
                           ("m52-imp8/policy-key-e2e",
-                           (b"M52-IMP8-BEGIN!", b"M52-IMP8-END!"))):
+                           (b"M52-IMP8-BEGIN!", b"M52-IMP8-END!")),
+                          ("m54-imp2/output-write-verdict-e2e",
+                           (b"M54-IMP2-BEGIN!", b"M54-IMP2-END!"))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
         if not case.get("expect_decimal"):
             problems.append("%s does not check a reported byte count" % name)
+    check("m54-imp2-output-bytes",
+          _case("m54-imp2/output-write-verdict-e2e").get("output_span_bytes"),
+          b"M54-IMP2-WRITEOK!")
     check("m52-cap-output-bytes",
           _case("m52-imp3/tty-emit-cap-e2e").get("output_span_bytes"),
           b"\x1b[3;11r")

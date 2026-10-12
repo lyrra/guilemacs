@@ -9,14 +9,14 @@
 ;;; It pins three groups, S1 .. S3:
 ;;;
 ;;;   S1 -- the re-measured surface of brief.org section 3, measured at
-;;;         the imp-4 base HEAD be857de94: src/term.c (6,078 lines, 29
-;;;         ^DEFUN (, 4 --tty-* leaf DEFUNs, 33 scm_c_public_ref
-;;;         sites); mod/emacs/tty-output.scm (343 lines); and the
-;;;         tree-wide scm_c_public_ref count over src/*.[chm] (257).
+;;;         the imp-4 base HEAD be857de94: src/term.c (6,116 lines, 29
+;;;         ^DEFUN (, 4 --tty-* leaf DEFUNs, 34 scm_c_public_ref
+;;;         sites); mod/emacs/tty-output.scm (404 lines); and the
+;;;         tree-wide scm_c_public_ref count over src/*.[chm] (258).
 ;;;         S1 holds 6 checks.
 ;;;   S2 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm after test-m53-imp3.el, and
-;;;         test/pty-driver.py still holds the 21-case total pin.  Read
+;;;         test/pty-driver.py still holds the 22-case total pin.  Read
 ;;;         tracked runner files only.  S2 holds 4 checks.
 ;;;   S3 -- the guards: a per-group min-count guard for S1 and one for
 ;;;         S2, and the group-total check.  The total check is an
@@ -162,9 +162,9 @@ host limit is a skip, never a pass (brief.org section 8)."
 
 (setq m53-imp4--group 's1)
 
-;; Row 1: src/term.c lines = 6,078.
-(m53-imp4--check "term.c-lines-6078"
-                 (eql 6078 (m53-imp4--lines "src/term.c")))
+;; Row 1: src/term.c lines = 6,116.
+(m53-imp4--check "term.c-lines-6116"
+                 (eql 6116 (m53-imp4--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m53-imp4--check "term.c-defun-count-29"
                  (eql 29 (m53-imp4--count "src/term.c" "^DEFUN (")))
@@ -172,15 +172,15 @@ host limit is a skip, never a pass (brief.org section 8)."
 ;; bare leaf tokens (each name also occurs in a sibling docstring).
 (m53-imp4--check "term.c-leaf-defun-count-4"
                  (eql 4 (m53-imp4--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 33.
-(m53-imp4--check "term.c-scm-ref-33"
-                 (eql 33 (m53-imp4--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 343.
-(m53-imp4--check "tty-output.scm-lines-343"
-                 (eql 343 (m53-imp4--lines "mod/emacs/tty-output.scm")))
-;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 257.
-(m53-imp4--check "tree-wide-scm-ref-257"
-                 (eql 257 (m53-imp4--count-scm-ref)))
+;; Row 4: src/term.c scm_c_public_ref sites = 34.
+(m53-imp4--check "term.c-scm-ref-34"
+                 (eql 34 (m53-imp4--count "src/term.c" "scm_c_public_ref")))
+;; Row 5: mod/emacs/tty-output.scm lines = 404.
+(m53-imp4--check "tty-output.scm-lines-404"
+                 (eql 404 (m53-imp4--lines "mod/emacs/tty-output.scm")))
+;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 258.
+(m53-imp4--check "tree-wide-scm-ref-258"
+                 (eql 258 (m53-imp4--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 5) ---------------------
 
@@ -199,10 +199,10 @@ host limit is a skip, never a pass (brief.org section 8)."
                    (and (integerp imp3) (integerp imp4) (< imp3 imp4))))
 (m53-imp4--check "run-tests-m53-group"
                  (m53-imp4--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp4--check "pty-driver-total-21"
+(m53-imp4--check "pty-driver-total-22"
                  (m53-imp4--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 21"))
+                  "\"total-case-count\", len(CASES), 22"))
 
 ;;; --- S3. The guards -------------------------------------------------
 

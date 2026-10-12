@@ -9,17 +9,17 @@
 ;;; It pins three groups, S1 .. S3:
 ;;;
 ;;;   S1 -- the surface of brief.org section 3.2, re-measured at HEAD
-;;;         d3ea64d7c: src/term.c (6,078 lines, 29 ^DEFUN (, 4
-;;;         --tty-* leaf DEFUNs, 10 fwrite ( sites, 33 scm_c_public_ref
-;;;         sites); mod/emacs/tty-output.scm (343 lines and its 26
+;;;         d3ea64d7c: src/term.c (6,116 lines, 29 ^DEFUN (, 4
+;;;         --tty-* leaf DEFUNs, 10 fwrite ( sites, 34 scm_c_public_ref
+;;;         sites); mod/emacs/tty-output.scm (404 lines and its 32
 ;;;         #:export names); prelude/load.scm holds (use-modules
 ;;;         (emacs tty-output)); the 30-key m52_caps table; and the
-;;;         tree-wide scm_c_public_ref count over src/*.[chm] (257).
-;;;         S1 holds 35 checks.
+;;;         tree-wide scm_c_public_ref count over src/*.[chm] (258).
+;;;         S1 holds 41 checks.
 ;;;   S2 -- the registration: the corpus is registered in the (m52)
 ;;;         group of tool/run-tests.scm after test-m52-imp8.el, and
 ;;;         test/pty-driver.py holds the m52-imp3 .. m52-imp8 groups and
-;;;         the 21-case total pin.  Read tracked runner files only.  S2
+;;;         the 22-case total pin.  Read tracked runner files only.  S2
 ;;;         holds 4 checks.
 ;;;   S3 -- the guards: a per-group min-count guard for S1 and one for
 ;;;         S2, and the group-total check.  The total check is an
@@ -223,13 +223,13 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;;; --- S1. The re-measured surface (brief.org section 3.2) ------------
 
 ;; One check per brief.org section 3.2 value row (rows 1 .. 10).  Row 7
-;; fans out to one check per exported name, so S1 holds 35 checks.
+;; fans out to one check per exported name, so S1 holds 41 checks.
 
 (setq m52-imp9--group 's1)
 
-;; Row 1: src/term.c lines = 6,078.
-(m52-imp9--check "term.c-lines-6078"
-                 (eql 6078 (m52-imp9--lines "src/term.c")))
+;; Row 1: src/term.c lines = 6,116.
+(m52-imp9--check "term.c-lines-6116"
+                 (eql 6116 (m52-imp9--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m52-imp9--check "term.c-defun-count-29"
                  (eql 29 (m52-imp9--count "src/term.c" "^DEFUN (")))
@@ -240,15 +240,21 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; Row 4: src/term.c fwrite ( count = 10.
 (m52-imp9--check "term.c-fwrite-count-10"
                  (eql 10 (m52-imp9--count "src/term.c" "fwrite (")))
-;; Row 5: src/term.c scm_c_public_ref sites = 33.
-(m52-imp9--check "term.c-scm-ref-33"
-                 (eql 33 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
-;; Row 6: mod/emacs/tty-output.scm lines = 343.
-(m52-imp9--check "tty-output.scm-lines-343"
-                 (eql 343 (m52-imp9--lines "mod/emacs/tty-output.scm")))
-;; Row 7: the 26 #:export names of the module, one check per name.
+;; Row 5: src/term.c scm_c_public_ref sites = 34.
+(m52-imp9--check "term.c-scm-ref-34"
+                 (eql 34 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
+;; Row 6: mod/emacs/tty-output.scm lines = 404.
+(m52-imp9--check "tty-output.scm-lines-404"
+                 (eql 404 (m52-imp9--lines "mod/emacs/tty-output.scm")))
+;; Row 7: the 32 #:export names of the module, one check per name.
+;; The 6 M54 imp-2 names (tty-write-verdict and the tty-out-handle
+;; accessors) come first, then the 26 M52 names.
 (dolist (name '("tty-emit-cap" "tty-write-bytes" "tty-flush"
                 "tty-emit-seq"
+                "tty-write-verdict"
+                "make-tty-out-handle" "tty-out-handle?"
+                "tty-out-handle-bytes" "tty-out-handle-short-writes"
+                "tty-out-handle-hard-errors"
                 "tty-turn-on-insert-cap" "tty-turn-off-insert-cap"
                 "tty-turn-off-highlight-cap" "tty-turn-on-highlight-cap"
                 "tty-toggle-highlight-cap"
@@ -272,9 +278,9 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; Row 9: the m52_caps table of src/term.c holds 30 keys.
 (m52-imp9--check "m52-caps-rows-30"
                  (eql 30 (m52-imp9--caps-row-count)))
-;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 257.
-(m52-imp9--check "tree-wide-scm-ref-257"
-                 (eql 257 (m52-imp9--count-scm-ref)))
+;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 258.
+(m52-imp9--check "tree-wide-scm-ref-258"
+                 (eql 258 (m52-imp9--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 3.3) -------------------
 
@@ -297,10 +303,10 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
                                       '("\"m52-imp3\"" "\"m52-imp4\""
                                         "\"m52-imp5\"" "\"m52-imp6\""
                                         "\"m52-imp7\"" "\"m52-imp8\"")))
-(m52-imp9--check "pty-driver-total-21"
+(m52-imp9--check "pty-driver-total-22"
                  (m52-imp9--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 21"))
+                  "\"total-case-count\", len(CASES), 22"))
 
 ;;; --- S3. The guards (brief.org section 3.4) -------------------------
 
@@ -308,13 +314,13 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; tests, so a green m52 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 35 checks;
+;; because every check is registered at load time.  S1 holds 41 checks;
 ;; S2 holds 4 checks.
 
 (setq m52-imp9--group nil)
 
-(m52-imp9--check "reg/min-s1-checks-35"
-                 (>= (m52-imp9--group-count 's1) 35))
+(m52-imp9--check "reg/min-s1-checks-41"
+                 (>= (m52-imp9--group-count 's1) 41))
 (m52-imp9--check "reg/min-s2-checks-4"
                  (>= (m52-imp9--group-count 's2) 4))
 
