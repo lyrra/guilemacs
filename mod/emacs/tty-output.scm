@@ -66,7 +66,7 @@
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
-            tty-write-verdict
+            tty-write-verdict tty-termscript-copy-handle
             make-tty-out-handle tty-out-handle? tty-out-handle-bytes
             tty-out-handle-short-writes tty-out-handle-hard-errors
             tty-turn-on-insert-cap tty-turn-off-insert-cap
@@ -159,6 +159,34 @@
   (cond ((>= written len)                                  "done")
         ((or (zero? err) (= err EINTR) (= err EAGAIN))     "retry")
         (else                                              "give-up")))
+
+;; --- M54 imp-3: the termscript copy DECISION --------------------------
+;;
+;; A termscript is a COPY of the terminal output (src/termchar.h :61:
+;; "send all terminal output characters to this stream also").  imp-3
+;; moves ONE operation of that copy stream: the after-write DECISION of
+;; ONE termscript copy write.  C keeps the FILE *termscript, the
+;; =fwrite=, and the =clearerr=; C stays the single writer, so Scheme
+;; still never sees the FILE *.  Scheme borrows the DECISION only.
+;;
+;; The copy REUSES tty-write-verdict (M54 imp-2).  There is ONE verdict
+;; procedure and ONE dispatcher; the copy votes through the same plain
+;; values (copied len err) and the same policy: copied >= len -> done;
+;; EINTR / EAGAIN (or err = 0) -> retry; a hard errno -> give-up.
+;;
+;; The record below carries the plain copy counts in the imp-2 handle
+;; tty-out-handle (brief.org section 9, Option A).  C still does not
+;; read the handle: the handle is BORROWED, not transferred, and C holds
+;; no Scheme-side store for it.  The procedure is pure -- it calls no
+;; leaf and emits nothing (docs/kb.org =leaf-must-call-the-mechanism=) --
+;; and it holds no module state.
+(define (tty-termscript-copy-handle copied len err)
+  (make-tty-out-handle
+   copied
+   (if (< copied len) 1 0)
+   (if (and (< copied len) (not (zero? err))
+            (not (= err EINTR)) (not (= err EAGAIN)))
+       1 0)))
 
 ;; --- M52 imp-4: the insert / highlight state-flip policy --------------
 ;;

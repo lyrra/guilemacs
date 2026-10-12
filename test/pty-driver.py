@@ -1144,16 +1144,72 @@ M54_IMP2_CASES = (
     },
 )
 
+# M54 imp-3: the termscript copy decision.  A termscript is a COPY of the
+# terminal output (src/termchar.h :61).  The child opens a real termscript
+# file (open-termscript), writes a marked span through tty-write-bytes,
+# and closes the termscript (open-termscript with no file flushes and
+# closes it).  The driver then compares the bytes of the termscript FILE
+# with the bytes read at the pty master: the copy MUST equal the output.
+# The span bytes are OUR OWN written bytes, so pinning them is allowed.
+M54_IMP3_BEGIN = b"M54-IMP3-BEGIN!"
+M54_IMP3_WRITEOK = b"M54-IMP3-WRITEOK!"
+M54_IMP3_END = b"M54-IMP3-END!"
+
+M54_IMP3_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (write! (module-ref output 'tty-write-bytes))
+       (flush! (module-ref output 'tty-flush)))
+  (if (not term)
+      "no-tty-terminal"
+    (begin
+      (write! term #vu8(@@BEGB@@))
+      (flush! term)
+      ((c 'open-termscript) "@@TSPATH@@")
+      (let* ((bytes #vu8(@@OKB@@))
+             (n (write! term bytes))
+             (flushed (flush! term)))
+        ((c 'open-termscript) #nil)
+        (write! term #vu8(@@ENDB@@))
+        (let ((end-flushed (flush! term)))
+          (if (and (= n @@NC@@) (= flushed 0) (= end-flushed 0))
+              (number->string n)
+            "write-failed"))))))
+"""
+
+M54_IMP3_CASES = (
+    {
+        "name": "m54-imp3/termscript-copy-e2e",
+        "group": "m54-imp3",
+        "probe": M54_IMP3_PROBE,
+        "subst": {"BEGB": " ".join(str(b) for b in M54_IMP3_BEGIN),
+                  "OKB": " ".join(str(b) for b in M54_IMP3_WRITEOK),
+                  "ENDB": " ".join(str(b) for b in M54_IMP3_END),
+                  "NC": str(len(M54_IMP3_WRITEOK))},
+        "expect_decimal": True,
+        "output_span": (M54_IMP3_BEGIN, M54_IMP3_END),
+        "output_span_bytes": M54_IMP3_WRITEOK,
+        # The driver opens a real termscript file and compares its bytes
+        # with the pty master span (brief.org section 11).
+        "termscript": True,
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
-         + M52_IMP8_CASES + M54_IMP2_CASES)
+         + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
           "m52-imp8",
-          "m54-imp2")
+          "m54-imp2", "m54-imp3")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1341,6 +1397,12 @@ def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     load_literal = load_path.replace("\\", "\\\\").replace('"', '\\"')
     subst = dict(case.get("subst", {}))
     subst.setdefault("LOADFILE", load_literal)
+    # A probe may open a real termscript file (M54 imp-3): its path is
+    # spliced in as the BODY of a Scheme string literal, like LOADFILE.
+    if case.get("termscript"):
+        ts_literal = (gate_path + ".termscript").replace(
+            "\\", "\\\\").replace('"', '\\"')
+        subst.setdefault("TSPATH", ts_literal)
     case = dict(case, subst=subst)
     scheme_probe = "(begin (call-with-input-file %s read-char) %s)" % (
         gate, build_probe(case).strip())
@@ -1428,6 +1490,31 @@ def check_output(case, got, output):
                 output[a + len(start):b], expected)
         if actual != reported:
             return "pty output span was %d bytes; leaf reported %d" % (actual, reported)
+    return None
+
+
+def check_termscript(case, output, ts_bytes):
+    """Compare the termscript FILE bytes with the pty master span (M54 imp-3).
+
+    A termscript is a COPY of the terminal output (src/termchar.h :61),
+    so the bytes of the opened termscript file MUST equal the bytes the
+    terminal received between the case's span markers.  TS_BYTES is the
+    termscript file content (None when it could not be read).  Return a
+    reason string on a mismatch, or None on success.
+    """
+    span = case.get("output_span")
+    if span is None:
+        return "case has no output_span to compare the termscript with"
+    start, end = span
+    a = output.find(start)
+    b = output.find(end, a + len(start)) if a >= 0 else -1
+    if a < 0 or b < 0:
+        return "pty output did not contain ordered markers %r %r" % (start, end)
+    master_span = output[a + len(start):b]
+    if ts_bytes is None:
+        return "could not read the termscript file"
+    if ts_bytes != master_span:
+        return "termscript bytes %r != pty master span %r" % (ts_bytes, master_span)
     return None
 
 
@@ -1521,6 +1608,13 @@ def run_case(case, emacs, timeout):
         with open(load_path, "w") as fixture_file:
             fixture_file.write(case["load_fixture"])
 
+    # A case may open a real termscript file (M54 imp-3).
+    # build_child_source splices its path (GATE_PATH + ".termscript"); the
+    # child opens it with open-termscript.
+    termscript_path = gate_path + ".termscript"
+    if case.get("termscript") and os.path.exists(termscript_path):
+        os.unlink(termscript_path)
+
     child = None
     try:
         cmd = [emacs, "-Q", "-nw", "-l", tmp.name]
@@ -1546,6 +1640,7 @@ def run_case(case, emacs, timeout):
         pty_eof = False
         mode_after = None
         exit_status = None
+        ts_bytes = None
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
@@ -1637,6 +1732,15 @@ def run_case(case, emacs, timeout):
                     timeout=max(0.0, deadline - time.monotonic()))
             except subprocess.TimeoutExpired:
                 exit_status = None
+        # M54 imp-3: read the termscript file before cleanup unlinks it.
+        # The probe closes the termscript before it reports, so the file
+        # is complete by the time the report arrives.
+        if case.get("termscript") and report_done:
+            try:
+                with open(termscript_path, "rb") as ts_file:
+                    ts_bytes = ts_file.read()
+            except OSError:
+                ts_bytes = None
     except OSError as err:
         # openpty already succeeded, so this is a live tty whose read or
         # write failed -- a harness error, not an environment gap.  Report
@@ -1656,7 +1760,7 @@ def run_case(case, emacs, timeout):
             except OSError:
                 pass
             child.wait()
-        for path in (tmp_path, gate_path, load_path):
+        for path in (tmp_path, gate_path, load_path, termscript_path):
             try:
                 os.unlink(path)
             except OSError:
@@ -1681,6 +1785,12 @@ def run_case(case, emacs, timeout):
         output_problem = check_output(case, got, pty_output)
         if output_problem:
             return (name, "FAIL", output_problem)
+        # M54 imp-3: the termscript file bytes MUST equal the pty master
+        # span (a termscript is a copy of the terminal output).
+        if case.get("termscript"):
+            ts_problem = check_termscript(case, pty_output, ts_bytes)
+            if ts_problem:
+                return (name, "FAIL", ts_problem)
         # M53 imp-3 step (f): the real exit status.
         if case.get("wait_exit") and exit_status != 0:
             return (name, "FAIL", "child exit status %r (want 0)" % (exit_status,))
@@ -1878,7 +1988,8 @@ def selftest():
     check("m52-imp8-case-count", len(group_cases("m52-imp8")), 1)
     check("m53-imp3-case-count", len(group_cases("m53-imp3")), 1)
     check("m54-imp2-case-count", len(group_cases("m54-imp2")), 1)
-    check("total-case-count", len(CASES), 22)
+    check("m54-imp3-case-count", len(group_cases("m54-imp3")), 1)
+    check("total-case-count", len(CASES), 23)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -1897,7 +2008,9 @@ def selftest():
                           ("m52-imp8/policy-key-e2e",
                            (b"M52-IMP8-BEGIN!", b"M52-IMP8-END!")),
                           ("m54-imp2/output-write-verdict-e2e",
-                           (b"M54-IMP2-BEGIN!", b"M54-IMP2-END!"))):
+                           (b"M54-IMP2-BEGIN!", b"M54-IMP2-END!")),
+                          ("m54-imp3/termscript-copy-e2e",
+                           (M54_IMP3_BEGIN, M54_IMP3_END))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
         if not case.get("expect_decimal"):
@@ -1905,6 +2018,18 @@ def selftest():
     check("m54-imp2-output-bytes",
           _case("m54-imp2/output-write-verdict-e2e").get("output_span_bytes"),
           b"M54-IMP2-WRITEOK!")
+    check("m54-imp3-output-bytes",
+          _case("m54-imp3/termscript-copy-e2e").get("output_span_bytes"),
+          b"M54-IMP3-WRITEOK!")
+    # The m54-imp3 case must open a termscript file, and run_case must
+    # compare the termscript file bytes with the pty master span.  These
+    # pins hold the wiring on a host with no pty.
+    if not _case("m54-imp3/termscript-copy-e2e").get("termscript"):
+        problems.append("m54-imp3 does not open a termscript file")
+    if "check_termscript" not in inspect.getsource(run_case):
+        problems.append("m54-imp3 run_case does not compare the termscript file")
+    if "@@TSPATH@@" in build_child_source(_case("m54-imp3/termscript-copy-e2e")):
+        problems.append("m54-imp3 probe left the TSPATH placeholder unresolved")
     check("m52-cap-output-bytes",
           _case("m52-imp3/tty-emit-cap-e2e").get("output_span_bytes"),
           b"\x1b[3;11r")

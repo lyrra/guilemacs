@@ -243,7 +243,7 @@
               (+ acc (count-substr (slurp (repo (string-append "src/" (car fs))))
                                    "scm_c_public_ref"))))))
 
-(check "m40/imp4a/static/tree-ref-sites-258" 258 tree-ref-sites)
+(check "m40/imp4a/static/tree-ref-sites-259" 259 tree-ref-sites)
 
 (define imp4a-corpus-src (slurp (repo "test/m40/test-m40-imp4a.scm")))
 (check "m40/imp4a/static/corpus-no-transient-citation" #f

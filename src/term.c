@@ -5577,6 +5577,52 @@ m54_tty_write_gives_up_p (Lisp_Object verdict)
 	  && memcmp (SSDATA (verdict), "give-up", sizeof "give-up" - 1) == 0);
 }
 
+/* --- M54 imp-3: the termscript copy decision ------------------------- */
+
+/* FIX-20261012-guilemacs: M54 imp-3 -- a termscript is a COPY of the
+   terminal output (src/termchar.h :61).  ONE operation of that copy
+   stream moves to Scheme: the after-write DECISION of ONE copy write.
+   C keeps the FILE *termscript and the =fwrite=, and it keeps the
+   OUTPUT =clearerr= (M54 imp-2).  C stays the single writer, so no port
+   and no FILE * crosses the seam.
+   The copy votes through the REUSED m54_tty_write_verdict_scheme
+   dispatcher (brief.org section 4): the copy and the output share ONE
+   verdict procedure, tty-write-verdict.  The plain counts also build
+   the imp-2 tty-out-handle in Scheme (brief.org section 9, Option A);
+   C does not read the handle, so the handle is BORROWED, not
+   transferred.  The m54_tty_termscript_ name reuses no static helper
+   (docs/kb.org =term-hub-helper-name-collision=).  */
+static Lisp_Object
+m54_tty_termscript_handle_scheme (Lisp_Object copied, Lisp_Object len,
+                                  Lisp_Object err)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-termscript-copy-handle");
+  return SCM_CALL_3 (proc, copied, len, err);
+}
+
+/* The after-write DECISION of ONE termscript copy write, borrowed from
+   Scheme.  COPIED is the plain =fwrite= count; LEN is the requested
+   count; FAILED is the plain C ferror result.  done / retry / give-up
+   comes from the shared tty-write-verdict procedure.  C keeps the
+   OUTPUT count as the m52_tty_write_1 return value, so the copy verdict
+   never changes the return shape.  A nil verdict (no Scheme runtime)
+   keeps the present C behavior: the copy result is discarded.  */
+static void
+m54_tty_termscript_verdict (size_t copied, size_t len, bool failed)
+{
+  int e = (copied < len && failed) ? (errno ? errno : EIO) : 0;
+  Lisp_Object verdict
+    = m54_tty_write_verdict_scheme (make_fixnum (copied), make_fixnum (len),
+                                    make_fixnum (e));
+  /* Record the plain copy counts in the BORROWED tty-out-handle.  C
+     does not read it (borrowed, not transferred).  */
+  m54_tty_termscript_handle_scheme (make_fixnum (copied), make_fixnum (len),
+                                    make_fixnum (e));
+  (void) verdict;
+}
+
 /* Write LEN bytes at STR to tty->output and, when set, tty->termscript.
    Return the number of bytes written, or the negated errno on a hard
    failure, or -EINVAL when TTY holds no output stream.  C keeps the
@@ -5592,11 +5638,17 @@ m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
   if (!tty || !tty->output)
     return -EINVAL;
   size_t written = fwrite (str, 1, len, tty->output);
+  /* FIX-20261012-guilemacs: M54 imp-3 cr.org F3 -- save the output errno
+     before the copy seam, whose Scheme calls can change errno.  */
+  int out_err = errno;
   if (tty->termscript)
-    fwrite (str, 1, len, tty->termscript);
+    {
+      size_t copied = fwrite (str, 1, len, tty->termscript);
+      m54_tty_termscript_verdict (copied, len, ferror (tty->termscript) != 0);
+    }
   if (written < len && ferror (tty->output))
     {
-      int e = errno ? errno : EIO;
+      int e = out_err ? out_err : EIO;
       Lisp_Object verdict
 	= m54_tty_write_verdict_scheme (make_fixnum (written),
 					make_fixnum (len), make_fixnum (e));
