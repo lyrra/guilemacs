@@ -11,6 +11,8 @@
   #:use-module ((srfi srfi-1) #:select (count any))
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs utils)
+  #:use-module ((emacs sequences) #:select (elisp-append))
+  #:use-module ((emacs list) #:select (elisp-car elisp-cdr))
   #:use-module (emacs reader)
   #:export (
     init-loader
@@ -861,26 +863,97 @@ Returns: handler result if handler found, #f if should continue with normal load
           #f ; return nil on error if noerror is true
           (apply throw key args)))))
 
+;;;
+;;; M55 imp-2 -- the reachable runtime cells in Scheme
+;;;
+;;; The loader applies 7 runtime function cells on the real plain-guile
+;;; load path (docs/m55-plan.org section 3.2, rows 3 ... 9).  In a plain
+;;; `guile' process the C bootstrap is absent, so every cell is empty.
+;;; imp-2 installs them, in call order, with no C fallback.  Two cells
+;;; need a small Scheme mechanism: `expand-file-name' (a path join) and
+;;; `file-directory-p' (a stat).  The other 5 reuse existing pure-Scheme
+;;; procedures: elisp-get-load-suffixes, elisp-append, symbol-value,
+;;; elisp-car, elisp-cdr.
+
+;; `expand-file-name' for the loader load-path search.  The loader calls
+;; it with the file name and a load-path directory, where FILE is the
+;; (possibly relative) name and DIR is a load-path entry.  Only the
+;; load-path case is handled: an absolute FILE returns as-is; else join
+;; DIR and FILE with one "/".  A #nil or empty DIR returns FILE (the
+;; elisp-normalize-load-path call site passes #nil).
+(define (elisp-loader-expand-file-name file dir)
+  (cond
+    ((or (eq? dir #nil) (not (string? dir)) (string-null? dir)) file)
+    ((not (string? file)) file)
+    ((string-prefix? "/" file) file)
+    (else (string-append (if (string-suffix? "/" dir) dir (string-append dir "/"))
+                         file))))
+
+;; `file-directory-p' from the Scheme stat.  The (emacs fileio) cell is
+;; C-backed and is NOT reusable (brief.org section 10).  A stat error
+;; (a missing path) folds to #f, like the C predicate.
+(define (elisp-loader-file-directory-p path)
+  (catch #t
+    (lambda () (eq? 'directory (stat:type (stat path))))
+    (lambda args #f)))
+
 (define (init-loader prelude-directory)
   (set-current-module (resolve-module '(emacs-elisp runtime)))
-  (let ((str (canonicalize-path (string-concatenate (list prelude-directory "/..")))))
-    (set! %load-path (append (list (string-concatenate (list str "/lisp"))
-                                   (string-concatenate (list str "/lisp/emacs-lisp"))
-                                   (string-concatenate (list str "/lisp/progmodes"))
-                                   (string-concatenate (list str "/lisp/language"))
-                                   (string-concatenate (list str "/lisp/international"))
-                                   (string-concatenate (list str "/lisp/textmodes"))
-                                   (string-concatenate (list str "/lisp/vc"))
-                                   (string-concatenate (list str "/lisp/mail"))
-                                   (string-concatenate (list str "/lisp/url"))
-                                   (string-concatenate (list str "/lisp/gnus"))
-                                   (string-concatenate (list str "/lisp/net"))
-                                   (string-concatenate (list str "/lisp/calendar"))
-                                   (string-concatenate (list str "/lisp/cedet"))
-                                   (string-concatenate (list str "/lisp/eshell")))
-                             %load-path)))
+  (let* ((str (canonicalize-path (string-concatenate (list prelude-directory "/.."))))
+         (dirs (list (string-concatenate (list str "/lisp"))
+                     (string-concatenate (list str "/lisp/emacs-lisp"))
+                     (string-concatenate (list str "/lisp/progmodes"))
+                     (string-concatenate (list str "/lisp/language"))
+                     (string-concatenate (list str "/lisp/international"))
+                     (string-concatenate (list str "/lisp/textmodes"))
+                     (string-concatenate (list str "/lisp/vc"))
+                     (string-concatenate (list str "/lisp/mail"))
+                     (string-concatenate (list str "/lisp/url"))
+                     (string-concatenate (list str "/lisp/gnus"))
+                     (string-concatenate (list str "/lisp/net"))
+                     (string-concatenate (list str "/lisp/calendar"))
+                     (string-concatenate (list str "/lisp/cedet"))
+                     (string-concatenate (list str "/lisp/eshell")))))
+    (set! %load-path (append dirs %load-path))
+    ;; M55 imp-2: the runtime cells read these elisp variables through
+    ;; `symbol-value'.  In a plain `guile' process they are UNBOUND
+    ;; (measured); the C bootstrap binds them in a full Emacs.  Bind the
+    ;; Emacs defaults only when absent, so the full-Emacs values stay.
+    ;; FIX-20261014-guilemacs: this default binding is a standalone-load
+    ;; workaround.  Remove it once the C bootstrap binds these variables.
+    (unless (symbol-bound? 'load-path)
+      (set-symbol-value! 'load-path dirs))
+    (unless (symbol-bound? 'load-suffixes)
+      (set-symbol-value! 'load-suffixes (list ".el")))
+    (unless (symbol-bound? 'load-file-rep-suffixes)
+      (set-symbol-value! 'load-file-rep-suffixes (list ""))))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)
   (set-symbol-function! 'autoload-do-load elisp-autoload-do-load)
+
+  ;; M55 imp-2: the 7 reachable runtime cells, in call order (rows 3 ...
+  ;; 9 of docs/m55-plan.org section 3.2), with no C fallback.
+  ;;
+  ;; F6 (cr.org section 4, item 7): install a cell ONLY when it is empty.
+  ;; In the full Emacs the C core already owns `expand-file-name'
+  ;; (src/fileio.x) and `file-directory-p'; the imp-2 Scheme cells handle
+  ;; the load-path case only, so an unconditional install would replace
+  ;; the C cell for EVERY elisp caller.  `symbol-fbound?' keeps the C
+  ;; cell.  In a plain `guile' process every cell is empty, so all 7
+  ;; install (measured: test/m55/test-m55-imp2.el group S2).
+  (unless (symbol-fbound? 'get-load-suffixes)
+    (set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes))
+  (unless (symbol-fbound? 'append)
+    (set-symbol-function! 'append elisp-append))
+  (unless (symbol-fbound? 'symbol-value)
+    (set-symbol-function! 'symbol-value symbol-value))
+  (unless (symbol-fbound? 'car)
+    (set-symbol-function! 'car elisp-car))
+  (unless (symbol-fbound? 'expand-file-name)
+    (set-symbol-function! 'expand-file-name elisp-loader-expand-file-name))
+  (unless (symbol-fbound? 'file-directory-p)
+    (set-symbol-function! 'file-directory-p elisp-loader-file-directory-p))
+  (unless (symbol-fbound? 'cdr)
+    (set-symbol-function! 'cdr elisp-cdr))
   )
