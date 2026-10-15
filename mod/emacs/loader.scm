@@ -818,29 +818,42 @@ Returns: handler result if handler found, #f if should continue with normal load
        (>= (stat:mtime (stat go)) (stat:mtime (stat src)))))
 
 (define (load-elisp file)
-  (let* ((src (%search-load-path file)) ; find foo.el on %load-path
-         (go  (compiled-file-name src)) ; cache path for .go
-         (el  (lookup-language 'emacs-elisp)))
+  ;; M55 imp-4 (cr.org M2): load-elisp is an exported entry point, so it can
+  ;; be reached in a plain `guile' process too.  Test the elisp compiler
+  ;; FIRST (the narrow catch) and take the source-reading branch when it is
+  ;; absent, like load-elisp-full.  `compiled-file-name' and `compile-file'
+  ;; are Guile-compiler cells and are UNBOUND in a plain `guile' process
+  ;; (measured), so compute the .go path ONLY on the compiler branch.  Row
+  ;; 10 stays C for the full-Emacs path.
+  (let ((src (%search-load-path file)) ; find foo.el on %load-path
+        (el  (elisp-loader-compiler-available?)))
     (unless src
       (error "Not found on %load-path" file))
-    (if (fresh-go? go src)
-        (load-compiled go)
-        (begin
-          (compile-file src
-                        #:from el ; 'elisp
-                        ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
-                        #:output-file go)
-          (load-compiled go)))))
+    (if el
+        (let ((go (compiled-file-name src))) ; cache path for .go
+          (if (fresh-go? go src)
+              (load-compiled go)
+              (begin
+                (compile-file src
+                              #:from el ; 'elisp
+                              ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
+                              #:output-file go)
+                (load-compiled go))))
+        ;; M55 imp-4: no elisp compiler, READ and RUN the source.
+        (elisp-load-source-file src))))
 
 ;; Enhanced version that handles full Fload parameters
 (define (load-elisp-full found-file noerror nomessage nosuffix must-suffix)
-  "Load elisp file with compilation, handling full Fload parameter set"
+  "Load elisp file with compilation on the full-Emacs path, or by
+reading the source when the elisp compiler is absent (M55 imp-4)."
   (catch #t
     (lambda ()
       (let* ((src found-file)
              (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
-             ;; Load our custom elisp language to override system elisp
-             (el (lookup-language 'emacs-elisp))
+             ;; Load our custom elisp language to override system elisp.
+             ;; When the C compiler is absent this is #f (imp-4): take the
+             ;; source-reading branch instead.  Row 10 stays C otherwise.
+             (el (elisp-loader-compiler-available?))
              ;; Save current load-file-name for restoration
              (old-load-file-name ((symbol-function 'symbol-value) 'load-file-name)))
         ;; Bind load-file-name to current file during loading
@@ -848,13 +861,18 @@ Returns: handler result if handler found, #f if should continue with normal load
           (lambda ()
             (set-symbol-value! 'load-file-name found-file))
           (lambda ()
-            (if (fresh-go? go src)
-                (load-compiled go)
-                (begin
-                  (compile-file src
-                                #:from el
-                                #:output-file go)
-                  (load-compiled go)))
+            (cond
+             (el
+              (if (fresh-go? go src)
+                  (load-compiled go)
+                  (begin
+                    (compile-file src
+                                  #:from el
+                                  #:output-file go)
+                    (load-compiled go))))
+             (else
+              ;; M55 imp-4: no elisp compiler, READ and RUN the source.
+              (elisp-load-source-file src)))
             #t) ; return t on success
           (lambda ()
             (set-symbol-value! 'load-file-name old-load-file-name)))))
@@ -897,6 +915,188 @@ Returns: handler result if handler found, #f if should continue with normal load
     (lambda () (eq? 'directory (stat:type (stat path))))
     (lambda args #f)))
 
+;;;
+;;; M55 imp-4 -- the source-reading load path (C delta 0)
+;;;
+;;; Load an .el file when the elisp compiler is absent, by READING the
+;;; source text and evaluating it.  The C elisp compiler (row 10,
+;;; lookup-language 'emacs-elisp) STAYS in place for the full-Emacs path.
+;;; imp-4 only adds a branch that runs when that lookup raises; on the
+;;; source-reading branch no compile-file and no eval-elisp (row 10) runs.
+;;;
+;;; FIX-20261015-guilemacs: the reader applies 3 function cells that the
+;;; C bootstrap owns in a full Emacs (intern, concat, substring), and the
+;;; read-eval loop applies the eval cell.  In a plain `guile' process
+;;; they are EMPTY, so the reader can not even read a form (measured:
+;;; wrong-type-arg "Wrong type to apply: #nil").  The loader POLICY
+;;; installs small pure-Scheme procedures for them, in call order, with a
+;;; symbol-fbound? guard so a present C cell is KEPT.  No C fallback.
+
+;; `intern' reuses the pure-Scheme elisp-intern (emacs utils).
+
+;; `concat' joins STRING arguments only; `substring' cuts a string with
+;; an optional end.  Both tolerate the #nil forms the reader may pass.
+;;
+;; F7 (cr.org section 4): these are READER SHIMS, NOT the Emacs
+;; procedures.  The Emacs `concat' also accepts a list, a vector, or an
+;; integer char, and a non-string argument folds to its printed form
+;; here.  The reader calls `concat' 2 times and `substring' 1 time, so
+;; the load path is safe.  Do not expose these as the Emacs definitions.
+(define (elisp-loader-concat . sequences)
+  (apply string-append
+         (map (lambda (seq)
+                (cond
+                 ((string? seq) seq)
+                 ((eq? seq #nil) "")
+                 ((null? seq) "")
+                 (else (format #f "~a" seq))))
+              sequences)))
+
+(define (elisp-loader-substring string start . rest)
+  (let* ((len (string-length string))
+         (from (if (or (eq? start #nil) (not (integer? start))) 0 start))
+         (end (if (null? rest)
+                  len
+                  (let ((e (car rest)))
+                    (if (or (eq? e #nil) (not (integer? e))) len e)))))
+    (substring string from end)))
+
+;; The eval cell.  A minimal Scheme elisp evaluator over the reader datum
+;; (brief.org section 7 default scope).  Special forms: quote, setq, if,
+;; progn, let, lambda, and function application.  This is NOT the elisp
+;; compiler (row 10): it never calls lookup-language or compile.
+(define (elisp-loader-truthy? obj)
+  (and (not (eq? obj #nil)) (not (eq? obj #f))))
+
+(define (elisp-loader-eval-seq forms)
+  (let ((result #nil))
+    (for-each (lambda (form) (set! result (elisp-loader-eval form))) forms)
+    result))
+
+;; F3 (cr.org section 4): an unbound FUNCTION raises `void-function',
+;; like elisp.  Without this the evaluator applied #nil and returned
+;; #nil with no error, so a broken file looked like a clean load.
+(define (elisp-loader-apply fn args)
+  (if (procedure? fn)
+      (apply fn args)
+      (throw 'void-function fn)))
+
+(define (elisp-loader-eval form)
+  (cond
+    ((symbol? form)
+     (if (symbol-bound? form)
+         (symbol-value form)
+         ;; F3: an unbound VARIABLE raises `void-variable', like elisp.
+         (throw 'void-variable form)))
+    ((pair? form) (elisp-loader-eval-form form))
+    (else form)))
+
+;; F4 (cr.org section 4): elisp `let' and a lambda argument bind
+;; dynamically and RESTORE the previous value on exit.  Bind through this
+;; thunk factory, then call every restore thunk after the body, so a
+;; loaded file can not corrupt global state.
+(define (elisp-loader-bind-thunk name value)
+  (if (symbol-bound? name)
+      (let ((old (symbol-value name)))
+        (set-symbol-value! name value)
+        (lambda () (set-symbol-value! name old)))
+      (begin
+        (set-symbol-value! name value)
+        ;; FIX-20261015-guilemacs: the elisp value slot has no Scheme
+        ;; "unbind".  A previously-unbound name restores to elisp nil; a
+        ;; bound name (the common case) restores exactly.
+        (lambda () (set-symbol-value! name #nil)))))
+
+(define (elisp-loader-bind-params! params args)
+  "Bind PARAMS to ARGS.  Return the list of restore thunks."
+  (let loop ((ps params) (as args) (restore '()))
+    (if (pair? ps)
+        (loop (cdr ps) (cdr as)
+              (cons (elisp-loader-bind-thunk (car ps)
+                                             (if (pair? as) (car as) #nil))
+                    restore))
+        restore)))
+
+(define (elisp-loader-make-procedure params body)
+  (lambda args
+    (let ((restore (elisp-loader-bind-params! params args)))
+      (let ((result (elisp-loader-eval-seq body)))
+        (for-each (lambda (thunk) (thunk)) restore)
+        result))))
+
+(define (elisp-loader-eval-form form)
+  (let ((head (car form)))
+    (cond
+      ((not (symbol? head))
+       (elisp-loader-apply (elisp-loader-eval head)
+                           (map elisp-loader-eval (cdr form))))
+      ((eq? head 'quote) (cadr form))
+      ((eq? head 'setq)
+       (let loop ((rest (cdr form)))
+         (cond
+          ((null? rest) #nil)
+          ((null? (cdr rest)) (elisp-loader-eval (car rest)))
+          (else
+           (set-symbol-value! (car rest) (elisp-loader-eval (cadr rest)))
+           (loop (cddr rest))))))
+      ((eq? head 'if)
+       (if (elisp-loader-truthy? (elisp-loader-eval (cadr form)))
+           (elisp-loader-eval (caddr form))
+           (if (pair? (cdddr form)) (elisp-loader-eval (cadddr form)) #nil)))
+      ((eq? head 'progn) (elisp-loader-eval-seq (cdr form)))
+      ((eq? head 'let)
+       (let* ((restore (map (lambda (binding)
+                              (elisp-loader-bind-thunk
+                               (car binding)
+                               (if (pair? (cdr binding))
+                                   (elisp-loader-eval (cadr binding))
+                                   #nil)))
+                            (cadr form)))
+              (result (elisp-loader-eval-seq (cddr form))))
+         (for-each (lambda (thunk) (thunk)) restore)
+         result))
+      ((eq? head 'lambda)
+       (elisp-loader-make-procedure (cadr form) (cddr form)))
+      ;; F2 (cr.org section 4): `defun' lets a loaded file DEFINE a
+      ;; function that a later form CALLS.  The definition lands in the
+      ;; elisp function cell.
+      ((eq? head 'defun)
+       (set-symbol-function! (cadr form)
+                             (elisp-loader-make-procedure (caddr form)
+                                                          (cdddr form))))
+      (else
+       (if (symbol-fbound? head)
+           (elisp-loader-apply (symbol-function head)
+                               (map elisp-loader-eval (cdr form)))
+           (throw 'void-function head))))))
+
+;; The elisp compiler is C (row 10).  When lookup-language raises
+;; misc-error with the "no such language" message, the C compiler is
+;; absent: return #f so load-elisp-full takes the source-reading branch.
+;; Keep the language object otherwise.
+;;
+;; F6 (cr.org section 4): catch ONLY the "no such language" case.  Any
+;; other misc-error (a real error) is RE-RAISED, so it can not silently
+;; take the source-reading branch.
+(define (elisp-loader-compiler-available?)
+  (catch 'misc-error
+    (lambda () (lookup-language 'emacs-elisp))
+    (lambda (key . args)
+      (if (any (lambda (arg)
+                 (and (string? arg) (string-contains arg "no such language")))
+               args)
+          #f
+          (apply throw key args)))))
+
+;; Read and evaluate SRC when the elisp compiler is absent.  The port is
+;; closed also on error (dynamic-wind), like the C unwind-protect.
+(define (elisp-load-source-file src)
+  (let ((port (open-input-file src)))
+    (dynamic-wind
+      (lambda () #t)
+      (lambda () (elisp-load-read-eval-loop-from-port port #f))
+      (lambda () (close-port port)))))
+
 (define (init-loader prelude-directory)
   (set-current-module (resolve-module '(emacs-elisp runtime)))
   (let* ((str (canonicalize-path (string-concatenate (list prelude-directory "/.."))))
@@ -926,7 +1126,18 @@ Returns: handler result if handler found, #f if should continue with normal load
     (unless (symbol-bound? 'load-suffixes)
       (set-symbol-value! 'load-suffixes (list ".el")))
     (unless (symbol-bound? 'load-file-rep-suffixes)
-      (set-symbol-value! 'load-file-rep-suffixes (list ""))))
+      (set-symbol-value! 'load-file-rep-suffixes (list "")))
+    ;; M55 imp-4: the reader reads `load-read-function' through
+    ;; symbol-value (mod/emacs/reader.scm elisp-read-with-load-function-
+    ;; from-port).  Emacs pre-binds it to nil.  In a plain `guile' process
+    ;; it is absent, and the Scheme symbol-value returns Guile's UNBOUND
+    ;; sentinel (not #nil), so the reader would treat the sentinel as a
+    ;; real read function and apply the empty `funcall' cell (measured).
+    ;; Bind the Emacs default only when absent.
+    ;; FIX-20261015-guilemacs: standalone-load workaround; remove once the
+    ;; C bootstrap binds this variable.
+    (unless (symbol-bound? 'load-read-function)
+      (set-symbol-value! 'load-read-function #nil)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)
@@ -956,4 +1167,21 @@ Returns: handler result if handler found, #f if should continue with normal load
     (set-symbol-function! 'file-directory-p elisp-loader-file-directory-p))
   (unless (symbol-fbound? 'cdr)
     (set-symbol-function! 'cdr elisp-cdr))
+
+  ;; M55 imp-4: the reader cells and the eval cell, in call order
+  ;; (brief.org section 6).  In a plain `guile' process the reader applies
+  ;; `intern' 18 times, `concat' 2 times, and `substring' 1 time; the
+  ;; read-eval loop applies `eval' on every form.  Every cell is empty
+  ;; there.  No C fallback: `intern' reuses the pure-Scheme elisp-intern;
+  ;; `concat' and `substring' are small Scheme procedures; `eval' is the
+  ;; minimal Scheme evaluator (elisp-loader-eval).  The `symbol-fbound?'
+  ;; guard keeps a C cell in a full Emacs.
+  (unless (symbol-fbound? 'intern)
+    (set-symbol-function! 'intern elisp-intern))
+  (unless (symbol-fbound? 'concat)
+    (set-symbol-function! 'concat elisp-loader-concat))
+  (unless (symbol-fbound? 'substring)
+    (set-symbol-function! 'substring elisp-loader-substring))
+  (unless (symbol-fbound? 'eval)
+    (set-symbol-function! 'eval elisp-loader-eval))
   )

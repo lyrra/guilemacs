@@ -20,16 +20,16 @@
 ;;;   S2 -- the REAL path (brief.org sections 3 and 6).  A plain
 ;;;         `guile -L mod -c' subprocess calls init-loader (the
 ;;;         registration site) and then elisp-load on a real .el file.
-;;;         It DERIVES that no reachable cell is empty, and it pins the
-;;;         NEW stop point: the load advances past rows 3 ... 9 and stops
-;;;         at row 10 (the elisp compiler) with `misc-error "no such
-;;;         language ~S"' (emacs-elisp).  One more subprocess pre-binds a
+;;;         It DERIVES that no reachable cell is empty.  M55 imp-4
+;;;         removed row 10 (the elisp compiler) from the route, so the
+;;;         load no longer stops there; the check pins the imp-4 end
+;;;         state, the LOAD-OK outcome.  One more subprocess pre-binds a
 ;;;         cell and checks the guard KEEPS it while an empty cell is
 ;;;         INSTALLED (cr.org F6).  S2 holds 3 checks.
-;;;   S3 -- the re-measured surface, re-measured at imp-2 (brief.org
-;;;         section 7): loader.scm 959 lines / 74 (symbol-function 'X)
-;;;         apply matches / 11 symbol-fbound? / 9 set-symbol-function! /
-;;;         4 FIX-*-guilemacs; reader.scm 2,021 lines; prelude/load.scm
+;;;   S3 -- the re-measured surface, re-measured at imp-4 (brief.org
+;;;         section 9): loader.scm 1187 lines / 74 (symbol-function 'X)
+;;;         apply matches / 18 symbol-fbound? / 14 set-symbol-function! /
+;;;         7 FIX-*-guilemacs; reader.scm 2,021 lines; prelude/load.scm
 ;;;         265 lines.  S3 holds 7 checks.
 ;;;   S4 -- the registration: the (m55) group of tool/run-tests.scm holds
 ;;;         the imp-2 file, after (m54).  S4 holds 4 checks.
@@ -344,11 +344,13 @@ symbol `m55-imp2-guile-absent'."
 (m55-imp2--check "no-c-public-ref-site"
                  (not (m55-imp2--contains-p "mod/emacs/loader.scm" "scm_c_public_ref")))
 
-;; The 7 new cells plus the 2 pre-existing ones (load,
-;; autoload-do-load) make 9 set-symbol-function! sites in init-loader.
+;; The 7 imp-2 new cells plus the 4 imp-4 cells (intern, concat,
+;; substring, eval) plus the 2 pre-existing ones (load,
+;; autoload-do-load) plus the imp-4 `defun' define site make 14
+;; set-symbol-function! sites in init-loader.
 
-(m55-imp2--check "install-cell-count-9"
-                 (eql 9 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "install-cell-count-14"
+                 (eql 14 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 
 ;;; --- S2. The REAL path (brief.org sections 3 and 6) -----------------
@@ -364,21 +366,17 @@ symbol `m55-imp2-guile-absent'."
       (progn
         (m55-imp2--info-skip "plain-guile-no-empty-cell"
                              "no guile binary on PATH")
-        (m55-imp2--info-skip "plain-guile-row10-stop"
+        (m55-imp2--info-skip "plain-guile-load-ok"
                              "no guile binary on PATH"))
     (progn
       ;; Rows 3 ... 9 are no longer empty: init-loader installed them.
       (m55-imp2--check "plain-guile-no-empty-cell"
                        (m55-imp2--contains-marker-p out "M55-IMP2-FIRST-EMPTY:NONE"))
-      ;; The NEW stop point: the load advances past rows 3 ... 9 to row
-      ;; 10 and raises `misc-error "no such language ~S"' (emacs-elisp).
-      ;; The check asserts the LANGUAGE NAME too, not only the generic
-      ;; key, so an unrelated misc-error can not pass it (cr.org section
-      ;; 8, item 4).
-      (m55-imp2--check "plain-guile-row10-stop"
-                       (and (m55-imp2--contains-marker-p out "M55-IMP2-OUTCOME:FAULT:misc-error")
-                            (m55-imp2--contains-marker-p out "no such language")
-                            (m55-imp2--contains-marker-p out "emacs-elisp"))))))
+      ;; M55 imp-4 removed row 10 from the route: the load no longer stops
+      ;; at the elisp compiler.  The check pins the imp-4 end state, the
+      ;; LOAD-OK outcome (the imp-2 row-10 stop is gone).
+      (m55-imp2--check "plain-guile-load-ok"
+                       (m55-imp2--contains-marker-p out "M55-IMP2-OUTCOME:LOAD-OK")))))
 
 ;; F6 regression probe: pre-bind ONE cell, call init-loader, and check
 ;; the guard KEPT the pre-bound cell and INSTALLED the empty one.  A
@@ -400,8 +398,8 @@ symbol `m55-imp2-guile-absent'."
 
 (setq m55-imp2--group 's3)
 
-(m55-imp2--check "loader.scm-lines-959"
-                 (eql 959 (m55-imp2--lines "mod/emacs/loader.scm")))
+(m55-imp2--check "loader.scm-lines-1187"
+                 (eql 1187 (m55-imp2--lines "mod/emacs/loader.scm")))
 (m55-imp2--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp2--lines "mod/emacs/reader.scm")))
 (m55-imp2--check "prelude-load.scm-lines-265"
@@ -409,14 +407,14 @@ symbol `m55-imp2-guile-absent'."
 (m55-imp2--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp2--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp2--check "loader.scm-symbol-fbound-guards-11"
-                 (eql 11 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-symbol-fbound-guards-18"
+                 (eql 18 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp2--check "loader.scm-set-symbol-function-9"
-                 (eql 9 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-set-symbol-function-14"
+                 (eql 14 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
-(m55-imp2--check "loader.scm-fix-markers-4"
-                 (eql 4 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-fix-markers-7"
+                 (eql 7 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 
 ;;; --- S4. The registration -------------------------------------------

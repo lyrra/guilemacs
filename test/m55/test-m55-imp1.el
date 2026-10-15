@@ -14,9 +14,9 @@
 ;;;
 ;;;   S1 -- the re-measured surface of brief.org section 4, re-measured
 ;;;         at imp-2 when it edits the loader.  S1 holds 9
-;;;         checks: mod/emacs/loader.scm 959 lines / 74 (symbol-function
-;;;         'X) apply sites / 11 symbol-fbound? guards / 9
-;;;         set-symbol-function! sites / 4 FIX-*-guilemacs markers;
+;;;         checks: mod/emacs/loader.scm 1187 lines / 74 (symbol-function
+;;;         'X) apply sites / 18 symbol-fbound? guards / 14
+;;;         set-symbol-function! sites / 7 FIX-*-guilemacs markers;
 ;;;         mod/emacs/reader.scm 2,021 lines; prelude/load.scm 265 lines
 ;;;         / 70 (use-modules ...) lines / 31 (init-...-registrations)
 ;;;         calls.
@@ -301,8 +301,8 @@ symbol `m55-imp1-guile-absent'."
 
 (setq m55-imp1--group 's1)
 
-(m55-imp1--check "loader.scm-lines-959"
-                 (eql 959 (m55-imp1--lines "mod/emacs/loader.scm")))
+(m55-imp1--check "loader.scm-lines-1187"
+                 (eql 1187 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
 (m55-imp1--check "prelude-load.scm-lines-265"
@@ -310,8 +310,8 @@ symbol `m55-imp1-guile-absent'."
 (m55-imp1--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp1--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp1--check "loader.scm-symbol-fbound-guards-11"
-                 (eql 11 (m55-imp1--count-lines "mod/emacs/loader.scm"
+(m55-imp1--check "loader.scm-symbol-fbound-guards-18"
+                 (eql 18 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 (m55-imp1--check "prelude-load.scm-use-modules-70"
                  (eql 70 (m55-imp1--count-lines "prelude/load.scm"
@@ -319,11 +319,11 @@ symbol `m55-imp1-guile-absent'."
 (m55-imp1--check "prelude-load.scm-init-registrations-31"
                  (eql 31 (m55-imp1--count-lines "prelude/load.scm"
                                                 "^(init-.*-registrations)")))
-(m55-imp1--check "loader.scm-set-symbol-function-9"
-                 (eql 9 (m55-imp1--count-lines "mod/emacs/loader.scm"
+(m55-imp1--check "loader.scm-set-symbol-function-14"
+                 (eql 14 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
-(m55-imp1--check "loader.scm-fix-markers-4"
-                 (eql 4 (m55-imp1--count-lines "mod/emacs/loader.scm"
+(m55-imp1--check "loader.scm-fix-markers-7"
+                 (eql 7 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 
 ;;; --- S2. The cell map (brief.org section 5) -------------------------
@@ -403,21 +403,19 @@ symbol `m55-imp1-guile-absent'."
                        (m55-imp1--contains-marker-p out "M55-OUTCOME:FAULT:wrong-type-arg")))))
 
 ;; The deep trace (brief.org section 5.1 step 4): supply rows 3 .. 9 with
-;; tolerant Scheme stubs and repeat the REAL load.  A green shot shows the
-;; path advances PAST rows 3 .. 9 to row 10 (the elisp compiler) and
-;; raises `misc-error' "no such language ~S" (emacs-elisp).  This
-;; confirms the A2 blocker by measurement, not by assertion.  The check
-;; asserts the LANGUAGE NAME as well as the key: `misc-error' alone is a
-;; generic Guile key, so an unrelated `misc-error' would also match it
-;; (cr.org section 8).  A missing guile binary is an explicit INFO skip.
+;; tolerant Scheme stubs and repeat the REAL load.  M55 imp-4 removed row
+;; 10 (the elisp compiler) from the route, so the trace no longer stops
+;; there: with the stub cells the load advances past rows 3 .. 9 and
+;; COMPLETES (the probe file holds no form, so the read reaches EOF at
+;; once).  This records the imp-4 end state by measurement, per the
+;; exact-value rule (cr.org section 8).  A missing guile binary is an
+;; explicit INFO skip.
 (let ((deep (m55-imp1--plain-guile-deep-trace-output)))
   (if (eq deep 'm55-imp1-guile-absent)
-      (m55-imp1--info-skip "plain-guile-deep-trace-row10"
+      (m55-imp1--info-skip "plain-guile-deep-trace-load-ok"
                            "no guile binary on PATH")
-    (m55-imp1--check "plain-guile-deep-trace-row10"
-                     (and (m55-imp1--contains-marker-p deep "M55-DEEP:FAULT:misc-error")
-                          (m55-imp1--contains-marker-p deep "no such language")
-                          (m55-imp1--contains-marker-p deep "emacs-elisp")))))
+    (m55-imp1--check "plain-guile-deep-trace-load-ok"
+                     (m55-imp1--contains-marker-p deep "M55-DEEP:LOAD-OK"))))
 
 ;;; --- S3. The registration site (brief.org section 5.4) --------------
 

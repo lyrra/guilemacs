@@ -12,8 +12,9 @@
 ;;;   1. a plain guile process calls init-loader, then elisp-load (the
 ;;;      REAL path, not a module-load probe);
 ;;;   2. after init-loader NO reachable runtime cell is empty;
-;;;   3. the load stops at row 10, the elisp compiler, with the language
-;;;      name emacs-elisp.
+;;;   3. M55 imp-4 removed row 10 (the elisp compiler) from this route, so
+;;;      the load no longer stops there.  This corpus now records the
+;;;      imp-4 end state: the real .el file LOADS (M55-IMP3-OUTCOME:LOAD-OK).
 ;;;
 ;;; This corpus pins these groups:
 ;;;
@@ -32,13 +33,13 @@
 ;;;         The check is a `come before' ORDER check on the 7
 ;;;         set-symbol-function! forms: a reordering FAILS the run.  S2
 ;;;         holds 1 check.
-;;;   S3 -- the surface pins, re-measured at imp-3 (brief.org section
-;;;         6.3 and section 7): loader.scm 959 lines / 74
-;;;         (symbol-function 'X) apply matches / 11 symbol-fbound? / 9
-;;;         set-symbol-function! / 4 FIX-*-guilemacs; reader.scm 2,021
-;;;         lines; prelude/load.scm 265 lines.  imp-3 edits NO mod/ and
-;;;         NO prelude/ file, so these values equal the imp-2 values.
-;;;         S3 holds 7 checks.
+;;;   S3 -- the surface pins, re-measured at imp-4 (brief.org section 9):
+;;;         loader.scm 1187 lines / 74
+;;;         (symbol-function 'X) apply matches / 18 symbol-fbound? / 14
+;;;         set-symbol-function! / 7 FIX-*-guilemacs; reader.scm 2,021
+;;;         lines; prelude/load.scm 265 lines.  imp-4 edits
+;;;         mod/emacs/loader.scm, so these values move from the imp-3
+;;;         values.  S3 holds 7 checks.
 ;;;   S4 -- the registration (brief.org section 6.4): the (m55) group of
 ;;;         tool/run-tests.scm holds the imp-3 file and the (m55) group
 ;;;         line; the group comes after (m54); the group holds the imp-1
@@ -260,21 +261,18 @@ symbol `m55-imp3-guile-absent'."
       (progn
         (m55-imp3--info-skip "plain-guile-no-empty-cell"
                              "no guile binary on PATH")
-        (m55-imp3--info-skip "plain-guile-row10-stop"
+        (m55-imp3--info-skip "plain-guile-load-ok"
                              "no guile binary on PATH"))
     (progn
       ;; After init-loader, rows 3 ... 9 are no longer empty: the first
       ;; empty cell of the ordered list is NONE.
       (m55-imp3--check "plain-guile-no-empty-cell"
                        (m55-imp3--contains-marker-p out "M55-IMP3-FIRST-EMPTY:NONE"))
-      ;; The load stops at row 10, the elisp compiler, with the language
-      ;; name emacs-elisp.  The check asserts the LANGUAGE NAME too, not
-      ;; only the generic key, so an unrelated misc-error can not pass it
-      ;; (brief.org section 6.1).
-      (m55-imp3--check "plain-guile-row10-stop"
-                       (and (m55-imp3--contains-marker-p out "M55-IMP3-OUTCOME:FAULT:misc-error")
-                            (m55-imp3--contains-marker-p out "no such language")
-                            (m55-imp3--contains-marker-p out "emacs-elisp"))))))
+      ;; M55 imp-4 removed row 10 from the route: the load no longer stops
+      ;; at the elisp compiler.  The check pins the imp-4 end state, the
+      ;; LOAD-OK outcome (the imp-3 row-10 stop is gone).
+      (m55-imp3--check "plain-guile-load-ok"
+                       (m55-imp3--contains-marker-p out "M55-IMP3-OUTCOME:LOAD-OK")))))
 
 ;;; --- S2. The ordered cell list (brief.org section 6.2) --------------
 
@@ -304,8 +302,8 @@ symbol `m55-imp3-guile-absent'."
 
 (setq m55-imp3--group 's3)
 
-(m55-imp3--check "loader.scm-lines-959"
-                 (eql 959 (m55-imp3--lines "mod/emacs/loader.scm")))
+(m55-imp3--check "loader.scm-lines-1187"
+                 (eql 1187 (m55-imp3--lines "mod/emacs/loader.scm")))
 (m55-imp3--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp3--lines "mod/emacs/reader.scm")))
 (m55-imp3--check "prelude-load.scm-lines-265"
@@ -313,14 +311,14 @@ symbol `m55-imp3-guile-absent'."
 (m55-imp3--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp3--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp3--check "loader.scm-symbol-fbound-guards-11"
-                 (eql 11 (m55-imp3--count-lines "mod/emacs/loader.scm"
+(m55-imp3--check "loader.scm-symbol-fbound-guards-18"
+                 (eql 18 (m55-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp3--check "loader.scm-set-symbol-function-9"
-                 (eql 9 (m55-imp3--count-lines "mod/emacs/loader.scm"
+(m55-imp3--check "loader.scm-set-symbol-function-14"
+                 (eql 14 (m55-imp3--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
-(m55-imp3--check "loader.scm-fix-markers-4"
-                 (eql 4 (m55-imp3--count-lines "mod/emacs/loader.scm"
+(m55-imp3--check "loader.scm-fix-markers-7"
+                 (eql 7 (m55-imp3--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 
 ;;; --- S4. The registration (brief.org section 6.4) -------------------
