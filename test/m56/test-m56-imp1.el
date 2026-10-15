@@ -23,8 +23,8 @@
 ;;;         scm_c_public_ref sites); the 454 lines of
 ;;;         mod/emacs/tty-output.scm; the tree-wide scm_c_public_ref
 ;;;         count over src/*.[ch] (260); the 3 src/termchar.h FILE *
-;;;         streams; and the 24 test/pty-driver.py cases.  S1 holds 9
-;;;         checks.
+;;;         streams; and the test/pty-driver.py cases (24 at imp-1;
+;;;         imp-2 adds one, so 25 now).  S1 holds 9 checks.
 ;;;   S2 -- the row map (brief.org section 4): the 3 C1 rows, their C
 ;;;         definitions, their src/term.c call sites, and the tracked C
 ;;;         evidence for each class.  Row 1 and row 3 STAYS C (C state
@@ -272,9 +272,9 @@ host limit is a skip, never a pass (brief.org section 11)."
                  (and (eql 51 (m56-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m56-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m56-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m56-imp1--check "pty-driver-cases-24"
+(m56-imp1--check "pty-driver-cases-25"
                  (m56-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 24"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 25"))
 
 ;;; --- S2. The row map (brief.org section 4) --------------------------
 

@@ -1258,16 +1258,117 @@ M54_IMP4_CASES = (
     },
 )
 
+# --------------------------------------------------------------------
+# M56 imp-2: the TTY init path on the real path.  See M56_IMP2_PROBE.
+#
+# The tty init path (C `init_tty', src/term.c) calls the three C1 rows:
+# add_keyboard_wait_descriptor, get_tty_size, and init_baud_rate.  A case
+# that boots the built src/emacs on a real PTY runs init_tty, so it runs
+# all three rows.  Row 3 (init_baud_rate) READS the termios state on the
+# C descriptor and WRITES the C global baud_rate; it has NO plain Scheme
+# observable (brief.org section 4.1), so the case does NOT assert a baud
+# value -- that is an honest limit, not a defect.  Because row 3 has no
+# plain observable, the case pins the WHOLE init path by the terminal's
+# live behaviour (brief.org section 4.2):
+#
+#   read  -- the child runs the (emacs gobble) read path once and reports
+#            "<return>,<stored>";
+#   write -- the child writes the BEGIN marker, the out bytes, and the
+#            END marker, and reports the byte count; the driver checks the
+#            span between the markers;
+#   size  -- the driver resizes the PTY (TIOCSWINSZ) after READY, before
+#            the gate; the child reads tty-size after the gate and
+#            reports "<W>x<H>".  A size that follows the resize proves a
+#            LIVE size query on the real descriptor.
+#
+# The report is ONE string, one line:
+#
+#   "read:<ret>,<stored> out:<n> size:<W>x<H>"
+M56_IMP2_BEGIN = b"M56-IMP2-BEGIN!"
+M56_IMP2_END = b"M56-IMP2-END!"
+M56_IMP2_OUT_BYTES = b"M56-IMP2-TTY-INIT-OK!"
+M56_IMP2_ROWS = 30
+M56_IMP2_COLS = 100
+
+M56_IMP2_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (modes (resolve-module '(emacs tty-modes)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the newest terminal is the
+       ;; last element (see READ_PATH_PROBE).
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (nr (module-ref gobble '%--kbd-buffer-nr-stored))
+       (read! (module-ref gobble 'tty-read-avail-input!))
+       (write! (module-ref output 'tty-write-bytes))
+       (flush! (module-ref output 'tty-flush))
+       (get-size (module-ref modes 'tty-size)))
+  (if (not term)
+      "no-tty-terminal"
+    (let* ((readstr
+            ;; Read input FIRST, right after the gate, before the write:
+            ;; Emacs's own input poll can move pending tty bytes into
+            ;; kbd_buffer during a longer step, and then FIONREAD reads 0.
+            (let* ((prev ((force nr)))
+                   (ret (read! term))
+                   (n1 ((force nr))))
+              (string-append
+               (if (number? ret) (number->string ret) "read-failed")
+               "," (number->string (- n1 prev)))))
+           (outstr
+            (begin
+              (write! term (string->utf8 "M56-IMP2-BEGIN!"))
+              (let ((n (write! term #vu8(@@OUTBYTES@@))))
+                (flush! term)
+                (write! term (string->utf8 "M56-IMP2-END!"))
+                (flush! term)
+                (if (number? n) (number->string n) "write-failed"))))
+           (sizestr
+            (let ((sz (get-size 0)))
+              (if (not (pair? sz))
+                  "no-size"
+                (string-append (number->string (car sz)) "x"
+                               (number->string (cdr sz)))))))
+      (string-append "read:" readstr
+                     " out:" outstr
+                     " size:" sizestr))))
+"""
+
+M56_IMP2_CASES = (
+    {
+        "name": "m56-imp2/tty-init-e2e",
+        "group": "m56-imp2",
+        "probe": M56_IMP2_PROBE,
+        "subst": {"OUTBYTES": " ".join(str(b) for b in M56_IMP2_OUT_BYTES)},
+        "bytes": b"AB",
+        "expect": "read:2,2 out:%d size:%dx%d"
+                  % (len(M56_IMP2_OUT_BYTES), M56_IMP2_COLS, M56_IMP2_ROWS),
+        # The driver resizes the pty after READY, before the gate; the
+        # child reads the size after the gate.  30x100 is NOT the pty
+        # default, so the report proves the change and the live query.
+        "resize": (M56_IMP2_ROWS, M56_IMP2_COLS),
+        # The BEGIN / END markers are our own written bytes, so pinning
+        # the span bytes is allowed (brief.org section 4.3).
+        "output_span": (M56_IMP2_BEGIN, M56_IMP2_END),
+        "output_span_bytes": M56_IMP2_OUT_BYTES,
+        # The report is composite, so the driver extracts the out count.
+        "output_count_re": r"out:(\d+)",
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
-         + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES)
+         + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
+         + M56_IMP2_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
           "m52-imp8",
-          "m54-imp2", "m54-imp3", "m54-imp4")
+          "m54-imp2", "m54-imp3", "m54-imp4",
+          "m56-imp2")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -2112,7 +2213,8 @@ def selftest():
     check("m54-imp2-case-count", len(group_cases("m54-imp2")), 1)
     check("m54-imp3-case-count", len(group_cases("m54-imp3")), 1)
     check("m54-imp4-case-count", len(group_cases("m54-imp4")), 1)
-    check("total-case-count", len(CASES), 24)
+    check("m56-imp2-case-count", len(group_cases("m56-imp2")), 1)
+    check("total-case-count", len(CASES), 25)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -2133,10 +2235,15 @@ def selftest():
                           ("m54-imp2/output-write-verdict-e2e",
                            (b"M54-IMP2-BEGIN!", b"M54-IMP2-END!")),
                           ("m54-imp3/termscript-copy-e2e",
-                           (M54_IMP3_BEGIN, M54_IMP3_END))):
+                           (M54_IMP3_BEGIN, M54_IMP3_END)),
+                          ("m56-imp2/tty-init-e2e",
+                           (M56_IMP2_BEGIN, M56_IMP2_END))):
         case = _case(name)
         check("%s-output-span" % name, case.get("output_span"), markers)
-        if not case.get("expect_decimal"):
+        # A bare-count report declares `expect_decimal'; a composite report
+        # (m56-imp2, like m53-imp3) extracts its count with `output_count_re'.
+        # Either way the case checks a reported byte count.
+        if not (case.get("expect_decimal") or case.get("output_count_re")):
             problems.append("%s does not check a reported byte count" % name)
     check("m54-imp2-output-bytes",
           _case("m54-imp2/output-write-verdict-e2e").get("output_span_bytes"),
@@ -2144,6 +2251,25 @@ def selftest():
     check("m54-imp3-output-bytes",
           _case("m54-imp3/termscript-copy-e2e").get("output_span_bytes"),
           b"M54-IMP3-WRITEOK!")
+    check("m56-imp2-output-bytes",
+          _case("m56-imp2/tty-init-e2e").get("output_span_bytes"),
+          M56_IMP2_OUT_BYTES)
+    # M56 imp-2 (brief.org section 4.2): the case must resize the pty so a
+    # size that follows the resize proves a LIVE size query, and its probe
+    # must resolve the size, read, and write paths.  These pins hold the
+    # wiring on a host with no pty.
+    m56 = _case("m56-imp2/tty-init-e2e")
+    check("m56-imp2-resize", m56.get("resize"),
+          (M56_IMP2_ROWS, M56_IMP2_COLS))
+    m56_src = build_child_source(m56)
+    for needle, label in (
+            ("tty-size", "probe reads the tty size"),
+            ("tty-read-avail-input!", "probe runs the read path"),
+            ("tty-write-bytes", "probe runs the write path")):
+        if needle not in m56_src:
+            problems.append("m56-imp2 probe does not %s" % label)
+    if "@@OUTBYTES@@" in m56_src:
+        problems.append("m56-imp2 probe left the OUTBYTES placeholder unresolved")
     # The m54-imp3 case must open a termscript file, and run_case must
     # compare the termscript file bytes with the pty master span.  These
     # pins hold the wiring on a host with no pty.
