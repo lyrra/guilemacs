@@ -1309,12 +1309,22 @@ M56_IMP2_PROBE = r"""
             ;; Read input FIRST, right after the gate, before the write:
             ;; Emacs's own input poll can move pending tty bytes into
             ;; kbd_buffer during a longer step, and then FIONREAD reads 0.
-            (let* ((prev ((force nr)))
-                   (ret (read! term))
-                   (n1 ((force nr))))
-              (string-append
-               (if (number? ret) (number->string ret) "read-failed")
-               "," (number->string (- n1 prev)))))
+            ;; Report the ACCOUNTED input as ONE number: the stored
+            ;; kbd_buffer count after the read.  The read stores each
+            ;; byte it reads, so this ONE count is the UNION of the two
+            ;; accounting paths, counted once.  The count is 2 for BOTH
+            ;; arms (a plain read and a winning poll), so it is RACE-PROOF
+            ;; (cr.org F1).  Emacs's own input poll can move the pending
+            ;; tty bytes into kbd_buffer before this probe runs; the old
+            ;; ret,delta pair then read 0 and 0 and failed on that benign
+            ;; variant.  The baseline is EMPTY by construction: the child
+            ;; is freshly started and the driver writes nothing before
+            ;; READY, and a resize SIGWINCH stores no kbd_buffer event.
+            (let* ((ret (read! term))
+                   (stored ((force nr))))
+              (if (number? ret)
+                  (number->string stored)
+                  "read-failed")))
            (outstr
             (begin
               (write! term (string->utf8 "M56-IMP2-BEGIN!"))
@@ -1341,7 +1351,7 @@ M56_IMP2_CASES = (
         "probe": M56_IMP2_PROBE,
         "subst": {"OUTBYTES": " ".join(str(b) for b in M56_IMP2_OUT_BYTES)},
         "bytes": b"AB",
-        "expect": "read:2,2 out:%d size:%dx%d"
+        "expect": "read:2 out:%d size:%dx%d"
                   % (len(M56_IMP2_OUT_BYTES), M56_IMP2_COLS, M56_IMP2_ROWS),
         # The driver resizes the pty after READY, before the gate; the
         # child reads the size after the gate.  30x100 is NOT the pty
@@ -2270,6 +2280,21 @@ def selftest():
             problems.append("m56-imp2 probe does not %s" % label)
     if "@@OUTBYTES@@" in m56_src:
         problems.append("m56-imp2 probe left the OUTBYTES placeholder unresolved")
+    # M57 (cr.org F1): the m56-imp2 probe reports the ACCOUNTED input as
+    # ONE race-proof number -- the stored kbd_buffer count after the read,
+    # not the racy (ret, delta) pair.  Emacs's own input poll can drain
+    # the pending tty bytes into kbd_buffer before the probe runs, and the
+    # old delta pair then read 0 and 0.  These pins hold the ABSOLUTE
+    # (not delta) decision on a host with no pty.
+    check("m56-imp2-expect-accounted", expect_string(m56),
+          "read:2 out:%d size:%dx%d"
+          % (len(M56_IMP2_OUT_BYTES), M56_IMP2_COLS, M56_IMP2_ROWS))
+    if "(number->string stored)" not in m56_src:
+        problems.append("m56-imp2 probe does not report the stored count")
+    if "(- n1 prev)" in m56_src:
+        problems.append("m56-imp2 probe still holds the racy (- n1 prev) pair")
+    if m56_src.count("force nr)") != 1:
+        problems.append("m56-imp2 probe reads the stored count not exactly once")
     # The m54-imp3 case must open a termscript file, and run_case must
     # compare the termscript file bytes with the pty master span.  These
     # pins hold the wiring on a host with no pty.
