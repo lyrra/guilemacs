@@ -1367,18 +1367,93 @@ M56_IMP2_CASES = (
     },
 )
 
+# --------------------------------------------------------------------
+# M58 imp-2: the face-appearance POLICY on the real path (Group A).
+#
+# The C hub is turn_on_face / turn_off_face / tty_capable_p
+# (src/term.c).  Its only callers are the glyph writers tty_write_glyphs /
+# tty_write_glyphs_with_face / tty_insert_glyphs.  A probe that calls
+# --tty-emit-cap or --tty-emit-seq does NOT reach that hub: only a real
+# redisplay of text that CARRIES a face attribute calls it.  So this case
+# drives the hub through a real redisplay, not through a leaf:
+#
+#   prelude -- runs in the child AFTER the READY letters and BEFORE the
+#              gate read.  It changes the buffer the selected window
+#              already shows (no new buffer that starts with a space),
+#              inserts BEGIN + a bold "X" + END, and forces a redisplay.
+#   probe   -- returns a constant.  It proves the child reached the report
+#              step; it is NOT the evidence.
+#   span    -- the driver requires the terminfo "bold" bytes INSIDE the
+#              case's own BEGIN .. END span.  The markers are our own
+#              bytes, so a span pin is allowed (the M56 imp-2 rule).  An
+#              absent "bold" capability is an explicit INFO skip: no byte
+#              can appear.  A capable host that emits no bold byte FAILS.
+#
+# The MOVE of the Group A decision is imp-3, and only after this check
+# returns A1.  This case is EVIDENCE, not a migration.
+M58_IMP2_BEGIN = b"M58-FACE-BEGIN!"
+M58_IMP2_END = b"M58-FACE-END!"
+# The xterm "bold" capability, MEASURED on this host with
+# terminfo_capability("xterm", "bold"); the selftest pins the equality.
+M58_IMP2_BOLD = b"\x1b[1m"
+
+M58_IMP2_PRELUDE = r"""
+(progn
+  ;; Change the buffer that the selected window ALREADY shows: do not
+  ;; switch to a new buffer that starts with a space.
+  (let ((buf (window-buffer (selected-window))))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert "M58-FACE-BEGIN!")
+      (insert (propertize "X" 'face 'bold))
+      (insert "M58-FACE-END!")
+      (goto-char (point-min))))
+  (redisplay t)
+  (sit-for 0))
+"""
+
+M58_IMP2_PROBE = r"""
+;; The report is ONE string.  The evidence is the pty span between the
+;; case's own markers, NOT this constant.
+"face-emitted"
+"""
+
+M58_IMP2_CASES = (
+    {
+        "name": "m58-imp2/face-appearance-e2e",
+        "group": "m58-imp2",
+        "probe": M58_IMP2_PROBE,
+        "prelude": M58_IMP2_PRELUDE,
+        "bytes": b"",
+        "expect": "face-emitted",
+        # The END marker proves the child's redisplay ran to completion on
+        # the real terminal.
+        "pty_contains": M58_IMP2_END,
+        # The bold bytes MUST appear INSIDE the case's own span.  The byte
+        # needs the terminfo "bold" capability; a host without it is an
+        # explicit INFO skip, never a pass.
+        "span_requires": {
+            "span": (M58_IMP2_BEGIN, M58_IMP2_END),
+            "needles": (M58_IMP2_BOLD,),
+            "capability": "bold",
+        },
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
-         + M56_IMP2_CASES)
+         + M56_IMP2_CASES + M58_IMP2_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
           "m52-imp3", "m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
           "m52-imp8",
           "m54-imp2", "m54-imp3", "m54-imp4",
-          "m56-imp2")
+          "m56-imp2",
+          "m58-imp2")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1428,6 +1503,15 @@ CHILD_PROGRAM = r""";;; pty-child.el --- the emacs under test's pty probe.
   ;; must also clear ISIG on the pty (deliver_raw), else the line
   ;; discipline eats the raw 0x07 as VQUIT and flushes the queue before
   ;; the store ever sees it.
+  ;; M58 imp-2: a case may supply a PRELUDE.  It runs in the child AFTER
+  ;; the READY letters and BEFORE the gate read, so a case that must
+  ;; reach a C path the Scheme probe cannot reach (the face-appearance
+  ;; policy: only a real redisplay of text that carries a face attribute
+  ;; calls turn_on_face / turn_off_face) can drive it here.  The default
+  ;; is the empty string, so every earlier case is unchanged.  A prelude
+  ;; value is spliced in as a VALUE by the Python `%%' operator, so its
+  ;; own text is not re-scanned for placeholders.
+%(prelude)s
   (let ((inhibit-quit t))
     (let ((res (condition-case err
                    (eval-scheme %(probe)s)
@@ -1566,6 +1650,11 @@ def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     load_literal = load_path.replace("\\", "\\\\").replace('"', '\\"')
     subst = dict(case.get("subst", {}))
     subst.setdefault("LOADFILE", load_literal)
+    # M58 imp-2: a case may supply a child PRELUDE that runs before the
+    # gate read.  It is spliced into CHILD_PROGRAM as a VALUE, so the
+    # `%' operator does not re-scan its text.  The default is the empty
+    # string, so every earlier case is byte-for-byte unchanged.
+    subst.setdefault("PRELUDE", case.get("prelude", ""))
     # A probe may open a real termscript file (M54 imp-3): its path is
     # spliced in as the BODY of a Scheme string literal, like LOADFILE.
     if case.get("termscript"):
@@ -1576,7 +1665,8 @@ def build_child_source(case, gate_path="/tmp/pty-driver-selftest-gate"):
     scheme_probe = "(begin (call-with-input-file %s read-char) %s)" % (
         gate, build_probe(case).strip())
     probe = scheme_probe.replace("\\", "\\\\").replace('"', '\\"')
-    return CHILD_PROGRAM % {"probe": '"%s"' % probe}
+    return CHILD_PROGRAM % {"probe": '"%s"' % probe,
+                            "prelude": subst["PRELUDE"]}
 
 
 def parse_report(text):
@@ -2224,7 +2314,8 @@ def selftest():
     check("m54-imp3-case-count", len(group_cases("m54-imp3")), 1)
     check("m54-imp4-case-count", len(group_cases("m54-imp4")), 1)
     check("m56-imp2-case-count", len(group_cases("m56-imp2")), 1)
-    check("total-case-count", len(CASES), 25)
+    check("m58-imp2-case-count", len(group_cases("m58-imp2")), 1)
+    check("total-case-count", len(CASES), 26)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -2295,6 +2386,42 @@ def selftest():
         problems.append("m56-imp2 probe still holds the racy (- n1 prev) pair")
     if m56_src.count("force nr)") != 1:
         problems.append("m56-imp2 probe reads the stored count not exactly once")
+    # M58 imp-2 (brief.org section 4.3): the face-appearance case drives
+    # the C hub through a REAL redisplay, so the prelude must be spliced
+    # into the built child source, the two markers must reach it, and the
+    # span must name the MEASURED bold byte plus the terminfo capability.
+    # These pins hold the wiring on a host with no pty.
+    face_case = _case("m58-imp2/face-appearance-e2e")
+    check("m58-imp2-span-requires", face_case.get("span_requires"),
+          {"span": (M58_IMP2_BEGIN, M58_IMP2_END),
+           "needles": (M58_IMP2_BOLD,),
+           "capability": "bold"})
+    # A hand-copied `output_span_bytes' would pin a GUESS: the honest pin
+    # is the span plus its needles and capability (brief.org section 4.3).
+    check("m58-imp2-no-span-bytes-guess",
+          "output_span_bytes" in face_case, False)
+    for needle, label in (
+            ("propertize", "prelude applies a face attribute"),
+            ("redisplay", "prelude forces a redisplay"),
+            ("'face 'bold", "prelude sets the bold face")):
+        if needle not in face_case.get("prelude", ""):
+            problems.append("m58-imp2 prelude does not %s" % label)
+    face_src = build_child_source(face_case)
+    for marker in (M58_IMP2_BEGIN, M58_IMP2_END):
+        if marker.decode() not in face_src:
+            problems.append("m58-imp2 built child source lost the marker %r"
+                            % (marker,))
+    if re.search(r"@@[A-Z_]+@@", face_src):
+        problems.append("m58-imp2 built child source leaves a placeholder")
+    # The prelude hook must not change an earlier case: its prelude is the
+    # empty string, so the built source holds no face prelude.
+    if "propertize" in build_child_source(_case("m56-imp2/tty-init-e2e")):
+        problems.append("m58-imp2 prelude leaked into an earlier case")
+    # The needle is MEASURED, then pinned: the host terminfo must agree.
+    bold_cap = terminfo_capability("xterm", "bold")
+    if bold_cap is not None and bold_cap != M58_IMP2_BOLD:
+        problems.append("xterm bold capability is %r, want %r"
+                        % (bold_cap, M58_IMP2_BOLD))
     # The m54-imp3 case must open a termscript file, and run_case must
     # compare the termscript file bytes with the pty master span.  These
     # pins hold the wiring on a host with no pty.

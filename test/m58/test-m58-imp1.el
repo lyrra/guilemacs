@@ -303,10 +303,14 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m58-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m58-imp1--check "pty-driver-cases-25"
+;; M58 imp-2 adds ONE PTY case (m58-imp2/face-appearance-e2e), so the
+;; counted surface moves from 25 to 26.  The re-pin lands in the SAME
+;; commit as the new case, else this check goes red (cr.org F6).  The
+;; imp-2 corpus T5 pins this re-pin from the other side.
+(m58-imp1--check "pty-driver-cases-26"
                  (let ((pins (m58-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 25 (car pins))
+                        (eql 26 (car pins))
                         ;; The group pins must add up to the total, so a
                         ;; group pin that moves without the total FAILS.
                         (eql (car pins) (cdr pins)))))
