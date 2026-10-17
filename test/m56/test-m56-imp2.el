@@ -25,7 +25,7 @@
 ;;;
 ;;;   S1 -- the case wiring in test/pty-driver.py: the case name, the
 ;;;         group, the M56_IMP2_CASES tuple, the CASES / GROUPS entries,
-;;;         the selftest group-count and total-case-count pins (25), the
+;;;         the selftest group-count and total-case-count pins (26), the
 ;;;         output span and its pinned bytes, the resize, and the absence
 ;;;         of a stale literal 24 case-count.  S1 holds 9 checks.
 ;;;   S2 -- the real path: python3 test/pty-driver.py --selftest passes,
@@ -183,22 +183,20 @@ host limit is a skip, never a pass (brief.org section 2)."
                  (m56-imp2--contains-p "test/pty-driver.py" "M56_IMP2_CASES = ("))
 (m56-imp2--check "cases-entry"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py" "+ M56_IMP2_CASES)"))
+                  "test/pty-driver.py" "+ M56_IMP2_CASES + M58_IMP2_CASES)"))
 (m56-imp2--check "groups-entry"
-                 ;; Use a needle UNIQUE to the GROUPS tuple: the entry is
-                 ;; the last group, closed by ")" and a newline.  The bare
-                 ;; "\"m56-imp2\")" alone also occurs in the selftest
-                 ;; group-count pin (len(group_cases("m56-imp2")), 1), so it
-                 ;; could pass on the selftest line alone.  Require exactly
-                 ;; one occurrence (cr.org F3).
-                 (= 1 (m56-imp2--count "test/pty-driver.py" "\"m56-imp2\")\n")))
+                 ;; M58 follows this entry.  Pin the adjacent pair inside
+                 ;; GROUPS, not the earlier m56 case declaration.
+                 (m56-imp2--contains-p
+                  "test/pty-driver.py"
+                  "\"m56-imp2\",\n          \"m58-imp2\")"))
 (m56-imp2--check "selftest-pins"
                  (and (m56-imp2--contains-p
                        "test/pty-driver.py"
                        "\"m56-imp2-case-count\", len(group_cases(\"m56-imp2\")), 1")
                       (m56-imp2--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 25")))
+                       "\"total-case-count\", len(CASES), 26")))
 (m56-imp2--check "output-span"
                  (m56-imp2--contains-p
                   "test/pty-driver.py"
@@ -211,7 +209,7 @@ host limit is a skip, never a pass (brief.org section 2)."
                        "test/pty-driver.py"
                        "\"resize\": (M56_IMP2_ROWS, M56_IMP2_COLS)")))
 (m56-imp2--check "no-stale-24-case-pin"
-                 ;; The case total is 25 now (imp-2 adds one case).  Guard
+                 ;; The case total is 26 now (imp-2 adds one case).  Guard
                  ;; against a stale literal 24 in the runner wiring: the
                  ;; pty-driver total pin and the run-tests.scm comment
                  ;; (brief.org section 7; cr.org F3).

@@ -28,7 +28,7 @@
 ;;;         checks.
 ;;;   S4 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm, and test/pty-driver.py holds
-;;;         the 25-case total pin and the --selftest entry.  S4 holds 4
+;;;         the 26-case total pin and the --selftest entry.  S4 holds 4
 ;;;         checks.
 ;;;   S5 -- the guards: a per-group min-count guard for S1 .. S4, and
 ;;;         the group-total `ert-deftest'.  S5 holds 4 checks.
@@ -306,10 +306,10 @@ probe: the loader must read and evaluate a real Elisp file."
                                        "test/m53/test-m53-imp1.el"))
 (m53-imp1--check "run-tests-m53-group"
                  (m53-imp1--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp1--check "pty-driver-total-25"
+(m53-imp1--check "pty-driver-total-26"
                  (m53-imp1--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 25"))
+                  "\"total-case-count\", len(CASES), 26"))
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 

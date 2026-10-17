@@ -16,7 +16,7 @@
 ;;;         S1 holds 6 checks.
 ;;;   S2 -- the registration: the corpus is registered in the (m54)
 ;;;         group of tool/run-tests.scm after test-m54-imp4.el, and
-;;;         test/pty-driver.py still holds the 25-case total pin.  Read
+;;;         test/pty-driver.py still holds the 26-case total pin.  Read
 ;;;         tracked runner files only.  S2 holds 4 checks.
 ;;;   S3 -- the guards: a per-group min-count guard for S1 and one for
 ;;;         S2, and the group-total check.  The total check is an
@@ -200,10 +200,10 @@ princ'd FAIL with no ERT test would leave the exit code 0."
                    (and (integerp imp4) (integerp imp5) (< imp4 imp5))))
 (m54-imp5--check "run-tests-m54-group"
                  (m54-imp5--contains-p "tool/run-tests.scm" "(group (m54)"))
-(m54-imp5--check "pty-driver-total-25"
+(m54-imp5--check "pty-driver-total-26"
                  (m54-imp5--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 25"))
+                  "\"total-case-count\", len(CASES), 26"))
 
 ;;; --- S3. The guards -------------------------------------------------
 

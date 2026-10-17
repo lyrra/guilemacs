@@ -261,9 +261,9 @@ host limit is a skip, never a pass (brief.org section 7)."
                  (and (eql 51 (m57-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m57-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m57-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m57-imp1--check "pty-driver-cases-25"
+(m57-imp1--check "pty-driver-cases-26"
                  (m57-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 25"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 26"))
 
 ;;; --- S2. The row map (brief.org section 5) --------------------------
 

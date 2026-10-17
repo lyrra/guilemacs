@@ -20,7 +20,7 @@
 ;;;         36 scm_c_public_ref sites; the tree-wide scm_c_public_ref
 ;;;         count over src/*.[chm] (260); mod/emacs/tty-output.scm 454
 ;;;         lines; the 3 src/termchar.h FILE * streams (:51 / :53 / :61);
-;;;         test/pty-driver.py 25 cases.  S1 holds 17 checks.
+;;;         test/pty-driver.py 26 cases.  S1 holds 17 checks.
 ;;;   S2 -- the registration (brief.org section 5): this corpus is
 ;;;         present in the (m56) group of tool/run-tests.scm, it comes
 ;;;         after test/m56/test-m56-imp2.el, the (m56) group exists, and
@@ -264,9 +264,9 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; --- Group A.  The M55 loader surface. ---
 
-;; A1: mod/emacs/loader.scm lines = 1,187.
-(m56-imp3--check "loader-lines-1187"
-                 (eql 1187 (m56-imp3--lines "mod/emacs/loader.scm")))
+;; A1: mod/emacs/loader.scm lines = 1,190.
+(m56-imp3--check "loader-lines-1190"
+                 (eql 1190 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -327,13 +327,13 @@ equality check would fail (brief.org section 5).  Return the symbol
                  (and (eql 51 (m56-imp3--line-of "src/termchar.h" "FILE *input;"))
                       (eql 53 (m56-imp3--line-of "src/termchar.h" "FILE *output;"))
                       (eql 61 (m56-imp3--line-of "src/termchar.h" "FILE *termscript;"))))
-;; B8: test/pty-driver.py cases = 25 (the total-case-count pin).  The
-;; close-out adds no PTY case, so the total stays 25 (brief.org section
+;; B8: test/pty-driver.py cases = 26 (the total-case-count pin).  The
+;; close-out adds no PTY case, so the total stays 26 (brief.org section
 ;; 9).  This guards against a stale literal 24.
-(m56-imp3--check "pty-driver-cases-25"
+(m56-imp3--check "pty-driver-cases-26"
                  (and (m56-imp3--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 25")
+                       "\"total-case-count\", len(CASES), 26")
                       (= 0 (m56-imp3--count "test/pty-driver.py"
                                             "len(CASES), 24"))))
 

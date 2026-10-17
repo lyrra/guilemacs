@@ -16,7 +16,7 @@
 ;;;         S1 holds 6 checks.
 ;;;   S2 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm after test-m53-imp3.el, and
-;;;         test/pty-driver.py still holds the 25-case total pin.  Read
+;;;         test/pty-driver.py still holds the 26-case total pin.  Read
 ;;;         tracked runner files only.  S2 holds 4 checks.
 ;;;   S3 -- the guards: a per-group min-count guard for S1 and one for
 ;;;         S2, and the group-total check.  The total check is an
@@ -199,10 +199,10 @@ host limit is a skip, never a pass (brief.org section 8)."
                    (and (integerp imp3) (integerp imp4) (< imp3 imp4))))
 (m53-imp4--check "run-tests-m53-group"
                  (m53-imp4--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp4--check "pty-driver-total-25"
+(m53-imp4--check "pty-driver-total-26"
                  (m53-imp4--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 25"))
+                  "\"total-case-count\", len(CASES), 26"))
 
 ;;; --- S3. The guards -------------------------------------------------
 
