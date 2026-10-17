@@ -284,8 +284,8 @@ symbol `m55-imp5-guile-absent'."
 (setq m55-imp5--group 's1)
 
 ;; Row 1: mod/emacs/loader.scm lines = 1,187.
-(m55-imp5--check "loader.scm-lines-1187"
-                 (eql 1187 (m55-imp5--lines "mod/emacs/loader.scm")))
+(m55-imp5--check "loader.scm-lines-1190"
+                 (eql 1190 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))

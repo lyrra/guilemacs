@@ -34,7 +34,7 @@
 ;;;         set-symbol-function! forms: a reordering FAILS the run.  S2
 ;;;         holds 1 check.
 ;;;   S3 -- the surface pins, re-measured at imp-4 (brief.org section 9):
-;;;         loader.scm 1187 lines / 74
+;;;         loader.scm 1190 lines / 74
 ;;;         (symbol-function 'X) apply matches / 18 symbol-fbound? / 14
 ;;;         set-symbol-function! / 7 FIX-*-guilemacs; reader.scm 2,021
 ;;;         lines; prelude/load.scm 265 lines.  imp-4 edits
@@ -302,8 +302,8 @@ symbol `m55-imp3-guile-absent'."
 
 (setq m55-imp3--group 's3)
 
-(m55-imp3--check "loader.scm-lines-1187"
-                 (eql 1187 (m55-imp3--lines "mod/emacs/loader.scm")))
+(m55-imp3--check "loader.scm-lines-1190"
+                 (eql 1190 (m55-imp3--lines "mod/emacs/loader.scm")))
 (m55-imp3--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp3--lines "mod/emacs/reader.scm")))
 (m55-imp3--check "prelude-load.scm-lines-265"

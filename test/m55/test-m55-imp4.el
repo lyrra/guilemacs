@@ -35,7 +35,8 @@
 ;;;         CALLS it (F2), and `let' RESTORES its binding (F4).  The
 ;;;         side-effect check FAILS when the loader only READS the file.
 ;;;         A second subprocess loads a BROKEN file and pins that the
-;;;         evaluator raises void-function (F3).  S1 holds 6 checks.
+;;;         evaluator raises void-function (F3), and error exits restore
+;;;         both `let' and lambda bindings.  S1 holds 8 checks.
 ;;;   S2 -- the route and the cells (brief.org sections 5 and 6).  The
 ;;;         source-reading branch in load-elisp-full: the compiler-absent
 ;;;         test (elisp-loader-compiler-available?), which catches ONLY
@@ -302,6 +303,29 @@ PATH."
             prelude file)))
       (ignore-errors (delete-file file)))))
 
+(defun m55-imp4--plain-guile-error-binding-output (body)
+  "Load BODY after setting a dynamic variable, then report its value."
+  (let ((file (make-temp-file "m55-imp4-unwind-" nil ".el"))
+        (prelude (expand-file-name "prelude" m55-imp4--root)))
+    (unwind-protect
+        (progn
+          (with-temp-file file
+            (insert "(setq m55-imp4-error-binding 1)\n" body "\n"))
+          (m55-imp4--run-guile
+           (format
+            (concat
+             "(use-modules (emacs loader))"
+             "(use-modules (emacs-elisp runtime))"
+             "(define el (module-ref (resolve-module '(emacs loader)) 'elisp-load))"
+             "(init-loader \"%s\")"
+             "(catch #t (lambda () (el \"%s\" #nil #nil #nil #nil))"
+             "  (lambda (k . a) (display \"M55-IMP4-UNWIND-FAULT:\")"
+             "    (display k) (newline)))"
+             "(display \"M55-IMP4-UNWIND-VALUE:\")"
+             "(write (symbol-value 'm55-imp4-error-binding)) (newline)")
+            prelude file)))
+      (ignore-errors (delete-file file)))))
+
 (defun m55-imp4--contains-marker-p (out marker)
   "Non-nil when the subprocess output OUT holds MARKER.  OUT may be the
 symbol `m55-imp4-guile-absent'."
@@ -369,6 +393,30 @@ symbol `m55-imp4-guile-absent'."
                            bad "M55-IMP4-BAD-OUTCOME:FAULT:void-function")
                           (not (m55-imp4--contains-marker-p
                                 bad "M55-IMP4-BAD-OUTCOME:LOAD-OK"))))))
+
+;; Binding cleanup must run when evaluation exits through an error.
+(dolist (case
+         (list
+          (cons "let"
+                (m55-imp4--plain-guile-error-binding-output
+                 (concat "(let ((m55-imp4-error-binding 99)) "
+                         "(m55-imp4-undefined-fn 1))")))
+          (cons "lambda"
+                (m55-imp4--plain-guile-error-binding-output
+                 (concat "(defun m55-imp4-error-lambda "
+                         "(m55-imp4-error-binding) "
+                         "(m55-imp4-undefined-fn 1))\n"
+                         "(m55-imp4-error-lambda 99)")))))
+  (let ((name (car case)) (out (cdr case)))
+    (if (eq out 'm55-imp4-guile-absent)
+        (m55-imp4--info-skip (format "unwind-%s-restores" name)
+                             "no guile binary on PATH")
+      (m55-imp4--check
+       (format "unwind-%s-restores" name)
+       (and (m55-imp4--contains-marker-p
+             out "M55-IMP4-UNWIND-FAULT:void-function")
+            (m55-imp4--contains-marker-p
+             out "M55-IMP4-UNWIND-VALUE:1"))))))
 
 ;;; --- S2. The route and the cells (brief.org sections 5 and 6) -------
 
@@ -473,8 +521,8 @@ symbol `m55-imp4-guile-absent'."
 
 (setq m55-imp4--group 's3)
 
-(m55-imp4--check "loader.scm-lines-1187"
-                 (eql 1187 (m55-imp4--lines "mod/emacs/loader.scm")))
+(m55-imp4--check "loader.scm-lines-1190"
+                 (eql 1190 (m55-imp4--lines "mod/emacs/loader.scm")))
 (m55-imp4--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp4--lines "mod/emacs/reader.scm")))
 (m55-imp4--check "prelude-load.scm-lines-265"
@@ -516,23 +564,23 @@ symbol `m55-imp4-guile-absent'."
 
 ;; An --filter that matches no group already reports exit 0 with 0
 ;; tests, so a green m55 gate proves nothing until the corpus exists and
-;; its checks really register.  S1 holds 6 checks, S2 holds 8, S3 holds
+;; its checks really register.  S1 holds 8 checks, S2 holds 8, S3 holds
 ;; 7, and S4 holds 4.
 
 (setq m55-imp4--group 's5)
 
-(m55-imp4--check "reg/min-s1-checks-6" (>= (m55-imp4--group-count 's1) 6))
+(m55-imp4--check "reg/min-s1-checks-8" (>= (m55-imp4--group-count 's1) 8))
 (m55-imp4--check "reg/min-s2-checks-8" (>= (m55-imp4--group-count 's2) 8))
 (m55-imp4--check "reg/min-s3-checks-7" (>= (m55-imp4--group-count 's3) 7))
 (m55-imp4--check "reg/min-s4-checks-4" (>= (m55-imp4--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m55-imp4 tests is 30: 29 registered checks
-;; (S1 6, S2 8, S3 7, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m55-imp4 tests is 32: 31 registered checks
+;; (S1 8, S2 8, S3 7, S4 4, S5 4) plus the group-total deftest itself.
 
-(defvar m55-imp4--min-gate-total 30
-  "The exact number of m55-imp4 ERT tests: 29 registered checks (S1 6,
+(defvar m55-imp4--min-gate-total 32
+  "The exact number of m55-imp4 ERT tests: 31 registered checks (S1 8,
 S2 8, S3 7, S4 4, S5 4) plus the group-total deftest itself.")
 
 (ert-deftest m55-imp4/gate-m55-total ()

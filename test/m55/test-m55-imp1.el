@@ -14,7 +14,7 @@
 ;;;
 ;;;   S1 -- the re-measured surface of brief.org section 4, re-measured
 ;;;         at imp-2 when it edits the loader.  S1 holds 9
-;;;         checks: mod/emacs/loader.scm 1187 lines / 74 (symbol-function
+;;;         checks: mod/emacs/loader.scm 1190 lines / 74 (symbol-function
 ;;;         'X) apply sites / 18 symbol-fbound? guards / 14
 ;;;         set-symbol-function! sites / 7 FIX-*-guilemacs markers;
 ;;;         mod/emacs/reader.scm 2,021 lines; prelude/load.scm 265 lines
@@ -301,8 +301,8 @@ symbol `m55-imp1-guile-absent'."
 
 (setq m55-imp1--group 's1)
 
-(m55-imp1--check "loader.scm-lines-1187"
-                 (eql 1187 (m55-imp1--lines "mod/emacs/loader.scm")))
+(m55-imp1--check "loader.scm-lines-1190"
+                 (eql 1190 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
 (m55-imp1--check "prelude-load.scm-lines-265"

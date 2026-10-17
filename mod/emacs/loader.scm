@@ -1020,9 +1020,10 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
 (define (elisp-loader-make-procedure params body)
   (lambda args
     (let ((restore (elisp-loader-bind-params! params args)))
-      (let ((result (elisp-loader-eval-seq body)))
-        (for-each (lambda (thunk) (thunk)) restore)
-        result))))
+      (dynamic-wind
+        (lambda () #t)
+        (lambda () (elisp-loader-eval-seq body))
+        (lambda () (for-each (lambda (thunk) (thunk)) restore))))))
 
 (define (elisp-loader-eval-form form)
   (let ((head (car form)))
@@ -1052,9 +1053,11 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
                                    (elisp-loader-eval (cadr binding))
                                    #nil)))
                             (cadr form)))
-              (result (elisp-loader-eval-seq (cddr form))))
-         (for-each (lambda (thunk) (thunk)) restore)
-         result))
+              (body (cddr form)))
+         (dynamic-wind
+           (lambda () #t)
+           (lambda () (elisp-loader-eval-seq body))
+           (lambda () (for-each (lambda (thunk) (thunk)) restore)))))
       ((eq? head 'lambda)
        (elisp-loader-make-procedure (cadr form) (cddr form)))
       ;; F2 (cr.org section 4): `defun' lets a loaded file DEFINE a
