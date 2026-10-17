@@ -1,7 +1,7 @@
 ;;; test-m58-imp1.el --- M58 imp-1 remaining TTY policy surface audit corpus.
 ;;;
-;;; M58 imp-1 is the remaining TTY policy-surface AUDIT (brief.org
-;;; section 1).  It is docs only: the C delta is 0 and the Scheme delta
+;;; M58 imp-1 is the remaining TTY policy-surface AUDIT
+;;; (docs/m58-plan.org).  It is docs only: the C delta is 0 and the Scheme delta
 ;;; is 0.  It walks every remaining movable TTY policy and state path in
 ;;; src/term.c, re-checks the C3 elisp-compiler boundary, classes each
 ;;; path MOVE / STAYS C / NOT PROVEN, and records the A1 / A2 verdict
@@ -14,11 +14,11 @@
 ;;;
 ;;; It pins these groups:
 ;;;
-;;;   S1 -- the re-measured surface of brief.org section 3 (the base
+;;;   S1 -- the re-measured surface of docs/m58-plan.org (the base
 ;;;         fca28d3be as an ANCESTOR of HEAD, and the src/term.c /
 ;;;         src/termchar.h / mod/emacs/tty-output.scm / pty-driver.py
 ;;;         numbers).  S1 holds 9 checks.
-;;;   S2 -- the row map of brief.org section 5: group A (the
+;;;   S2 -- the row map of docs/m58-plan.org: group A (the
 ;;;         face-appearance policy), group B (the color-mode policy),
 ;;;         group C (the cost policy), group D (the init policy),
 ;;;         group E (the C-mechanism blocks), group F (the read-only
@@ -29,7 +29,7 @@
 ;;;         PTY through test/pty-driver.py, so init_tty runs the TTY
 ;;;         sites.  On a result that is neither PASS nor INFO the check
 ;;;         RETRIES the driver once, then prints both runs when the
-;;;         retry still fails (brief.org section 7).  A missing built
+;;;         retry still fails (docs/m58-plan.org).  A missing built
 ;;;         src/emacs or PTY is an explicit INFO skip.  S3 holds 2.
 ;;;   S4 -- the registration: the corpus is registered in the (m58)
 ;;;         group of tool/run-tests.scm, after the (m57) group, and the
@@ -46,7 +46,7 @@
 ;;; only pass or skip, so a record check proves nothing.
 ;;;
 ;;; A read error is a real error, never a silent pass.  An absent
-;;; TRACKED file is a real FAIL, not a pass (brief.org section 8).  A
+;;; TRACKED file is a real FAIL, not a pass (docs/m58-plan.org).  A
 ;;; missing `git', `python3', `guile' binary or a missing PTY is an
 ;;; explicit INFO skip, never a pass.  Every check registers a real ERT
 ;;; test via imp-register-bool-as-ert-test, so the harness parses the
@@ -92,7 +92,7 @@ the symbol `m58-imp1-absent' when REL does not exist."
 (defun m58-imp1--contains-p (rel needle)
   "Non-nil when the TRACKED file REL contains NEEDLE.  An absent file
 folds to nil, so a check prints FAIL: an absent TRACKED file is a real
-error, not a pass (brief.org section 8)."
+error, not a pass (docs/m58-plan.org)."
   (let ((hit (m58-imp1--with rel
                (lambda ()
                  (goto-char (point-min))
@@ -109,6 +109,45 @@ once, so a multi-needle check does not re-read the file per needle."
           (goto-char (point-min))
           (unless (search-forward needle nil t) (setq all nil)))
         all))))
+
+(defun m58-imp1--live-p (rel needle)
+  "Non-nil when the TRACKED file REL holds NEEDLE on a line that is NOT
+commented out.  A plain `contains-p' match also passes when the line is
+commented out, and a commented line registers no test (cr.org F4), so
+this skips a line whose first non-blank character is `;'."
+  (m58-imp1--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (let ((hit nil))
+        (while (and (not hit) (search-forward needle nil t))
+          (setq hit (save-excursion
+                      (goto-char (line-beginning-position))
+                      (not (looking-at-p "[ \t]*;")))))
+        hit))))
+
+(defun m58-imp1--pty-case-pins ()
+  "Read the `test/pty-driver.py' case-count pins as (TOTAL . SUM).
+TOTAL is the `total-case-count' pin; SUM is the sum of the per-group
+`-case-count' pins.  Return nil when a pin is absent.  A plain string
+search for the pin line proves nothing about the number of cases
+(cr.org F5), so the corpus checks the two numbers agree and that TOTAL
+is the re-pinned value."
+  (m58-imp1--with "test/pty-driver.py"
+    (lambda ()
+      (goto-char (point-min))
+      (let ((total nil) (sum 0) (n 0))
+        ;; ONE bracket expression, no `\|' alternation in the pattern.
+        ;; Each pin number is read in the same `let' init that runs the
+        ;; search, so the match data is read right after the match.
+        (while (re-search-forward "check(\"\\([a-z0-9-]*-case-count\\)\", " nil t)
+          (let ((name (match-string 1))
+                (pin (progn (re-search-forward "), \\([0-9]+\\))" nil t)
+                           (match-string 1))))
+            (if (string= name "total-case-count")
+                (setq total (string-to-number (or pin "0")))
+              (setq sum (+ sum (string-to-number (or pin "0"))))
+              (setq n (1+ n)))))
+        (and total (> n 0) (cons total sum))))))
 
 (defun m58-imp1--ordered-p (rel needles)
   "Non-nil when the TRACKED file REL holds every NEEDLE in the GIVEN
@@ -161,11 +200,11 @@ to nil and the check FAILS."
 (defun m58-imp1--count-defun-leaf (rel)
   "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
 with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 3)."
+also occurs in a sibling docstring (docs/m58-plan.org)."
   (m58-imp1--count rel "^DEFUN (\"--tty-"))
 
 (defun m58-imp1--count-scm-ref ()
-  "Count scm_c_public_ref over src/*.[ch] (the brief.org section 3
+  "Count scm_c_public_ref over src/*.[ch] (the docs/m58-plan.org
 tree-wide measure, `grep -rc scm_c_public_ref src/*.c src/*.h').  The
 selector is .c and .h ONLY, to match the brief command; the .m files
 (Objective-C, out of scope) are not read."
@@ -226,15 +265,15 @@ pass."
 
 (defun m58-imp1--info-skip (name reason)
   "Register one explicit INFO skip, counted into the current group.  A
-host limit is a skip, never a pass (brief.org section 7)."
+host limit is a skip, never a pass (docs/m58-plan.org)."
   (princ (format "INFO m58/imp1/%s %s\n" name reason))
   (setq m58-imp1--registered (1+ m58-imp1--registered))
   (m58-imp1--bump-group)
   (imp-register-skip-as-ert-test (format "m58-imp1/%s" name) reason))
 
-;;; --- S1. The measured surface (brief.org section 3) -----------------
+;;; --- S1. The measured surface (docs/m58-plan.org) -----------------
 
-;; One check per row of brief.org section 3.  Row 1 (HEAD) checks that
+;; One check per row of docs/m58-plan.org.  Row 1 (HEAD) checks that
 ;; the base commit is an ANCESTOR of the running HEAD: a committed
 ;; corpus cannot pin HEAD to a literal, because HEAD moves to the imp
 ;; commit.  A missing `git' is an explicit INFO skip, never a pass.  The
@@ -265,10 +304,14 @@ host limit is a skip, never a pass (brief.org section 7)."
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m58-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
 (m58-imp1--check "pty-driver-cases-25"
-                 (m58-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 25"))
+                 (let ((pins (m58-imp1--pty-case-pins)))
+                   (and (consp pins)
+                        (eql 25 (car pins))
+                        ;; The group pins must add up to the total, so a
+                        ;; group pin that moves without the total FAILS.
+                        (eql (car pins) (cdr pins)))))
 
-;;; --- S2. The row map (brief.org section 5) --------------------------
+;;; --- S2. The row map (docs/m58-plan.org) --------------------------
 
 ;; The row map groups the remaining TTY policy and state paths by the
 ;; kind of decision they hold.  One check per group, against the TRACKED
@@ -383,7 +426,7 @@ host limit is a skip, never a pass (brief.org section 7)."
                  (m58-imp1--contains-p "src/term.c"
                                        "no Guile port owns a FILE *"))
 
-;;; --- S3. The real tty init path (brief.org section 5) ---------------
+;;; --- S3. The real tty init path (docs/m58-plan.org) ---------------
 
 ;; The module-load probe is NOT proof.  The real path is the built
 ;; src/emacs on a real PTY: test/pty-driver.py boots the child emacs,
@@ -429,15 +472,15 @@ host limit is a skip, never a pass (brief.org section 7)."
 (setq m58-imp1--group 's4)
 
 (m58-imp1--check "run-tests-m58-imp1"
-                 (m58-imp1--contains-p "tool/run-tests.scm"
-                                       "test/m58/test-m58-imp1.el"))
+                 (m58-imp1--live-p "tool/run-tests.scm"
+                                   "test/m58/test-m58-imp1.el"))
 (m58-imp1--check "run-tests-m58-group"
-                 (m58-imp1--contains-p "tool/run-tests.scm" "(group (m58)"))
+                 (m58-imp1--live-p "tool/run-tests.scm" "(group (m58)"))
 (m58-imp1--check "run-tests-m58-after-m57"
                  (m58-imp1--ordered-p "tool/run-tests.scm"
                                       '("(group (m57)" "(group (m58)")))
 (m58-imp1--check "run-tests-m57-present"
-                 (m58-imp1--contains-p "tool/run-tests.scm" "(group (m57)"))
+                 (m58-imp1--live-p "tool/run-tests.scm" "(group (m57)"))
 
 ;;; --- S5. The guards -------------------------------------------------
 
