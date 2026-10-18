@@ -228,8 +228,8 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (setq m52-imp9--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m52-imp9--check "term.c-lines-6214"
-                 (eql 6214 (m52-imp9--lines "src/term.c")))
+(m52-imp9--check "term.c-lines-6363"
+                 (eql 6363 (m52-imp9--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m52-imp9--check "term.c-defun-count-29"
                  (eql 29 (m52-imp9--count "src/term.c" "^DEFUN (")))
@@ -241,11 +241,11 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "term.c-fwrite-count-10"
                  (eql 10 (m52-imp9--count "src/term.c" "fwrite (")))
 ;; Row 5: src/term.c scm_c_public_ref sites = 36.
-(m52-imp9--check "term.c-scm-ref-36"
-                 (eql 36 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
+(m52-imp9--check "term.c-scm-ref-39"
+                 (eql 39 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
 ;; Row 6: mod/emacs/tty-output.scm lines = 454.
-(m52-imp9--check "tty-output.scm-lines-454"
-                 (eql 454 (m52-imp9--lines "mod/emacs/tty-output.scm")))
+(m52-imp9--check "tty-output.scm-lines-635"
+                 (eql 637 (m52-imp9--lines "mod/emacs/tty-output.scm")))
 ;; Row 7: the 34 #:export names of the module, one check per name.
 ;; The 8 M54 names (tty-write-verdict, tty-termscript-copy-handle,
 ;; tty-tab-verdict, and the tty-out-handle accessors) come first, then the
@@ -277,12 +277,12 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "load.scm-use-modules"
                  (m52-imp9--contains-p "prelude/load.scm"
                                        "(use-modules (emacs tty-output))"))
-;; Row 9: the m52_caps table of src/term.c holds 30 keys.
-(m52-imp9--check "m52-caps-rows-30"
-                 (eql 30 (m52-imp9--caps-row-count)))
+;; Row 9: the m52_caps table of src/term.c holds 37 keys (M58 imp-3 added 7 face keys).
+(m52-imp9--check "m52-caps-rows-37"
+                 (eql 37 (m52-imp9--caps-row-count)))
 ;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m52-imp9--check "tree-wide-scm-ref-260"
-                 (eql 260 (m52-imp9--count-scm-ref)))
+(m52-imp9--check "tree-wide-scm-ref-263"
+                 (eql 263 (m52-imp9--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 3.3) -------------------
 
@@ -308,7 +308,7 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "pty-driver-total-26"
                  (m52-imp9--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 26"))
+                  "\"total-case-count\", len(CASES), 31"))
 
 ;;; --- S3. The guards (brief.org section 3.4) -------------------------
 

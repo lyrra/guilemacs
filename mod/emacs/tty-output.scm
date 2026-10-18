@@ -81,7 +81,8 @@
             tty-clear-to-end-steps tty-clear-frame-steps
             tty-clear-end-of-line-steps
             tty-set-terminal-window-steps tty-set-scroll-region-steps
-            tty-delete-glyphs-steps tty-ins-del-lines-steps))
+            tty-delete-glyphs-steps tty-ins-del-lines-steps
+            tty-face-on-steps tty-face-off-steps tty-capable-p))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -452,3 +453,185 @@
         (cond ((not (zero? has-multi))  (list "multi" i))
               ((not (zero? has-single)) (list "single" i))
               (else (list "scroll" i (- specified-window vpos)))))))
+
+;; --- M58 imp-3: the Group A face-appearance DECISION -----------------
+;;
+;; FIX-20261018-guilemacs: M58 imp-3 -- the face-appearance DECISION of
+;; src/term.c moves to this module.  Three C hubs hold the decision
+;; today: turn_on_face, turn_off_face, and tty_capable_p.  C keeps every
+;; MECHANISM and passes PLAIN values only:
+;;
+;;   stays C (mechanism)          | C passes
+;;   -----------------------------+-----------------------------------
+;;   the struct face field reads  | the plain attrs mask
+;;   MAY_USE_WITH_COLORS_P        | the plain `may' mask
+;;   the TS_* / TF_* / TN_* reads | the plain `cap' presence mask
+;;   strcmp (me, se)              | the plain me-is-end-standout flag
+;;   face_tty_specified_color     | folded into the `cap' mask
+;;   tparam                       | the plain color number
+;;   OUTPUT / OUTPUT1 / OUTPUT_IF | the step list below
+;;   tty_toggle_highlight         | the ("toggle-highlight") step
+;;   the standout_mode clear      | the ("clear-standout") step
+;;   the FILE * streams, fwrite   | nothing crosses the seam
+;;
+;; The step protocol extends the M52 vocabulary.  Every step is a plain
+;; list (TAG ARG...); C tells the tags apart with m52_tty_step_tag_p:
+;;
+;;   ("cap1" KEY)      OUTPUT1_IF (tty, m52_cap_string_1 (tty, KEY))
+;;   ("cap" KEY)       OUTPUT_IF  (tty, m52_cap_string_1 (tty, KEY))
+;;   ("tparam" SLOT V) tparam, OUTPUT, xfree
+;;   ("toggle-highlight")  tty_toggle_highlight (tty)
+;;   ("clear-standout")    tty->standout_mode = 0
+;;
+;; SLOT: 0 = TS_set_foreground, 1 = TS_set_background,
+;;       2 = TF_set_underline_color, 3 = TF_set_underline_style.
+;;
+;; OUTPUT and OUTPUT1 are NOT interchangeable: OUTPUT pads with
+;; FRAME_TOTAL_LINES - curY, OUTPUT1 uses 1 line (brief.org section
+;; 5.1 rule 1).  The KEY therefore carries its macro: ("cap" KEY) is the
+;; frame-padded route, ("cap1" KEY) is the 1-line route.  Every KEY
+;; MUST match a m52_caps key byte for byte; a mismatch makes
+;; m52_cap_string_1 return NULL and the hub emits nothing (a silent byte
+;; change).
+;;
+;; The masks are plain fixnums.  NEVER duplicate a C enum or a sentinel
+;; value here: C makes every compare and passes plain results.
+;;
+;;   attrs:  1 bold, 2 italic, 4 underline, 8 strike-through, 16 reverse
+;;   may:    1 reverse, 2 bold, 4 italic, 8 underline, 16 strike-through
+;;           (the MAY_USE_WITH_COLORS_P results, evaluated in C)
+;;   cap:    1 TS_enter_italic_mode, 2 TF_set_underline_style,
+;;           16 foreground specified AND its slot string present,
+;;           32 background specified AND its slot string present,
+;;           64 TF_set_underline_color AND a face underline color,
+;;           128 the plain underline route (the underline style is
+;;           FACE_UNDERLINE_SINGLE, or the terminal holds no style
+;;           capability)
+;;
+;; face->foreground / face->background / face->underline_color hold the
+;; 3 sentinels FACE_TTY_DEFAULT_* (src/dispextern.h) as (unsigned long)
+;; -1 ... -3, i.e. 0xFFFFFFFFFFFFFFFF on a 64-bit host.  A sentinel does
+;; NOT fit in a fixnum, so it NEVER crosses this seam: C tests it
+;; (face_tty_specified_color), folds the answer into the cap mask, and
+;; passes 0 in place of the sentinel.  A number below is always a real
+;; color.  Scheme copies no sentinel and no C enum.
+
+;; The step list of turn_on_face.  ARGS is ONE plain list:
+;;   (reverse attrs underline may cap colors standout fg bg underline-color)
+;; Ten fixnums exceed the 9-argument SCM_CALL_N form, so C passes one
+;; list.  The ORDER is the original C order: reverse FIRST, because
+;; TS_end_standout_mode may equal TS_exit_attribute_mode.  UNDERLINE is
+;; the plain face->underline value, used as the tparam argument only.
+(define (tty-face-on-steps args)
+  (define (bit? mask n) (not (zero? (logand mask n))))
+  (let ((reverse   (list-ref args 0))
+        (attrs     (list-ref args 1))
+        (underline (list-ref args 2))
+        (may       (list-ref args 3))
+        (cap       (list-ref args 4))
+        (colors    (list-ref args 5))
+        (standout  (list-ref args 6))
+        (fg        (list-ref args 7))
+        (bg        (list-ref args 8))
+        (underline-color (list-ref args 9)))
+    (append
+     ;; Reverse video FIRST.
+     (if (and (bit? may 1) (not (zero? reverse)))
+         (list (list "toggle-highlight"))
+         '())
+     (if (and (bit? attrs 1) (bit? may 2))
+         (list (list "cap1" "bold"))
+         '())
+     ;; Italics are unavailable on many terminals: map the slant to dim.
+     (if (and (bit? attrs 2) (bit? may 4))
+         (list (list "cap1" (if (bit? cap 1) "italic" "dim")))
+         '())
+     ;; A single underline uses the plain capability; any other style
+     ;; needs the parameterized string.
+     (if (and (bit? attrs 4) (bit? may 8))
+         (list (if (bit? cap 128)
+                   (list "cap1" "underline")
+                   (list "tparam" 3 underline)))
+         '())
+     (if (and (bit? attrs 8) (bit? may 16))
+         (list (list "cap1" "strike-through"))
+         '())
+     ;; The color steps run only when the terminal has colors.  The
+     ;; foreground and background slots SWAP while standout is on.
+     (if (zero? colors)
+         '()
+         (append
+          (if (bit? cap 16)
+              (list (list "tparam" (if (zero? standout) 0 1) fg))
+              '())
+          (if (bit? cap 32)
+              (list (list "tparam" (if (zero? standout) 1 0) bg))
+              '())
+          (if (bit? cap 64)
+              (list (list "tparam" 2 underline-color))
+              '()))))))
+
+;; The step list of turn_off_face.  Seven plain fixnums:
+;;   has-me attrs has-exit-underline me-is-end-standout colors
+;;   fg-not-default bg-not-default
+;; The exit sequence comes BEFORE the color reset.  C keeps the
+;; standout_mode clear; Scheme decides when the ("clear-standout") step
+;; is present.
+(define (tty-face-off-steps has-me attrs has-exit-underline
+                            me-is-end-standout colors
+                            fg-not-default bg-not-default)
+  (append
+   (if (not (zero? has-me))
+       ;; "me" turns off double-bright, half-bright, reverse, standout,
+       ;; and underline.  Emit it only when a face attribute is on.
+       (if (zero? attrs)
+           '()
+           (append (list (list "cap1" "exit-attribute"))
+                   (if (zero? me-is-end-standout)
+                       '()
+                       (list (list "clear-standout")))))
+       ;; Without "me" only the appearances that have an exit sequence
+       ;; work.  The C source tests face->underline (src/term.c
+       ;; :2352 ... :2358) and OUTPUT_IF tests the string, so BOTH the
+       ;; underline bit of attrs and the plain presence flag must hold.
+       ;; Testing has-exit-underline alone emits the underline exit
+       ;; string for a face that holds no underline -- a silent byte
+       ;; change on a terminal without "me" (brief.org S2 point 4).
+       (if (or (zero? (logand attrs 4)) (zero? has-exit-underline))
+           '()
+           (list (list "cap" "exit-underline"))))
+   ;; Switch back to the default colors.
+   (if (and (not (zero? colors))
+            (or (not (zero? fg-not-default))
+                (not (zero? bg-not-default))))
+       (list (list "cap1" "orig-pair"))
+       '())))
+
+;; The verdict of tty_capable_p.  Four plain fixnums:
+;;   caps presence no-color-video max-colors
+;; CAPS holds the requested TTY_CAP_* bits, PRESENCE the matching "the
+;; TS_* / TF_* string is present" bits, NO-COLOR-VIDEO the TN_no_color_video
+;; bits, and MAX-COLORS the TN_max_colors count (0 = no color support).
+;; Return the plain fixnum 0 (not capable) or 1 (capable).
+;;
+;; The table below is the C TTY_CAPABLE_P_TRY chain of src/term.c, one
+;; row per check: the requested bit, the presence bit, and the
+;; enum no_color_bit value.  C keeps the field reads and passes the
+;; masks.
+(define (tty-capable-p caps presence no-color-video max-colors)
+  (define (may-use? nc-bit)
+    ;; MAY_USE_WITH_COLORS_P: colors > 0 means the NC bit decides.
+    (or (<= max-colors 0) (zero? (logand no-color-video nc-bit))))
+  (define (blocked? cap-bit presence-bit nc-bit)
+    (and (not (zero? (logand caps cap-bit)))
+         (or (zero? (logand presence presence-bit))
+             (not (may-use? nc-bit)))))
+  (if (or (blocked? #x01 #x01 #x04)   ; TTY_CAP_INVERSE          NC_REVERSE
+          (blocked? #x02 #x02 #x02)   ; TTY_CAP_UNDERLINE        NC_UNDERLINE
+          (blocked? #x02 #x04 #x02)   ; TTY_CAP_UNDERLINE_STYLED NC_UNDERLINE
+          (blocked? #x04 #x08 #x20)   ; TTY_CAP_BOLD             NC_BOLD
+          (blocked? #x08 #x10 #x10)   ; TTY_CAP_DIM              NC_DIM
+          (blocked? #x10 #x20 #x08)   ; TTY_CAP_ITALIC           NC_ITALIC
+          (blocked? #x20 #x40 #x40))  ; TTY_CAP_STRIKE_THROUGH   NC_STRIKE_THROUGH
+      0
+      1))

@@ -183,20 +183,20 @@ host limit is a skip, never a pass (brief.org section 2)."
                  (m56-imp2--contains-p "test/pty-driver.py" "M56_IMP2_CASES = ("))
 (m56-imp2--check "cases-entry"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py" "+ M56_IMP2_CASES + M58_IMP2_CASES)"))
+                  "test/pty-driver.py" "+ M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES)"))
 (m56-imp2--check "groups-entry"
                  ;; M58 follows this entry.  Pin the adjacent pair inside
                  ;; GROUPS, not the earlier m56 case declaration.
                  (m56-imp2--contains-p
                   "test/pty-driver.py"
-                  "\"m56-imp2\",\n          \"m58-imp2\")"))
+                  "\"m58-imp2\", \"m58-imp3\")"))
 (m56-imp2--check "selftest-pins"
                  (and (m56-imp2--contains-p
                        "test/pty-driver.py"
                        "\"m56-imp2-case-count\", len(group_cases(\"m56-imp2\")), 1")
                       (m56-imp2--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 26")))
+                       "\"total-case-count\", len(CASES), 31")))
 (m56-imp2--check "output-span"
                  (m56-imp2--contains-p
                   "test/pty-driver.py"

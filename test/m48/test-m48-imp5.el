@@ -154,9 +154,9 @@ FAIL with no ERT test would leave the exit code 0."
                  (let ((lines (m48-imp5--lines "src/term.c"))
                        (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
                        (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 6214 lines)
+                   (and (integerp lines) (eql 6363 lines)
                         (integerp defuns) (eql 29 defuns)
-                        (integerp refs) (eql 36 refs))))
+                        (integerp refs) (eql 39 refs))))
 (m48-imp5--check "term.c-guile.h-at-48"
                  (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))
 (m48-imp5--check "term.c-leaves-6"
@@ -167,7 +167,7 @@ FAIL with no ERT test would leave the exit code 0."
 (m48-imp5--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
 (m48-imp5--check "tree-wide-scm-public-ref-260"
-                 (eql 260 (m48-imp5--count-scm-ref)))
+                 (eql 263 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
                  (let ((lines (m48-imp5--lines "src/keyboard.c"))
                        (defuns (m48-imp5--count "src/keyboard.c" "^DEFUN (\"")))

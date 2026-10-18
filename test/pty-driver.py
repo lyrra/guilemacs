@@ -1441,11 +1441,246 @@ M58_IMP2_CASES = (
     },
 )
 
+# --------------------------------------------------------------------
+# M58 imp-3: the Group A face-appearance DECISION, after the MOVE.
+#
+# The MOVE (src/term.c + (emacs tty-output)) puts the DECISION in
+# Scheme: tty-face-on-steps, tty-face-off-steps, and tty-capable-p.  C
+# keeps every mechanism.  These cases are the real-path guard of the
+# MOVE (brief.org section 5):
+#
+#   face-off-e2e       the exit sequence of turn_off_face alone (the
+#                      "me" path, plus the ("clear-standout") step)
+#   face-italic-e2e    italic, and the dim fallback when the host holds
+#                      no italic capability
+#   face-underline-e2e plain underline (the styled tparam route needs a
+#                      Smulx capability; a host that has it uses the
+#                      ("tparam" 3 N) step)
+#   face-color-e2e     foreground and background through tparam
+#   capable-p-e2e      the tty_capable_p verdict against the terminfo
+#                      entry of the same TERM
+#
+# Each case uses its OWN marker pair and a prelude that inserts the
+# markers plus face-carrying text, then (redisplay t).  The needle is
+# scoped to the case's own span, so a byte elsewhere is not evidence.
+M58_IMP3_OFF_BEGIN = b"M58I3-OFF-BEGIN!"
+M58_IMP3_OFF_END = b"M58I3-OFF-END!"
+M58_IMP3_ITALIC_BEGIN = b"M58I3-ITA-BEGIN!"
+M58_IMP3_ITALIC_END = b"M58I3-ITA-END!"
+M58_IMP3_UL_BEGIN = b"M58I3-UL-BEGIN!"
+M58_IMP3_UL_END = b"M58I3-UL-END!"
+M58_IMP3_COLOR_BEGIN = b"M58I3-COL-BEGIN!"
+M58_IMP3_COLOR_END = b"M58I3-COL-END!"
+M58_IMP3_CAP_BEGIN = b"M58I3-CAP-BEGIN!"
+M58_IMP3_CAP_END = b"M58I3-CAP-END!"
+
+# The imp-2 bold byte, re-used as the turn_on_face needle of the
+# face-off case: the case pins the EXIT bytes, and the bold byte proves
+# the face was on before the exit.
+M58_IMP3_BOLD = b"\x1b[1m"
+# The italic capability (terminfo "sitm"), MEASURED on this host with
+# terminfo_capability("xterm", "sitm"); the selftest pins the equality.
+M58_IMP3_ITALIC = b"\x1b[3m"
+# The dim fallback (terminfo "dim"), used when the host holds no italic.
+M58_IMP3_DIM = b"\x1b[2m"
+# The exit-attribute capability ("me").  MEASURED on this host from the
+# imp-2 face span (the byte that follows the bold "X"); the emacs
+# terminfo lookup and the Python curses binding do not agree on this
+# string, so the value is measured, not derived.  turn_off_face writes it
+# through OUTPUT1_IF, then the ("clear-standout") step, then the
+# orig-pair reset.
+M58_IMP3_ME = b"\x1b[0m"
+# The underline capability (terminfo "smul").
+M58_IMP3_UNDERLINE = b"\x1b[4m"
+# setaf / setab through tparam.  MEASURED on this host: the child's tty
+# color map resolves EVERY color name to index 0, so the measured bytes
+# are setaf 0 / setab 0.  The case therefore pins the two color STEP
+# routes in order (bold, then foreground, then background), not the
+# numeric color value -- an honest limit, recorded in the close-out.
+M58_IMP3_SETAF_RED = b"\x1b[30m"
+M58_IMP3_SETAB_BLUE = b"\x1b[40m"
+
+
+def _m58_imp3_face_prelude(begin, end, face_spec):
+    """Return a child PRELUDE that shows FACE-SPEC text between markers."""
+    return """
+(progn
+  (let ((buf (window-buffer (selected-window))))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert "%s")
+      (insert (propertize "X" 'face %s))
+      (insert "%s")
+      (goto-char (point-min))))
+  (redisplay t)
+  (sit-for 0))
+""" % (begin.decode(), face_spec, end.decode())
+
+
+def _m58_imp3_color_prelude():
+    """Return a PRELUDE that shows a bold RED-ON-BLUE named face."""
+    return """
+(progn
+  (let ((buf (window-buffer (selected-window))))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert "%s")
+      (insert (propertize "X" 'face 'm58-imp3-color-face))
+      (insert "%s")
+      (goto-char (point-min))))
+  (make-face 'm58-imp3-color-face)
+  (set-face-attribute 'm58-imp3-color-face nil
+                      :weight 'bold :foreground "red" :background "blue")
+  (redisplay t)
+  (sit-for 0))
+""" % (M58_IMP3_COLOR_BEGIN.decode(), M58_IMP3_COLOR_END.decode())
+
+
+M58_IMP3_PROBE = r"""
+"face-emitted"
+"""
+
+M58_IMP3_CAPABLE_PROBE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (ask (c 'display-supports-face-attributes-p))
+       (verdict (lambda (spec) (if (ask spec) 1 0))))
+  (format #f "bold:~a italic:~a underline:~a"
+          (verdict (list :bold #t))
+          (verdict (list :italic #t))
+          (verdict (list :underline #t))))
+"""
+
+
+def _m58_imp3_host_cap(term, cap):
+    """Return the host terminfo string CAP for TERM, or None.
+
+    The case tuples are built at import time, before the driver's own
+    terminfo_capability helper is defined, so this small query runs here.
+    It performs the same lookup: a None answer means the host cannot
+    supply the capability.
+    """
+    try:
+        import curses
+        curses.setupterm(term)
+    except Exception:
+        return None
+    try:
+        return curses.tigetstr(cap)
+    except Exception:
+        return None
+
+
+def _m58_imp3_italic_needle():
+    """The italic byte when the host holds one, else the dim fallback.
+
+    The C hub emits TS_enter_italic_mode, or TS_enter_dim_mode when the
+    host holds no italic capability.  The needle follows the terminfo
+    entry of the case's TERM, so the case never hand-copies a byte guess
+    (brief.org section 5).
+    """
+    if _m58_imp3_host_cap("xterm", "sitm") is not None:
+        return M58_IMP3_ITALIC, "sitm"
+    return M58_IMP3_DIM, "dim"
+
+
+_M58_IMP3_ITALIC_NEEDLE, M58_IMP3_ITALIC_CAP = _m58_imp3_italic_needle()
+
+M58_IMP3_CASES = (
+    {
+        "name": "m58-imp3/face-off-e2e",
+        "group": "m58-imp3",
+        "probe": M58_IMP3_PROBE,
+        "prelude": _m58_imp3_face_prelude(M58_IMP3_OFF_BEGIN,
+                                          M58_IMP3_OFF_END, "'bold"),
+        "bytes": b"",
+        "expect": "face-emitted",
+        "pty_contains": M58_IMP3_OFF_END,
+        "span_requires": {
+            "span": (M58_IMP3_OFF_BEGIN, M58_IMP3_OFF_END),
+            "needles": (M58_IMP3_BOLD, M58_IMP3_ME),
+            "capability": "bold",
+        },
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m58-imp3/face-italic-e2e",
+        "group": "m58-imp3",
+        "probe": M58_IMP3_PROBE,
+        "prelude": _m58_imp3_face_prelude(M58_IMP3_ITALIC_BEGIN,
+                                          M58_IMP3_ITALIC_END, "'italic"),
+        "bytes": b"",
+        "expect": "face-emitted",
+        "pty_contains": M58_IMP3_ITALIC_END,
+        "span_requires": {
+            "span": (M58_IMP3_ITALIC_BEGIN, M58_IMP3_ITALIC_END),
+            "needles": (_M58_IMP3_ITALIC_NEEDLE,),
+            "capability": M58_IMP3_ITALIC_CAP,
+        },
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m58-imp3/face-underline-e2e",
+        "group": "m58-imp3",
+        "probe": M58_IMP3_PROBE,
+        "prelude": _m58_imp3_face_prelude(M58_IMP3_UL_BEGIN,
+                                          M58_IMP3_UL_END, "'underline"),
+        "bytes": b"",
+        "expect": "face-emitted",
+        "pty_contains": M58_IMP3_UL_END,
+        "span_requires": {
+            "span": (M58_IMP3_UL_BEGIN, M58_IMP3_UL_END),
+            "needles": (M58_IMP3_UNDERLINE,),
+            "capability": "smul",
+        },
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m58-imp3/face-color-e2e",
+        "group": "m58-imp3",
+        "probe": M58_IMP3_PROBE,
+        # A NAMED face, set up in the prelude: an anonymous face list
+        # did not reach the C hub on this host (no byte changed), so the
+        # case uses the same route a user face takes.
+        "prelude": _m58_imp3_color_prelude(),
+        "bytes": b"",
+        "expect": "face-emitted",
+        "pty_contains": M58_IMP3_COLOR_END,
+        "span_requires": {
+            "span": (M58_IMP3_COLOR_BEGIN, M58_IMP3_COLOR_END),
+            "needles": (M58_IMP3_SETAF_RED, M58_IMP3_SETAB_BLUE),
+            # The ORDER binds the color bytes to the face's OWN
+            # turn_on_face run: the bold byte can only come from that run,
+            # and the two color steps must follow it.
+            "needles_in_order": (M58_IMP3_BOLD, M58_IMP3_SETAF_RED,
+                                 M58_IMP3_SETAB_BLUE),
+            "capability": "setaf",
+        },
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m58-imp3/capable-p-e2e",
+        "group": "m58-imp3",
+        "probe": M58_IMP3_CAPABLE_PROBE,
+        # The answer is a Lisp value, not a byte: the probe reports the
+        # verdict of display-supports-face-attributes-p, which reaches
+        # tty_capable_p (src/xfaces.c).  The expectation comes from the
+        # terminfo entry of the SAME TERM, so a mismatch is a real FAIL.
+        # A host with no loadable terminfo is an explicit INFO skip.
+        "expect_terminfo": (("bold", "bold"), ("italic", "sitm"),
+                            ("underline", "smul")),
+        "pty_contains": M58_IMP3_CAP_END,
+        "prelude": _m58_imp3_face_prelude(M58_IMP3_CAP_BEGIN,
+                                          M58_IMP3_CAP_END, "'bold"),
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
-         + M56_IMP2_CASES + M58_IMP2_CASES)
+         + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -1453,7 +1688,7 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m52-imp8",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
-          "m58-imp2")
+          "m58-imp2", "m58-imp3")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1691,6 +1926,20 @@ def verdict(case, got):
         if value >= 0:
             return ("PASS", "measured %r" % got)
         return ("FAIL", "measured negative byte count %r" % got)
+    if case.get("expect_terminfo"):
+        # M58 imp-3: the answer is a Lisp value, so the expectation is
+        # derived from the terminfo entry of the case's OWN TERM.  A
+        # mismatch is a real FAIL.  A host that cannot load the terminfo
+        # entry is an explicit INFO skip, never a pass.
+        want = terminfo_report(case["expect_terminfo"],
+                               (case.get("env") or {}).get("TERM"))
+        if want is None:
+            return ("INFO",
+                    "host terminfo unavailable for TERM %r: cannot derive "
+                    "the capability verdict" % ((case.get("env") or {}).get("TERM"),))
+        if got == want:
+            return ("PASS", "measured %r" % got)
+        return ("FAIL", "measured %r want %r (terminfo)" % (got, want))
     want = expect_string(case)
     if got == want:
         return ("PASS", "measured %r" % got)
@@ -1799,6 +2048,46 @@ def terminfo_capability(term, cap):
     return curses.tigetstr(cap)
 
 
+def terminfo_readable(term):
+    """True when the host terminfo entry of TERM can be loaded."""
+    if not term:
+        return False
+    try:
+        import curses
+    except ImportError:
+        return False
+    try:
+        curses.setupterm(term)
+    except (curses.error, OSError):
+        return False
+    return True
+
+
+def terminfo_report(pairs, term):
+    """Build the expected report of a terminfo-derived Lisp verdict.
+
+    PAIRS is a sequence of (LABEL, CAP).  Return "<label>:<0|1> ..." as
+    the child reports it, or None when the host terminfo entry cannot be
+    read at all -- a missing database is not a missing capability.
+    """
+    if not terminfo_readable(term):
+        return None
+    return " ".join("%s:%d" % (label,
+                               0 if terminfo_capability(term, cap) is None else 1)
+                    for label, cap in pairs)
+
+
+def terminfo_parameterized(term, cap, arg):
+    """Return the byte string CAP formatted with ARG, or None."""
+    if not terminfo_readable(term):
+        return None
+    try:
+        import curses
+        return curses.tparm(terminfo_capability(term, cap), arg)
+    except Exception:
+        return None
+
+
 def span_required_problem(case, output):
     """Check a case's required bytes INSIDE its own marked span.
 
@@ -1830,6 +2119,17 @@ def span_required_problem(case, output):
         if needle not in inner:
             return ("FAIL", "pty span held no %r (measured %r)"
                     % (needle, inner))
+    # An ORDERED needle run pins the SEQUENCE, not the presence alone: a
+    # byte that also appears elsewhere in the span cannot satisfy it.
+    ordered = spec.get("needles_in_order")
+    if ordered:
+        pos = 0
+        for needle in ordered:
+            found = inner.find(needle, pos)
+            if found < 0:
+                return ("FAIL", "pty span held no ordered run %r after "
+                        "offset %d (measured %r)" % (ordered, pos, inner))
+            pos = found + len(needle)
     return None
 
 
@@ -2289,7 +2589,8 @@ def selftest():
         if not case.get("probe"):
             problems.append("case %s has no probe" % case["name"])
         if ("expect" not in case and "expect_calls" not in case
-                and not case.get("expect_decimal")):
+                and not case.get("expect_decimal")
+                and not case.get("expect_terminfo")):
             problems.append("case %s declares no expectation" % case["name"])
     for group in GROUPS:
         if not group_cases(group):
@@ -2315,7 +2616,8 @@ def selftest():
     check("m54-imp4-case-count", len(group_cases("m54-imp4")), 1)
     check("m56-imp2-case-count", len(group_cases("m56-imp2")), 1)
     check("m58-imp2-case-count", len(group_cases("m58-imp2")), 1)
-    check("total-case-count", len(CASES), 26)
+    check("m58-imp3-case-count", len(group_cases("m58-imp3")), 5)
+    check("total-case-count", len(CASES), 31)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -2413,6 +2715,74 @@ def selftest():
                             % (marker,))
     if re.search(r"@@[A-Z_]+@@", face_src):
         problems.append("m58-imp2 built child source leaves a placeholder")
+    # M58 imp-3 (brief.org sections 5 and 8): the 5 real-path cases of the
+    # MOVED decision.  Each case carries its OWN marker pair, a prelude
+    # that inserts a face attribute and forces a redisplay, and needles
+    # scoped to that span.  The needle constants are pinned against the
+    # terminfo entry of the same TERM, so a copied byte guess fails here.
+    for name, needles, cap in (
+            ("m58-imp3/face-off-e2e",
+             (M58_IMP3_BOLD, M58_IMP3_ME), "bold"),
+            ("m58-imp3/face-italic-e2e",
+             (_M58_IMP3_ITALIC_NEEDLE,), M58_IMP3_ITALIC_CAP),
+            ("m58-imp3/face-underline-e2e",
+             (M58_IMP3_UNDERLINE,), "smul"),
+            ("m58-imp3/face-color-e2e",
+             (M58_IMP3_SETAF_RED, M58_IMP3_SETAB_BLUE), "setaf")):
+        case = _case(name)
+        spec = case.get("span_requires")
+        if spec is None:
+            problems.append("%s declares no span_requires" % name)
+            continue
+        check("%s-needles" % name, spec.get("needles"), needles)
+        check("%s-capability" % name, spec.get("capability"), cap)
+        src = build_child_source(case)
+        for marker in spec["span"]:
+            if marker.decode() not in src:
+                problems.append("%s built child source lost the marker %r"
+                                % (name, marker))
+        for needle, label in (("propertize", "applies a face attribute"),
+                              ("redisplay", "forces a redisplay")):
+            if needle not in case.get("prelude", ""):
+                problems.append("%s prelude does not %s" % (name, label))
+        if spec["span"][0] == spec["span"][1]:
+            problems.append("%s span markers are not distinct" % name)
+    # The span of every imp-3 case is its OWN marker pair: two cases must
+    # never share one, or a byte of one case could satisfy the other.
+    spans = [tuple(_case(c)["span_requires"]["span"])
+             for c in ("m58-imp3/face-off-e2e", "m58-imp3/face-italic-e2e",
+                       "m58-imp3/face-underline-e2e", "m58-imp3/face-color-e2e")]
+    check("m58-imp3-distinct-spans", len(set(spans)), len(spans))
+    # The measured needle constants MUST equal the terminfo entry of the
+    # same TERM.  The exception is the "me" byte: this host's emacs
+    # terminfo lookup and the Python curses binding disagree on it, so it
+    # is measured from the imp-2 span instead (a host-independent pin
+    # cannot express that; the PTY case is the authority).
+    check("m58-imp3-bold-needle-eq-terminfo", M58_IMP3_BOLD,
+          terminfo_capability("xterm", "bold"))
+    check("m58-imp3-italic-needle-eq-terminfo", M58_IMP3_ITALIC,
+          terminfo_capability("xterm", "sitm"))
+    check("m58-imp3-underline-needle-eq-terminfo", M58_IMP3_UNDERLINE,
+          terminfo_capability("xterm", "smul"))
+    # This host's tty color map resolves every color NAME to index 0, so
+    # the measured color bytes are setaf 0 / setab 0.  The pin is the
+    # terminfo STRING with that measured index: the case proves the two
+    # color step routes, not the numeric color value (an honest limit).
+    check("m58-imp3-setaf-needle-eq-terminfo", M58_IMP3_SETAF_RED,
+          terminfo_parameterized("xterm", "setaf", 0))
+    check("m58-imp3-setab-needle-eq-terminfo", M58_IMP3_SETAB_BLUE,
+          terminfo_parameterized("xterm", "setab", 0))
+    # The capable-p case reports a Lisp value, so it holds no needle: the
+    # expectation comes from terminfo (a mismatch FAILS) and a host with
+    # no loadable terminfo is an explicit INFO skip.
+    cap_case = _case("m58-imp3/capable-p-e2e")
+    check("m58-imp3-capable-p-expectation", cap_case.get("expect_terminfo"),
+          (("bold", "bold"), ("italic", "sitm"), ("underline", "smul")))
+    if "span_requires" in cap_case:
+        problems.append("m58-imp3/capable-p-e2e must not pin a byte span")
+    if "display-supports-face-attributes-p" not in cap_case.get("probe", ""):
+        problems.append("m58-imp3/capable-p-e2e does not query "
+                        "display-supports-face-attributes-p")
     # The prelude hook must not change an earlier case: its prelude is the
     # empty string, so the built source holds no face prelude.
     if "propertize" in build_child_source(_case("m56-imp2/tty-init-e2e")):

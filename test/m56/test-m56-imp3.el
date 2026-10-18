@@ -303,9 +303,9 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; --- Group B.  The TTY surface that M56 audits. ---
 
-;; B1: src/term.c lines = 6,214.
-(m56-imp3--check "term-c-lines-6214"
-                 (eql 6214 (m56-imp3--lines "src/term.c")))
+;; B1: src/term.c lines = 6,363 (M58 imp-3).
+(m56-imp3--check "term-c-lines-6363"
+                 (eql 6363 (m56-imp3--lines "src/term.c")))
 ;; B2: src/term.c ^DEFUN count = 29.
 (m56-imp3--check "term-c-defun-29"
                  (eql 29 (m56-imp3--count-lines "src/term.c" "^DEFUN (")))
@@ -313,15 +313,15 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; leaf token: each leaf name also occurs in a sibling docstring.
 (m56-imp3--check "term-c-tty-leaf-4"
                  (eql 4 (m56-imp3--count-lines "src/term.c" "^DEFUN (\"--tty-")))
-;; B4: src/term.c scm_c_public_ref sites = 36.
-(m56-imp3--check "term-c-scm-ref-36"
-                 (eql 36 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
-;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m56-imp3--check "tree-wide-scm-ref-260"
-                 (eql 260 (m56-imp3--count-scm-ref)))
-;; B6: mod/emacs/tty-output.scm lines = 454.
-(m56-imp3--check "tty-output-lines-454"
-                 (eql 454 (m56-imp3--lines "mod/emacs/tty-output.scm")))
+;; B4: src/term.c scm_c_public_ref sites = 39 (M58 imp-3 added 3).
+(m56-imp3--check "term-c-scm-ref-39"
+                 (eql 39 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
+;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
+(m56-imp3--check "tree-wide-scm-ref-263"
+                 (eql 263 (m56-imp3--count-scm-ref)))
+;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
+(m56-imp3--check "tty-output-lines-635"
+                 (eql 637 (m56-imp3--lines "mod/emacs/tty-output.scm")))
 ;; B7: the 3 src/termchar.h FILE * streams at :51 / :53 / :61.
 (m56-imp3--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp3--line-of "src/termchar.h" "FILE *input;"))
@@ -330,10 +330,10 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; B8: test/pty-driver.py cases = 26 (the total-case-count pin).  The
 ;; close-out adds no PTY case, so the total stays 26 (brief.org section
 ;; 9).  This guards against a stale literal 24.
-(m56-imp3--check "pty-driver-cases-26"
+(m56-imp3--check "pty-driver-cases-31"
                  (and (m56-imp3--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 26")
+                       "\"total-case-count\", len(CASES), 31")
                       (= 0 (m56-imp3--count "test/pty-driver.py"
                                             "len(CASES), 24"))))
 

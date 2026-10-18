@@ -181,7 +181,7 @@ passes the raw symbol to reach it."
 (m49-imp1--check "dired-module-present"
                  (m49-imp1--exists-p "mod/emacs/dired.scm"))
 (m49-imp1--check "scm-c-public-ref-260"
-                 (eql 260 (m49-imp1--count-scm-ref)))
+                 (eql 263 (m49-imp1--count-scm-ref)))
 
 ;;; --- D2. The block map (docs/m49-plan.org section 3.1) ---------------
 ;;

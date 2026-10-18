@@ -287,30 +287,31 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
       (m58-imp1--info-skip "head-fca28d3be" "no git binary on PATH")
     (m58-imp1--check "head-fca28d3be" ok)))
 
-(m58-imp1--check "term.c-lines-6214"
-                 (eql 6214 (m58-imp1--lines "src/term.c")))
+(m58-imp1--check "term.c-lines-6363"
+                 (eql 6363 (m58-imp1--lines "src/term.c")))
 (m58-imp1--check "term.c-defun-count-29"
                  (eql 29 (m58-imp1--count "src/term.c" "^DEFUN (")))
 (m58-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m58-imp1--count-defun-leaf "src/term.c")))
-(m58-imp1--check "term.c-scm-ref-36"
-                 (eql 36 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
-(m58-imp1--check "tree-wide-scm-ref-260"
-                 (eql 260 (m58-imp1--count-scm-ref)))
-(m58-imp1--check "tty-output.scm-lines-454"
-                 (eql 454 (m58-imp1--lines "mod/emacs/tty-output.scm")))
+(m58-imp1--check "term.c-scm-ref-39"
+                 (eql 39 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
+(m58-imp1--check "tree-wide-scm-ref-263"
+                 (eql 263 (m58-imp1--count-scm-ref)))
+(m58-imp1--check "tty-output.scm-lines-635"
+                 (eql 637 (m58-imp1--lines "mod/emacs/tty-output.scm")))
 (m58-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m58-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-;; M58 imp-2 adds ONE PTY case (m58-imp2/face-appearance-e2e), so the
-;; counted surface moves from 25 to 26.  The re-pin lands in the SAME
-;; commit as the new case, else this check goes red (cr.org F6).  The
-;; imp-2 corpus T5 pins this re-pin from the other side.
-(m58-imp1--check "pty-driver-cases-26"
+;; M58 imp-2 added ONE PTY case (m58-imp2/face-appearance-e2e) and
+;; M58 imp-3 added FIVE (the m58-imp3 group), so the counted surface
+;; moves from 25 to 31.  The re-pin lands in the SAME commit as the new
+;; cases, else this check goes red.  The imp-2 corpus T5 and the imp-3
+;; corpus U2 pin this re-pin from the other side.
+(m58-imp1--check "pty-driver-cases-31"
                  (let ((pins (m58-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 26 (car pins))
+                        (eql 31 (car pins))
                         ;; The group pins must add up to the total, so a
                         ;; group pin that moves without the total FAILS.
                         (eql (car pins) (cdr pins)))))
@@ -332,13 +333,20 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; booleans; the C struct face read, MAY_USE_WITH_COLORS_P, tparam, the
 ;; OUTPUT macros, and the FILE * stay C.
 
+;; M58 imp-3 re-pinned this row: the TTY_CAPABLE_P_TRY macro is GONE.
+;; The Group A decision MOVED to Scheme (tty-face-on-steps,
+;; tty-face-off-steps, tty-capable-p), so the row now pins the three
+;; dispatcher call sites instead of the inline C chain.  The 7
+;; TTY_CAPABLE_P_TRY rows survive as ONE table in the Scheme procedure.
 (m58-imp1--check "group-a-face-appearance"
                  (m58-imp1--holds-all
                   "src/term.c"
                   '("turn_on_face (struct frame *f, struct face *face)"
                     "turn_off_face (struct frame *f, struct face *face)"
                     "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                    "TTY_CAPABLE_P_TRY")))
+                    "\"tty-face-on-steps\""
+                    "\"tty-face-off-steps\""
+                    "\"tty-capable-p\"")))
 
 ;; Group B -- the color-mode policy (a MOVE candidate).  The mode
 ;; canonicalization and the -1 / 0 / 8 choice are plain policy; the cap

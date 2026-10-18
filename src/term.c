@@ -2238,6 +2238,133 @@ produce_glyphless_glyph (struct it *it, Lisp_Object acronym)
    ? (tty->TN_no_color_video & (ATTR)) == 0             \
    : 1)
 
+/* FIX-20261018-guilemacs: M58 imp-3 -- the face-appearance DECISION of
+   the three Group A hubs moved to pure procedures of (emacs tty-output):
+   tty-face-on-steps, tty-face-off-steps, and tty-capable-p.  C keeps
+   every mechanism: the struct face field reads, MAY_USE_WITH_COLORS_P,
+   the TS_* / TF_* / TN_* reads, face_tty_specified_color, the strcmp of
+   the exit sequences, tparam, the OUTPUT / OUTPUT1 / OUTPUT_IF macros,
+   tty_toggle_highlight, the tty->standout_mode clear, and the FILE *
+   streams.  C passes plain fixnums only -- one plain list for the
+   face-on hub, which needs ten values -- so no Lisp_Object, char *,
+   struct face *, or FILE * crosses the seam (docs/kb.org
+   =passthrough-leaf-is-not-a-port=, the M42 rule).
+
+   The step protocol extends the M52 vocabulary.  Each step is a plain
+   list (TAG ARG...), and C tells the tags apart with
+   m52_tty_step_tag_p:
+
+     ("cap1" KEY)          OUTPUT1_IF (tty, m52_cap_string_1 (tty, KEY))
+     ("cap" KEY)           OUTPUT_IF  (tty, m52_cap_string_1 (tty, KEY))
+     ("tparam" SLOT VALUE) tparam, OUTPUT, xfree
+     ("toggle-highlight")  tty_toggle_highlight (tty)
+     ("clear-standout")    tty->standout_mode = 0
+
+   OUTPUT and OUTPUT1 are NOT interchangeable: OUTPUT pads with
+   FRAME_TOTAL_LINES minus curY, OUTPUT1 uses 1 line, so a swap is a
+   silent byte change (brief.org section 5.1 rule 1).  The KEY of a cap step
+   MUST match a m52_caps key byte for byte; a mismatch makes
+   m52_cap_string_1 return NULL and the hub emits nothing.
+
+   A nil step list (no Scheme runtime) emits nothing.  The inline C
+   decision is DELETED, not kept as a second path: a rewire that leaves
+   the decision in C is a C dedup, not a port.  */
+
+static Lisp_Object
+m58_tty_face_on_scheme (Lisp_Object args)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-face-on-steps");
+  return SCM_CALL_1 (proc, args);
+}
+
+static Lisp_Object
+m58_tty_face_off_scheme (Lisp_Object has_me, Lisp_Object attrs,
+			 Lisp_Object has_exit_underline,
+			 Lisp_Object me_is_end_standout, Lisp_Object colors,
+			 Lisp_Object fg_not_default,
+			 Lisp_Object bg_not_default)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-face-off-steps");
+  return SCM_CALL_7 (proc, has_me, attrs, has_exit_underline,
+		     me_is_end_standout, colors, fg_not_default,
+		     bg_not_default);
+}
+
+static Lisp_Object
+m58_tty_capable_p_scheme (Lisp_Object caps, Lisp_Object presence,
+			  Lisp_Object no_color_video, Lisp_Object max_colors)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-capable-p");
+  return SCM_CALL_4 (proc, caps, presence, no_color_video, max_colors);
+}
+
+/* Run ONE step of a face step list.  This is the MECHANISM only: the
+   selection of the step, its order, and its arguments come from
+   Scheme.  The tparam slot picks the C-owned capability field; the
+   value is the plain fixnum from the step.
+
+   FIX-20261018-guilemacs: F2 of cr.org.  A bare KEY string is NOT a
+   step here.  The M52 hubs read a bare string as OUTPUT_IF (the
+   frame-padded route); accepting it here as OUTPUT1_IF would give the
+   same step list two different meanings in two runners (brief.org
+   section 5.1 rule 2).  Every step carries an explicit tag.  */
+static void
+m58_tty_face_step_run (struct tty_display_info *tty, Lisp_Object step)
+{
+  int a[2];
+
+  if (m52_tty_step_tag_p (step, "cap1"))
+    OUTPUT1_IF (tty, m52_cap_string_1 (tty, CONSP (XCDR (step))
+				       ? XCAR (XCDR (step)) : Qnil));
+  else if (m52_tty_step_tag_p (step, "cap"))
+    OUTPUT_IF (tty, m52_cap_string_1 (tty, CONSP (XCDR (step))
+				      ? XCAR (XCDR (step)) : Qnil));
+  else if (m52_tty_step_tag_p (step, "tparam"))
+    {
+      const char *ts = NULL;
+      char *p;
+
+      a[0] = a[1] = 0;
+      m52_tty_step_args_1 (step, a, 2);
+      switch (a[0])
+	{
+	case 0: ts = tty->TS_set_foreground; break;
+	case 1: ts = tty->TS_set_background; break;
+	case 2: ts = tty->TF_set_underline_color; break;
+	case 3: ts = tty->TF_set_underline_style; break;
+	default: break;
+	}
+      if (ts)
+	{
+	  p = tparam (ts, NULL, 0, a[1], 0, 0, 0);
+	  OUTPUT (tty, p);
+	  xfree (p);
+	}
+    }
+  else if (m52_tty_step_tag_p (step, "toggle-highlight"))
+    tty_toggle_highlight (tty);
+  else if (m52_tty_step_tag_p (step, "clear-standout"))
+    tty->standout_mode = 0;
+}
+
+/* The plain attrs mask of a face: 1 bold, 2 italic, 4 underline,
+   8 strike-through, 16 reverse.  */
+static int
+m58_face_attrs_mask (struct face *face)
+{
+  return ((face->tty_bold_p ? 0x01 : 0)
+	  | (face->tty_italic_p ? 0x02 : 0)
+	  | (face->underline ? 0x04 : 0)
+	  | (face->tty_strike_through_p ? 0x08 : 0)
+	  | (face->tty_reverse_p ? 0x10 : 0));
+}
+
 /* Turn appearances of face FACE_ID on tty frame F on.
    FACE_ID is a realized face ID number, in the face cache.  */
 
@@ -2247,77 +2374,71 @@ turn_on_face (struct frame *f, struct face *face)
   unsigned long fg = face->foreground;
   unsigned long bg = face->background;
   struct tty_display_info *tty = FRAME_TTY (f);
+  /* The MAY_USE_WITH_COLORS_P results, evaluated in C: 1 reverse,
+     2 bold, 4 italic, 8 underline, 16 strike-through.  */
+  int may = ((MAY_USE_WITH_COLORS_P (tty, NC_REVERSE) ? 0x01 : 0)
+	     | (MAY_USE_WITH_COLORS_P (tty, NC_BOLD) ? 0x02 : 0)
+	     | (MAY_USE_WITH_COLORS_P (tty, NC_ITALIC) ? 0x04 : 0)
+	     | (MAY_USE_WITH_COLORS_P (tty, NC_UNDERLINE) ? 0x08 : 0)
+	     | (MAY_USE_WITH_COLORS_P (tty, NC_STRIKE_THROUGH) ? 0x10 : 0));
+  int colors = tty->TN_max_colors > 0;
+  int standout = tty->standout_mode != 0;
+  /* Use reverse video if the face specifies that.  The sentinel
+     compares stay C.  */
+  int reverse
+    = (inverse_video
+       ? fg == FACE_TTY_DEFAULT_FG_COLOR || bg == FACE_TTY_DEFAULT_BG_COLOR
+       : fg == FACE_TTY_DEFAULT_BG_COLOR || bg == FACE_TTY_DEFAULT_FG_COLOR);
+  /* FIX-20261018-guilemacs: F1 of cr.org.  Scheme emits
+     ("toggle-highlight") from the SAME two plain inputs (the may bit 1
+     and the reverse verdict), so C can compute the state AFTER the
+     toggle.  The original C called tty_toggle_highlight first and read
+     tty->standout_mode afterwards; a stale value swaps the setaf and
+     the setab slots for a reverse-video face with an explicit color,
+     which is a silent byte change.  */
+  int will_toggle = (may & 0x01) && reverse;
+  int standout_after = will_toggle ? !standout : standout;
+  /* The foreground and background capabilities SWAP while standout is
+     on.  C reads both fields and passes the plain verdicts.  */
+  const char *fg_slot = standout_after ? tty->TS_set_background
+				       : tty->TS_set_foreground;
+  const char *bg_slot = standout_after ? tty->TS_set_foreground
+				       : tty->TS_set_background;
+  /* The capability presence mask: 1 italic, 2 underline-style,
+     16 foreground, 32 background, 64 underline-color,
+     128 the plain underline route.  */
+  int cap = ((tty->TS_enter_italic_mode ? 0x01 : 0)
+	     | (tty->TF_set_underline_style ? 0x02 : 0)
+	     | (face_tty_specified_color (fg) && fg_slot ? 0x10 : 0)
+	     | (face_tty_specified_color (bg) && bg_slot ? 0x20 : 0)
+	     | (tty->TF_set_underline_color && face->underline_color
+		? 0x40 : 0)
+	     | ((face->underline == FACE_UNDERLINE_SINGLE
+		 || !tty->TF_set_underline_style) ? 0x80 : 0));
 
-  /* Use reverse video if the face specifies that.
-     Do this first because TS_end_standout_mode may be the same
-     as TS_exit_attribute_mode, which turns all appearances off. */
-  if (MAY_USE_WITH_COLORS_P (tty, NC_REVERSE)
-      && (inverse_video
-	  ? fg == FACE_TTY_DEFAULT_FG_COLOR || bg == FACE_TTY_DEFAULT_BG_COLOR
-	  : fg == FACE_TTY_DEFAULT_BG_COLOR || bg == FACE_TTY_DEFAULT_FG_COLOR))
-    tty_toggle_highlight (tty);
+  Lisp_Object steps
+    = m58_tty_face_on_scheme
+    (scm_list_n (make_fixnum (reverse),
+		 make_fixnum (m58_face_attrs_mask (face)),
+		 make_fixnum (face->underline),
+		 make_fixnum (may),
+		 make_fixnum (cap),
+		 make_fixnum (colors),
+		 make_fixnum (standout_after),
+		 /* FIX-20261018-guilemacs: T1 of brief.org section 5.
+		    face->foreground, background, and underline_color may hold
+		    a FACE_TTY_DEFAULT_* sentinel ((unsigned long) -1 ... -3),
+		    which does NOT fit in a fixnum.  The cap mask above already
+		    carries the verdict, so a sentinel crosses as 0 and only a
+		    specified color crosses as a number.  Every fixnum of the
+		    seam obeys this rule.  */
+		 make_fixnum (face_tty_specified_color (fg) ? (EMACS_INT) fg : 0),
+		 make_fixnum (face_tty_specified_color (bg) ? (EMACS_INT) bg : 0),
+		 make_fixnum ((cap & 0x40) ? (EMACS_INT) face->underline_color : 0),
+		 SCM_UNDEFINED));
 
-  if (face->tty_bold_p && MAY_USE_WITH_COLORS_P (tty, NC_BOLD))
-    OUTPUT1_IF (tty, tty->TS_enter_bold_mode);
-
-  if (face->tty_italic_p && MAY_USE_WITH_COLORS_P (tty, NC_ITALIC))
-    {
-      if (tty->TS_enter_italic_mode)
-	OUTPUT1 (tty, tty->TS_enter_italic_mode);
-      else
-	/* Italics mode is unavailable on many terminals.  In that
-	   case, map slant to dimmed text; we want italic text to
-	   appear different and dimming is not otherwise used.  */
-	OUTPUT1 (tty, tty->TS_enter_dim_mode);
-    }
-
-  if (face->underline && MAY_USE_WITH_COLORS_P (tty, NC_UNDERLINE))
-    {
-      if (face->underline == FACE_UNDERLINE_SINGLE
-	  || !tty->TF_set_underline_style)
-	OUTPUT1_IF (tty, tty->TS_enter_underline_mode);
-      else if (tty->TF_set_underline_style)
-	{
-	  char *p;
-	  p = tparam (tty->TF_set_underline_style, NULL, 0, face->underline, 0, 0, 0);
-	  OUTPUT (tty, p);
-	  xfree (p);
-	}
-    }
-
-  if (face->tty_strike_through_p
-      && MAY_USE_WITH_COLORS_P (tty, NC_STRIKE_THROUGH))
-    OUTPUT1_IF (tty, tty->TS_enter_strike_through_mode);
-
-  if (tty->TN_max_colors > 0)
-    {
-      const char *ts;
-      char *p;
-
-      ts = tty->standout_mode ? tty->TS_set_background : tty->TS_set_foreground;
-      if (face_tty_specified_color (fg) && ts)
-	{
-          p = tparam (ts, NULL, 0, fg, 0, 0, 0);
-	  OUTPUT (tty, p);
-	  xfree (p);
-	}
-
-      ts = tty->standout_mode ? tty->TS_set_foreground : tty->TS_set_background;
-      if (face_tty_specified_color (bg) && ts)
-	{
-          p = tparam (ts, NULL, 0, bg, 0, 0, 0);
-	  OUTPUT (tty, p);
-	  xfree (p);
-	}
-
-	ts = tty->TF_set_underline_color;
-	if (ts && face->underline_color)
-	  {
-	    p = tparam (ts, NULL, 0, face->underline_color, 0, 0, 0);
-	    OUTPUT (tty, p);
-	    xfree (p);
-	  }
-    }
+  for (Lisp_Object l = steps; CONSP (l); l = XCDR (l))
+    m58_tty_face_step_run (tty, XCAR (l));
 }
 
 
@@ -2327,38 +2448,42 @@ static void
 turn_off_face (struct frame *f, struct face *face)
 {
   struct tty_display_info *tty = FRAME_TTY (f);
+  int has_me = tty->TS_exit_attribute_mode != NULL;
+  /* Capability "me" will turn off appearance modes double-bright,
+     half-bright, reverse-video, standout, underline.  It may or may
+     not turn off alt-char-mode.  The strcmp stays C.  */
+  /* FIX-20261018-guilemacs: T4 of brief.org section 5.  The original C
+     ran strcmp (me, se) with NO test on `se', inside the has-me branch.
+     The guard below is deliberate: a NULL `se' would make strcmp read
+     address 0, which is undefined behavior.  The verdict is 0 when `se'
+     is absent, so the ("clear-standout") step is absent too -- the same
+     state the emitted bytes produce when no standout was turned on.  */
+  int me_is_end_standout
+    = (has_me && tty->TS_end_standout_mode
+       && strcmp (tty->TS_exit_attribute_mode,
+		  tty->TS_end_standout_mode) == 0);
+  int fg_not_default
+    = (face->foreground != FACE_TTY_DEFAULT_COLOR
+       && face->foreground != FACE_TTY_DEFAULT_FG_COLOR);
+  int bg_not_default
+    = (face->background != FACE_TTY_DEFAULT_COLOR
+       && face->background != FACE_TTY_DEFAULT_BG_COLOR);
 
-  if (tty->TS_exit_attribute_mode)
-    {
-      /* Capability "me" will turn off appearance modes double-bright,
-	 half-bright, reverse-video, standout, underline.  It may or
-	 may not turn off alt-char-mode.  */
-      if (face->tty_bold_p
-	  || face->tty_italic_p
-	  || face->tty_reverse_p
-	  || face->underline
-	  || face->tty_strike_through_p)
-	{
-	  OUTPUT1_IF (tty, tty->TS_exit_attribute_mode);
-	  if (strcmp (tty->TS_exit_attribute_mode, tty->TS_end_standout_mode) == 0)
-	    tty->standout_mode = 0;
-	}
-    }
-  else
-    {
-      /* If we don't have "me" we can only have those appearances
-	 that have exit sequences defined.  */
-      if (face->underline)
-	OUTPUT_IF (tty, tty->TS_exit_underline_mode);
-    }
+  Lisp_Object steps
+    = m58_tty_face_off_scheme
+    (make_fixnum (has_me),
+     make_fixnum (m58_face_attrs_mask (face)),
+     make_fixnum (tty->TS_exit_underline_mode != NULL),
+     make_fixnum (me_is_end_standout),
+     make_fixnum (tty->TN_max_colors > 0),
+     make_fixnum (fg_not_default),
+     make_fixnum (bg_not_default));
 
-  /* Switch back to default colors.  */
-  if (tty->TN_max_colors > 0
-      && ((face->foreground != FACE_TTY_DEFAULT_COLOR
-	   && face->foreground != FACE_TTY_DEFAULT_FG_COLOR)
-	  || (face->background != FACE_TTY_DEFAULT_COLOR
-	      && face->background != FACE_TTY_DEFAULT_BG_COLOR)))
-    OUTPUT1_IF (tty, tty->TS_orig_pair);
+  /* Emit the exit sequence BEFORE the color reset (Scheme orders the
+     steps).  C keeps the tty->standout_mode clear, as the
+     ("clear-standout") step.  */
+  for (Lisp_Object l = steps; CONSP (l); l = XCDR (l))
+    m58_tty_face_step_run (tty, XCAR (l));
 }
 
 #endif /* !HAVE_ANDROID */
@@ -2370,34 +2495,45 @@ bool
 tty_capable_p (struct tty_display_info *tty, unsigned int caps)
 {
 #ifndef HAVE_ANDROID
-#define TTY_CAPABLE_P_TRY(tty, cap, TS, NC_bit)				\
-  if ((caps & (cap)) && (!(TS) || !MAY_USE_WITH_COLORS_P (tty, NC_bit)))	\
-    return 0;
+  /* The verdict runs in Scheme: tty-capable-p takes the requested CAPS
+     bits, the plain presence mask, and the TN_no_color_video /
+     TN_max_colors values, and returns 0 or 1.  The 7 TTY_CAPABLE_P_TRY
+     rows are now ONE table in the Scheme procedure; the inline C chain
+     is DELETED (a second copy would be dead policy in C).  The
+     presence mask: 1 standout-mode, 2 underline-mode,
+     4 underline-style, 8 bold, 16 dim, 32 italic, 64 strike-through.
 
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_INVERSE,	  tty->TS_standout_mode, NC_REVERSE);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_UNDERLINE,	  tty->TS_enter_underline_mode,
-		     NC_UNDERLINE);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_UNDERLINE_STYLED,	  tty->TF_set_underline_style,
-		     NC_UNDERLINE);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_BOLD,	  tty->TS_enter_bold_mode, NC_BOLD);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_DIM,	  tty->TS_enter_dim_mode, NC_DIM);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_ITALIC,	  tty->TS_enter_italic_mode, NC_ITALIC);
-  TTY_CAPABLE_P_TRY (tty,
-		     TTY_CAP_STRIKE_THROUGH, tty->TS_enter_strike_through_mode,
-		     NC_STRIKE_THROUGH);
+     FIX-20261018-guilemacs: F3 of cr.org.  There is NO "no Scheme
+     runtime" fallback: the module-binding lookup signals an error when
+     the module or the binding is absent, so it never yields a
+     non-fixnum verdict.  A non-fixnum verdict means a BROKEN module,
+     and it answers false: a broken module must not silently claim that
+     the terminal is capable.  */
+  int presence = ((tty->TS_standout_mode ? 0x01 : 0)
+		  | (tty->TS_enter_underline_mode ? 0x02 : 0)
+		  | (tty->TF_set_underline_style ? 0x04 : 0)
+		  | (tty->TS_enter_bold_mode ? 0x08 : 0)
+		  | (tty->TS_enter_dim_mode ? 0x10 : 0)
+		  | (tty->TS_enter_italic_mode ? 0x20 : 0)
+		  | (tty->TS_enter_strike_through_mode ? 0x40 : 0));
+  Lisp_Object verdict
+    = m58_tty_capable_p_scheme (make_fixnum (caps),
+				make_fixnum (presence),
+				make_fixnum (tty->TN_no_color_video),
+				make_fixnum (tty->TN_max_colors));
 
-  /* We can do it!  */
-  return 1;
+  return (FIXNUMP (verdict) && XFIXNUM (verdict) != 0);
 #else
   return false;
 #endif
 }
+
+/* M58 imp-3, one honest detail: the dim fallback of the italic arm used
+   to call emacs_tputs even when TS_enter_dim_mode was NULL.  The
+   ("cap1" KEY) route now applies the `if (a)' guard of OUTPUT1_IF
+   (:147), so tputs never receives NULL.  No byte changes: the old route
+   reached tputs with NULL, and ncurses tputs answers ERR without a byte
+   (measured: tputs (NULL) = -1).  The note sits BELOW the hubs.  */
 
 /* FIX-20261005-guilemacs: M48 imp-3 -- the G1 dispatch helpers over the
    terminal-capability policy of (emacs terminal).  The hub reads the
@@ -5546,7 +5682,20 @@ static const struct m52_cap_entry m52_caps[] =
     M52_CAP ("del-char", TS_del_char),
     M52_CAP ("del-multi-chars", TS_del_multi_chars),
     M52_CAP ("delete-mode", TS_delete_mode),
-    M52_CAP ("end-delete-mode", TS_end_delete_mode)
+    M52_CAP ("end-delete-mode", TS_end_delete_mode),
+    /* M58 imp-3: the 7 NON-parameterized face keys of turn_on_face /
+       turn_off_face.  The parameterized strings TS_set_foreground,
+       TS_set_background, TF_set_underline_color, and
+       TF_set_underline_style are NOT listed: they hold tparam format
+       directives, so an emit without tparam changes the bytes.  They
+       use the ("tparam" SLOT VALUE) step instead (brief.org section 6).  */
+    M52_CAP ("bold", TS_enter_bold_mode),
+    M52_CAP ("dim", TS_enter_dim_mode),
+    M52_CAP ("italic", TS_enter_italic_mode),
+    M52_CAP ("underline", TS_enter_underline_mode),
+    M52_CAP ("strike-through", TS_enter_strike_through_mode),
+    M52_CAP ("exit-attribute", TS_exit_attribute_mode),
+    M52_CAP ("exit-underline", TS_exit_underline_mode)
   };
 #undef M52_CAP
 

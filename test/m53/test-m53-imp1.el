@@ -225,8 +225,8 @@ probe: the loader must read and evaluate a real Elisp file."
 (setq m53-imp1--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m53-imp1--check "term.c-lines-6214"
-                 (eql 6214 (m53-imp1--lines "src/term.c")))
+(m53-imp1--check "term.c-lines-6363"
+                 (eql 6363 (m53-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
 (m53-imp1--check "term.c-defun-count-29"
                  (eql 29 (m53-imp1--count "src/term.c" "^DEFUN (")))
@@ -234,14 +234,14 @@ probe: the loader must read and evaluate a real Elisp file."
 (m53-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m53-imp1--count-defun-leaf "src/term.c")))
 ;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m53-imp1--check "term.c-scm-ref-36"
-                 (eql 36 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
+(m53-imp1--check "term.c-scm-ref-39"
+                 (eql 39 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
 ;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m53-imp1--check "tty-output.scm-lines-454"
-                 (eql 454 (m53-imp1--lines "mod/emacs/tty-output.scm")))
+(m53-imp1--check "tty-output.scm-lines-635"
+                 (eql 637 (m53-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m53-imp1--check "tree-wide-scm-ref-260"
-                 (eql 260 (m53-imp1--count-scm-ref)))
+(m53-imp1--check "tree-wide-scm-ref-263"
+                 (eql 263 (m53-imp1--count-scm-ref)))
 
 ;;; --- S2. CHECK 1, the standalone loader -----------------------------
 
@@ -309,7 +309,7 @@ probe: the loader must read and evaluate a real Elisp file."
 (m53-imp1--check "pty-driver-total-26"
                  (m53-imp1--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 26"))
+                  "\"total-case-count\", len(CASES), 31"))
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 

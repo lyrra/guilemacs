@@ -29,8 +29,8 @@
 ;;;         and the imp-1 line stays present.  T4 holds 4 checks.
 ;;;   T5 -- the cross-corpus re-pin: the new case moves the
 ;;;         test/pty-driver.py total from 25 to 26, so
-;;;         test/m58/test-m58-imp1.el must hold pty-driver-cases-26 and
-;;;         must hold no live pty-driver-cases-25.  T5 holds 2 checks.
+;;;         test/m58/test-m58-imp1.el must hold pty-driver-cases-31 and
+;;;         must hold no live pty-driver-cases-26.  T5 holds 2 checks.
 ;;;   T6 -- the guards: 5 checks -- one per-group min-count guard for each
 ;;;         of T1 .. T5.  The in-process group-total `ert-deftest' is a
 ;;;         separate test (the floor is 21 checks plus that deftest = 22).
@@ -235,19 +235,23 @@ host limit is a skip, never a pass."
 
 (setq m58-imp2--group 't1)
 
+;; M58 imp-3 re-pinned these SIX lines: the three dispatcher
+;; definitions sit directly above turn_on_face (brief.org step 3), so the
+;; hub signatures moved down by 124 lines.  The signatures themselves did
+;; NOT change: the C hubs keep their shape and their 6 callers.
 (m58-imp2--check "term.c-face-hub-signatures"
                  (and (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 2244))
+                               (m58-imp2--line-text "src/term.c" 2371))
                       (string= "turn_on_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 2245))
+                               (m58-imp2--line-text "src/term.c" 2372))
                       (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 2326))
+                               (m58-imp2--line-text "src/term.c" 2447))
                       (string= "turn_off_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 2327))
+                               (m58-imp2--line-text "src/term.c" 2448))
                       (string= "bool"
-                               (m58-imp2--line-text "src/term.c" 2369))
+                               (m58-imp2--line-text "src/term.c" 2494))
                       (string= "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                               (m58-imp2--line-text "src/term.c" 2370))))
+                               (m58-imp2--line-text "src/term.c" 2495))))
 
 (m58-imp2--check "term.c-six-glyph-writer-callers"
                  (and (eql 6 (m58-imp2--count
@@ -272,14 +276,27 @@ host limit is a skip, never a pass."
                        "^[ \t]*turn_off_face (f, face);$"
                        (or (m58-imp2--line-text "src/term.c" 1202) ""))))
 
+;; M58 imp-3 SUPERSEDED this check.  imp-2 pinned the INLINE C
+;; decision (the TTY_CAPABLE_P_TRY macro and the bold gate).  The MOVE
+;; deleted them, so the check now pins the MOVE itself: the three
+;; dispatcher resolve sites, the plain-value argument shape (one list for
+;; face-on, fixnums elsewhere), the mechanism that STAYS C, and the
+;; boundary rule.  A re-introduced inline decision would FAIL it, because
+;; the dispatcher sites are the only route to the decision.
 (m58-imp2--check "term.c-bold-gate-and-boundary"
                  (m58-imp2--holds-all
                   "src/term.c"
-                  '("#define TTY_CAPABLE_P_TRY(tty, cap, TS, NC_bit)"
-                    "if (face->tty_bold_p && MAY_USE_WITH_COLORS_P (tty, NC_BOLD))"
-                    "OUTPUT1_IF (tty, tty->TS_enter_bold_mode);"
-                    "tty->TS_enter_bold_mode, NC_BOLD);"
-                    "if (tty->TS_exit_attribute_mode)"
+                  '("\"tty-face-on-steps\""
+                    "\"tty-face-off-steps\""
+                    "\"tty-capable-p\""
+                    ;; C keeps the mechanism: tparam, the OUTPUT macros,
+                    ;; tty_toggle_highlight, and the standout clear.
+                    "m58_tty_face_step_run (struct tty_display_info *tty, Lisp_Object step)"
+                    "tty->standout_mode = 0;"
+                    ;; The 7 non-parameterized face keys are in m52_caps;
+                    ;; the tparam-formatted strings are NOT.
+                    "M52_CAP (\"bold\", TS_enter_bold_mode),"
+                    "M52_CAP (\"exit-attribute\", TS_exit_attribute_mode),"
                     ;; The boundary rule do-not-give-scheme-a-C-descriptor
                     ;; holds for this candidate: a Guile port must NOT own
                     ;; a C FILE *.
@@ -310,11 +327,11 @@ host limit is a skip, never a pass."
                        "test/pty-driver.py"
                        '("GROUPS = (" "\"m58-imp2\")"))))
 
-(m58-imp2--check "pty-case-counts-26"
+(m58-imp2--check "pty-case-counts-31"
                  (let ((pins (m58-imp2--pty-case-pins)))
                    (and (consp pins)
-                        (eql 26 (car pins))
-                        ;; The 17 group pins must add up to the total, so
+                        (eql 31 (car pins))
+                        ;; The 18 group pins must add up to the total, so
                         ;; a group pin that moves alone FAILS.
                         (eql (car pins) (cdr pins)))))
 
@@ -406,20 +423,21 @@ host limit is a skip, never a pass."
 
 ;;; --- T5. The cross-corpus re-pin ------------------------------------
 
-;; The new case moves the test/pty-driver.py total from 25 to 26, so the
-;; older corpus must hold the re-pin in the SAME commit.
+;; imp-2 moved the test/pty-driver.py total from 25 to 26; M58 imp-3
+;; moved it again, from 26 to 31 (5 new cases).  The older corpus must
+;; hold the CURRENT re-pin in the SAME commit, so this check reads 31.
 
 (setq m58-imp2--group 't5)
 
-(m58-imp2--check "imp1-repinned-26"
+(m58-imp2--check "imp1-repinned-31"
                  (and (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-26\"")
+                                        "\"pty-driver-cases-31\"")
                       (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 26 (car pins))")))
+                                        "(eql 31 (car pins))")))
 
-(m58-imp2--check "imp1-no-stale-pin-25"
+(m58-imp2--check "imp1-no-stale-pin-26"
                  (not (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-25\"")))
+                                        "\"pty-driver-cases-26\"")))
 
 ;;; --- T6. The guards -------------------------------------------------
 

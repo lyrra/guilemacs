@@ -200,7 +200,7 @@ regression, and must not turn the gate red."
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
 (m45-imp1--check "scm-c-public-ref-260"
-                 (eql 260 (m45-imp1--count-scm-ref)))
+                 (eql 263 (m45-imp1--count-scm-ref)))
 (m45-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp1--lines "mod/emacs/tty-modes.scm")))
 (m45-imp1--check "callproc.c-lines-2387"

@@ -136,7 +136,7 @@ corpus pins is tracked, so an absent one means a broken checkout."
                  (let ((files (directory-files (expand-file-name "src" m42-imp5--root)
                                                t "\\.\\(c\\|h\\|m\\)\\'")))
                    (and (consp files)
-                        (eql 260
+                        (eql 263
                              (let ((n 0))
                                (dolist (f files)
                                  (with-temp-buffer
