@@ -13,10 +13,14 @@ fi
 
 status=0
 
+# Each suite pins its own expected case count and exits non-zero when the
+# count drops, so this runner does not need a second pin (cr.org F3).
+# GUILE_AUTO_COMPILE=0: auto-compile writes .go cache files and prints
+# warnings into the captured output (cr.org N3, the tool/run-tests.sh rule).
 run_suite () {
     suite=$1
     printf '\n=== %s ===\n' "$suite"
-    if GUILEMACS_ROOT="$repo_root" \
+    if GUILEMACS_ROOT="$repo_root" GUILE_AUTO_COMPILE=0 \
         guile -L "$repo_root/mod" "$script_dir/$suite"; then
         return 0
     else

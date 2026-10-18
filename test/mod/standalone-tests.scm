@@ -4,6 +4,12 @@
              (emacs loader)
              (emacs-elisp runtime))
 
+;; Pinned case count.  A suite that loses a case must fail (cr.org F3).
+(define expected-passes 4)
+
+;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
+(set! test-log-to-file #f)
+
 (define repo-root (getenv "GUILEMACS_ROOT"))
 (unless repo-root
   (error "GUILEMACS_ROOT must be set by run-mod-tests.sh"))
@@ -23,21 +29,27 @@
 (define test-runner (test-runner-current))
 
 ;; Initialize in plain Guile.  This suite does not start Emacs or loadup.el.
-(define initialized
+;; The handler keeps the condition key and arguments, so a failure names its
+;; cause instead of a bare #f (cr.org N2).
+(define init-result
   (catch #t
     (lambda ()
       (save-module-excursion
        (lambda () (init-loader (string-append repo-root "/prelude"))))
       #t)
-    (lambda (key . args) #f)))
-(test-assert "init-loader starts in plain Guile" initialized)
+    (lambda (key . args) (cons 'error (cons key args)))))
+(test-assert (format #f "init-loader starts in plain Guile (result: ~s)"
+                     init-result)
+             (eq? #t init-result))
 
 ;; This fixture defines and calls an Elisp function, then stores its result.
 (let ((result
        (catch #t
          (lambda () (load-fixture "standalone-loader.el") 'loaded)
          (lambda (key . args) (list 'error key args)))))
-  (test-eq "loader reads and evaluates standalone Elisp" 'loaded result))
+  (test-eq (format #f "loader reads and evaluates standalone Elisp (result: ~s)"
+                   result)
+           'loaded result))
 (test-equal "evaluated Elisp side effect is observable"
             42
             (and (symbol-bound? 'standalone-loader-test-result)
@@ -49,8 +61,15 @@
        (catch #t
          (lambda () (load-fixture "standalone-loader-error.el") 'loaded)
          (lambda (key . args) key))))
-  (test-eq "loader propagates void-function from evaluation"
+  (test-eq (format #f "loader propagates void-function from evaluation (key: ~s)"
+                   result)
            'void-function result))
 
 (test-end "Guilemacs standalone loader and reader")
-(exit (if (> (test-runner-fail-count test-runner) 0) 1 0))
+
+(let ((passes (test-runner-pass-count test-runner))
+      (fails  (test-runner-fail-count test-runner)))
+  (format #t "~a: ~a passed, ~a failed (expected ~a passed)~%"
+          "Guilemacs standalone loader and reader" passes fails
+          expected-passes)
+  (exit (if (and (zero? fails) (= passes expected-passes)) 0 1)))
