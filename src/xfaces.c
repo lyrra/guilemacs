@@ -227,6 +227,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "frame.h"
 #include "guile_fns.h"
+#include "guile.h"
 
 #ifdef USE_MOTIF
 #include <Xm/Xm.h>
@@ -4170,6 +4171,29 @@ x_update_menu_appearance (struct frame *f)
 #endif /* HAVE_X_WINDOWS && USE_X_TOOLKIT */
 
 
+/* M59 imp-3: the DECISION of face-attribute-relative-p is in Scheme
+   ((emacs faces), face-attribute-relative-verdict).  C keeps the 3 type
+   tests, because a type test on a Lisp_Object is a C read; the combine
+   of the 3 results is the decision.
+
+   No fallback: an absent module or a renamed binding signals at the
+   first call, so a broken load raises an error to the Lisp caller.  A
+   default verdict would hide a broken load (docs/kb.org, ** M58).  */
+static Lisp_Object
+m59_face_attribute_relative_p_scheme (bool unspecified_or_ignore,
+				      bool height, bool fixnum)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs faces",
+			     "face-attribute-relative-verdict");
+  return scm_is_true (SCM_CALL_3 (proc,
+				  scm_from_bool (unspecified_or_ignore),
+				  scm_from_bool (height),
+				  scm_from_bool (fixnum)))
+    ? Qt : Qnil;
+}
+
 DEFUN ("face-attribute-relative-p", Fface_attribute_relative_p,
        Sface_attribute_relative_p,
        2, 2, 0,
@@ -4184,12 +4208,11 @@ However, for :height, floating point values are also relative.  */
        attributes: const)
   (Lisp_Object attribute, Lisp_Object value)
 {
-  if (EQ (value, Qunspecified) || (EQ (value, QCignore_defface)))
-    return Qt;
-  else if (EQ (attribute, QCheight))
-    return FIXNUMP (value) ? Qnil : Qt;
-  else
-    return Qnil;
+  /* The 3 type tests stay in C; the combine is in Scheme.  */
+  bool a = EQ (value, Qunspecified) || EQ (value, QCignore_defface);
+  bool b = EQ (attribute, QCheight);
+  bool c = FIXNUMP (value);
+  return m59_face_attribute_relative_p_scheme (a, b, c);
 }
 
 DEFUN ("merge-face-attribute", Fmerge_face_attribute, Smerge_face_attribute,

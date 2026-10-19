@@ -299,7 +299,7 @@ real error, not a pass."
 (m46-imp3--check "filelock.c-defuns-13"
                  (eql 13 (m46-imp3--count "src/filelock.c" "^DEFUN (\"")))
 (m46-imp3--check "tree-wide-scm-public-ref-260"
-                 (eql 265 (m46-imp3--count-scm-ref)))
+                 (eql 266 (m46-imp3--count-scm-ref)))
 (m46-imp3--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp3--lines "src/callproc.c")))
 (m46-imp3--check "sysdep.c-lines-4950"

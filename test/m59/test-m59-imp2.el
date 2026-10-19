@@ -53,8 +53,15 @@
 ;;;
 ;;; The values agree with the C body of src/xfaces.c and with brief.org
 ;;; section 4.  `QCignore_defface' is the KEYWORD :ignore-defface
-;;; (src/xfaces.c :7468), not the SYMBOL 'ignore-defface, so the last
-;;; control is the one that proves the second term of branch 1.
+;;; (src/xfaces.c :7491 after the M59 imp-3 MOVE; :7468 at imp-2), not
+;;; the SYMBOL 'ignore-defface, so the last control is the one that
+;;; proves the second term of branch 1.
+;;;
+;;; M59 imp-3 moved the DECISION of this row to ((emacs faces)) and
+;;; re-pinned the 2 C layout rows of S2: the DEFUN is now at :4197 and
+;;; the body is the 3 plain booleans plus the dispatcher call.  The 3
+;;; milestone values and the 5 controls are UNCHANGED, because the
+;;; Scheme combine is the same truth table.
 ;;;
 ;;; This corpus reads TRACKED files only (src/, tool/run-tests.scm).  It
 ;;; does NOT read docs/ (docs/kb.org test-must-not-read-docs): a
@@ -127,6 +134,16 @@ once, so a multi-needle check does not re-read the file per needle."
           (goto-char (point-min))
           (unless (search-forward needle nil t) (setq all nil)))
         all))))
+
+(defun m59-imp2--holds-none (rel needles)
+  "Non-nil when the TRACKED file REL holds NO needle of NEEDLES."
+  (m59-imp2--with rel
+    (lambda ()
+      (let ((none t))
+        (dolist (needle needles)
+          (goto-char (point-min))
+          (when (search-forward needle nil t) (setq none nil)))
+        none))))
 
 (defun m59-imp2--live-p (rel needle)
   "Non-nil when the TRACKED file REL holds NEEDLE on a line that is NOT
@@ -317,23 +334,33 @@ real error, not a pass."
 
 (setq m59-imp2--group 's2)
 
-;; The DEFUN line.  MEASURED at HEAD c5ad1632a: :4173.
+;; The DEFUN line.  MEASURED at HEAD 2841bc4db (M59 imp-2): :4173.
+;; MEASURED after the M59 imp-3 MOVE: :4197, because the dispatcher is
+;; above the DEFUN.  This pin is REWRITTEN to the post-MOVE shape: the
+;; checks stay, the value moves.
 (m59-imp2--check "s2/defun-line"
                  (let ((got (m59-imp2--line-of
                              "src/xfaces.c"
                              "^DEFUN (\"face-attribute-relative-p\"")))
-                   (unless (eql 4173 got)
+                   (unless (eql 4197 got)
                      (princ (format "m59 imp2: the DEFUN moved, measured line: %s\n"
                                     got)))
-                   (eql 4173 got)))
+                   (eql 4197 got)))
 
-;; The 3 body tests, in the TRACKED C source.
+;; The 3 body tests, in the TRACKED C source.  After the MOVE they are the
+;; 3 plain booleans that C computes and hands to Scheme.  The old inline
+;; decision (the 2-branch return) is DELETED.
 (m59-imp2--check "s2/body-tests"
-                 (m59-imp2--holds-all
-                  "src/xfaces.c"
-                  '("if (EQ (value, Qunspecified) || (EQ (value, QCignore_defface)))"
-                    "else if (EQ (attribute, QCheight))"
-                    "return FIXNUMP (value) ? Qnil : Qt;")))
+                 (and (m59-imp2--holds-all
+                       "src/xfaces.c"
+                       '("bool a = EQ (value, Qunspecified) || EQ (value, QCignore_defface);"
+                         "bool b = EQ (attribute, QCheight);"
+                         "bool c = FIXNUMP (value);"
+                         "return m59_face_attribute_relative_p_scheme (a, b, c);"))
+                      (m59-imp2--holds-none
+                       "src/xfaces.c"
+                       '("return FIXNUMP (value) ? Qnil : Qt;"
+                         "if (EQ (value, Qunspecified) || (EQ (value, QCignore_defface)))"))))
 
 ;; 0 internal C callers.  Scope: src/xfaces.c ONLY, unit OCCURRENCES.  A
 ;; tree-wide count over src/*.[ch] is 2 on a built tree, because the

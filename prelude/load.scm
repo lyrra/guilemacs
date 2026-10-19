@@ -218,6 +218,7 @@
 ;; M52 imp-3 — the src/term.c TTY output boundary leaves in
 ;; (emacs tty-output).
 (use-modules (emacs tty-output))
+(use-modules (emacs faces))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)

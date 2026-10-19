@@ -199,7 +199,7 @@ draft hash)."
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
 (m46-imp1--check "scm-c-public-ref-260"
-                 (eql 265 (m46-imp1--count-scm-ref)))
+                 (eql 266 (m46-imp1--count-scm-ref)))
 (m46-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m46-imp1--lines "mod/emacs/tty-modes.scm")))
 (m46-imp1--check "callproc.c-lines-2387"

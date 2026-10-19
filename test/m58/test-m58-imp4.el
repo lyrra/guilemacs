@@ -688,7 +688,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (m58-imp4--check "surface/public-refs"
                  (and (eql 41 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
-                      (eql 265 (m58-imp4--src-public-refs))))
+                      (eql 266 (m58-imp4--src-public-refs))))
 
 (m58-imp4--check "surface/module-lines"
                  (eql 682 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))

@@ -343,7 +343,7 @@ the forbidden hub.")
                        (dir (expand-file-name "src" m47-imp3--root)))
                    (dolist (f (directory-files dir t "\\.[chm]\\'"))
                      (setq total (+ total (or (m47-imp3--count f "scm_c_public_ref") 0))))
-                   (eql 265 total)))
+                   (eql 266 total)))
 (m47-imp3--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp3--lines "src/keyboard.c")))
 (m47-imp3--check "keyboard-globals.c-lines-490"

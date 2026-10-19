@@ -294,7 +294,7 @@ real error, not a pass."
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
 (m45-imp2--check "scm-c-public-ref-260"
-                 (eql 265 (m45-imp2--count-scm-ref)))
+                 (eql 266 (m45-imp2--count-scm-ref)))
 (m45-imp2--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp2--lines "mod/emacs/tty-modes.scm")))
 ;; src/callproc.c: 2,184 (imp-1 base) -> 2,514 (imp-2) -> 2,380 (imp-3,

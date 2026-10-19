@@ -290,8 +290,8 @@ symbol `m55-imp5-guile-absent'."
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
 ;; Row 3: prelude/load.scm lines = 265.
-(m55-imp5--check "prelude-load.scm-lines-265"
-                 (eql 265 (m55-imp5--lines "prelude/load.scm")))
+(m55-imp5--check "prelude-load.scm-lines-266"
+                 (eql 266 (m55-imp5--lines "prelude/load.scm")))
 ;; Row 4: (symbol-function 'X) applies in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m55-imp5--check "loader.scm-symbol-function-apply-74"
@@ -312,8 +312,8 @@ symbol `m55-imp5-guile-absent'."
 ;; Row 8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71
 ;; (brief.org section 4).
-(m55-imp5--check "prelude-load.scm-use-modules-lines-70"
-                 (eql 70 (m55-imp5--count-lines "prelude/load.scm"
+(m55-imp5--check "prelude-load.scm-use-modules-lines-71"
+                 (eql 71 (m55-imp5--count-lines "prelude/load.scm"
                                                 "^(use-modules")))
 ;; Row 9: prelude/load.scm ^(init-...-registrations) lines = 31.
 (m55-imp5--check "prelude-load.scm-init-registrations-lines-31"

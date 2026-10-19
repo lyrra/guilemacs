@@ -126,7 +126,7 @@ the symbol `m43-imp6-absent' when REL does not exist."
                         (eql 11723 (+ k kg))
                         (eql 237 (- 11960 (+ k kg))))))
 (m43-imp6--check "surface/scm-c-public-ref-260"
-                 (eql 265 (m43-imp6--count-scm-ref)))
+                 (eql 266 (m43-imp6--count-scm-ref)))
 (m43-imp6--check "surface/tty-modes.scm-lines-313"
                  (eql 313 (m43-imp6--lines "mod/emacs/tty-modes.scm")))
 

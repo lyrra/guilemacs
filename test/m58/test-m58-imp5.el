@@ -416,7 +416,7 @@ the TRACKED file is absent and prints FAIL."
 
 (m58-imp5--check "v3/public-refs"
                  (and (eql 41 (m58-imp5--count "src/term.c" "scm_c_public_ref"))
-                      (eql 265 (m58-imp5--src-public-refs))))
+                      (eql 266 (m58-imp5--src-public-refs))))
 
 (m58-imp5--check "v3/module-lines"
                  (eql 682 (m58-imp5--count "mod/emacs/tty-output.scm" "\n")))

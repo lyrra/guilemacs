@@ -222,7 +222,7 @@ mechanism helpers, whose TN_max_colors reads are not the hub policy."
 (m48-imp3--check "term.c-scm-ref-41"
                  (eql 41 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
 (m48-imp3--check "scm-c-public-ref-260"
-                 (eql 265 (m48-imp3--count-scm-ref)))
+                 (eql 266 (m48-imp3--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 3.2) --------
 

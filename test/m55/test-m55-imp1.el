@@ -305,16 +305,16 @@ symbol `m55-imp1-guile-absent'."
                  (eql 1190 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
-(m55-imp1--check "prelude-load.scm-lines-265"
-                 (eql 265 (m55-imp1--lines "prelude/load.scm")))
+(m55-imp1--check "prelude-load.scm-lines-266"
+                 (eql 266 (m55-imp1--lines "prelude/load.scm")))
 (m55-imp1--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp1--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 (m55-imp1--check "loader.scm-symbol-fbound-guards-18"
                  (eql 18 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp1--check "prelude-load.scm-use-modules-70"
-                 (eql 70 (m55-imp1--count-lines "prelude/load.scm"
+(m55-imp1--check "prelude-load.scm-use-modules-71"
+                 (eql 71 (m55-imp1--count-lines "prelude/load.scm"
                                                 "^(use-modules")))
 (m55-imp1--check "prelude-load.scm-init-registrations-31"
                  (eql 31 (m55-imp1--count-lines "prelude/load.scm"

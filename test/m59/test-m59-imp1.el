@@ -4,14 +4,20 @@
 ;;; It is docs only: the C delta is 0 and the Scheme delta is 0.  It
 ;;; measures the surface at HEAD, classes every DEFUN of src/xfaces.c
 ;;; MOVE / STAYS C / NOT PROVEN, and records the A1 verdict with ONE
-;;; named candidate (face-attribute-relative-p, :4173) and ONE
-;;; runner-up (bitmap-spec-p, :813).
+;;; named candidate (face-attribute-relative-p, :4173 at imp-1) and ONE
+;;; runner-up (bitmap-spec-p, :813 at imp-1).
+;;;
+;;; M59 imp-3 LANDED the named candidate and re-pinned the surface rows
+;;; of S1 and S2: the DEFUN is at :4197, the file is 7,708 lines,
+;;; src/xfaces.c holds 1 scm_c_public_ref LINE, the tree-wide count is
+;;; 266 OCCURRENCES, and the inline decision is GONE (the 3 type tests
+;;; stay C; the combine is in ((emacs faces))).
 ;;;
 ;;; It pins these groups:
 ;;;
 ;;;   S1 -- the re-measured surface of docs/m59-plan.org section 2 (the
 ;;;         base e9f87b051 as an ANCESTOR of HEAD, the src/xfaces.c
-;;;         numbers, the 11 direct scm_* lines, the tree-wide
+;;;         numbers, the 16 direct scm_* lines, the tree-wide
 ;;;         scm_c_public_ref count, the pty-driver.py case pin, and the
 ;;;         corpus directory).  S1 holds 9 checks.  The (m59) group
 ;;;         registration is pinned by S4 and NOT here: a duplicate
@@ -55,8 +61,8 @@
 ;;; Every pin states its MEASURE UNIT: `m59-imp1--grep-c' counts LINES
 ;;; (the unit of `grep -c'), `m59-imp1--count' counts OCCURRENCES (the
 ;;; unit of `grep -o | wc -l'), and `m59-imp1--lines' counts NEWLINES
-;;; (the unit of `wc -l').  The 2 counts differ on this file: `guile'
-;;; matches 13 occurrences but 7 lines.
+;;; (the unit of `wc -l').  MEASURED after M59 imp-3: the token `guile'
+;;; matches 8 OCCURRENCES and 8 LINES in src/xfaces.c.
 
 (princ "=== m59 imp-1 src/xfaces.c face surface audit suite ===\n")
 
@@ -109,6 +115,18 @@ error, not a pass (docs/m59-plan.org)."
                  (goto-char (point-min))
                  (search-forward needle nil t)))))
     (and (not (eq hit 'm59-imp1-absent)) (and hit t))))
+
+(defun m59-imp1--holds-none (rel needles)
+  "Non-nil when the TRACKED file REL holds NO needle of NEEDLES.  An
+absent file returns the symbol `m59-imp1-absent', which fails the check."
+  (let ((res (m59-imp1--with rel
+               (lambda ()
+                 (let ((none t))
+                   (dolist (needle needles)
+                     (goto-char (point-min))
+                     (when (search-forward needle nil t) (setq none nil)))
+                   none)))))
+    (if (eq res 'm59-imp1-absent) res res)))
 
 (defun m59-imp1--holds-all (rel needles)
   "Non-nil when the TRACKED file REL holds every NEEDLE.  REL is read
@@ -343,34 +361,37 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
       (m59-imp1--info-skip "head-e9f87b051" "no git binary on PATH")
     (m59-imp1--check "head-e9f87b051" ok)))
 
-;; Unit: LINES (`wc -l').
-(m59-imp1--check "xfaces.c-lines-7685"
-                 (eql 7685 (m59-imp1--lines "src/xfaces.c")))
+;; Unit: LINES (`wc -l').  M59 imp-3 adds 23 net lines (the dispatcher,
+;; the include, and the shorter body).
+(m59-imp1--check "xfaces.c-lines-7708"
+                 (eql 7708 (m59-imp1--lines "src/xfaces.c")))
 ;; Unit: LINES (`grep -c "^DEFUN ("').
 (m59-imp1--check "xfaces.c-defun-count-33"
                  (eql 33 (m59-imp1--grep-c "src/xfaces.c" "^DEFUN (")))
-;; Unit: LINES (`grep -c scm_c_public_ref').
-(m59-imp1--check "xfaces.c-scm-ref-0"
-                 (eql 0 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
+;; Unit: LINES (`grep -c scm_c_public_ref').  1 after the M59 imp-3 MOVE:
+;; the dispatcher resolves (emacs faces) one time.
+(m59-imp1--check "xfaces.c-scm-ref-1"
+                 (eql 1 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -h ... | wc -l').
-(m59-imp1--check "tree-wide-scm-ref-265"
-                 (eql 265 (m59-imp1--count-scm-ref)))
-;; Unit: LINES (`grep -c guile' = 7).  The 7 lines of Guile coupling: the
-;; include (:229), the 2 real seams (:1046 guile_parse_color_spec, :3994
-;; guile_parse_face_bool_attribute), and 4 support lines.  The 2 seams
-;; are pinned by name too.
-(m59-imp1--check "xfaces.c-guile-lines-7"
-                 (and (eql 7 (m59-imp1--grep-c "src/xfaces.c" "guile"))
+(m59-imp1--check "tree-wide-scm-ref-266"
+                 (eql 266 (m59-imp1--count-scm-ref)))
+;; Unit: LINES (`grep -c guile' = 8).  The lines of Guile coupling: the
+;; 2 includes (:229, :230), the 2 real seams (:1047
+;; guile_parse_color_spec, :3995 guile_parse_face_bool_attribute), and 4
+;; support lines.  The 2 seams are pinned by name too.
+(m59-imp1--check "xfaces.c-guile-lines-8"
+                 (and (eql 8 (m59-imp1--grep-c "src/xfaces.c" "guile"))
                       (m59-imp1--contains-p "src/xfaces.c"
                                             "guile_parse_color_spec (spec)")
                       (m59-imp1--contains-p "src/xfaces.c"
                                             "guile_parse_face_bool_attribute")))
-;; Unit: LINES (`grep -c scm_ src/xfaces.c' = 11).  The file holds 11
-;; lines with a DIRECT scm_* call, at :1246 :1247 :1248 :1249 :1550
-;; :1551 :4003 :4023 :4599 :4601 :4611.  So "0 scm_c_public_ref, 2
-;; seams" does not state the full size of the Guile coupling.
-(m59-imp1--check "xfaces.c-scm-lines-11"
-                 (eql 11 (m59-imp1--grep-c "src/xfaces.c" "scm_")))
+;; Unit: LINES (`grep -c scm_ src/xfaces.c' = 16).  The file holds 16
+;; lines with a DIRECT scm_* call: the 11 old sites plus the 5 lines of
+;; the M59 imp-3 dispatcher (scm_c_public_ref, scm_is_true / SCM_CALL_3,
+;; and the 3 scm_from_bool arguments).  So "1 scm_c_public_ref" does not
+;; state the full size of the Guile coupling.
+(m59-imp1--check "xfaces.c-scm-lines-16"
+                 (eql 16 (m59-imp1--grep-c "src/xfaces.c" "scm_")))
 ;; M59 imp-1 adds NO PTY case.  The counted surface stays 32.  The group
 ;; pins must add up to the total, so a group pin that moves without the
 ;; total FAILS.
@@ -393,18 +414,26 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 
 (setq m59-imp1--group 's2)
 
-;; The NAMED candidate face-attribute-relative-p (:4173 ... :4193).  The
-;; site line, the 2 keyword symbols of the first test, the :height
-;; branch, and the final return.
+;; The NAMED candidate face-attribute-relative-p is now the FIRST LANDED
+;; MOVE row.  M59 imp-3 landed it: the DEFUN moved to :4197, C keeps the
+;; 3 type tests, and the combine is in Scheme ((emacs faces),
+;; face-attribute-relative-verdict).  The inline decision is GONE.
 (m59-imp1--check "candidate-face-attribute-relative-p"
-                 (and (eql 4173 (m59-imp1--line-of
+                 (and (eql 4197 (m59-imp1--line-of
                                  "src/xfaces.c"
                                  "^DEFUN (\"face-attribute-relative-p\""))
                       (m59-imp1--holds-all
                        "src/xfaces.c"
-                       '("if (EQ (value, Qunspecified) || (EQ (value, QCignore_defface)))"
-                         "else if (EQ (attribute, QCheight))"
-                         "return FIXNUMP (value) ? Qnil : Qt;"))))
+                       '("bool a = EQ (value, Qunspecified) || EQ (value, QCignore_defface);"
+                         "bool b = EQ (attribute, QCheight);"
+                         "bool c = FIXNUMP (value);"
+                         "return m59_face_attribute_relative_p_scheme (a, b, c);"
+                         "scm_c_public_ref (\"emacs faces\","
+                         "\"face-attribute-relative-verdict\");"))
+                      (m59-imp1--holds-none
+                       "src/xfaces.c"
+                       '("return FIXNUMP (value) ? Qnil : Qt;"
+                         "if (EQ (value, Qunspecified) || (EQ (value, QCignore_defface)))"))))
 
 ;; The candidate has 0 internal C callers: src/xfaces.c holds only the
 ;; DEFUN, and src/globals.h holds only the EXFUN.  So a port adds no
@@ -418,9 +447,9 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; The RUNNER-UP bitmap-spec-p (:813 ... :860) has 5 internal C callers,
 ;; so it ranks second.  The 5 caller lines are measured.
 (m59-imp1--check "runner-up-bitmap-spec-p"
-                 (and (eql 813 (m59-imp1--line-of
+                 (and (eql 814 (m59-imp1--line-of
                                 "src/xfaces.c" "^DEFUN (\"bitmap-spec-p\""))
-                      (equal '(877 1400 1914 2884 3583)
+                      (equal '(878 1401 1915 2885 3584)
                              (m59-imp1--sites "src/xfaces.c"
                                               "Fbitmap_spec_p"))))
 
@@ -451,12 +480,12 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; (safe_calln); row 24 color-distance (:4765) reads a struct frame
 ;; (:4777), a C hook (:4782 :4790), and calls the metric (:4801).
 (m59-imp1--check "not-proven-rows-2"
-                 (and (eql 4195 (m59-imp1--line-of
+                 (and (eql 4218 (m59-imp1--line-of
                                  "src/xfaces.c"
                                  "^DEFUN (\"merge-face-attribute\""))
-                      (eql 4765 (m59-imp1--line-of
+                      (eql 4788 (m59-imp1--line-of
                                  "src/xfaces.c" "^DEFUN (\"color-distance\""))
-                      (eql 2280 (m59-imp1--line-of
+                      (eql 2281 (m59-imp1--line-of
                                  "src/xfaces.c" "result = safe_calln (from, to)"))
                       (m59-imp1--holds-all
                        "src/xfaces.c"
@@ -478,7 +507,7 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; The color-spec row ALREADY LANDED: the body returns the Guile parser.
 ;; Do not port it again.
 (m59-imp1--check "already-landed-color-spec"
-                 (eql 1046 (m59-imp1--line-of
+                 (eql 1047 (m59-imp1--line-of
                             "src/xfaces.c" "guile_parse_color_spec (spec)")))
 
 ;; The boundary rule do-not-give-scheme-a-C-descriptor, by name in the

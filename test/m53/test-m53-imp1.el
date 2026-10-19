@@ -240,8 +240,8 @@ probe: the loader must read and evaluate a real Elisp file."
 (m53-imp1--check "tty-output.scm-lines-682"
                  (eql 682 (m53-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m53-imp1--check "tree-wide-scm-ref-265"
-                 (eql 265 (m53-imp1--count-scm-ref)))
+(m53-imp1--check "tree-wide-scm-ref-266"
+                 (eql 266 (m53-imp1--count-scm-ref)))
 
 ;;; --- S2. CHECK 1, the standalone loader -----------------------------
 

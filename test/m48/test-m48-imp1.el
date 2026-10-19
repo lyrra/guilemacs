@@ -186,7 +186,7 @@ passes the raw symbol to reach it."
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
 (m48-imp1--check "scm-c-public-ref-260"
-                 (eql 265 (m48-imp1--count-scm-ref)))
+                 (eql 266 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"

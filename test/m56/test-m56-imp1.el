@@ -264,8 +264,8 @@ host limit is a skip, never a pass (brief.org section 11)."
                  (eql 4 (m56-imp1--count-defun-leaf "src/term.c")))
 (m56-imp1--check "term.c-scm-ref-41"
                  (eql 41 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
-(m56-imp1--check "tree-wide-scm-ref-265"
-                 (eql 265 (m56-imp1--count-scm-ref)))
+(m56-imp1--check "tree-wide-scm-ref-266"
+                 (eql 266 (m56-imp1--count-scm-ref)))
 (m56-imp1--check "tty-output.scm-lines-682"
                  (eql 682 (m56-imp1--lines "mod/emacs/tty-output.scm")))
 (m56-imp1--check "termchar-file-streams-3"

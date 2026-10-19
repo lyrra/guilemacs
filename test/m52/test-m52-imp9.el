@@ -281,8 +281,8 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "m52-caps-rows-37"
                  (eql 37 (m52-imp9--caps-row-count)))
 ;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m52-imp9--check "tree-wide-scm-ref-265"
-                 (eql 265 (m52-imp9--count-scm-ref)))
+(m52-imp9--check "tree-wide-scm-ref-266"
+                 (eql 266 (m52-imp9--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 3.3) -------------------
 

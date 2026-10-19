@@ -288,13 +288,13 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "reader-lines-2021"
                  (eql 2021 (m56-imp3--lines "mod/emacs/reader.scm")))
 ;; A7: prelude/load.scm lines = 265.
-(m56-imp3--check "prelude-lines-265"
-                 (eql 265 (m56-imp3--lines "prelude/load.scm")))
+(m56-imp3--check "prelude-lines-266"
+                 (eql 266 (m56-imp3--lines "prelude/load.scm")))
 ;; A8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71
 ;; (brief.org section 4).
-(m56-imp3--check "prelude-use-modules-70"
-                 (eql 70 (m56-imp3--count-lines "prelude/load.scm"
+(m56-imp3--check "prelude-use-modules-71"
+                 (eql 71 (m56-imp3--count-lines "prelude/load.scm"
                                                 "^(use-modules")))
 ;; A9: prelude/load.scm ^(init-...-registrations) lines = 31.
 (m56-imp3--check "prelude-init-registrations-31"
@@ -317,8 +317,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "term-c-scm-ref-41"
                  (eql 41 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
 ;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
-(m56-imp3--check "tree-wide-scm-ref-265"
-                 (eql 265 (m56-imp3--count-scm-ref)))
+(m56-imp3--check "tree-wide-scm-ref-266"
+                 (eql 266 (m56-imp3--count-scm-ref)))
 ;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
 (m56-imp3--check "tty-output-lines-635"
                  (eql 682 (m56-imp3--lines "mod/emacs/tty-output.scm")))
