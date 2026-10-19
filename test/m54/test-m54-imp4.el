@@ -235,7 +235,7 @@ error, not a pass."
                        "\"m54-imp4-case-count\", len(group_cases(\"m54-imp4\")), 1")
                       (m54-imp4--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 31")))
+                       "\"total-case-count\", len(CASES), 32")))
 
 ;;; --- S5. The guards -------------------------------------------------
 

@@ -206,10 +206,10 @@ anchored match finds the definition only."
                     "src/term.c"
                     (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                             wrapper))))
-(m48-imp4--check "term.c-scm-ref-39"
-                 (eql 39 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
+(m48-imp4--check "term.c-scm-ref-41"
+                 (eql 41 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
 (m48-imp4--check "scm-c-public-ref-260"
-                 (eql 263 (m48-imp4--count-scm-ref)))
+                 (eql 265 (m48-imp4--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 4.4) --------
 

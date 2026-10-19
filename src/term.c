@@ -116,6 +116,14 @@ static const char *m52_cap_string_1 (struct tty_display_info *, Lisp_Object);
    call site.  The m54_tty_tabs_ name reuses no static helper
    (docs/kb.org =term-hub-helper-name-collision=).  */
 static Lisp_Object m54_tty_tabs_verdict_scheme (Lisp_Object, Lisp_Object);
+/* M58 imp-4: the Group B color-mode DECISION dispatchers.  The call
+   sites (tty_setup_colors, set_tty_color_mode) come later in this
+   file, so the prototypes are declared here.  The m58_tty_color_
+   names reuse no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).  */
+static Lisp_Object m58_tty_color_mode_tag_scheme (Lisp_Object);
+static Lisp_Object m58_tty_color_mode_changed_scheme (Lisp_Object,
+						      Lisp_Object);
 static void clear_tty_hooks (struct terminal *terminal);
 static void set_tty_hooks (struct terminal *terminal);
 static void dissociate_if_controlling_tty (int fd);
@@ -2683,6 +2691,49 @@ static char *default_orig_pair;
 static char *default_set_foreground;
 static char *default_set_background;
 
+/* FIX-20261019-guilemacs: M58 imp-4 -- the Group B color-mode
+   DECISION moved to pure procedures of (emacs tty-output):
+
+     tty-color-mode-tag        the mode canonicalization and the
+                               -1 / 0 / 8 scheme choice of
+                               tty_setup_colors
+     tty-color-mode-changed-p  the change gate of set_tty_color_mode
+
+   C keeps every mechanism: the 3 cap strings (including the TERMINFO
+   variants of the 8-color scheme), every TN_* and TS_* write, the
+   static default slots, tty_default_color_capabilities save / restore,
+   the f->param_alist and tty-color-mode-alist resolve, the
+   TYPE_RANGED_FIXNUMP narrowing, the RAW previous_color_mode store,
+   safe_calln (Qtty_set_up_initial_frame_faces), and the FILE *
+   streams.  C resolves each Lisp value to a plain int and passes
+   make_fixnum, so no Lisp_Object, struct frame *, or
+   struct tty_display_info * crosses the seam (docs/kb.org
+   =passthrough-leaf-is-not-a-port=).
+
+   The inline C decision is DELETED, not kept as a second path: a
+   rewire that leaves the decision in C is a C dedup, not a port.  An
+   unknown tag, which means a broken or missing module, emits nothing
+   and raises no error (the turn_off_face rule).  */
+
+static Lisp_Object
+m58_tty_color_mode_tag_scheme (Lisp_Object mode)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output", "tty-color-mode-tag");
+  return SCM_CALL_1 (proc, mode);
+}
+
+static Lisp_Object
+m58_tty_color_mode_changed_scheme (Lisp_Object mode, Lisp_Object previous)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output",
+			     "tty-color-mode-changed-p");
+  return SCM_CALL_2 (proc, mode, previous);
+}
+
 /* Save or restore the default color-related capabilities of this
    terminal.  */
 static void
@@ -2714,34 +2765,35 @@ tty_default_color_capabilities (struct tty_display_info *tty, bool save)
 static void
 tty_setup_colors (struct tty_display_info *tty, int mode)
 {
-  /* Canonicalize all negative values of MODE.  */
-  if (mode < -1)
-    mode = -1;
+  /* FIX-20261019-guilemacs: the canonicalization and the scheme choice
+     come from tty-color-mode-tag.  The body below is the MECHANISM
+     only: the cap strings and the TN_* / TS_* writes stay C.  */
+  Lisp_Object tag = m58_tty_color_mode_tag_scheme (make_fixnum (mode));
 
-  switch (mode)
+  if (m52_tty_step_tag_p (tag, "none"))
     {
-      case -1:	 /* no colors at all */
-	tty->TN_max_colors = 0;
-	tty->TN_no_color_video = 0;
-	tty->TS_set_foreground = tty->TS_set_background = tty->TS_orig_pair = NULL;
-	break;
-      case 0:	 /* default colors, if any */
-      default:
-	tty_default_color_capabilities (tty, 0);
-	break;
-      case 8:	/* 8 standard ANSI colors */
-	tty->TS_orig_pair = "\033[0m";
-#ifdef TERMINFO
-	tty->TS_set_foreground = "\033[3%p1%dm";
-	tty->TS_set_background = "\033[4%p1%dm";
-#else
-	tty->TS_set_foreground = "\033[3%dm";
-	tty->TS_set_background = "\033[4%dm";
-#endif
-	tty->TN_max_colors = 8;
-	tty->TN_no_color_video = 0;
-	break;
+      tty->TN_max_colors = 0;
+      tty->TN_no_color_video = 0;
+      tty->TS_set_foreground = tty->TS_set_background = tty->TS_orig_pair = NULL;
     }
+  else if (m52_tty_step_tag_p (tag, "ansi-8"))
+    {
+      tty->TS_orig_pair = "\033[0m";
+#ifdef TERMINFO
+      tty->TS_set_foreground = "\033[3%p1%dm";
+      tty->TS_set_background = "\033[4%p1%dm";
+#else
+      tty->TS_set_foreground = "\033[3%dm";
+      tty->TS_set_background = "\033[4%dm";
+#endif
+      tty->TN_max_colors = 8;
+      tty->TN_no_color_video = 0;
+    }
+  else if (m52_tty_step_tag_p (tag, "default"))
+    tty_default_color_capabilities (tty, 0);
+  /* An unknown tag means a broken or missing module.  Emit nothing and
+     raise no error, as turn_off_face does: the terminal keeps its
+     current capabilities.  */
 }
 
 void
@@ -2768,13 +2820,23 @@ set_tty_color_mode (struct tty_display_info *tty, struct frame *f)
 
   mode = TYPE_RANGED_FIXNUMP (int, color_mode) ? XFIXNUM (color_mode) : 0;
 
-  if (mode != tty->previous_color_mode)
-    {
-      tty->previous_color_mode = mode;
-      tty_setup_colors (tty , mode);
-      /*  This recomputes all the faces given the new color definitions.  */
-      safe_calln (Qtty_set_up_initial_frame_faces);
-    }
+  /* FIX-20261019-guilemacs: the change gate comes from
+     tty-color-mode-changed-p, which compares the RAW modes.  A
+     non-fixnum verdict means a broken module; a broken module answers
+     "no change", so C writes no capability and raises no error.  */
+  {
+    Lisp_Object changed
+      = m58_tty_color_mode_changed_scheme (make_fixnum (mode),
+					   make_fixnum (tty->previous_color_mode));
+
+    if (FIXNUMP (changed) && XFIXNUM (changed) != 0)
+      {
+	tty->previous_color_mode = mode;
+	tty_setup_colors (tty , mode);
+	/*  This recomputes all the faces given the new color definitions.  */
+	safe_calln (Qtty_set_up_initial_frame_faces);
+      }
+  }
 }
 
 #endif /* !DOS_NT && !HAVE_ANDROID */

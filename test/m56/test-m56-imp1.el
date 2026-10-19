@@ -256,25 +256,25 @@ host limit is a skip, never a pass (brief.org section 11)."
       (m56-imp1--info-skip "head-30213d139" "no git binary on PATH")
     (m56-imp1--check "head-30213d139" ok)))
 
-(m56-imp1--check "term.c-lines-6363"
-                 (eql 6363 (m56-imp1--lines "src/term.c")))
+(m56-imp1--check "term.c-lines-6425"
+                 (eql 6425 (m56-imp1--lines "src/term.c")))
 (m56-imp1--check "term.c-defun-count-29"
                  (eql 29 (m56-imp1--count "src/term.c" "^DEFUN (")))
 (m56-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m56-imp1--count-defun-leaf "src/term.c")))
-(m56-imp1--check "term.c-scm-ref-39"
-                 (eql 39 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
-(m56-imp1--check "tree-wide-scm-ref-263"
-                 (eql 263 (m56-imp1--count-scm-ref)))
-(m56-imp1--check "tty-output.scm-lines-635"
-                 (eql 637 (m56-imp1--lines "mod/emacs/tty-output.scm")))
+(m56-imp1--check "term.c-scm-ref-41"
+                 (eql 41 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
+(m56-imp1--check "tree-wide-scm-ref-265"
+                 (eql 265 (m56-imp1--count-scm-ref)))
+(m56-imp1--check "tty-output.scm-lines-682"
+                 (eql 682 (m56-imp1--lines "mod/emacs/tty-output.scm")))
 (m56-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m56-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m56-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m56-imp1--check "pty-driver-cases-31"
+(m56-imp1--check "pty-driver-cases-32"
                  (m56-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 31"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 32"))
 
 ;;; --- S2. The row map (brief.org section 4) --------------------------
 

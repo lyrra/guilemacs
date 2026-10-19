@@ -266,7 +266,7 @@ block names."
                  (eql 3 (m50-imp4--count "src/emacs.c"
                                          "FIX-20261006-guilemacs")))
 (m50-imp4--check "scm-c-public-ref-260"
-                 (eql 263 (m50-imp4--count-scm-ref)))
+                 (eql 265 (m50-imp4--count-scm-ref)))
 ;; The two tokens of the deleted typed leaf are absent.
 (m50-imp4--check "leaf-token-absent"
                  (not (m50-imp4--contains-p "src/emacs.c"

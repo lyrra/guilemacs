@@ -26,8 +26,8 @@
 ;;;         that must NOT be there, and the DELETED inline decision.
 ;;;         U3 holds 6 checks.
 ;;;   U4 -- the 5 real-path PTY cases in test/pty-driver.py: their names,
-;;;         the (m58-imp3) group, the case-count pins (TOTAL 31 = the SUM
-;;;         of the 18 group pins), the distinct marker spans, and the
+;;;         the (m58-imp3) group, the case-count pins (TOTAL 32 = the SUM
+;;;         of the 19 group pins), the distinct marker spans, and the
 ;;;         ordered needle run of the color case.  U4 holds 4 checks.
 ;;;   U5 -- the cross-corpus re-pins: this MOVE moves the src/term.c and
 ;;;         mod/emacs/tty-output.scm line counts, the scm_c_public_ref
@@ -486,13 +486,13 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
                          "\"m58-imp3\")"))
                       (m58-imp3--contains-p
                        "test/pty-driver.py"
-                       "+ M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES)")))
+                       "+ M58_IMP3_CASES")))
 
-(m58-imp3--check "pty/case-counts-31"
+(m58-imp3--check "pty/case-counts-32"
                  (let ((pins (m58-imp3--pty-case-pins)))
                    (and (consp pins)
-                        (eql 31 (car pins))
-                        ;; The 18 group pins must add up to the total, so
+                        (eql 32 (car pins))
+                        ;; The 19 group pins must add up to the total, so
                         ;; a group pin that moves alone FAILS.
                         (eql (car pins) (cdr pins)))))
 
@@ -533,22 +533,22 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 (m58-imp3--check "repin/imp1-surface"
                  (and (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
-                       "(eql 6363 (m58-imp1--lines \"src/term.c\"))")
+                       "(eql 6425 (m58-imp1--lines \"src/term.c\"))")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
-                       "(eql 39 (m58-imp1--count \"src/term.c\" \"scm_c_public_ref\"))")
+                       "(eql 41 (m58-imp1--count \"src/term.c\" \"scm_c_public_ref\"))")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
-                       "(eql 263 (m58-imp1--count-scm-ref))")
+                       "(eql 265 (m58-imp1--count-scm-ref))")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
-                       "(eql 637 (m58-imp1--lines \"mod/emacs/tty-output.scm\"))")))
+                       "(eql 682 (m58-imp1--lines \"mod/emacs/tty-output.scm\"))")))
 
 (m58-imp3--check "repin/imp1-cases-and-group-a"
                  (and (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el" "\"pty-driver-cases-31\"")
+                       "test/m58/test-m58-imp1.el" "\"pty-driver-cases-32\"")
                       (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el" "(eql 31 (car pins))")
+                       "test/m58/test-m58-imp1.el" "(eql 32 (car pins))")
                       ;; The Group A row re-pin: TTY_CAPABLE_P_TRY is
                       ;; gone, so the row pins the 3 dispatcher keys.
                       (m58-imp3--contains-p
@@ -556,16 +556,16 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 
 (m58-imp3--check "repin/imp2-signatures-and-total"
                  (and (string= "turn_on_face (struct frame *f, struct face *face)"
-                               (or (m58-imp3--line-text "src/term.c" 2372) ""))
+                               (or (m58-imp3--line-text "src/term.c" 2380) ""))
                       (string= "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                               (or (m58-imp3--line-text "src/term.c" 2495) ""))
+                               (or (m58-imp3--line-text "src/term.c" 2503) ""))
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp2.el"
-                       "(m58-imp2--line-text \"src/term.c\" 2371)")
+                       "(m58-imp2--line-text \"src/term.c\" 2379)")
                       (m58-imp3--contains-p
-                       "test/m58/test-m58-imp2.el" "\"pty-case-counts-31\"")
+                       "test/m58/test-m58-imp2.el" "\"pty-case-counts-32\"")
                       (m58-imp3--contains-p
-                       "test/m58/test-m58-imp2.el" "(eql 31 (car pins))")
+                       "test/m58/test-m58-imp2.el" "(eql 32 (car pins))")
                       (m58-imp3--contains-p "tool/run-tests.scm"
                                             "test/m58/test-m58-imp3.el")))
 

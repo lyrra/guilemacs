@@ -57,6 +57,15 @@
 ;;; section 5: a plain value box, not a FILE * and not a port over one.
 ;;; The state is *C owned, Scheme borrowed* (docs/m54-plan.org sect. 6).
 ;;;
+;;; M58 imp-4 (the Group B color-mode DECISION).  The mode
+;;; canonicalization and the -1 / 0 / 8 scheme choice of
+;;; tty_setup_colors, and the change gate of set_tty_color_mode, are
+;;; pure procedures of this module: tty-color-mode-tag and
+;;; tty-color-mode-changed-p.  The DECISION moved; the cap strings,
+;;; the TN_* / TS_* writes, the static default slots, the param_alist
+;;; and tty-color-mode-alist resolve, the raw previous_color_mode
+;;; store, and the FILE * streams stay C.
+;;;
 ;;; Conventions (identical to M9-M51): defelisp delayed references for
 ;;; every C DEFUN ((force %--foo)); elisp nil is #nil; no module-level
 ;;; mutable state.
@@ -82,7 +91,8 @@
             tty-clear-end-of-line-steps
             tty-set-terminal-window-steps tty-set-scroll-region-steps
             tty-delete-glyphs-steps tty-ins-del-lines-steps
-            tty-face-on-steps tty-face-off-steps tty-capable-p))
+            tty-face-on-steps tty-face-off-steps tty-capable-p
+            tty-color-mode-tag tty-color-mode-changed-p))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -635,3 +645,38 @@
           (blocked? #x20 #x40 #x40))  ; TTY_CAP_STRIKE_THROUGH   NC_STRIKE_THROUGH
       0
       1))
+
+;; M58 imp-4: the Group B color-mode DECISION of src/term.c.  The
+;; canonicalization and the -1 / 0 / 8 scheme choice of
+;; tty_setup_colors move HERE.  C keeps every mechanism: the 3 cap
+;; strings (including the TERMINFO variants of the 8-color scheme),
+;; every TN_* and TS_* write, the static default slots,
+;; tty_default_color_capabilities save / restore, the
+;; f->param_alist and tty-color-mode-alist resolve, the
+;; TYPE_RANGED_FIXNUMP narrowing, the raw previous_color_mode store,
+;; safe_calln, and the FILE * streams.  C resolves the Lisp value to a
+;; plain int first, so no Lisp_Object, struct frame *, or
+;; struct tty_display_info * crosses the seam.
+
+;; The scheme tag of one color MODE.  MODE is a plain fixnum.  Return
+;; one plain tag list:
+;;
+;;   ("none")    no colors at all (TN_max_colors 0, the 3 TS_* NULL)
+;;   ("ansi-8")  the 8 standard ANSI colors
+;;   ("default") the default capabilities, if any
+;;
+;; The canonicalization belongs HERE: every mode below -1 (-5, -1)
+;; gives ("none"), so C canonicalizes no second time.
+(define (tty-color-mode-tag mode)
+  (cond
+   ((< mode -1) (list "none"))
+   ((= mode -1) (list "none"))
+   ((= mode 8) (list "ansi-8"))
+   (else (list "default"))))
+
+;; The change gate of set_tty_color_mode.  MODE and PREVIOUS are the
+;; RAW color modes (plain fixnums).  Return the plain fixnum 1 when the
+;; mode changed, else 0.  The compare is on the RAW modes: -5 and -1
+;; are a change, even though both give the same ("none") scheme.
+(define (tty-color-mode-changed-p mode previous)
+  (if (= mode previous) 0 1))

@@ -59,6 +59,11 @@ Optional keys: `bytes` to write to the pty master, `close_master` to
 take the terminal away after READY, and `env_gate` to turn a value
 mismatch into an INFO skip on a host that cannot produce the result.
 
+A case may also carry `info_report_prefix`.  When the probe's OWN value
+STARTS WITH that prefix, the driver reports an INFO skip and drops the
+prefix from the reason.  This is a NARROW skip: every other value
+mismatch stays a real FAIL.  It is not the catch-all `env_gate`.
+
 Python 3 only.  No third-party module.
 
 Usage:
@@ -1676,11 +1681,92 @@ M58_IMP3_CASES = (
     },
 )
 
+# --------------------------------------------------------------------
+# M58 imp-4: the Group B color-mode DECISION, after the MOVE.
+#
+# The MOVE (src/term.c + (emacs tty-output)) puts the DECISION in
+# Scheme: tty-color-mode-tag (the canonicalization and the -1 / 0 / 8
+# scheme choice of tty_setup_colors) and tty-color-mode-changed-p (the
+# change gate of set_tty_color_mode).  C keeps every mechanism.
+#
+# The trigger is a FRAME SWITCH.  set_tty_color_mode has one caller,
+# redisplay_internal, and that call tests the terminal's previous_frame.
+# A plain (redisplay t) on the same frame does NOT run the gate, so the
+# probe makes a SECOND tty frame on the same terminal and switches.
+#
+# The case pins a VALUE, not a byte span: ("8 0 8") from
+# tty-display-color-cells, the only observable of the scheme choice.
+#
+#   switch 1  mode 8    the 8-color scheme gives 8 cells
+#   switch 2  mode -5   the canonicalization: -5 becomes -1 -> 0 cells
+#   switch 3  mode 8    the gate fires a SECOND time (a stuck gate
+#                       leaves 0, the value of switch 2)
+#
+# The 3 values do not depend on the terminfo entry of the host, so the
+# case does NOT use expect_terminfo and does NOT use span_requires.
+#
+# A host that cannot create a second tty frame reports the NARROW
+# m58-imp4-skip: prefix.  Every other error reaches the driver as a
+# FAIL.
+#
+# Negative control (measured 2026-10-19 on this tree, then reverted):
+# with tty-color-mode-changed-p forced to return 0 always reports
+# "8 8 8", not "8 0 8".  The first value repeats, so the SECOND switch
+# no longer reaches tty_setup_colors.  The case is green again after the
+# revert.
+M58_IMP4_END = b"M58I4-END!"
+
+M58_IMP4_PROBE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (make-frame (c 'make-frame))
+       (select-frame (c 'select-frame))
+       (set-param (c 'set-frame-parameter))
+       (redisplay (c 'redisplay))
+       (cells (c 'tty-display-color-cells))
+       (selected (c 'selected-frame))
+       (send (c 'send-string-to-terminal))
+       (switch (lambda (frame mode)
+                 (set-param frame 'tty-color-mode mode)
+                 (select-frame frame)
+                 (redisplay #t)
+                 (cells)))
+       (f1 (selected))
+       (f2 (catch #t (lambda () (make-frame)) (lambda args #f))))
+  (if (not f2)
+      (string-append "m58-imp4-skip: cannot make a second tty frame")
+      (let ((a (switch f2 8))
+            (b (switch f1 -5))
+            (d (switch f2 8)))
+        (send "M58I4-END!")
+        (format #f "~a ~a ~a" a b d))))
+"""
+
+M58_IMP4_SKIP = "m58-imp4-skip:"
+
+M58_IMP4_CASES = (
+    {
+        "name": "m58-imp4/color-mode-e2e",
+        "group": "m58-imp4",
+        "probe": M58_IMP4_PROBE,
+        # Two tty frames on one terminal, 3 frame switches.  The value
+        # 8 0 8 proves the canonicalization (-5 gives -1 gives 0 cells)
+        # and a gate that fires two times.
+        "expect": "8 0 8",
+        "pty_contains": M58_IMP4_END,
+        # The ONLY skip: the probe's own prefix.  Every other mismatch
+        # is a real FAIL.
+        "info_report_prefix": M58_IMP4_SKIP,
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
-         + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES)
+         + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
+         + M58_IMP4_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -1688,7 +1774,7 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m52-imp8",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
-          "m58-imp2", "m58-imp3")
+          "m58-imp2", "m58-imp3", "m58-imp4")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -1941,6 +2027,12 @@ def verdict(case, got):
             return ("PASS", "measured %r" % got)
         return ("FAIL", "measured %r want %r (terminfo)" % (got, want))
     want = expect_string(case)
+    # M58 imp-4: a NARROW skip.  Only the probe's own prefix is an INFO
+    # skip; every other value mismatch stays a real FAIL.  This is not
+    # the catch-all env_gate.
+    skip = case.get("info_report_prefix")
+    if skip is not None and isinstance(got, str) and got.startswith(skip):
+        return ("INFO", got[len(skip):].strip())
     if got == want:
         return ("PASS", "measured %r" % got)
     if case.get("env_gate"):
@@ -2617,7 +2709,8 @@ def selftest():
     check("m56-imp2-case-count", len(group_cases("m56-imp2")), 1)
     check("m58-imp2-case-count", len(group_cases("m58-imp2")), 1)
     check("m58-imp3-case-count", len(group_cases("m58-imp3")), 5)
-    check("total-case-count", len(CASES), 31)
+    check("m58-imp4-case-count", len(group_cases("m58-imp4")), 1)
+    check("total-case-count", len(CASES), 32)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
@@ -2997,6 +3090,18 @@ def selftest():
     # ... but it still PASSes on the expected value.
     check("env-gate-match-passes",
           verdict(_case("m42-imp4/case-5-terminal-loss"), "-2 0 -")[0], "PASS")
+
+    # M58 imp-4: the info_report_prefix skip is NARROW.  The probe's own
+    # prefix is an INFO skip; a WRONG value is a real FAIL, and a value
+    # that merely contains the prefix is not a skip.
+    imp4 = _case("m58-imp4/color-mode-e2e")
+    check("m58-imp4-explicit-skip-is-info",
+          verdict(imp4, M58_IMP4_SKIP + " cannot make a second tty frame")[0],
+          "INFO")
+    check("m58-imp4-wrong-value-fails", verdict(imp4, "8 8 8")[0], "FAIL")
+    check("m58-imp4-prefix-must-lead",
+          verdict(imp4, "x" + M58_IMP4_SKIP)[0], "FAIL")
+    check("m58-imp4-value-passes", verdict(imp4, "8 0 8")[0], "PASS")
 
     # --- the M42 case-table models --------------------------------------
     # The case-6 continuation must match the code under test: the first

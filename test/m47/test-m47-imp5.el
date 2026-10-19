@@ -360,7 +360,7 @@ the forbidden hub.")
                      (setq total (+ total
                                     (or (m47-imp5--count f "scm_c_public_ref")
                                         0))))
-                   (and (integerp total) (eql 263 total))))
+                   (and (integerp total) (eql 265 total))))
 
 ;;; --- T7. The group and the guards -----------------------------------
 

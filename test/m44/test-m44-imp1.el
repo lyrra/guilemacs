@@ -189,7 +189,7 @@ regression, and must not turn the gate red."
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
 (m44-imp1--check "scm-c-public-ref-260"
-                 (eql 263 (m44-imp1--count-scm-ref)))
+                 (eql 265 (m44-imp1--count-scm-ref)))
 (m44-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m44-imp1--lines "mod/emacs/tty-modes.scm")))
 

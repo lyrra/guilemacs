@@ -287,18 +287,18 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
       (m58-imp1--info-skip "head-fca28d3be" "no git binary on PATH")
     (m58-imp1--check "head-fca28d3be" ok)))
 
-(m58-imp1--check "term.c-lines-6363"
-                 (eql 6363 (m58-imp1--lines "src/term.c")))
+(m58-imp1--check "term.c-lines-6425"
+                 (eql 6425 (m58-imp1--lines "src/term.c")))
 (m58-imp1--check "term.c-defun-count-29"
                  (eql 29 (m58-imp1--count "src/term.c" "^DEFUN (")))
 (m58-imp1--check "term.c-leaf-defun-count-4"
                  (eql 4 (m58-imp1--count-defun-leaf "src/term.c")))
-(m58-imp1--check "term.c-scm-ref-39"
-                 (eql 39 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
-(m58-imp1--check "tree-wide-scm-ref-263"
-                 (eql 263 (m58-imp1--count-scm-ref)))
-(m58-imp1--check "tty-output.scm-lines-635"
-                 (eql 637 (m58-imp1--lines "mod/emacs/tty-output.scm")))
+(m58-imp1--check "term.c-scm-ref-41"
+                 (eql 41 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
+(m58-imp1--check "tree-wide-scm-ref-265"
+                 (eql 265 (m58-imp1--count-scm-ref)))
+(m58-imp1--check "tty-output.scm-lines-682"
+                 (eql 682 (m58-imp1--lines "mod/emacs/tty-output.scm")))
 (m58-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
@@ -308,10 +308,10 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; moves from 25 to 31.  The re-pin lands in the SAME commit as the new
 ;; cases, else this check goes red.  The imp-2 corpus T5 and the imp-3
 ;; corpus U2 pin this re-pin from the other side.
-(m58-imp1--check "pty-driver-cases-31"
+(m58-imp1--check "pty-driver-cases-32"
                  (let ((pins (m58-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 31 (car pins))
+                        (eql 32 (car pins))
                         ;; The group pins must add up to the total, so a
                         ;; group pin that moves without the total FAILS.
                         (eql (car pins) (cdr pins)))))

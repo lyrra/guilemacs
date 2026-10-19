@@ -158,7 +158,7 @@ FAIL with no ERT test would leave the exit code 0 (cr.org finding
 (m47-imp6--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp6--lines "mod/emacs/fileio.scm")))
 (m47-imp6--check "tree-wide-scm-public-ref-260"
-                 (eql 263 (m47-imp6--count-scm-ref)))
+                 (eql 265 (m47-imp6--count-scm-ref)))
 (m47-imp6--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp6--lines "src/keyboard.c")))
 (m47-imp6--check "keyboard.c-defuns-447"

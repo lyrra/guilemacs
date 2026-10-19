@@ -153,7 +153,7 @@ of the presence of docs/."
 (m46-imp4--check "filelock.scm-lines-104"
                  (eql 104 (m46-imp4--lines "mod/emacs/filelock.scm")))
 (m46-imp4--check "scm-c-public-ref-260"
-                 (eql 263 (m46-imp4--count-scm-ref)))
+                 (eql 265 (m46-imp4--count-scm-ref)))
 (m46-imp4--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp4--lines "src/callproc.c")))
 (m46-imp4--check "callproc.c-defuns-7"

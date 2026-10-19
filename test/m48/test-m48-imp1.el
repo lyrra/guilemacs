@@ -175,18 +175,18 @@ passes the raw symbol to reach it."
 ;;; two geometry leaves and their C arithmetic were removed; the Scheme
 ;;; module now owns the geometry arithmetic.  The current source has 29
 ;;; DEFUNs and 36 term.c refs.  The keyboard surface does not move.
-(m48-imp1--check "term.c-lines-6363"
-                 (eql 6363 (m48-imp1--lines "src/term.c")))
+(m48-imp1--check "term.c-lines-6425"
+                 (eql 6425 (m48-imp1--lines "src/term.c")))
 (m48-imp1--check "term.c-defuns-29"
                  (eql 29 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
-(m48-imp1--check "term.c-scm-ref-39"
-                 (eql 39 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
+(m48-imp1--check "term.c-scm-ref-41"
+                 (eql 41 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
 (m48-imp1--check "term.c-has-guile.h"
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
 (m48-imp1--check "scm-c-public-ref-260"
-                 (eql 263 (m48-imp1--count-scm-ref)))
+                 (eql 265 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"
