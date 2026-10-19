@@ -180,8 +180,8 @@ passes the raw symbol to reach it."
                  (m49-imp1--tracked-p "src/dired.c" "#include \"guile.h\""))
 (m49-imp1--check "dired-module-present"
                  (m49-imp1--exists-p "mod/emacs/dired.scm"))
-(m49-imp1--check "scm-c-public-ref-260"
-                 (eql 266 (m49-imp1--count-scm-ref)))
+(m49-imp1--check "scm-c-public-ref-267"
+                 (eql 267 (m49-imp1--count-scm-ref)))
 
 ;;; --- D2. The block map (docs/m49-plan.org section 3.1) ---------------
 ;;

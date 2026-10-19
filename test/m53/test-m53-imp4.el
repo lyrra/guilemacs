@@ -179,8 +179,8 @@ host limit is a skip, never a pass (brief.org section 8)."
 (m53-imp4--check "tty-output.scm-lines-682"
                  (eql 682 (m53-imp4--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m53-imp4--check "tree-wide-scm-ref-266"
-                 (eql 266 (m53-imp4--count-scm-ref)))
+(m53-imp4--check "tree-wide-scm-ref-267"
+                 (eql 267 (m53-imp4--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 5) ---------------------
 

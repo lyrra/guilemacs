@@ -244,15 +244,19 @@ file gives the symbol `m59-imp3-absent', which is a FAIL, not a pass."
 (m59-imp3--check "module-present"
                  (m59-imp3--exists-p "mod/emacs/faces.scm"))
 
-;; ONE #:export entry, and it names the procedure that C resolves.  A
-;; drifted name makes `scm_c_public_ref' fail at the first call.
-(m59-imp3--check "module-one-export"
+;; ONE #:export FORM that names the procedure that C resolves.  M59
+;; imp-4 added a second entry (bitmap-spec-verdict) to the same form, so
+;; the pin follows that landing: the MOVE this corpus proves is
+;; face-attribute-relative-verdict, and that entry must stay.  A drifted
+;; name makes `scm_c_public_ref' fail at the first call.
+(m59-imp3--check "module-export-entry"
                  (and (eql 1 (m59-imp3--grep-c "mod/emacs/faces.scm"
                                                "^  #:export ("))
                       (m59-imp3--holds-all
                        "mod/emacs/faces.scm"
                        '("(define-module (emacs faces)"
-                         "#:export (face-attribute-relative-verdict)"))))
+                         "#:export (face-attribute-relative-verdict"
+                         "bitmap-spec-verdict))"))))
 (m59-imp3--check "module-procedure"
                  (m59-imp3--holds-all
                   "mod/emacs/faces.scm"
@@ -382,13 +386,15 @@ file gives the symbol `m59-imp3-absent', which is a FAIL, not a pass."
 ;; Unit: LINES (`grep -c "^DEFUN ("').
 (m59-imp3--check "c/defun-count-33"
                  (eql 33 (m59-imp3--grep-c "src/xfaces.c" "^DEFUN (")))
-;; Unit: LINES (`grep -c scm_c_public_ref src/xfaces.c' = 1).
-(m59-imp3--check "c/xfaces-scm-ref-1"
-                 (eql 1 (m59-imp3--grep-c "src/xfaces.c"
+;; Unit: LINES (`grep -c scm_c_public_ref src/xfaces.c' = 2).  1 after
+;; the imp-3 MOVE, 2 after the M59 imp-4 MOVE (the bitmap-spec-p
+;; dispatcher resolves ((emacs faces)) one time as well).
+(m59-imp3--check "c/xfaces-scm-ref-2"
+                 (eql 2 (m59-imp3--grep-c "src/xfaces.c"
                                           "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -o scm_c_public_ref src/*.h src/*.c | wc -l').
-(m59-imp3--check "c/tree-wide-scm-ref-266"
-                 (eql 266 (m59-imp3--src-public-refs)))
+(m59-imp3--check "c/tree-wide-scm-ref-267"
+                 (eql 267 (m59-imp3--src-public-refs)))
 
 ;;; --- U4. The negative control ---------------------------------------
 

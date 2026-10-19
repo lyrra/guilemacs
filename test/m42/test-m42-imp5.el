@@ -132,11 +132,11 @@ corpus pins is tracked, so an absent one means a broken checkout."
                  (eql 24 (m42-imp5--count "src/xdisp.c" "^DEFUN (\"")))
 ;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
 ;; src/*.m, like the measurement in brief.org section 7.1.
-(m42-imp5--check "surface/tree-ref-sites-260"
+(m42-imp5--check "surface/tree-ref-sites-267"
                  (let ((files (directory-files (expand-file-name "src" m42-imp5--root)
                                                t "\\.\\(c\\|h\\|m\\)\\'")))
                    (and (consp files)
-                        (eql 266
+                        (eql 267
                              (let ((n 0))
                                (dolist (f files)
                                  (with-temp-buffer

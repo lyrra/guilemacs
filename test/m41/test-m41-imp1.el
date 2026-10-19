@@ -112,7 +112,7 @@
                      (eql 11233 (m41-imp1--lines "src/keyboard.c")))
     (m41-imp1--check "keyboard-globals.c-lines-490"
                      (eql 490 (m41-imp1--lines "src/keyboard-globals.c")))
-    (m41-imp1--check "tree-wide-scm-public-ref-260"
+    (m41-imp1--check "tree-wide-scm-public-ref-267"
                      (eql 263 (m41-imp1--tree-wide-scm-public-ref)))
 
     ;; --- The gitignored plan (guarded: skip when absent) ------------

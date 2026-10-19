@@ -180,8 +180,8 @@ princ'd FAIL with no ERT test would leave the exit code 0."
 (m54-imp5--check "tty-output.scm-lines-682"
                  (eql 682 (m54-imp5--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp5--check "tree-wide-scm-ref-266"
-                 (eql 266 (m54-imp5--count-scm-ref)))
+(m54-imp5--check "tree-wide-scm-ref-267"
+                 (eql 267 (m54-imp5--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 8) ---------------------
 

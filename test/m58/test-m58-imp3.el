@@ -539,7 +539,7 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
                        "(eql 41 (m58-imp1--count \"src/term.c\" \"scm_c_public_ref\"))")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
-                       "(eql 266 (m58-imp1--count-scm-ref))")
+                       "(eql 267 (m58-imp1--count-scm-ref))")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el"
                        "(eql 682 (m58-imp1--lines \"mod/emacs/tty-output.scm\"))")))

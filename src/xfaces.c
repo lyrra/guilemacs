@@ -811,6 +811,35 @@ Optional THOROUGHLY non-nil means try to free unused fonts, too.  */)
 
 #ifdef HAVE_WINDOW_SYSTEM
 
+/* M59 imp-4: the DECISION of bitmap-spec-p is in Scheme ((emacs faces),
+   bitmap-spec-verdict).  C keeps the CONSP unpack and the type tests,
+   because a read of a Lisp list or a type test on a Lisp_Object is a C
+   read; the combine of the plain values is the decision.
+
+   The seam is 4 plain values: 1 boolean and 3 integers.  A field that
+   is not of the expected type crosses as -1.  The -1 sentinel is safe:
+   it can only make the verdict false, and the deleted C accept rule
+   also made a non-fixnum field false.  A real WIDTH of -1 is a fixnum
+   and fails the 1 <= WIDTH bound, so the sentinel can not collide with
+   a value that the deleted rule would accept.
+
+   No fallback: an absent module or a renamed binding signals at the
+   first call, so a broken load raises an error to the Lisp caller
+   (docs/kb.org, ** M58).  */
+static Lisp_Object
+m59_bitmap_spec_p_scheme (bool file_name, ptrdiff_t width,
+			  ptrdiff_t height, ptrdiff_t data_bytes)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs faces", "bitmap-spec-verdict");
+  return scm_is_true (SCM_CALL_4 (proc, scm_from_bool (file_name),
+				  scm_from_ptrdiff_t (width),
+				  scm_from_ptrdiff_t (height),
+				  scm_from_ptrdiff_t (data_bytes)))
+    ? Qt : Qnil;
+}
+
 DEFUN ("bitmap-spec-p", Fbitmap_spec_p, Sbitmap_spec_p, 1, 1, 0,
        doc: /* Value is non-nil if OBJECT is a valid bitmap specification.
 A bitmap specification is either a string, a file name, or a list
@@ -820,44 +849,48 @@ the pixmap.  Bits are stored row by row, each row occupies
 \(WIDTH + 7)/8 bytes.  */)
   (Lisp_Object object)
 {
-  bool pixmap_p = false;
+  /* The CONSP unpack and the type tests stay in C; the combine of the
+     plain values is in Scheme.  A field that is not of the expected
+     type crosses as -1 (see m59_bitmap_spec_p_scheme above).  */
+  bool file_name = false;
+  ptrdiff_t width = -1, height = -1, data_bytes = -1;
 
   if (STRINGP (object))
     /* If OBJECT is a string, it's a file name.  */
-    pixmap_p = true;
+    file_name = true;
   else if (CONSP (object))
     {
       /* Otherwise OBJECT must be (WIDTH HEIGHT DATA), WIDTH and
 	 HEIGHT must be ints > 0, and DATA must be string large
 	 enough to hold a bitmap of the specified size.  */
-      Lisp_Object width, height, data;
+      Lisp_Object width_obj, height_obj, data;
 
-      height = width = data = Qnil;
+      height_obj = width_obj = data = Qnil;
 
       if (CONSP (object))
 	{
-	  width = XCAR (object);
+	  width_obj = XCAR (object);
 	  object = XCDR (object);
 	  if (CONSP (object))
 	    {
-	      height = XCAR (object);
+	      height_obj = XCAR (object);
 	      object = XCDR (object);
 	      if (CONSP (object))
 		data = XCAR (object);
 	    }
 	}
 
-      if (STRINGP (data)
-	  && RANGED_FIXNUMP (1, width, INT_MAX)
-	  && RANGED_FIXNUMP (1, height, INT_MAX))
-	{
-	  int bytes_per_row = (XFIXNUM (width) + CHAR_BIT - 1) / CHAR_BIT;
-	  if (XFIXNUM (height) <= SBYTES (data) / bytes_per_row)
-	    pixmap_p = true;
-	}
+      /* Test the type FIRST and read the value SECOND.  A read of a
+	 non-fixnum or of a non-string is not a value.  */
+      if (FIXNUMP (width_obj))
+	width = XFIXNUM (width_obj);
+      if (FIXNUMP (height_obj))
+	height = XFIXNUM (height_obj);
+      if (STRINGP (data))
+	data_bytes = SBYTES (data);
     }
 
-  return pixmap_p ? Qt : Qnil;
+  return m59_bitmap_spec_p_scheme (file_name, width, height, data_bytes);
 }
 
 

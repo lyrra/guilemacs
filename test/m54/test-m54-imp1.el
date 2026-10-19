@@ -203,8 +203,8 @@ pass."
 (m54-imp1--check "tty-output.scm-lines-682"
                  (eql 682 (m54-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp1--check "tree-wide-scm-ref-266"
-                 (eql 266 (m54-imp1--count-scm-ref)))
+(m54-imp1--check "tree-wide-scm-ref-267"
+                 (eql 267 (m54-imp1--count-scm-ref)))
 
 ;;; --- S2. The 3 stream fields and the boundary rule ------------------
 

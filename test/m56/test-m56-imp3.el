@@ -317,8 +317,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "term-c-scm-ref-41"
                  (eql 41 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
 ;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
-(m56-imp3--check "tree-wide-scm-ref-266"
-                 (eql 266 (m56-imp3--count-scm-ref)))
+(m56-imp3--check "tree-wide-scm-ref-267"
+                 (eql 267 (m56-imp3--count-scm-ref)))
 ;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
 (m56-imp3--check "tty-output-lines-635"
                  (eql 682 (m56-imp3--lines "mod/emacs/tty-output.scm")))

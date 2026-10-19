@@ -8,10 +8,13 @@
 ;;; runner-up (bitmap-spec-p, :813 at imp-1).
 ;;;
 ;;; M59 imp-3 LANDED the named candidate and re-pinned the surface rows
-;;; of S1 and S2: the DEFUN is at :4197, the file is 7,708 lines,
-;;; src/xfaces.c holds 1 scm_c_public_ref LINE, the tree-wide count is
-;;; 266 OCCURRENCES, and the inline decision is GONE (the 3 type tests
-;;; stay C; the combine is in ((emacs faces))).
+;;; of S1 and S2: the DEFUN was at :4197, the file was 7,708 lines,
+;;; src/xfaces.c held 1 scm_c_public_ref LINE and the tree-wide count was
+;;; 266 OCCURRENCES.  M59 imp-4 LANDED the RUNNER-UP and re-pinned the
+;;; same rows again: the file is 7,741 lines, src/xfaces.c holds 2
+;;; scm_c_public_ref LINES (2 dispatchers) and 21 direct scm_* LINES, the
+;;; tree-wide count is 267 OCCURRENCES, and the inline decision of
+;;; bitmap-spec-p is GONE too (the type tests stay C).
 ;;;
 ;;; It pins these groups:
 ;;;
@@ -362,19 +365,20 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
     (m59-imp1--check "head-e9f87b051" ok)))
 
 ;; Unit: LINES (`wc -l').  M59 imp-3 adds 23 net lines (the dispatcher,
-;; the include, and the shorter body).
-(m59-imp1--check "xfaces.c-lines-7708"
-                 (eql 7708 (m59-imp1--lines "src/xfaces.c")))
+;; the include, and the shorter body); M59 imp-4 adds 33 net lines (the
+;; second dispatcher and its comment).
+(m59-imp1--check "xfaces.c-lines-7741"
+                 (eql 7741 (m59-imp1--lines "src/xfaces.c")))
 ;; Unit: LINES (`grep -c "^DEFUN ("').
 (m59-imp1--check "xfaces.c-defun-count-33"
                  (eql 33 (m59-imp1--grep-c "src/xfaces.c" "^DEFUN (")))
-;; Unit: LINES (`grep -c scm_c_public_ref').  1 after the M59 imp-3 MOVE:
-;; the dispatcher resolves (emacs faces) one time.
-(m59-imp1--check "xfaces.c-scm-ref-1"
-                 (eql 1 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
+;; Unit: LINES (`grep -c scm_c_public_ref').  2 after the M59 imp-4 MOVE:
+;; each of the 2 dispatchers resolves (emacs faces) one time.
+(m59-imp1--check "xfaces.c-scm-ref-2"
+                 (eql 2 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -h ... | wc -l').
-(m59-imp1--check "tree-wide-scm-ref-266"
-                 (eql 266 (m59-imp1--count-scm-ref)))
+(m59-imp1--check "tree-wide-scm-ref-267"
+                 (eql 267 (m59-imp1--count-scm-ref)))
 ;; Unit: LINES (`grep -c guile' = 8).  The lines of Guile coupling: the
 ;; 2 includes (:229, :230), the 2 real seams (:1047
 ;; guile_parse_color_spec, :3995 guile_parse_face_bool_attribute), and 4
@@ -385,13 +389,15 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
                                             "guile_parse_color_spec (spec)")
                       (m59-imp1--contains-p "src/xfaces.c"
                                             "guile_parse_face_bool_attribute")))
-;; Unit: LINES (`grep -c scm_ src/xfaces.c' = 16).  The file holds 16
-;; lines with a DIRECT scm_* call: the 11 old sites plus the 5 lines of
-;; the M59 imp-3 dispatcher (scm_c_public_ref, scm_is_true / SCM_CALL_3,
-;; and the 3 scm_from_bool arguments).  So "1 scm_c_public_ref" does not
-;; state the full size of the Guile coupling.
-(m59-imp1--check "xfaces.c-scm-lines-16"
-                 (eql 16 (m59-imp1--grep-c "src/xfaces.c" "scm_")))
+;; Unit: LINES (`grep -c scm_ src/xfaces.c' = 21).  The file holds 21
+;; lines with a DIRECT scm_* call: the 11 old sites, the 5 lines of the
+;; M59 imp-3 dispatcher (scm_c_public_ref, scm_is_true / SCM_CALL_3, and
+;; the 3 scm_from_bool arguments), and the 5 lines of the M59 imp-4
+;; dispatcher (scm_c_public_ref, scm_is_true / SCM_CALL_4, and the 4
+;; scm_from_bool / scm_from_ptrdiff_t arguments).  So "2
+;; scm_c_public_ref" does not state the full size of the Guile coupling.
+(m59-imp1--check "xfaces.c-scm-lines-21"
+                 (eql 21 (m59-imp1--grep-c "src/xfaces.c" "scm_")))
 ;; M59 imp-1 adds NO PTY case.  The counted surface stays 32.  The group
 ;; pins must add up to the total, so a group pin that moves without the
 ;; total FAILS.
@@ -415,11 +421,12 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 (setq m59-imp1--group 's2)
 
 ;; The NAMED candidate face-attribute-relative-p is now the FIRST LANDED
-;; MOVE row.  M59 imp-3 landed it: the DEFUN moved to :4197, C keeps the
+;; MOVE row.  M59 imp-3 landed it: the DEFUN moved to :4197 (:4230
+;; after the M59 imp-4 MOVE), C keeps the
 ;; 3 type tests, and the combine is in Scheme ((emacs faces),
 ;; face-attribute-relative-verdict).  The inline decision is GONE.
 (m59-imp1--check "candidate-face-attribute-relative-p"
-                 (and (eql 4197 (m59-imp1--line-of
+                 (and (eql 4230 (m59-imp1--line-of
                                  "src/xfaces.c"
                                  "^DEFUN (\"face-attribute-relative-p\""))
                       (m59-imp1--holds-all
@@ -444,12 +451,13 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
                       (eql 1 (m59-imp1--count "src/globals.h"
                                               "Fface_attribute_relative_p"))))
 
-;; The RUNNER-UP bitmap-spec-p (:813 ... :860) has 5 internal C callers,
+;; The RUNNER-UP bitmap-spec-p (:843 ... :893 after the M59 imp-4 MOVE,
+;; :813 ... :860 at imp-1) has 5 internal C callers,
 ;; so it ranks second.  The 5 caller lines are measured.
 (m59-imp1--check "runner-up-bitmap-spec-p"
-                 (and (eql 814 (m59-imp1--line-of
+                 (and (eql 843 (m59-imp1--line-of
                                 "src/xfaces.c" "^DEFUN (\"bitmap-spec-p\""))
-                      (equal '(878 1401 1915 2885 3584)
+                      (equal '(911 1434 1948 2918 3617)
                              (m59-imp1--sites "src/xfaces.c"
                                               "Fbitmap_spec_p"))))
 
@@ -476,16 +484,16 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; The 2 NOT PROVEN rows of the row map, with their blocker in the
 ;; TRACKED C source.  Rule 5.6 of brief.org: a row is MOVE only if a
 ;; plain value crosses the seam AND an observable exists.  Row 16
-;; merge-face-attribute (:4195) calls the Lisp engine at :2280
-;; (safe_calln); row 24 color-distance (:4765) reads a struct frame
-;; (:4777), a C hook (:4782 :4790), and calls the metric (:4801).
+;; merge-face-attribute (:4251 after the M59 imp-4 MOVE) calls the Lisp
+;; engine at :2314 (safe_calln); row 24 color-distance (:4821) reads a
+;; struct frame, a C hook, and calls the metric (:4834).
 (m59-imp1--check "not-proven-rows-2"
-                 (and (eql 4218 (m59-imp1--line-of
+                 (and (eql 4251 (m59-imp1--line-of
                                  "src/xfaces.c"
                                  "^DEFUN (\"merge-face-attribute\""))
-                      (eql 4788 (m59-imp1--line-of
+                      (eql 4821 (m59-imp1--line-of
                                  "src/xfaces.c" "^DEFUN (\"color-distance\""))
-                      (eql 2281 (m59-imp1--line-of
+                      (eql 2314 (m59-imp1--line-of
                                  "src/xfaces.c" "result = safe_calln (from, to)"))
                       (m59-imp1--holds-all
                        "src/xfaces.c"
@@ -507,7 +515,7 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; The color-spec row ALREADY LANDED: the body returns the Guile parser.
 ;; Do not port it again.
 (m59-imp1--check "already-landed-color-spec"
-                 (eql 1047 (m59-imp1--line-of
+                 (eql 1080 (m59-imp1--line-of
                             "src/xfaces.c" "guile_parse_color_spec (spec)")))
 
 ;; The boundary rule do-not-give-scheme-a-C-descriptor, by name in the

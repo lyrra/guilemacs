@@ -58,8 +58,9 @@
 ;;; proves the second term of branch 1.
 ;;;
 ;;; M59 imp-3 moved the DECISION of this row to ((emacs faces)) and
-;;; re-pinned the 2 C layout rows of S2: the DEFUN is now at :4197 and
-;;; the body is the 3 plain booleans plus the dispatcher call.  The 3
+;;; re-pinned the 2 C layout rows of S2: the DEFUN is now at :4230
+;;; (:4197 after imp-3, :4230 after the M59 imp-4 MOVE) and the body is
+;;; the 3 plain booleans plus the dispatcher call.  The 3
 ;;; milestone values and the 5 controls are UNCHANGED, because the
 ;;; Scheme combine is the same truth table.
 ;;;
@@ -336,16 +337,18 @@ real error, not a pass."
 
 ;; The DEFUN line.  MEASURED at HEAD 2841bc4db (M59 imp-2): :4173.
 ;; MEASURED after the M59 imp-3 MOVE: :4197, because the dispatcher is
-;; above the DEFUN.  This pin is REWRITTEN to the post-MOVE shape: the
-;; checks stay, the value moves.
+;; above the DEFUN.  MEASURED after the M59 imp-4 MOVE: :4230, because
+;; the imp-4 dispatcher and the longer bitmap-spec-p body are above it.
+;; This pin is REWRITTEN to the post-MOVE shape: the checks stay, the
+;; value moves.
 (m59-imp2--check "s2/defun-line"
                  (let ((got (m59-imp2--line-of
                              "src/xfaces.c"
                              "^DEFUN (\"face-attribute-relative-p\"")))
-                   (unless (eql 4197 got)
+                   (unless (eql 4230 got)
                      (princ (format "m59 imp2: the DEFUN moved, measured line: %s\n"
                                     got)))
-                   (eql 4197 got)))
+                   (eql 4230 got)))
 
 ;; The 3 body tests, in the TRACKED C source.  After the MOVE they are the
 ;; 3 plain booleans that C computes and hands to Scheme.  The old inline
