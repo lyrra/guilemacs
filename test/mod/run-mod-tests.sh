@@ -31,5 +31,6 @@ run_suite () {
 
 run_suite sequences-tests.scm
 run_suite standalone-tests.scm
+run_suite faces-tests.scm
 
 exit "$status"
