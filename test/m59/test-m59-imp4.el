@@ -331,8 +331,8 @@ file gives the symbol `m59-imp4-absent', which is a FAIL, not a pass."
 (m59-imp4--check "load-line-once"
                  (eql 1 (m59-imp4--grep-c "prelude/load.scm"
                                           "^(use-modules (emacs faces))")))
-(m59-imp4--check "load-lines-266"
-                 (eql 266 (m59-imp4--lines "prelude/load.scm")))
+(m59-imp4--check "load-lines-230"
+                 (eql 230 (m59-imp4--lines "prelude/load.scm")))
 
 ;;; --- W2. The REAL behaviour: brief.org section 6 --------------------
 

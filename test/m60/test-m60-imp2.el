@@ -311,6 +311,19 @@ status."
           (goto-char (point-min))
           (and (search-forward needle nil t) t))))))
 
+(defun m60-imp2--probe-raw-holds-none (mode needle)
+  "Non-nil when the OUTPUT of the probe MODE holds NO NEEDLE, at ANY exit
+status.  Use it for a mode that must fail: the imp-3 re-pin of R5 pins
+the ABSENT old error of the `registration' mode."
+  (let ((out (m60-imp2--probe-raw-output mode)))
+    (cond
+     ((eq out 'm60-imp2-prog-absent) out)
+     ((not (stringp out)) nil)
+     (t (with-temp-buffer
+          (insert out)
+          (goto-char (point-min))
+          (not (search-forward needle nil t)))))))
+
 (defun m60-imp2--probe-line (mode line)
   "Non-nil when the probe MODE printed LINE as one WHOLE line and the
 child exited 0.  A substring match is NOT enough: a line pin holds the
@@ -433,13 +446,13 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/xfaces.c-lines"
                  (eql 7741 (m60-imp2--lines "src/xfaces.c")))
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1190 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1203 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
-                 (eql 266 (m60-imp2--lines "prelude/load.scm")))
+                 (eql 230 (m60-imp2--lines "prelude/load.scm")))
 (m60-imp2--check "r1/faces-and-spec-lines"
                  (and (eql 70 (m60-imp2--lines "mod/emacs/faces.scm"))
-                      (eql 38 (m60-imp2--lines "mod/emacs-elisp/spec.scm"))))
+                      (eql 32 (m60-imp2--lines "mod/emacs-elisp/spec.scm"))))
 
 ;; Unit: LINES (`grep -c').  MEASURED: 18 / 14 / 7.
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
@@ -611,10 +624,14 @@ host limit is a skip, never a pass."
 
 ;;; --- R5. The registration -------------------------------------------
 
-;; The NAMED BLOCKER.  MEASURED: the fixture exits 1 and the error text
-;; names the language and the Guile site.  The cause is the circularity
-;; of mod/emacs-elisp/spec.scm: :20 defines the language and :37 calls
-;; `compile-and-load' on a file that needs the same language.
+;; R5 re-pinned at M60 imp-3 (brief.org F2).  The named blocker of imp-2
+;; ("no such language emacs-elisp") is CLOSED: the split registers the
+;; language in (language emacs-elisp spec), the name Guile resolves.
+;; MEASURED now: the fixture still exits 1, but it stops at the NEXT
+;; blocker inside `compile-and-load' -- the Scheme elisp compiler
+;; resolves `mapcar' at compile time and only the C runtime binds it.
+;; So no check here claims a module load; the language object itself is
+;; pinned by test-m60-imp3.el (mode `language').
 (setq m60-imp2--group 'r5)
 
 ;; cr.org F4: `m60-imp2--probe-exit' returns the marker
@@ -627,36 +644,48 @@ host limit is a skip, never a pass."
                        exit
                      (and (integerp exit) (/= 0 exit)))))
 
+;; RE-PINNED at imp-3 (brief.org F2): "no such language emacs-elisp" is
+;; GONE from the output (the blocker is closed) and the stop is the next
+;; one.  The check keeps its strength: it pins the ABSENT old error, the
+;; PRESENT new error, and the site that reports it.
 (m60-imp2--check "r5/registration-error-text"
-                 (m60-imp2--all (m60-imp2--probe-raw-holds "registration"
-                                                           "no such language emacs-elisp")
-                                (m60-imp2--probe-raw-holds "registration"
-                                                           "system/base/language.scm:66")))
+                 (m60-imp2--all
+                  (m60-imp2--probe-raw-holds-none "registration"
+                                                  "no such language emacs-elisp")
+                  (m60-imp2--probe-raw-holds "registration"
+                                             "Unbound variable: mapcar")
+                  (m60-imp2--probe-raw-holds "registration"
+                                             "ERROR: In procedure %resolve-variable")))
 
+;; RE-PINNED at imp-3 (brief.org F2): (emacs-elisp spec) now IMPORTS the
+;; language module at :8 and calls `compile-and-load' at :31.  The
+;; `define-language' form is no longer in this file; it is at :15 of
+;; mod/language/emacs-elisp/spec.scm.
 (m60-imp2--check "r5/spec.scm-sites"
-                 (and (eql 20 (m60-imp2--line-of
+                 (and (eql 8 (m60-imp2--line-of
+                              "mod/emacs-elisp/spec.scm"
+                              "#:use-module (language emacs-elisp spec)"))
+                      (eql 31 (m60-imp2--line-of
                                "mod/emacs-elisp/spec.scm"
-                               "define-language emacs-elisp"))
-                      (eql 37 (m60-imp2--line-of
-                               "mod/emacs-elisp/spec.scm"
-                               "(compile-and-load (%search-load-path"))))
+                               "(compile-and-load (%search-load-path"))
+                      (eql 0 (m60-imp2--grep-c
+                              "mod/emacs-elisp/spec.scm"
+                              "define-language"))
+                      (eql 15 (m60-imp2--line-of
+                               "mod/language/emacs-elisp/spec.scm"
+                               "(define-language emacs-elisp"))))
 
-;; The prelude patch is the code that makes the language findable in a
-;; FULL Emacs, and it is STILL LIVE (not commented out).  A plain
-;; `guile' process does not load the prelude, so it still raises.
+;; RE-PINNED at imp-3 (brief.org F2).  This check pinned the ABSENT
+;; state ("the patch is live").  The patch is DELETED, so the check pins
+;; the PRESENT new thing: ZERO patch lines, and `<prelude>/../mod' still
+;; on %load-path -- that path is what lets a FULL Emacs find the new
+;; module without any patch.
 (m60-imp2--check "r5/prelude-patch-live"
-                 (m60-imp2--all (m60-imp2--live-p
-                                 "prelude/load.scm"
-                                 "(module-set! lang-module 'lookup-language patched-lookup)")
-                                (m60-imp2--live-p
-                                 "prelude/load.scm"
-                                 "(module-set! compile-module 'lookup-language patched-lookup)")
-                                (m60-imp2--live-p
-                                 "prelude/load.scm"
-                                 "(module-set! lang-module 'default-environment patched-default-env)")
-                                (m60-imp2--live-p
-                                 "prelude/load.scm"
-                                 "(resolve-module '(emacs-elisp spec))")))
+                 (m60-imp2--all
+                  (eql 0 (m60-imp2--grep-c "prelude/load.scm" "patched-lookup"))
+                  (eql 0 (m60-imp2--grep-c "prelude/load.scm" "module-set!"))
+                  (eql 0 (m60-imp2--grep-c "prelude/load.scm" "bad language"))
+                  (m60-imp2--live-p "prelude/load.scm" "/../mod")))
 
 ;; The C core resolves the language module itself, so the language
 ;; exists in a full Emacs and NOT in a plain `guile' process.

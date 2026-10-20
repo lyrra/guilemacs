@@ -301,12 +301,12 @@ symbol `m55-imp1-guile-absent'."
 
 (setq m55-imp1--group 's1)
 
-(m55-imp1--check "loader.scm-lines-1190"
-                 (eql 1190 (m55-imp1--lines "mod/emacs/loader.scm")))
+(m55-imp1--check "loader.scm-lines-1203"
+                 (eql 1203 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
-(m55-imp1--check "prelude-load.scm-lines-266"
-                 (eql 266 (m55-imp1--lines "prelude/load.scm")))
+(m55-imp1--check "prelude-load.scm-lines-230"
+                 (eql 230 (m55-imp1--lines "prelude/load.scm")))
 (m55-imp1--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp1--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))

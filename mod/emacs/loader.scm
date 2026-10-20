@@ -7,7 +7,12 @@
 (define-module (emacs loader)
   #:use-module (system base language)
   #:use-module ((system base compile)
-                #:select (compile compile-file))
+                ;; M60 imp-3: load-elisp calls `compiled-file-name', which
+                ;; was UNBOUND in this module (MEASURED).  The M55 imp-4
+                ;; comment below assumed a plain `guile' process never
+                ;; reaches the compiled branch; the split registration
+                ;; makes the language findable, so the import is needed.
+                #:select (compile compile-file compiled-file-name))
   #:use-module ((srfi srfi-1) #:select (count any))
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs utils)
@@ -1081,9 +1086,17 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
 ;; F6 (cr.org section 4): catch ONLY the "no such language" case.  Any
 ;; other misc-error (a real error) is RE-RAISED, so it can not silently
 ;; take the source-reading branch.
+;; M60 imp-3: the presence of the language object does NOT prove that a
+;; compiled elisp form can RUN.  The bytecode resolves its variables in
+;; the `elisp-symbols' module, and only the C core fills that module
+;; (MEASURED: a compiled test/mod fixture raises `Unbound variable: n',
+;; and a compiled lisp/ file raises `Unbound variable: mapcar').  So the
+;; test below also requires the C runtime handoff of `emacs!' (see
+;; `c-runtime-installed?').  Before the split the absent language hid
+;; this gap; it is now explicit.
 (define (elisp-loader-compiler-available?)
   (catch 'misc-error
-    (lambda () (lookup-language 'emacs-elisp))
+    (lambda () (if (c-runtime-installed?) (lookup-language 'emacs-elisp) #f))
     (lambda (key . args)
       (if (any (lambda (arg)
                  (and (string? arg) (string-contains arg "no such language")))

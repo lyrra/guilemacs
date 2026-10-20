@@ -192,6 +192,7 @@ src/gl-stamp
 *.dll
 *.core
 *.elc
+*.el.go
 *.eln
 *.o
 *.res

@@ -265,8 +265,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; --- Group A.  The M55 loader surface. ---
 
 ;; A1: mod/emacs/loader.scm lines = 1,190.
-(m56-imp3--check "loader-lines-1190"
-                 (eql 1190 (m56-imp3--lines "mod/emacs/loader.scm")))
+(m56-imp3--check "loader-lines-1203"
+                 (eql 1203 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -288,8 +288,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "reader-lines-2021"
                  (eql 2021 (m56-imp3--lines "mod/emacs/reader.scm")))
 ;; A7: prelude/load.scm lines = 265.
-(m56-imp3--check "prelude-lines-266"
-                 (eql 266 (m56-imp3--lines "prelude/load.scm")))
+(m56-imp3--check "prelude-lines-230"
+                 (eql 230 (m56-imp3--lines "prelude/load.scm")))
 ;; A8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71
 ;; (brief.org section 4).

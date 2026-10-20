@@ -299,14 +299,14 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1190 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1203 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
-                 (eql 266 (m60-imp1--lines "prelude/load.scm")))
+                 (eql 230 (m60-imp1--lines "prelude/load.scm")))
 (m60-imp1--check "faces.scm-and-spec.scm-lines"
                  (and (eql 70 (m60-imp1--lines "mod/emacs/faces.scm"))
-                      (eql 38 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))))
+                      (eql 32 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))))
 
 ;; Unit: LINES (`grep -c').  7 + 4 guarded installs plus 2 unguarded
 ;; installs and the `defun' branch of the minimal evaluator make the 14.
@@ -395,7 +395,9 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                                               "elisp-require"))
                       (eql 26 (m60-imp1--line-of "mod/emacs/utils.scm"
                                                  "elisp-require"))
-                      (eql 236 (m60-imp1--line-of
+                      ;; RE-PINNED at M60 imp-3: the prelude lost the 36
+                      ;; patch lines, so this site moved 236 -> 200.
+                      (eql 200 (m60-imp1--line-of
                                 "prelude/load.scm"
                                 "(init-utils-registrations)"))
                       (m60-imp1--holds-none
@@ -438,35 +440,45 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 
 (setq m60-imp1--group 's3)
 
-;; The `lookup-language' sites in the TRACKED Scheme: the guard at
-;; loader.scm :1086, the `emacs!' row at runtime.scm :773, and the
-;; prelude patch (the original read plus the 2 module-set! lines).
+;; The `lookup-language' sites in the TRACKED Scheme.  M60 imp-3 RE-PINS
+;; this check: the split moved the loader guard to :1099 (it now also
+;; tests `c-runtime-installed?') and the `emacs!' row of runtime.scm to
+;; :788, and it DELETED the prelude read, so 0 sites stay there.
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1086 (m60-imp1--line-of
+                 (and (eql 1099 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
-                      (eql 773 (m60-imp1--line-of
+                      (eql 788 (m60-imp1--line-of
                                 "mod/emacs-elisp/runtime.scm"
                                 "(lookup-language 'emacs-elisp)"))
-                      (eql 63 (m60-imp1--line-of
-                               "prelude/load.scm"
-                               "(original-lookup (module-ref"))))
+                      (eql 0 (m60-imp1--grep-c
+                              "prelude/load.scm"
+                              "lookup-language"))))
 
-;; The monkey patch replaces the binding in 2 modules each, and it lives
-;; inside one `let' that runs only when the PRELUDE loads.
+;; M60 imp-3 RE-PINS this check.  It pinned an ABSENT thing ("the
+;; monkey patch of 4 `module-set!' sites is live"), and the patch is now
+;; DELETED.  The check pins the PRESENT new thing instead: ONE mechanism,
+;; the module `(language emacs-elisp spec)', and ZERO patch lines in the
+;; prelude.  It does NOT get weaker: the 4 old sites are named as the
+;; needles that must be gone, and the new module must exist.
 (m60-imp1--check "prelude-patch-2-modules"
-                 (and (m60-imp1--contains-p
+                 (and (eql 0 (m60-imp1--grep-c
+                              "prelude/load.scm"
+                              "module-set!"))
+                      (eql 0 (m60-imp1--grep-c
+                              "prelude/load.scm"
+                              "patched-lookup"))
+                      (eql 0 (m60-imp1--grep-c
+                              "prelude/load.scm"
+                              "bad language"))
+                      (m60-imp1--holds-none
                        "prelude/load.scm"
-                       "(module-set! lang-module 'lookup-language patched-lookup)")
-                      (m60-imp1--contains-p
-                       "prelude/load.scm"
-                       "(module-set! compile-module 'lookup-language patched-lookup)")
-                      (m60-imp1--contains-p
-                       "prelude/load.scm"
-                       "(module-set! lang-module 'default-environment patched-default-env)")
-                      (m60-imp1--contains-p
-                       "prelude/load.scm"
-                       "(resolve-module '(emacs-elisp spec))")))
+                       '("(module-set! lang-module 'lookup-language patched-lookup)"
+                         "(module-set! compile-module 'lookup-language patched-lookup)"
+                         "(module-set! lang-module 'default-environment patched-default-env)"
+                         "(resolve-module '(emacs-elisp spec))"))
+                      (m60-imp1--exists-p
+                       "mod/language/emacs-elisp/spec.scm")))
 
 ;; The C core loads the language module itself, so the language exists
 ;; in a full Emacs and not in a plain `guile' process.
@@ -475,17 +487,25 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                             "src/emacs.c"
                             "scm_c_resolve_module (\"emacs-elisp spec\")")))
 
-;; The circularity that makes the move verdict A2: mod/emacs-elisp/
-;; spec.scm defines the language and then calls `compile-and-load' on a
-;; file that needs the same language; `lookup-language' does not look in
-;; `(emacs-elisp spec)'.
+;; M60 imp-3 RE-PINS this check.  The circularity that makes the move
+;; verdict A2 is GONE: the language object lives in
+;; mod/language/emacs-elisp/spec.scm, and (emacs-elisp spec) imports it
+;; and re-exports it, so it keeps `compile-and-load' and holds no
+;; `define-language'.  32 lines is the MEASURED value after the split.
 (m60-imp1--check "spec.scm-circularity"
-                 (and (eql 38 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))
+                 (and (eql 32 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))
                       (m60-imp1--ordered-p
                        "mod/emacs-elisp/spec.scm"
                        '("(define-module (emacs-elisp spec)"
-                         "(define-language emacs-elisp"
-                         "(compile-and-load"))))
+                         "#:use-module (language emacs-elisp spec)"
+                         "#:re-export (emacs-elisp)"
+                         "(compile-and-load"))
+                      (eql 0 (m60-imp1--grep-c
+                              "mod/emacs-elisp/spec.scm"
+                              "define-language"))
+                      (eql 1 (m60-imp1--grep-c
+                              "mod/language/emacs-elisp/spec.scm"
+                              "^(define-language emacs-elisp"))))
 
 ;; The guard at loader.scm :1086 catches ONLY the "no such language"
 ;; message and re-raises any other misc-error.

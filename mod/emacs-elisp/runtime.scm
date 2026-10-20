@@ -40,6 +40,7 @@
             proclaim-special!
             special?
             emacs!
+            c-runtime-installed?
             unbound
             lexical-binding?
             set-lexical-binding-mode
@@ -755,6 +756,19 @@ when a let binding exits."
   (vector-set! (symbol-desc sym) 3 1)
   #nil)
 
+;; M60 imp-3: TRUE only after the C core hands the runtime over to this
+;; module.  A plain `guile -L mod' process never calls `emacs!', so the
+;; flag stays #f there.  The elisp COMPILER writes bytecode that resolves
+;; its variables in the `elisp-symbols' module, and only the C core fills
+;; that module (MEASURED: `load-compiled' of a compiled test/mod fixture
+;; raises `Unbound variable: n').  So the flag, not the presence of the
+;; language object, is the signal that a compiled elisp form can RUN.
+(define %c-runtime-installed? #f)
+
+(define (c-runtime-installed?)
+  "True when the C core has installed the elisp runtime via `emacs!'."
+  %c-runtime-installed?)
+
 (define (emacs! ref set boundp dref dset dboundp bind)
   (set! symbol-value ref)
   (set! set-symbol-value! set)
@@ -767,7 +781,8 @@ when a let binding exits."
   ;; others).  Don't replace with C Fbind_symbol.
   ;; (set! bind-symbol bind)
   (set! lexical-binding? (lambda () (symbol-value 'lexical-binding)))
-  (set! set-lexical-binding-mode (lambda (x) (set-symbol-value! 'lexical-binding x))))
+  (set! set-lexical-binding-mode (lambda (x) (set-symbol-value! 'lexical-binding x)))
+  (set! %c-runtime-installed? #t))
 
 (define (eval-elisp form)
   (let ((lang (lookup-language 'emacs-elisp)))
