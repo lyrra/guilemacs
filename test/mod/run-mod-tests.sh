@@ -14,9 +14,11 @@ fi
 status=0
 
 # Each suite pins its own expected case count and exits non-zero when the
-# count drops, so this runner does not need a second pin (cr.org F3).
+# count drops, so this runner does not need a second pin (cr.org of the M59
+# imp-5 round, F3: the round file is reused, so name the round).
 # GUILE_AUTO_COMPILE=0: auto-compile writes .go cache files and prints
-# warnings into the captured output (cr.org N3, the tool/run-tests.sh rule).
+# warnings into the captured output (cr.org of the M59 imp-5 round, N3: the
+# tool/run-tests.sh rule).
 run_suite () {
     suite=$1
     printf '\n=== %s ===\n' "$suite"

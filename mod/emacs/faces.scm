@@ -1,4 +1,4 @@
-;;; faces.scm --- M59 imp-3: the face-attribute-relative-p DECISION
+;;; faces.scm --- M59 imp-3 / imp-4: the 2 face DECISIONs
 ;;;                ((emacs faces))
 ;;;
 ;;; M59 imp-3 moves the DECISION of `face-attribute-relative-p' from C

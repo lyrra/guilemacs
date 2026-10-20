@@ -3,7 +3,8 @@
 (use-modules (srfi srfi-64)
              (emacs sequences))
 
-;; Pinned case count.  A suite that loses a case must fail (cr.org F3).
+;; Pinned case count.  A suite that loses a case must fail (cr.org of the
+;; M59 imp-5 round, F3: the round file is reused, so name the round).
 (define expected-passes 3)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
