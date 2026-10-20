@@ -17,12 +17,13 @@
 ;;;   GUILEMACS_ROOT=$PWD GUILE_AUTO_COMPILE=0 \
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
-;;; MODE is one of `cells', `provide', `stubs', `negative',
+;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `registration', or `language'.  The fixture prints `key: value'
 ;;; lines on stdout.  It reads the repo root from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
 ;;; control; it needs its own process, because it installs a faithful
-;;; `provide' cell.
+;;; `provide' cell.  `noboot' skips the boot on purpose: it is the
+;;; MEASUREMENT that shapes the control (M60 imp-4).
 ;;;
 ;;; `init-loader' leaves the current module at (emacs-elisp runtime), so
 ;;; the fixture restores (guile-user) after the call (measured: without
@@ -58,9 +59,12 @@
 
 ;; The prelude path is the same path that src/emacs takes at startup.  A
 ;; plain `guile' process has no C bootstrap, so `init-loader' is the only
-;; registration wave that runs.
-(init-loader (string-append root "/prelude"))
-(set-current-module (resolve-module '(guile-user)))
+;; registration wave that runs.  Mode `noboot' is the ONE exception: it
+;; measures what a control WITHOUT the boot stops at, so the boot is
+;; skipped there.
+(unless (string=? mode "noboot")
+  (init-loader (string-append root "/prelude"))
+  (set-current-module (resolve-module '(guile-user))))
 
 ;;; --- helpers --------------------------------------------------------
 
@@ -132,6 +136,13 @@ definition itself: a `memq' over the `features' list."
         (symbol-fbound? 'require) (symbol-fbound? 'provide))
   (load-line "lisp/subdirs.el")
   (load-line "lisp/cdl.el")
+  ;; M60 imp-4 acceptance: mode `cells' never installs the 2 cells, so
+  ;; these 3 words come from the 2 guarded forms of `init-loader' and
+  ;; from NOWHERE else.  `featurep' is a C DEFUN, so its own cell is
+  ;; empty here and the plain-Scheme definition is used.
+  (show "featurep-fbound" "~s" (symbol-fbound? 'featurep))
+  (show "featurep cdl" "~s" (elisp-featurep 'cdl))
+  (show "features" "~s" (symbol-value 'features))
   (load-line "lisp/obarray.el")
   (load-line "lisp/hex-util.el")
   (show "FEATURES-BOUND" "~s" (symbol-bound? 'features)))
@@ -139,10 +150,14 @@ definition itself: a `memq' over the `features' list."
 ;;; --- mode: provide --------------------------------------------------
 
 (define (mode-provide)
-  (show "features-bound-before" "~s" (symbol-bound? 'features))
-  (show "provide-fbound-before" "~s" (symbol-fbound? 'provide))
-  ;; The unbound sentinel of `features' names its state; the address in
-  ;; the sentinel changes between runs, so a check pins only the words.
+  ;; M60 imp-4: `init-loader' already bound both cells, so these lines
+  ;; are the state AT START, not the empty-cell state of imp-3.  This
+  ;; mode is a FIXTURE: it installs both cells itself, so it measures the
+  ;; LOAD, not the home.  The home is proven by mode `cells'.
+  (show "features-bound-at-start" "~s" (symbol-bound? 'features))
+  (show "provide-fbound-at-start" "~s" (symbol-fbound? 'provide))
+  ;; The address in the sentinel changes between runs, so a check pins
+  ;; only the words.
   (show "symbol-value features" "~s" (symbol-value 'features))
   ;; The faithful cell: the real elisp primitive of (emacs utils).
   (set-symbol-function! 'provide elisp-provide)
@@ -185,7 +200,35 @@ definition itself: a `memq' over the `features' list."
 ;; `provide' cell is installed and the `features' variable is NOT bound.
 ;; The load of lisp/cdl.el must error, and the error must name the
 ;; unbound sentinel -- it is NOT a `void-function' stop.
+;;
+;; M60 imp-4: `init-loader' now binds `features' (row 19), so a control
+;; that simply skips the boot would also lose the reader cells that
+;; `init-loader' installs, and the load would stop with `Wrong type to
+;; apply: #nil' before `provide' ever runs.  Mode `noboot' is the
+;; REPEATABLE record of that measurement.  So this mode takes the FULL
+;; boot, like every other mode, and then UNBINDS the value cell of
+;; `features' again with `makunbound!' -- the exported helper that is
+;; also the elisp primitive of mod/emacs/boot.scm:10.  No private
+;; binding is touched: `symbol-bound?' (mod/emacs-elisp/runtime.scm
+;; :388) reports the unset variable as UNBOUND, not as #nil.  Only
+;; `features' is unbound; `provide' stays installed.
 (define (mode-negative)
+  (makunbound! 'features)
+  (show "features-bound" "~s" (symbol-bound? 'features))
+  (show "provide-fbound" "~s" (symbol-fbound? 'provide))
+  (show "LOAD cdl" "~a" (describe (try-load "lisp/cdl.el"))))
+
+;;; --- mode: noboot ---------------------------------------------------
+
+;; M60 imp-4, F3 of the review of 174f0d2db: the MEASUREMENT behind the
+;; shape of mode `negative'.  This mode takes NO boot, as brief.org
+;; section 8 proposed, and installs `provide' only.  MEASURED 2026-10-20:
+;; without `init-loader' the reader cells are gone too, so the load of
+;; lisp/cdl.el stops with `Wrong type to apply: #nil'.  That error does
+;; NOT name the unbound sentinel, so the control can not use this shape.
+(define (mode-noboot)
+  (set! %load-path (cons (string-append root "/lisp") %load-path))
+  (set-current-module (resolve-module '(guile-user)))
   (set-symbol-function! 'provide elisp-provide)
   (show "features-bound" "~s" (symbol-bound? 'features))
   (show "provide-fbound" "~s" (symbol-fbound? 'provide))
@@ -228,7 +271,8 @@ definition itself: a `memq' over the `features' list."
   ((provide) (mode-provide))
   ((stubs) (mode-stubs))
   ((negative) (mode-negative))
+  ((noboot) (mode-noboot))
   ((registration) (mode-registration))
   ((language) (mode-language))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|registration|language)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|registration|language)"
                      mode))))

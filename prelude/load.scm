@@ -224,7 +224,6 @@
 (init-menu-item-parse-registrations)
 (init-tab-bar-items-registrations)
 
-(set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
 
 (format (current-error-port) ";; load.scm done~%")

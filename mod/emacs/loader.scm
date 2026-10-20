@@ -1153,7 +1153,18 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
     ;; FIX-20261015-guilemacs: standalone-load workaround; remove once the
     ;; C bootstrap binds this variable.
     (unless (symbol-bound? 'load-read-function)
-      (set-symbol-value! 'load-read-function #nil)))
+      (set-symbol-value! 'load-read-function #nil))
+    ;; M60 imp-4 — row 19: `features' is a C DEFVAR_LISP (src/fns.c
+    ;; :6372).  Bind the Emacs default only when absent.
+    ;; FIX-20261020-guilemacs: standalone-load default; remove it when
+    ;; the C bootstrap binds this variable.
+    (unless (symbol-bound? 'features)
+      (set-symbol-value! 'features '()))
+    ;; M60 imp-4 — row 18: the pure cell of (emacs utils) :211.  A full
+    ;; Emacs already owns the C DEFUN (src/fns.c :3450), so the guard
+    ;; keeps that cell.
+    (unless (symbol-fbound? 'provide)
+      (set-symbol-function! 'provide elisp-provide)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

@@ -415,31 +415,31 @@ host limit is a skip, never a pass."
 ;;; --- S1. The surface, re-measured -----------------------------------
 
 ;; Unit: NEWLINES (`wc -l').  MEASURED 2026-10-20 after the split:
-;; prelude/load.scm lost the 36 patch lines (266 -> 230), and
-;; mod/emacs-elisp/spec.scm lost the language form (38 -> 32).
+;; prelude/load.scm lost the 36 patch lines (266 -> 230) and the bare
+;; `features' bind (-1), and mod/emacs-elisp/spec.scm lost the language
+;; form (38 -> 32).
 (setq m60-imp3--group 's1)
 
 (m60-imp3--check "s1/prelude-load-lines"
-                 (eql 230 (m60-imp3--lines "prelude/load.scm")))
+                 (eql 229 (m60-imp3--lines "prelude/load.scm")))
 (m60-imp3--check "s1/spec-and-language-spec-lines"
                  (and (eql 32 (m60-imp3--lines "mod/emacs-elisp/spec.scm"))
                       (eql 20 (m60-imp3--lines
                                "mod/language/emacs-elisp/spec.scm"))))
 
-;; MEASURED 1203: 1190 plus the 13 lines of the `compiled-file-name'
-;; import and the `c-runtime-installed?' test of
-;; `elisp-loader-compiler-available?'.
+;; MEASURED 1214: the imp-3 value 1203 plus the 11 lines of the 2
+;; guarded forms of M60 imp-4 (2 forms, 9 lines of comment).
 (m60-imp3--check "s1/loader-lines"
-                 (eql 1203 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1214 (m60-imp3--lines "mod/emacs/loader.scm")))
 
-;; Unit: LINES (`grep -c').  MEASURED: 18 / 14 / 7 -- the split and the
-;; loader edit change none of them.
+;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-4: 19 / 15 / 8.
+;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
 (m60-imp3--check "s1/loader.scm-grep-c-counts"
-                 (and (eql 18 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                 (and (eql 19 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 14 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      (eql 15 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 7 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      (eql 8 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; brief.org F1: mod/emacs-elisp KEEPS 9 ENTRIES (`runtime/' is ONE
@@ -613,16 +613,19 @@ host limit is a skip, never a pass."
                    "cells"
                    (concat "VARS: load-path=#t load-suffixes=#t"
                            " load-file-rep-suffixes=#t load-read-function=#t"))
-                  (m60-imp3--probe-line "cells" "ASYM: require=#f provide=#f")))
+                  (m60-imp3--probe-line "cells" "ASYM: require=#f provide=#t")))
+;; RE-PINNED at M60 imp-4: lisp/cdl.el is no stop any more, it loads
+;; to the END (`provide' and `features' landed).  The 3 remaining stops
+;; keep their text.
 (m60-imp3--check "s5/four-first-stops"
                  (m60-imp3--probe-ordered
                   "cells"
                   '("LOAD lisp/subdirs.el: ERROR void-function"
-                    "LOAD lisp/cdl.el: ERROR void-function (provide)"
+                    "LOAD lisp/cdl.el: done"
                     "LOAD lisp/obarray.el: ERROR void-function (defconst)"
                     "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)")))
-(m60-imp3--check "s5/features-unbound"
-                 (m60-imp3--probe-line "cells" "FEATURES-BOUND: #f"))
+(m60-imp3--check "s5/features-bound"
+                 (m60-imp3--probe-line "cells" "FEATURES-BOUND: #t"))
 (m60-imp3--check "s5/provide-then-cdl"
                  (m60-imp3--all
                   (m60-imp3--probe-line "provide" "LOAD cdl: done")

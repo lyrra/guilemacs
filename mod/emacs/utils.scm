@@ -573,7 +573,6 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'hash-table-count elisp-hash-table-count)
   (set-symbol-function! 'clrhash elisp-clrhash)
   (set-symbol-function! 'featurep elisp-featurep)
-  (set-symbol-function! 'provide elisp-provide)
   (set-symbol-function! 'nreverse elisp-nreverse)
   (set-symbol-function! 'markerp elisp-markerp)
   (set-symbol-function! 'keywordp elisp-keywordp)

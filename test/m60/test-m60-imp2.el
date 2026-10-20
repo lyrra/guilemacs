@@ -446,21 +446,21 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/xfaces.c-lines"
                  (eql 7741 (m60-imp2--lines "src/xfaces.c")))
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1203 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1214 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
-                 (eql 230 (m60-imp2--lines "prelude/load.scm")))
+                 (eql 229 (m60-imp2--lines "prelude/load.scm")))
 (m60-imp2--check "r1/faces-and-spec-lines"
                  (and (eql 70 (m60-imp2--lines "mod/emacs/faces.scm"))
                       (eql 32 (m60-imp2--lines "mod/emacs-elisp/spec.scm"))))
 
-;; Unit: LINES (`grep -c').  MEASURED: 18 / 14 / 7.
+;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-4: 19 / 15 / 8.
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
-                 (and (eql 18 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                 (and (eql 19 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 14 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      (eql 15 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 7 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      (eql 8 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; Unit: OCCURRENCES over src/*.[ch].  MEASURED: 267.
@@ -524,12 +524,13 @@ host limit is a skip, never a pass."
                   (concat "VARS: load-path=#t load-suffixes=#t"
                           " load-file-rep-suffixes=#t load-read-function=#t")))
 
-;; MEASURED (probe mode `cells'): provide / require is ASYMMETRIC --
-;; `init-loader' installs NEITHER, and the prelude (which installs
-;; `provide') is not loaded by a plain `guile' process.
+;; MEASURED (probe mode `cells'): provide / require is STILL
+;; ASYMMETRIC.  RE-PINNED at M60 imp-4: `init-loader' now installs
+;; `provide' (row 18) and `require' is still absent, so the asymmetry is
+;; `provide=#t'.  `(elisp-require)' is exported and never defined.
 (m60-imp2--check "r2/provide-require-asymmetry"
                  (m60-imp2--all (m60-imp2--probe-line
-                                 "cells" "ASYM: require=#f provide=#f")
+                                 "cells" "ASYM: require=#f provide=#t")
                                 (eql 0 (m60-imp2--count "mod/emacs/utils.scm"
                                                         "set-symbol-function! 'require"))))
 
@@ -546,9 +547,11 @@ host limit is a skip, never a pass."
                   "cells"
                   (concat "LOAD lisp/subdirs.el: ERROR void-function"
                           " (normal-top-level-add-to-load-path)")))
+;; RE-PINNED at M60 imp-4: `provide' landed (row 18), so lisp/cdl.el
+;; is NO stop of mode `cells' any more: it loads to the END.  The old
+;; pin is not deleted; it follows the measured value.
 (m60-imp2--check "r3/cdl-first-stop"
-                 (m60-imp2--probe-line
-                  "cells" "LOAD lisp/cdl.el: ERROR void-function (provide)"))
+                 (m60-imp2--probe-line "cells" "LOAD lisp/cdl.el: done"))
 (m60-imp2--check "r3/obarray-first-stop"
                  (m60-imp2--probe-line
                   "cells" "LOAD lisp/obarray.el: ERROR void-function (defconst)"))
@@ -557,10 +560,11 @@ host limit is a skip, never a pass."
                   "cells"
                   "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)"))
 
-;; MEASURED: `features' is a C DEFVAR_LISP (src/fns.c :6372) and its
-;; variable cell is UNBOUND in a plain `guile' process.
-(m60-imp2--check "r3/features-unbound"
-                 (m60-imp2--all (m60-imp2--probe-line "cells" "FEATURES-BOUND: #f")
+;; MEASURED: `features' is a C DEFVAR_LISP (src/fns.c :6372).
+;; RE-PINNED at M60 imp-4: `init-loader' binds it (row 19), so the
+;; variable cell is BOUND in a plain `guile' process.
+(m60-imp2--check "r3/features-bound"
+                 (m60-imp2--all (m60-imp2--probe-line "cells" "FEATURES-BOUND: #t")
                                 (eql 6372 (m60-imp2--line-of
                                            "src/fns.c"
                                            "DEFVAR_LISP (\"features\""))))

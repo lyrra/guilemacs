@@ -299,23 +299,25 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1203 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1214 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
-                 (eql 230 (m60-imp1--lines "prelude/load.scm")))
+                 (eql 229 (m60-imp1--lines "prelude/load.scm")))
 (m60-imp1--check "faces.scm-and-spec.scm-lines"
                  (and (eql 70 (m60-imp1--lines "mod/emacs/faces.scm"))
                       (eql 32 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))))
 
 ;; Unit: LINES (`grep -c').  7 + 4 guarded installs plus 2 unguarded
-;; installs and the `defun' branch of the minimal evaluator make the 14.
+;; installs and the `defun' branch of the minimal evaluator made 14.
+;; RE-MEASURED at M60 imp-4: the guarded `provide' install adds 1 to
+;; each count -> 19 / 15 / 8.
 (m60-imp1--check "loader.scm-grep-c-counts"
-                 (and (eql 18 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                 (and (eql 19 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 14 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      (eql 15 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 7 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      (eql 8 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 ;; Unit: OCCURRENCES over src/*.[ch].
 (m60-imp1--check "tree-wide-scm-ref-267"
@@ -382,9 +384,17 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                       (eql 211 (m60-imp1--line-of
                                 "mod/emacs/utils.scm"
                                 "^(define elisp-provide"))
-                      (eql 576 (m60-imp1--line-of
-                                "mod/emacs/utils.scm"
-                                "(set-symbol-function! 'provide elisp-provide)"))))
+                      ;; RE-PINNED at M60 imp-4: the install LEFT
+                      ;; `init-utils-registrations'.  The pin follows the
+                      ;; install and also pins that `utils.scm' holds
+                      ;; NONE: ONE home only.
+                      (eql 0 (m60-imp1--grep-c
+                              "mod/emacs/utils.scm"
+                              "set-symbol-function! 'provide"))
+                      (m60-imp1--holds-all
+                       "mod/emacs/loader.scm"
+                       '("(unless (symbol-fbound? 'provide)"
+                         "(set-symbol-function! 'provide elisp-provide)"))))
 
 ;; MEASURED ASYMMETRY: `elisp-require' appears ONCE in the tree -- the
 ;; #:export list at :26 -- and is never defined and never installed.

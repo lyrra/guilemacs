@@ -284,30 +284,30 @@ symbol `m55-imp5-guile-absent'."
 (setq m55-imp5--group 's1)
 
 ;; Row 1: mod/emacs/loader.scm lines = 1,187.
-(m55-imp5--check "loader.scm-lines-1203"
-                 (eql 1203 (m55-imp5--lines "mod/emacs/loader.scm")))
+(m55-imp5--check "loader.scm-lines-1214"
+                 (eql 1214 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
 ;; Row 3: prelude/load.scm lines = 265.
-(m55-imp5--check "prelude-load.scm-lines-230"
-                 (eql 230 (m55-imp5--lines "prelude/load.scm")))
+(m55-imp5--check "prelude-load.scm-lines-229"
+                 (eql 229 (m55-imp5--lines "prelude/load.scm")))
 ;; Row 4: (symbol-function 'X) applies in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m55-imp5--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp5--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; Row 5: symbol-fbound? lines in loader.scm = 18 (`grep -c').
-(m55-imp5--check "loader.scm-symbol-fbound-lines-18"
-                 (eql 18 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-symbol-fbound-lines-19"
+                 (eql 19 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
-(m55-imp5--check "loader.scm-set-symbol-function-lines-14"
-                 (eql 14 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-set-symbol-function-lines-15"
+                 (eql 15 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
-(m55-imp5--check "loader.scm-fix-markers-lines-7"
-                 (eql 7 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-fix-markers-lines-8"
+                 (eql 8 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; Row 8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71

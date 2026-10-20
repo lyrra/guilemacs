@@ -133,10 +133,14 @@ definition itself: a `memq' over the `features' list."
 ;;; --- mode: provide --------------------------------------------------
 
 (define (mode-provide)
-  (show "features-bound-before" "~s" (symbol-bound? 'features))
-  (show "provide-fbound-before" "~s" (symbol-fbound? 'provide))
-  ;; The unbound sentinel of `features' names its state; the address in
-  ;; the sentinel changes between runs, so a check pins only the words.
+  ;; M60 imp-4: `init-loader' already bound both cells, so these lines are
+  ;; the state AT START, not the empty-cell state of imp-2.  This mode is a
+  ;; FIXTURE: it installs both cells itself, so it measures the LOAD, not
+  ;; the home.
+  (show "features-bound-at-start" "~s" (symbol-bound? 'features))
+  (show "provide-fbound-at-start" "~s" (symbol-fbound? 'provide))
+  ;; The address in the sentinel changes between runs, so a check pins
+  ;; only the words.
   (show "symbol-value features" "~s" (symbol-value 'features))
   ;; The faithful cell: the real elisp primitive of (emacs utils).
   (set-symbol-function! 'provide elisp-provide)
@@ -179,7 +183,17 @@ definition itself: a `memq' over the `features' list."
 ;; `provide' cell is installed and the `features' variable is NOT bound.
 ;; The load of lisp/cdl.el must error, and the error must name the
 ;; unbound sentinel -- it is NOT a `void-function' stop.
+;;
+;; M60 imp-4: `init-loader' now binds `features' (row 19), so this
+;; control UNBINDS the value cell again with `makunbound!' -- the exported
+;; helper that is also the elisp primitive of mod/emacs/boot.scm:10.  No
+;; private binding is touched; `symbol-bound?' reports the unset variable
+;; as UNBOUND, not as #nil.  The boot is NOT skipped: a mode without
+;; `init-loader' also loses the reader cells, and the load stops with
+;; `Wrong type to apply: #nil' before `provide' ever runs (recorded by
+;; probe-imp3.scm, mode `noboot').
 (define (mode-negative)
+  (makunbound! 'features)
   (set-symbol-function! 'provide elisp-provide)
   (show "features-bound" "~s" (symbol-bound? 'features))
   (show "provide-fbound" "~s" (symbol-fbound? 'provide))

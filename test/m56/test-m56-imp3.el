@@ -11,8 +11,8 @@
 ;;;   S1 -- the re-measured surface of brief.org section 4, measured at
 ;;;         the imp-3 base HEAD dc8af1488.  Group A (the M55 loader
 ;;;         surface, 9 rows): mod/emacs/loader.scm 1,187 lines / 74
-;;;         (symbol-function 'X) matches / 18 symbol-fbound? lines / 14
-;;;         set-symbol-function! lines / 7 FIX-*-guilemacs lines;
+;;;         (symbol-function 'X) matches / 19 symbol-fbound? lines / 15
+;;;         set-symbol-function! lines / 8 FIX-*-guilemacs lines;
 ;;;         mod/emacs/reader.scm 2,021 lines; prelude/load.scm 265 lines
 ;;;         / 70 ^(use-modules lines / 31 ^(init-...-registrations)
 ;;;         lines.  Group B (the TTY surface M56 audits, 8 rows):
@@ -266,30 +266,30 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; A1: mod/emacs/loader.scm lines = 1,190.
 (m56-imp3--check "loader-lines-1203"
-                 (eql 1203 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1214 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
                  (eql 74 (m56-imp3--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-;; A3: symbol-fbound? lines in loader.scm = 18 (`grep -c').
-(m56-imp3--check "loader-symbol-fbound-18"
-                 (eql 18 (m56-imp3--count-lines "mod/emacs/loader.scm"
+;; A3: symbol-fbound? lines in loader.scm = 19 (`grep -c').
+(m56-imp3--check "loader-symbol-fbound-19"
+                 (eql 19 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-;; A4: set-symbol-function! lines in loader.scm = 14 (`grep -c').
-(m56-imp3--check "loader-set-symbol-function-14"
-                 (eql 14 (m56-imp3--count-lines "mod/emacs/loader.scm"
+;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
+(m56-imp3--check "loader-set-symbol-function-15"
+                 (eql 15 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
-;; A5: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
-(m56-imp3--check "loader-fix-markers-7"
-                 (eql 7 (m56-imp3--count-lines "mod/emacs/loader.scm"
+;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
+(m56-imp3--check "loader-fix-markers-8"
+                 (eql 8 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; A6: mod/emacs/reader.scm lines = 2,021.
 (m56-imp3--check "reader-lines-2021"
                  (eql 2021 (m56-imp3--lines "mod/emacs/reader.scm")))
-;; A7: prelude/load.scm lines = 265.
-(m56-imp3--check "prelude-lines-230"
-                 (eql 230 (m56-imp3--lines "prelude/load.scm")))
+;; A7: prelude/load.scm lines = 229.
+(m56-imp3--check "prelude-lines-229"
+                 (eql 229 (m56-imp3--lines "prelude/load.scm")))
 ;; A8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71
 ;; (brief.org section 4).
