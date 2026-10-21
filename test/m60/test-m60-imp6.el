@@ -654,9 +654,13 @@ host limit is a skip, never a pass."
 ;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the
 ;; `elisp-make-obsolete-variable' procedure, 1 export NAME and the
 ;; L11 ... L15 limit block).  The old value was 606.
+;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
+;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
+;; block, above them, in `elisp-loader-eval-form').
+;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 (m60-imp6--check "s5/line-counts"
                  (m60-imp6--all
-                  (eql 1409 (m60-imp6--lines "mod/emacs/loader.scm"))
+                  (eql 1511 (m60-imp6--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp6--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp6--lines "prelude/load.scm"))))
 

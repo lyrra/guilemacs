@@ -746,12 +746,18 @@ host limit is a skip, never a pass."
 ;; L11 ... L15 limit block).  The old value was 606.
 ;; M60 imp-8 (row 27) RE-PIN: probe-imp3.scm 444 -> 471 LINES (mode
 ;; `obsolete', its comment block, 1 dispatch clause, 1 mode name).
+;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
+;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
+;; block, above them, in `elisp-loader-eval-form').  probe-imp3.scm
+;; 471 -> 535 LINES (mode `control') -> 584 LINES (the cr.org fix
+;; observables and the REAL path fixture of mode `control').
+;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 (m60-imp7--check "s5/line-counts"
                  (m60-imp7--all
-                  (eql 1409 (m60-imp7--lines "mod/emacs/loader.scm"))
+                  (eql 1511 (m60-imp7--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp7--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp7--lines "prelude/load.scm"))
-                  (eql 471 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
+                  (eql 584 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
 ;; values, UNCHANGED.  A macro object in the elisp function cell would

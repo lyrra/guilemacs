@@ -307,8 +307,12 @@ symbol `m55-imp3-guile-absent'."
 ;; `elisp-loader-eval-form'.
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
 ;; guarded `make-obsolete-variable' install in `init-loader').
-(m55-imp3--check "loader.scm-lines-1409"
-                 (eql 1409 (m55-imp3--lines "mod/emacs/loader.scm")))
+;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
+;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
+;; block, above them, in `elisp-loader-eval-form').
+;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
+(m55-imp3--check "loader.scm-lines-1511"
+                 (eql 1511 (m55-imp3--lines "mod/emacs/loader.scm")))
 (m55-imp3--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp3--lines "mod/emacs/reader.scm")))
 (m55-imp3--check "prelude-load.scm-lines-229"

@@ -1100,6 +1100,17 @@ elisp nil instead of a `load' error."
                     restore))
         restore)))
 
+;; M60 imp-9 fix (cr.org F5): elisp accepts a BARE SYMBOL binding, as in
+;; `(let (q) ...)'.  It binds elisp nil, the same as `((q))'.  The old
+;; path took `(car binding)' of a SYMBOL and raised `wrong-type-arg'.
+(define (elisp-loader-binding-name binding)
+  (if (symbol? binding) binding (car binding)))
+
+(define (elisp-loader-binding-init binding)
+  (if (and (pair? binding) (pair? (cdr binding)))
+      (elisp-loader-eval (cadr binding))
+      #nil))
+
 (define (elisp-loader-make-procedure params body)
   (lambda args
     (let ((restore (elisp-loader-bind-params! params args)))
@@ -1148,18 +1159,28 @@ elisp nil instead of a `load' error."
            (elisp-loader-eval (caddr form))
            (if (pair? (cdddr form)) (elisp-loader-eval (cadddr form)) #nil)))
       ((eq? head 'progn) (elisp-loader-eval-seq (cdr form)))
+      ;; M60 imp-9 fix (cr.org F3, F4, F5): `let' shares the undo path
+      ;; of `let*'.  Every INIT is evaluated in the OUTER environment
+      ;; FIRST, then the names are bound INSIDE the `dynamic-wind' body,
+      ;; so an INIT that raises restores the names that are bound
+      ;; already (F3).  The restore thunks run LAST-IN-FIRST-OUT, so a
+      ;; DUPLICATE name gets the outer value back (F4).  A BARE SYMBOL
+      ;; binding binds elisp nil (F5).
       ((eq? head 'let)
-       (let* ((restore (map (lambda (binding)
-                              (elisp-loader-bind-thunk
-                               (car binding)
-                               (if (pair? (cdr binding))
-                                   (elisp-loader-eval (cadr binding))
-                                   #nil)))
-                            (cadr form)))
-              (body (cddr form)))
+       (let ((body (cddr form))
+             (restore '()))
          (dynamic-wind
            (lambda () #t)
-           (lambda () (elisp-loader-eval-seq body))
+           (lambda ()
+             (let ((inits (map elisp-loader-binding-init (cadr form))))
+               (for-each (lambda (binding init)
+                           (set! restore
+                                 (cons (elisp-loader-bind-thunk
+                                        (elisp-loader-binding-name binding)
+                                        init)
+                                       restore)))
+                         (cadr form) inits))
+             (elisp-loader-eval-seq body))
            (lambda () (for-each (lambda (thunk) (thunk)) restore)))))
       ((eq? head 'lambda)
        (elisp-loader-make-procedure (cadr form) (cddr form)))
@@ -1232,6 +1253,87 @@ elisp nil instead of a `load' error."
                     (elisp-loader-make-procedure (caddr form) (cdddr form))
                     elisp-loader-macro-table))
        (cadr form))
+      ;; M60 imp-9 LIMITS of row 28a (brief.org section 10).  These are
+      ;; NAMED limits, never claims:
+      ;; L16 `cond' has no `=>' extension and no `cl-case' clause shape.
+      ;;    A file that needs either is a NEW row.
+      ;; L17 `while' has no loop limit.  A loaded file can loop forever.
+      ;;    No limit is added here: a limit would change elisp behavior.
+      ;; L18 the binding model is DYNAMIC, as for `let' (L3).  `let*'
+      ;;    does not make a closure.
+      ;; L19 `cond' tests the catch-all SYMBOLS `t' and `otherwise'
+      ;;    WITHOUT evaluation.  An elisp file that binds `otherwise' as
+      ;;    a variable gets a different result.
+      ;; L20 the loader still has no `catch' / `unwind-protect' /
+      ;;    `condition-case'.  Row 28b (backquote) stays OPEN.
+      ;; L21 the `cond' clause-shape error is a Guile `misc-error', not
+      ;;    an elisp `error' signal (cr.org F6): this loader has no
+      ;;    `signal' path (L20).  The rest of the loader throws
+      ;;    `void-function' / `void-variable' only.
+      ;; NOTE (imp-9): L7 above holds the row-28 status AT imp-7.  Row
+      ;; 28a CLOSES here; row 28b (`backquote', `,' and `,@') stays OPEN.
+      ;;
+      ;; M60 imp-9 -- row 28a: `cond'.  A clause is (TEST BODY ...).  The
+      ;; catch-all is tested as a SYMBOL, before the evaluation of TEST,
+      ;; because `t' is a variable and `otherwise' is usually unbound.
+      ;; A clause with a TEST only returns the test value.  An empty
+      ;; clause list and a no-match return #nil.  The elisp truth test is
+      ;; `elisp-loader-truthy?', not Scheme truth: (eq? '#nil #f) is
+      ;; false.
+      ((eq? head 'cond)
+       (let loop ((clauses (cdr form)))
+         (if (null? clauses)
+             #nil
+             (let ((clause (car clauses)))
+               (if (not (pair? clause))
+                   (error "cond: clause is not a list: ~s" clause)
+                   (if (memq (car clause) '(t otherwise))
+                       (if (pair? (cdr clause))
+                           (elisp-loader-eval-seq (cdr clause))
+                           (car clause))
+                       (let ((value (elisp-loader-eval (car clause))))
+                         (if (elisp-loader-truthy? value)
+                             (if (pair? (cdr clause))
+                                 (elisp-loader-eval-seq (cdr clause))
+                                 value)
+                             (loop (cdr clauses))))))))))
+      ;; M60 imp-9 -- row 28a: `let*'.  The bindings are made ONE AT A
+      ;; TIME, so a later INIT sees the PREVIOUS name.  All INIT forms
+      ;; must NOT be pre-evaluated into a list.  The undo path is the
+      ;; `let' path: 1 `elisp-loader-bind-thunk' per name, the body inside
+      ;; `dynamic-wind', and every restore thunk in the exit thunk.
+      ;; M60 imp-9 fix (cr.org F3, F5): the bindings are made ONE AT A
+      ;; TIME, so a later INIT sees the PREVIOUS name, and the loop runs
+      ;; INSIDE the `dynamic-wind' body, so an INIT that raises restores
+      ;; the names that are bound already (F3).  Restore runs
+      ;; LAST-IN-FIRST-OUT.  A BARE SYMBOL binding binds elisp nil.
+      ((eq? head 'let*)
+       (let ((body (cddr form))
+             (restore '()))
+         (dynamic-wind
+           (lambda () #t)
+           (lambda ()
+             (let loop ((bindings (cadr form)))
+               (if (pair? bindings)
+                   (begin
+                     (set! restore
+                           (cons (elisp-loader-bind-thunk
+                                  (elisp-loader-binding-name (car bindings))
+                                  (elisp-loader-binding-init (car bindings)))
+                                 restore))
+                     (loop (cdr bindings)))))
+             (elisp-loader-eval-seq body))
+           (lambda () (for-each (lambda (thunk) (thunk)) restore)))))
+      ;; M60 imp-9 -- row 28a: `while'.  The TEST runs BEFORE the first
+      ;; body form, so a false test runs the body 0 times.  A body of 0
+      ;; forms is legal: then the loop is 1 test only.  The value is
+      ;; ALWAYS #nil, also when the body ran.  A named `let' loop, not
+      ;; Guile `while'.
+      ((eq? head 'while)
+       (let loop ()
+         (if (elisp-loader-truthy? (elisp-loader-eval (cadr form)))
+             (begin (elisp-loader-eval-seq (cddr form)) (loop))
+             #nil)))
       (else
        ;; M60 imp-7 -- row 23: the macro table is tested BEFORE the
        ;; function cell.  The expander gets the UNEVALUATED argument

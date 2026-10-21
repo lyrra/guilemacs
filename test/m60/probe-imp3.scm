@@ -18,11 +18,12 @@
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `require', `defs', `macros', `registration', `language', or
-;;; `obsolete'.  Mode `defs' is the M60 imp-6 record of rows 21 and
-;;; 22 (`defconst', `defvar').  Mode `macros' is the M60 imp-7 record
-;;; of rows 23 and 24
-;;; (`defmacro' and `eval-when-compile').  The
+;;; `require', `defs', `macros', `registration', `language',
+;;; `obsolete', or `control'.  Mode `defs' is the M60 imp-6 record of
+;;; rows 21 and 22 (`defconst', `defvar').  Mode `macros' is the M60
+;;; imp-7 record of rows 23 and 24 (`defmacro' and
+;;; `eval-when-compile').  Mode `control' is the M60 imp-9 record of row
+;;; 28a (`cond', `let*', `while').  The
 ;;; fixture prints `key: value' lines on stdout.  It reads the repo root
 ;;; from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
@@ -453,6 +454,117 @@ definition itself: a `memq' over the `features' list."
     (show "MARK" "~s"
           (elisp-get 'obarray-default-size 'byte-obsolete-variable))))
 
+;;; --- mode: control --------------------------------------------------
+
+;; M60 imp-9 (row 28a).  The 3 branches `cond', `let*' and `while' of
+;; `elisp-loader-eval-form', plus the 3 recorded FIRST STOPS of real
+;; `.el' files.  Every value comes from the live `guile' child, never
+;; from a copied number.
+;;
+;; `elisp-loader-eval' is not exported, so the fixture gets it with
+;; `module-ref'.  NOTE: in this evaluator `nil' is `#nil' and the reader
+;; returns `()' for the empty list; `()' is TRUTHY for
+;; `elisp-loader-truthy?' (a limit of the `if' branch that predates row
+;; 28a).  So every loop below ends on `#nil' and NOT on `()': the
+;; `while' counter walks a DOTTED list whose tail is `nil'.
+(define (mode-control)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval)))
+    ;; `cond': the catch-all `t' clause, the `otherwise' clause, no
+    ;; match, an empty clause list, a clause with a TEST only, and the
+    ;; first match that wins.
+    (show "cond t-clause" "~s" (eval-form '(cond (nil 1) (t 2))))
+    (show "cond otherwise-clause" "~s" (eval-form '(cond (nil 1) (otherwise 2))))
+    (show "cond no-match" "~s" (eval-form '(cond (nil 1) (nil 2))))
+    (show "cond empty" "~s" (eval-form '(cond)))
+    (show "cond test-only-true" "~s" (eval-form '(cond ((quote yes)))))
+    (show "cond test-only-false" "~s" (eval-form '(cond (nil))))
+    (show "cond first-match-wins" "~s"
+          (eval-form '(cond (t (quote a)) (t (quote b)))))
+    ;; `let*': the 2nd INIT reads the 1st name, and the 1st name is
+    ;; RESTORED after the form (dynamic binding, limit L18).
+    (eval-form '(defconst m60-probe-o 1))
+    (show "let* later-init-sees-earlier" "~s"
+          (eval-form '(let* ((m60-probe-o 2) (m60-probe-p m60-probe-o))
+                        (cons m60-probe-o m60-probe-p))))
+    (show "let* restored-after" "~s" (symbol-value 'm60-probe-o))
+    (show "let* no-init" "~s" (eval-form '(let* ((m60-probe-q)) m60-probe-q)))
+    (show "let* body-last-value" "~s"
+          (eval-form '(let* ((m60-probe-r 1)) (quote first) (quote last))))
+    ;; `while': a counter that runs N times, a false FIRST test that runs
+    ;; the body 0 times, a 0-form body, and the always-#nil value.
+    (eval-form '(defconst m60-probe-rest (quote (1 2 . #nil))))
+    (eval-form '(defconst m60-probe-steps nil))
+    (show "while return" "~s"
+          (eval-form '(while m60-probe-rest
+                        (setq m60-probe-steps
+                              (cons (car m60-probe-rest) m60-probe-steps))
+                        (setq m60-probe-rest (cdr m60-probe-rest)))))
+    (show "while steps" "~s" (symbol-value 'm60-probe-steps))
+    (show "while rest-after" "~s" (symbol-value 'm60-probe-rest))
+    (eval-form '(defconst m60-probe-zero nil))
+    (show "while false-first-test return" "~s"
+          (eval-form '(while m60-probe-zero
+                        (setq m60-probe-zero (quote ran)))))
+    (show "while false-first-test body-runs" "~s"
+          (symbol-value 'm60-probe-zero))
+    (show "while empty-body" "~s" (eval-form '(while nil)))
+    ;; The 3 recorded FIRST STOPS of real `.el' files on the plain path.
+    ;; None of the 3 is `cond', `let*' or `while': a real file stops on
+    ;; an EARLIER missing cell (the deviation of brief.org section 3).
+    (load-line "lisp/subr.el")
+    (load-line "lisp/calendar/time-date.el")
+    (load-line "lisp/color.el")
+    ;; The cr.org fixes of the row-28a branches.  A raising INIT restores
+    ;; the names that are bound already (F3), a DUPLICATE name gets the
+    ;; OUTER value back (F4), and a BARE SYMBOL binding binds elisp nil
+    ;; (F5).
+    (eval-form '(defconst m60-probe-dup 0))
+    (show "let* duplicate-value" "~s"
+          (eval-form '(let* ((m60-probe-dup 1) (m60-probe-dup 2)) m60-probe-dup)))
+    (show "let* duplicate-after" "~s" (symbol-value 'm60-probe-dup))
+    (eval-form '(defconst m60-probe-dup 0))
+    (show "let duplicate-value" "~s"
+          (eval-form '(let ((m60-probe-dup 1) (m60-probe-dup 2)) m60-probe-dup)))
+    (show "let duplicate-after" "~s" (symbol-value 'm60-probe-dup))
+    (eval-form '(defconst m60-probe-leak 'outer))
+    (show "let* init-raises" "~s"
+          (catch #t
+            (lambda ()
+              (eval-form '(let* ((m60-probe-leak 'inner)
+                                 (m60-probe-leak-2 no-such-variable))
+                            m60-probe-leak))
+              'no-error)
+            (lambda (key . args) key)))
+    (show "let* leak-after" "~s" (symbol-value 'm60-probe-leak))
+    (show "let* bare-symbol" "~s"
+          (eval-form '(let* (m60-probe-bare) m60-probe-bare)))
+    (show "let bare-symbol" "~s"
+          (eval-form '(let (m60-probe-bare) m60-probe-bare)))
+    ;; The REAL path (cr.org F8): a TRACKED fixture `.el' file goes
+    ;; through the elisp reader and then the elisp evaluator, and the
+    ;; `setq' side effects are the proof.  This is not hand-built datum.
+    (let ((load-source (module-ref (resolve-module '(emacs loader))
+                                   'elisp-load-source-file)))
+      (show "real load" "~s"
+            (catch #t
+              (lambda ()
+                (load-source (string-append root "/test/m60/fixture-imp9.el"))
+                'done)
+              (lambda (key . args) (cons key args))))
+      (show "real cond t-clause" "~s" (symbol-value 'm60-fixture-cond-t))
+      (show "real cond otherwise-clause" "~s"
+            (symbol-value 'm60-fixture-cond-otherwise))
+      (show "real cond no-match" "~s" (symbol-value 'm60-fixture-cond-none))
+      (show "real cond test-only" "~s"
+            (symbol-value 'm60-fixture-cond-test-only))
+      (show "real let* later-init-sees-earlier" "~s"
+            (symbol-value 'm60-fixture-let*))
+      (show "real let* restored-after" "~s" (symbol-value 'm60-fixture-restored))
+      (show "real let* bare-symbol" "~s" (symbol-value 'm60-fixture-bare))
+      (show "real while steps" "~s" (symbol-value 'm60-fixture-steps))
+      (show "real while return" "~s" (symbol-value 'm60-fixture-while)))))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -467,5 +579,6 @@ definition itself: a `memq' over the `features' list."
   ((registration) (mode-registration))
   ((language) (mode-language))
   ((obsolete) (mode-obsolete))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete)"
+  ((control) (mode-control))
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control)"
                      mode))))

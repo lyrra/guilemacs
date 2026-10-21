@@ -450,8 +450,12 @@ host limit is a skip, never a pass."
 ;; not move.
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
 ;; guarded `make-obsolete-variable' install in `init-loader').
+;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
+;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
+;; block, above them, in `elisp-loader-eval-form').
+;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1409 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1511 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))

@@ -303,8 +303,12 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
 ;; guarded `make-obsolete-variable' install in `init-loader').
+;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
+;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
+;; block, above them, in `elisp-loader-eval-form').
+;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1409 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1511 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -490,10 +494,13 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; site moves 1196 -> 1231.  The imp-7 fix RE-PINS it once more: the
 ;; L2 ... L6 limits block and the macro-drop helper add 26 lines ABOVE
 ;; it, so the site moves 1231 -> 1257 -> 1259.  The cr.org F2 fix of
-;; L10 adds 7 more lines ABOVE it, so it moves 1259 -> 1266 (old values
-;; 1231, 1257 and 1259).
+;; L10 adds 7 more lines ABOVE it, so it moves 1259 -> 1266.
+;; M60 imp-9 RE-PINS it: the 3 branches of row 28a and the L16 ... L20
+;; limit block add lines ABOVE it, and the cr.org fix of imp-9 adds 31
+;; more, so it moves 1266 -> 1337 -> 1368 (old
+;; values 1231, 1257, 1259 and 1266).
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1266 (m60-imp1--line-of
+                 (and (eql 1368 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
                       (eql 788 (m60-imp1--line-of
