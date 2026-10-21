@@ -1348,7 +1348,18 @@ elisp nil instead of a `load' error."
       (set-symbol-function! 'string-suffix-p elisp-string-suffix-p))
     (unless (symbol-fbound? 'file-name-directory)
       (set-symbol-function! 'file-name-directory
-                            elisp-loader-file-name-directory)))
+                            elisp-loader-file-name-directory))
+    ;; M60 imp-8 -- row 27: the cell of (emacs utils), the row-18 pattern
+    ;; of `provide' above: 1 install site, 1 guard, 0 new evaluator
+    ;; branches.  A full Emacs already owns this cell, because
+    ;; lisp/emacs-lisp/byte-run.el is preloaded.  L15: the `EMPTY-CELLS'
+    ;; list of test/m60/probe-imp3.scm is a FIXED list of 11 guarded
+    ;; names and does NOT hold this name, so that line is not the proof
+    ;; of row 27.  The proof is the `LOAD lisp/obarray.el: done' line and
+    ;; the return value and the mark that mode `obsolete' prints.
+    (unless (symbol-fbound? 'make-obsolete-variable)
+      (set-symbol-function! 'make-obsolete-variable
+                            elisp-make-obsolete-variable)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

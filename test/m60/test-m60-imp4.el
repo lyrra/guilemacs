@@ -442,20 +442,29 @@ host limit is a skip, never a pass."
 (setq m60-imp4--group 's5)
 
 ;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
-(m60-imp4--check "s5/loader-lines-1398"
-                 (eql 1398 (m60-imp4--lines "mod/emacs/loader.scm")))
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+(m60-imp4--check "s5/loader-lines-1409"
+                 (eql 1409 (m60-imp4--lines "mod/emacs/loader.scm")))
 (m60-imp4--check "s5/prelude-load-lines-229"
                  (eql 229 (m60-imp4--lines "prelude/load.scm")))
+;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the
+;; `elisp-make-obsolete-variable' procedure, 1 export NAME and the
+;; L11 ... L15 limit block).  The old value was 606.
 (m60-imp4--check "s5/utils-lines-606"
-                 (eql 606 (m60-imp4--lines "mod/emacs/utils.scm")))
+                 (eql 640 (m60-imp4--lines "mod/emacs/utils.scm")))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-20: 18/14/7 before the
 ;; change, 19/15/8 after it.  Each count moves by 1, the 3 new lines of
 ;; the 2 forms.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp4--check "s5/loader-grep-c-counts"
-                 (and (eql 22 (m60-imp4--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp4--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))

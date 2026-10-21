@@ -288,8 +288,10 @@ symbol `m55-imp5-guile-absent'."
 ;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES.  Rows 23 and 24
 ;; add the `defmacro' store and the `eval-when-compile' branch to
 ;; `elisp-loader-eval-form'.
-(m55-imp5--check "loader.scm-lines-1398"
-                 (eql 1398 (m55-imp5--lines "mod/emacs/loader.scm")))
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+(m55-imp5--check "loader.scm-lines-1409"
+                 (eql 1409 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
@@ -302,12 +304,16 @@ symbol `m55-imp5-guile-absent'."
                  (eql 74 (m55-imp5--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; Row 5: symbol-fbound? lines in loader.scm = 18 (`grep -c').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
 (m55-imp5--check "loader.scm-symbol-fbound-lines-22"
-                 (eql 22 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 (eql 23 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m55-imp5--check "loader.scm-set-symbol-function-lines-18"
-                 (eql 18 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 (eql 19 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
 (m55-imp5--check "loader.scm-fix-markers-lines-9"

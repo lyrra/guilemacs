@@ -433,15 +433,21 @@ host limit is a skip, never a pass."
 ;; The 2 evaluator branches of rows 21 and 22 add 20 lines (5 comment
 ;; lines each, and 5 code lines each).
 ;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
 (m60-imp3--check "s1/loader-lines"
-                 (eql 1398 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1409 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp3--check "s1/loader.scm-grep-c-counts"
-                 (and (eql 22 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -628,12 +634,14 @@ host limit is a skip, never a pass."
 ;; `eval-when-compile' stops, so lisp/hex-util.el loads to the END.  The
 ;; old 4th line was `LOAD lisp/hex-util.el: ERROR void-function
 ;; (eval-when-compile)'.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp3--check "s5/four-first-stops"
                  (m60-imp3--probe-ordered
                   "cells"
                   '("LOAD lisp/subdirs.el: ERROR void-function"
                     "LOAD lisp/cdl.el: done"
-                    "LOAD lisp/obarray.el: ERROR void-function (make-obsolete-variable)"
+                    "LOAD lisp/obarray.el: done"
                     "LOAD lisp/hex-util.el: done")))
 (m60-imp3--check "s5/features-bound"
                  (m60-imp3--probe-line "cells" "FEATURES-BOUND: #t"))
@@ -646,11 +654,13 @@ host limit is a skip, never a pass."
 ;; (the real branch matches first) and STAYS in the fixture, because this
 ;; mode records the chain.  The old step was
 ;; `stub-eval-when-compile / hex-util: ERROR void-function (defmacro)'.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp3--check "s5/stub-chain"
                  (m60-imp3--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
-                    "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
+                    "stub-defconst / obarray: done"
                     "stub-eval-when-compile / hex-util: done"
                     "stub-ntl / subdirs: done")))
 (m60-imp3--check "s5/last-good-point"

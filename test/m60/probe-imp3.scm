@@ -18,9 +18,10 @@
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `require', `defs', `macros', `registration', or `language'.  Mode
-;;; `defs' is the M60 imp-6 record of rows 21 and 22 (`defconst',
-;;; `defvar').  Mode `macros' is the M60 imp-7 record of rows 23 and 24
+;;; `require', `defs', `macros', `registration', `language', or
+;;; `obsolete'.  Mode `defs' is the M60 imp-6 record of rows 21 and
+;;; 22 (`defconst', `defvar').  Mode `macros' is the M60 imp-7 record
+;;; of rows 23 and 24
 ;;; (`defmacro' and `eval-when-compile').  The
 ;;; fixture prints `key: value' lines on stdout.  It reads the repo root
 ;;; from GUILEMACS_ROOT only, so
@@ -427,6 +428,31 @@ definition itself: a `memq' over the `features' list."
     (lambda (key . args)
       (show "ERROR" "~a ~s" key args))))
 
+;;; --- mode: obsolete -------------------------------------------------
+
+;; M60 imp-8 (row 27).  The 2 observables that mode `cells' does NOT
+;; print: the RETURN VALUE of the procedure and the MARK.  Both come from
+;; the guarded install of `init-loader', so the call goes through the
+;; elisp FUNCTION cell with the elisp evaluator, not through a Scheme
+;; variable.  L15: `EMPTY-CELLS' is a FIXED 11-name list and does not hold
+;; `make-obsolete-variable', so it is NOT the proof of row 27.
+(define (mode-obsolete)
+  ;; The whole file on the real load path: was `ERROR void-function
+  ;; (make-obsolete-variable)' at imp-7.
+  (load-line "lisp/obarray.el")
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval)))
+    ;; The return value must be the SYMBOL.  `elisp-put' returns the
+    ;; VALUE, so a procedure that ended with that call prints the mark.
+    (show "RETURN" "~a"
+          (eval-form '(make-obsolete-variable
+                       'obarray-default-size
+                       "obarrays now grow automatically." "30.1")))
+    ;; The mark keeps the SOURCE order of byte-run.el :576.  The 3-arity
+    ;; form passes #nil, so field 2 is #nil and not ().
+    (show "MARK" "~s"
+          (elisp-get 'obarray-default-size 'byte-obsolete-variable))))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -440,5 +466,6 @@ definition itself: a `memq' over the `features' list."
   ((macros) (mode-macros))
   ((registration) (mode-registration))
   ((language) (mode-language))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language)"
+  ((obsolete) (mode-obsolete))
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete)"
                      mode))))

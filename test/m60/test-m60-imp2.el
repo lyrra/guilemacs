@@ -448,8 +448,10 @@ host limit is a skip, never a pass."
 ;; RE-PINNED at M60 imp-7: loader.scm 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES
 ;; (rows 23 and 24; the old imp-7 value was 1,363).  reader.scm does
 ;; not move.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1398 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1409 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -458,10 +460,14 @@ host limit is a skip, never a pass."
                       (eql 32 (m60-imp2--lines "mod/emacs-elisp/spec.scm"))))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
-                 (and (eql 22 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -559,11 +565,12 @@ host limit is a skip, never a pass."
 ;; The old pin was `LOAD lisp/obarray.el: ERROR void-function
 ;; (defconst)'.  The load now reaches the `make-obsolete-variable' call
 ;; of lisp/obarray.el :31 -- that is row 27, NOT PROVEN.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp2--check "r3/obarray-first-stop"
                  (m60-imp2--probe-line
                   "cells"
-                  (concat "LOAD lisp/obarray.el: ERROR void-function"
-                          " (make-obsolete-variable)")))
+                  "LOAD lisp/obarray.el: done"))
 ;; RE-PINNED at M60 imp-7: row 24 closes the `eval-when-compile' stop
 ;; and row 23 the `defmacro' stop, so lisp/hex-util.el loads to the END.
 ;; The old pin was `LOAD lisp/hex-util.el: ERROR void-function
@@ -596,11 +603,13 @@ host limit is a skip, never a pass."
 ;; this mode records the chain) and the chain step is `done'.  The old
 ;; step was `stub-eval-when-compile / hex-util: ERROR void-function
 ;; (defmacro)'.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp2--check "r4/stub-chain-order"
                  (m60-imp2--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
-                    "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
+                    "stub-defconst / obarray: done"
                     "stub-eval-when-compile / hex-util: done"
                     "stub-ntl / subdirs: done")))
 
@@ -618,11 +627,12 @@ host limit is a skip, never a pass."
 ;;
 ;; RE-PINNED at M60 imp-7: row 23 adds the `defmacro' branch, so the
 ;; ABSENCE pin flips to PRESENCE.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp2--check "r4/defvar-and-defconst-branches"
                  (m60-imp2--all (m60-imp2--probe-line
                                  "stubs"
-                                 (concat "stub-defconst / obarray: ERROR void-function"
-                                         " (make-obsolete-variable)"))
+                                 "stub-defconst / obarray: done")
                                 (m60-imp2--holds-all
                                  "mod/emacs/loader.scm"
                                  '("((eq? head 'defun)"

@@ -351,8 +351,10 @@ symbol `m55-imp2-guile-absent'."
 ;; `require' install and the 2 `load' protocol installs (`string-suffix-p',
 ;; `file-name-directory'), so the FILE count is 18 LINES (`grep -c').
 
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m55-imp2--check "install-cell-count-18"
-                 (eql 18 (m55-imp2--count-lines "mod/emacs/loader.scm"
+                 (eql 19 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 
 ;;; --- S2. The REAL path (brief.org sections 3 and 6) -----------------
@@ -403,8 +405,10 @@ symbol `m55-imp2-guile-absent'."
 ;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES.  Rows 23 and 24
 ;; add the `defmacro' store and the `eval-when-compile' branch to
 ;; `elisp-loader-eval-form'.
-(m55-imp2--check "loader.scm-lines-1398"
-                 (eql 1398 (m55-imp2--lines "mod/emacs/loader.scm")))
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+(m55-imp2--check "loader.scm-lines-1409"
+                 (eql 1409 (m55-imp2--lines "mod/emacs/loader.scm")))
 (m55-imp2--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp2--lines "mod/emacs/reader.scm")))
 (m55-imp2--check "prelude-load.scm-lines-229"
@@ -412,11 +416,15 @@ symbol `m55-imp2-guile-absent'."
 (m55-imp2--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp2--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp2--check "loader.scm-symbol-fbound-guards-22"
-                 (eql 22 (m55-imp2--count-lines "mod/emacs/loader.scm"
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+(m55-imp2--check "loader.scm-symbol-fbound-guards-23"
+                 (eql 23 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp2--check "loader.scm-set-symbol-function-18"
-                 (eql 18 (m55-imp2--count-lines "mod/emacs/loader.scm"
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
+(m55-imp2--check "loader.scm-set-symbol-function-19"
+                 (eql 19 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 (m55-imp2--check "loader.scm-fix-markers-9"
                  (eql 9 (m55-imp2--count-lines "mod/emacs/loader.scm"

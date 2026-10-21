@@ -301,8 +301,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; `eval-when-compile' branch, and the L10 note of cr.org F2).
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1398 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1409 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -315,10 +317,14 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; installs and the `defun' branch of the minimal evaluator made 14.
 ;; RE-MEASURED at M60 imp-4: the guarded `provide' install adds 1 to
 ;; each count -> 19 / 15 / 8.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp1--check "loader.scm-grep-c-counts"
-                 (and (eql 22 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -384,7 +390,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                                  "src/fns.c" "^DEFUN (\"provide\""))
                       (eql 3496 (m60-imp1--line-of
                                  "src/fns.c" "^DEFUN (\"require\""))
-                      (eql 211 (m60-imp1--line-of
+                      ;; M60 imp-8 (row 27) RE-PIN: 211 -> 212.  The
+                      ;; export NAME of `elisp-make-obsolete-variable'
+                      ;; is 1 line above `elisp-provide'.
+                      (eql 212 (m60-imp1--line-of
                                 "mod/emacs/utils.scm"
                                 "^(define elisp-provide"))
                       ;; RE-PINNED at M60 imp-4: the install LEFT
@@ -440,8 +449,12 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; `evaluator-has-no-defvar' and pinned the ABSENCE of both branches.
 ;; That was the pre-imp-6 measurement: the load of lisp/obarray.el
 ;; stopped at (void-function defconst), because the `defvar' of
-;; `obarray-default-size' was never evaluated.  The stop is now
+;; `obarray-default-size' was never evaluated.  The stop was then
 ;; (void-function make-obsolete-variable) -- row 27.
+;;
+;; RE-PINNED at M60 imp-8: row 27 lands, so lisp/obarray.el loads to the
+;; END in a plain `guile -L mod' process.  The old stop was
+;; `LOAD lisp/obarray.el: ERROR void-function (make-obsolete-variable)'.
 (m60-imp1--check "evaluator-has-defvar-and-defconst"
                  (and (m60-imp1--contains-p "mod/emacs/loader.scm"
                                             "((eq? head 'defun)")

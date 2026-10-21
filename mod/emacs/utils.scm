@@ -24,6 +24,7 @@
     elisp-get elisp-put elisp-symbol-plist elisp-setplist
     elisp-intern elisp-intern-soft elisp-mapatoms elisp-unintern
     elisp-featurep elisp-provide
+    elisp-make-obsolete-variable
     elisp-make-hash-table elisp-gethash elisp-puthash elisp-remhash
     elisp-clrhash elisp-hash-table-count elisp-hash-table-test
     elisp-hash-table-weakness elisp-hash-table-rehash-size
@@ -222,6 +223,39 @@ particular subfeatures supported in this version of FEATURE."
        (if (not (memq feature current-features))
            (set-symbol-value! 'features (cons feature current-features))))
      feature)))
+
+;; M60 imp-8 -- row 27.  The owner is the Lisp function of
+;; lisp/emacs-lisp/byte-run.el :564, not a C DEFUN: `rg -c
+;; make-obsolete-variable src/' gives 0 hits.  The mark is DATA only, in
+;; the source order of byte-run.el :576: (CURRENT-NAME ACCESS-TYPE WHEN).
+;; The 3-arity form passes #nil and NOT '(): (equal? #nil '()) is #f.
+;; The return value is the SYMBOL; `elisp-put' above returns the VALUE.
+;;
+;; M60 imp-8 LIMITS of row 27 -- named, not claimed:
+;;   L11: no `purecopy'.  It needs its own cell and it is not in the
+;;        tree, so the mark is a plain Scheme list.
+;;   L12: no warning channel.  The byte-compiler warnings of Emacs do not
+;;        exist here, so nothing reads the mark.
+;;   L13: no `byte-run--constant-obsolete-warning' call, and no `nil' /
+;;        `t' guard of the C path: the mark is stored for every
+;;        OBSOLETE-NAME, and ACCESS-TYPE is not checked.
+;;   L14: lisp/obarray.el :35 holds `(declare (obsolete ...))' in the
+;;        BODY of `obarray-size'.  The loader has no `declare' branch.
+;;        The LOAD passes, because `defun' does not evaluate the body.  A
+;;        CALL of `obarray-size' raises `void-function declare'.
+(define elisp-make-obsolete-variable
+  (case-lambda
+    ((obsolete-name current-name when)
+     ;; Called with 3 arguments -- no ACCESS-TYPE, as at
+     ;; lisp/obarray.el :31.
+     (elisp-make-obsolete-variable obsolete-name current-name when #nil))
+    ((obsolete-name current-name when access-type)
+     "Make the byte-compiler warn that OBSOLETE-NAME is obsolete.
+The warning will say that CURRENT-NAME should be used instead.
+This port stores the mark only; see limits L11 ... L13 above."
+     (elisp-put obsolete-name 'byte-obsolete-variable
+                (list current-name access-type when))
+     obsolete-name)))
 
 ;;;
 ;;; List Utilities

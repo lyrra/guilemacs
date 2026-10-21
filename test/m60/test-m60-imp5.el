@@ -530,13 +530,14 @@ host limit is a skip, never a pass."
 ;; RE-PINNED at M60 imp-7: the real `eval-when-compile' branch matches
 ;; FIRST, so that pure stub is DEAD and hex-util.el loads to the END.  The
 ;; stub STAYS in the fixture: the mode records the chain.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp5--check "s4/stubs-blockers"
                  (m60-imp5--all
                   (m60-imp5--probe-line "stubs" "stub-provide / cdl: done")
                   (m60-imp5--probe-line
                    "stubs"
-                   (concat "stub-defconst / obarray: ERROR void-function"
-                           " (make-obsolete-variable)"))
+                   "stub-defconst / obarray: done")
                   (m60-imp5--probe-line
                    "stubs" "stub-eval-when-compile / hex-util: done")
                   (m60-imp5--probe-line "stubs" "stub-ntl / subdirs: done")))
@@ -579,19 +580,28 @@ host limit is a skip, never a pass."
 (setq m60-imp5--group 's5)
 
 ;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the
+;; `elisp-make-obsolete-variable' procedure, 1 export NAME and the
+;; L11 ... L15 limit block).  The old value was 606.
 (m60-imp5--check "s5/line-counts"
                  (m60-imp5--all
-                  (eql 1398 (m60-imp5--lines "mod/emacs/loader.scm"))
-                  (eql 606 (m60-imp5--lines "mod/emacs/utils.scm"))
+                  (eql 1409 (m60-imp5--lines "mod/emacs/loader.scm"))
+                  (eql 640 (m60-imp5--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp5--lines "prelude/load.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 19/15/8 before the
 ;; change, 22/18/9 after it (+3 `symbol-fbound?' guards, +3
 ;; `set-symbol-function!' installs, +1 FIX marker).
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp5--check "s5/grep-c-counts"
-                 (and (eql 22 (m60-imp5--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp5--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp5--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp5--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp5--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))

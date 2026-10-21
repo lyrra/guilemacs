@@ -642,12 +642,13 @@ host limit is a skip, never a pass."
 
 ;; RE-PINNED at imp-7: the FIRST stop moved from form 1 of hex-util.el
 ;; to the row-27 call in obarray.el, and hex-util.el now reaches the END.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp7--check "s4/cells-stops"
                  (m60-imp7--all
                   (m60-imp7--probe-line
                    "cells"
-                   (concat "LOAD lisp/obarray.el: ERROR void-function"
-                           " (make-obsolete-variable)"))
+                   "LOAD lisp/obarray.el: done")
                   (m60-imp7--probe-line "cells" "LOAD lisp/hex-util.el: done")
                   (m60-imp7--probe-holds-none "cells" "(eval-when-compile)")))
 
@@ -662,13 +663,14 @@ host limit is a skip, never a pass."
 ;; so the pure stub of that name is DEAD.  The stub STAYS in the fixture,
 ;; like the `defconst' stub of imp-6, because the mode records the chain.
 ;; The stop is no longer `(defmacro)'.
+;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
+;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
 (m60-imp7--check "s4/stubs-blockers"
                  (m60-imp7--all
                   (m60-imp7--probe-line "stubs" "stub-provide / cdl: done")
                   (m60-imp7--probe-line
                    "stubs"
-                   (concat "stub-defconst / obarray: ERROR void-function"
-                           " (make-obsolete-variable)"))
+                   "stub-defconst / obarray: done")
                   (m60-imp7--probe-line "stubs"
                                         "stub-eval-when-compile / hex-util: done")
                   (m60-imp7--probe-line "stubs" "stub-ntl / subdirs: done")))
@@ -737,20 +739,31 @@ host limit is a skip, never a pass."
 ;; OTHER file was touched.
 (setq m60-imp7--group 's5)
 
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the
+;; `elisp-make-obsolete-variable' procedure, 1 export NAME and the
+;; L11 ... L15 limit block).  The old value was 606.
+;; M60 imp-8 (row 27) RE-PIN: probe-imp3.scm 444 -> 471 LINES (mode
+;; `obsolete', its comment block, 1 dispatch clause, 1 mode name).
 (m60-imp7--check "s5/line-counts"
                  (m60-imp7--all
-                  (eql 1398 (m60-imp7--lines "mod/emacs/loader.scm"))
-                  (eql 606 (m60-imp7--lines "mod/emacs/utils.scm"))
+                  (eql 1409 (m60-imp7--lines "mod/emacs/loader.scm"))
+                  (eql 640 (m60-imp7--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp7--lines "prelude/load.scm"))
-                  (eql 444 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
+                  (eql 471 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
 ;; values, UNCHANGED.  A macro object in the elisp function cell would
 ;; move the first two, so these 3 counts are the DESIGN GUARD of row 23.
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m60-imp7--check "s5/grep-c-counts"
-                 (and (eql 22 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                 (and (eql 23 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 18 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                      (eql 19 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))

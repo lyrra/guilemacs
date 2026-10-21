@@ -270,20 +270,26 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; the measurement, the old values stay here (cr.org F3).  Rows 23 and 24
 ;; add the `defmacro' store and the `eval-when-compile' branch, and the
 ;; L10 note of cr.org F2 adds 7 lines.
-(m56-imp3--check "loader-lines-1398"
-                 (eql 1398 (m56-imp3--lines "mod/emacs/loader.scm")))
+;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
+;; guarded `make-obsolete-variable' install in `init-loader').
+(m56-imp3--check "loader-lines-1409"
+                 (eql 1409 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
                  (eql 74 (m56-imp3--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; A3: symbol-fbound? lines in loader.scm = 19 (`grep -c').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
+;; LINES (1 guarded install, the row-18 pattern of `provide').
 (m56-imp3--check "loader-symbol-fbound-19"
-                 (eql 22 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 23 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
+;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
+;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
 (m56-imp3--check "loader-set-symbol-function-15"
-                 (eql 18 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 19 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"
