@@ -475,7 +475,9 @@ host limit is a skip, never a pass."
                   (eql 1 (m60-imp6--literal-lines
                           "mod/emacs/loader.scm"
                           "((pair? form) (elisp-loader-eval-form form))"))
-                  (eql 1 (m60-imp6--literal-lines
+                  ;; RE-PINNED at M60 imp-7: 1 -> 2 LITERAL LINES.  The
+                  ;; `eval-when-compile' branch of row 24 adds the 2nd.
+                  (eql 2 (m60-imp6--literal-lines
                           "mod/emacs/loader.scm"
                           "(elisp-loader-eval-seq (cdr form))"))))
 
@@ -494,10 +496,14 @@ host limit is a skip, never a pass."
                   (eql 1 (m60-imp6--literal-lines-in-eval-form
                           "(elisp-loader-apply (symbol-function head)"))))
 
-;; Row 23 (`defmacro') is imp-7 and stays OPEN: no branch.
-(m60-imp6--check "s2/no-defmacro-branch"
-                 (m60-imp6--holds-none "mod/emacs/loader.scm"
-                                       '("((eq? head 'defmacro)")))
+;; RE-PINNED at M60 imp-7: row 23 CLOSED, so the pin flips from ABSENCE
+;; to PRESENCE.  RENAMED with the assertion: the old name
+;; `s2/no-defmacro-branch' named the ABSENCE that no longer holds, so it
+;; is `s2/defmacro-branch' now.  The old check was a `holds-none' of
+;; `((eq? head 'defmacro)'.
+(m60-imp6--check "s2/defmacro-branch"
+                 (m60-imp6--holds-all "mod/emacs/loader.scm"
+                                      '("((eq? head 'defmacro)")))
 
 ;;; --- S3. The observables (mode `defs') -------------------------------
 
@@ -560,15 +566,16 @@ host limit is a skip, never a pass."
                   (m60-imp6--probe-line "cells" "FEATURES-BOUND: #t")))
 
 ;; The 2 stops that rows 21 and 22 close, and the 2 that stay open.
+;; RE-PINNED at M60 imp-7: rows 23 and 24 close the hex-util stop, so
+;; the file loads to the END.  The old line was `LOAD lisp/hex-util.el:
+;; ERROR void-function (eval-when-compile)'.
 (m60-imp6--check "s4/cells-stops"
                  (m60-imp6--all
                   (m60-imp6--probe-line
                    "cells"
                    (concat "LOAD lisp/obarray.el: ERROR void-function"
                            " (make-obsolete-variable)"))
-                  (m60-imp6--probe-line
-                   "cells"
-                   "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)")))
+                  (m60-imp6--probe-line "cells" "LOAD lisp/hex-util.el: done")))
 
 (m60-imp6--check "s4/provide-unchanged"
                  (m60-imp6--all
@@ -586,9 +593,13 @@ host limit is a skip, never a pass."
                    "stubs"
                    (concat "stub-defconst / obarray: ERROR void-function"
                            " (make-obsolete-variable)"))
-                  (m60-imp6--probe-line
-                   "stubs"
-                   "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)")
+                  ;; RE-PINNED at M60 imp-7: the real `eval-when-compile'
+                  ;; branch matches FIRST, so that stub is DEAD and the
+                  ;; file loads to the END.  The old line was
+                  ;; `stub-eval-when-compile / hex-util: ERROR
+                  ;; void-function (defmacro)'.
+                  (m60-imp6--probe-line "stubs"
+                                        "stub-eval-when-compile / hex-util: done")
                   (m60-imp6--probe-line "stubs" "stub-ntl / subdirs: done")))
 
 ;; The imp-4 negative control still names the unbound sentinel.  The
@@ -634,9 +645,11 @@ host limit is a skip, never a pass."
 ;; branches add LINES to the FIRST count only.
 (setq m60-imp6--group 's5)
 
+;; RE-PINNED at M60 imp-7: loader.scm 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and
+;; 24).  utils.scm and prelude/load.scm do not move.
 (m60-imp6--check "s5/line-counts"
                  (m60-imp6--all
-                  (eql 1328 (m60-imp6--lines "mod/emacs/loader.scm"))
+                  (eql 1398 (m60-imp6--lines "mod/emacs/loader.scm"))
                   (eql 606 (m60-imp6--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp6--lines "prelude/load.scm"))))
 

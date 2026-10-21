@@ -13,7 +13,8 @@
                 ;; reaches the compiled branch; the split registration
                 ;; makes the language findable, so the import is needed.
                 #:select (compile compile-file compiled-file-name))
-  #:use-module ((srfi srfi-1) #:select (count any))
+  ;; M60 imp-7 fix (cr.org F3): `remove' drops a shadowed macro entry.
+  #:use-module ((srfi srfi-1) #:select (count any remove))
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs utils)
   #:use-module ((emacs sequences) #:select (elisp-append))
@@ -1107,6 +1108,26 @@ elisp nil instead of a `load' error."
         (lambda () (elisp-loader-eval-seq body))
         (lambda () (for-each (lambda (thunk) (thunk)) restore))))))
 
+;; M60 imp-7 -- row 23: the macro store of (emacs loader).  An alist maps
+;; the elisp NAME to its EXPANDER procedure.  The elisp FUNCTION cell is
+;; NOT touched: the `symbol-function' reader and the `fbound?' predicate
+;; read that cell, and a full Emacs owns it in C.
+;; L9: the table is process-GLOBAL and has no reset, so a 2nd `load'
+;; keeps the old expanders.  This is a limit, not a claim.
+(define elisp-loader-macro-table '())
+
+(define (elisp-loader-macro-ref name)
+  (let ((hit (assq name elisp-loader-macro-table)))
+    (if hit (cdr hit) #f)))
+
+;; M60 imp-7 fix -- L8 (cr.org F3): a `defun' SHADOWS a macro of the same
+;; name.  Emacs keeps the 2 forms in ONE cell, so the later `defun' wins.
+;; Here the cells are separate, so the table entry must be DROPPED.
+(define (elisp-loader-macro-drop! name)
+  (set! elisp-loader-macro-table
+        (remove (lambda (entry) (eq? (car entry) name))
+                elisp-loader-macro-table)))
+
 (define (elisp-loader-eval-form form)
   (let ((head (car form)))
     (cond
@@ -1146,6 +1167,10 @@ elisp nil instead of a `load' error."
       ;; function that a later form CALLS.  The definition lands in the
       ;; elisp function cell.
       ((eq? head 'defun)
+       ;; M60 imp-7 fix -- L8 (cr.org F3): the `defun' must SHADOW a macro
+       ;; of the same name, so the table entry is DROPPED BEFORE the
+       ;; function cell is written.  Emacs has ONE cell for both forms.
+       (elisp-loader-macro-drop! (cadr form))
        (set-symbol-function! (cadr form)
                              (elisp-loader-make-procedure (caddr form)
                                                           (cdddr form))))
@@ -1169,11 +1194,56 @@ elisp nil instead of a `load' error."
          (if (and (pair? (cddr form)) (not (symbol-bound? name)))
              (set-symbol-value! name (elisp-loader-eval (caddr form))))
          name))
+      ;; M60 imp-7 LIMITS of rows 23 and 24 (brief.org section 5, cr.org
+      ;; F2).  These are NAMED limits, never claims:
+      ;; L2 a macro call expands when the evaluator EVALUATES the call
+      ;;    form, so a call inside a `defun' body expands at CALL time,
+      ;;    not at definition time.
+      ;; L3 the expander runs on the DYNAMIC binding model of this
+      ;;    evaluator, not on the lexical model of a compiler.
+      ;; L4 no `&rest' / `&optional' parameter support.  This is the
+      ;;    existing limit of `elisp-loader-make-procedure'.
+      ;; L5 a DOC element is not stripped.  A leading string in the body
+      ;;    evaluates to itself and is ignored.
+      ;; L6 the table lookup adds 1 `assq' to every function call on this
+      ;;    path.  No timing was taken.
+      ;; M60 imp-7 -- row 24 (L1): `eval-when-compile' is a MACRO in Emacs,
+      ;; but a source-reading loader has no compile phase.  At LOAD time
+      ;; its body must RUN.  DECISION, not a port: this is the
+      ;; INTERPRETER behaviour; a compiler drops the body.
+      ((eq? head 'eval-when-compile)
+       (elisp-loader-eval-seq (cdr form)))
+      ;; M60 imp-7 -- row 23: `defmacro' STORES an expander and does NOT
+      ;; evaluate the argument forms.  The expander goes into the macro
+      ;; table above, built with the same call that `defun' makes.  The
+      ;; elisp function cell is NOT touched (see the table comment), so
+      ;; the `symbol-function' reader and the `fbound?' predicate stay
+      ;; unaware.  The branch returns the SYMBOL.
+      ;; L10 (cr.org F2): the drop is ONE-WAY.  A `defmacro' that lands
+      ;; AFTER a `defun' of the same name leaves the OLD procedure in the
+      ;; elisp function cell, because Emacs has 1 cell and this loader has
+      ;; 2 stores.  A CALL is still correct: `else' tests the table FIRST.
+      ;; Only `symbol-function' reads the stale value.  The cell is NOT
+      ;; cleared, because 1 more write to the elisp function cell would
+      ;; move the design counter 18 of brief.org section 9.
+      ((eq? head 'defmacro)
+       (set! elisp-loader-macro-table
+             (acons (cadr form)
+                    (elisp-loader-make-procedure (caddr form) (cdddr form))
+                    elisp-loader-macro-table))
+       (cadr form))
       (else
-       (if (symbol-fbound? head)
-           (elisp-loader-apply (symbol-function head)
-                               (map elisp-loader-eval (cdr form)))
-           (throw 'void-function head))))))
+       ;; M60 imp-7 -- row 23: the macro table is tested BEFORE the
+       ;; function cell.  The expander gets the UNEVALUATED argument
+       ;; forms, and the evaluator evaluates the expansion.  L7 Row 28 (the
+       ;; expansion path: backquote, ,@, cond, let*, while) stays OPEN.
+       (let ((expander (elisp-loader-macro-ref head)))
+         (if expander
+             (elisp-loader-eval (apply expander (cdr form)))
+             (if (symbol-fbound? head)
+                 (elisp-loader-apply (symbol-function head)
+                                     (map elisp-loader-eval (cdr form)))
+                 (throw 'void-function head))))))))
 
 ;; The elisp compiler is C (row 10).  When lookup-language raises
 ;; misc-error with the "no such language" message, the C compiler is

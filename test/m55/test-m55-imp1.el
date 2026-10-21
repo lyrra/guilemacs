@@ -301,8 +301,11 @@ symbol `m55-imp1-guile-absent'."
 
 (setq m55-imp1--group 's1)
 
-(m55-imp1--check "loader.scm-lines-1328"
-                 (eql 1328 (m55-imp1--lines "mod/emacs/loader.scm")))
+;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES.  Rows 23 and 24
+;; add the `defmacro' store and the `eval-when-compile' branch to
+;; `elisp-loader-eval-form'.
+(m55-imp1--check "loader.scm-lines-1398"
+                 (eql 1398 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
 (m55-imp1--check "prelude-load.scm-lines-229"

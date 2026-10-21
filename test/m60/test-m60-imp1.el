@@ -296,10 +296,13 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
     (m60-imp1--check "head-3603a6795" ok)))
 
 ;; Unit: LINES (`wc -l').  Measured 2026-10-20 at HEAD 3603a6795.
+;; RE-PINNED at M60 imp-7: loader.scm 1,328 -> 1,363 -> 1,389 -> 1,391 ->
+;; 1,398 LINES (rows 23 and 24: the `defmacro' store and the
+;; `eval-when-compile' branch, and the L10 note of cr.org F2).
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1328 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1398 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -446,9 +449,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                                             "((eq? head 'defvar)")
                       (m60-imp1--contains-p "mod/emacs/loader.scm"
                                             "((eq? head 'defconst)")
-                      (m60-imp1--holds-none
-                       "mod/emacs/loader.scm"
-                       '("((eq? head 'defmacro)"))))
+                      ;; RE-PINNED at M60 imp-7: the ABSENCE pin of the
+                      ;; `defmacro' branch (row 23) flips to PRESENCE.
+                      (m60-imp1--contains-p "mod/emacs/loader.scm"
+                                            "((eq? head 'defmacro)")))
 
 ;;; --- S3. The registration (docs/m60-plan.org section 4) -----------
 
@@ -469,8 +473,14 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; `load' protocol cells add 77 lines ABOVE it, so it moves 1099 -> 1176.
 ;; M60 imp-6 RE-PINS it one more time: the 2 evaluator branches of rows
 ;; 21 and 22 add 20 lines ABOVE it, so it moves 1176 -> 1196.
+;; M60 imp-7 RE-PINS it: rows 23 and 24 add 35 lines ABOVE it, so the
+;; site moves 1196 -> 1231.  The imp-7 fix RE-PINS it once more: the
+;; L2 ... L6 limits block and the macro-drop helper add 26 lines ABOVE
+;; it, so the site moves 1231 -> 1257 -> 1259.  The cr.org F2 fix of
+;; L10 adds 7 more lines ABOVE it, so it moves 1259 -> 1266 (old values
+;; 1231, 1257 and 1259).
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1196 (m60-imp1--line-of
+                 (and (eql 1266 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
                       (eql 788 (m60-imp1--line-of

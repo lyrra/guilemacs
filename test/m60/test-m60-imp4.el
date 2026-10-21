@@ -441,8 +441,9 @@ host limit is a skip, never a pass."
 ;; the old value 1214 stays in this comment (cr.org F3).
 (setq m60-imp4--group 's5)
 
-(m60-imp4--check "s5/loader-lines-1328"
-                 (eql 1328 (m60-imp4--lines "mod/emacs/loader.scm")))
+;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
+(m60-imp4--check "s5/loader-lines-1398"
+                 (eql 1398 (m60-imp4--lines "mod/emacs/loader.scm")))
 (m60-imp4--check "s5/prelude-load-lines-229"
                  (eql 229 (m60-imp4--lines "prelude/load.scm")))
 (m60-imp4--check "s5/utils-lines-606"

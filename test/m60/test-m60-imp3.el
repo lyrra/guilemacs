@@ -432,8 +432,9 @@ host limit is a skip, never a pass."
 ;; RE-MEASURED at M60 imp-6: 1214 -> 1308 at imp-5, then 1308 -> 1328.
 ;; The 2 evaluator branches of rows 21 and 22 add 20 lines (5 comment
 ;; lines each, and 5 code lines each).
+;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
 (m60-imp3--check "s1/loader-lines"
-                 (eql 1328 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1398 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
@@ -623,13 +624,17 @@ host limit is a skip, never a pass."
 ;; RE-PINNED at M60 imp-6: the obarray stop moves from `(defconst)' to
 ;; `(make-obsolete-variable)' (row 27).  The other 2 stops keep their
 ;; text.
+;; RE-PINNED at M60 imp-7: rows 23 and 24 close the `defmacro' and the
+;; `eval-when-compile' stops, so lisp/hex-util.el loads to the END.  The
+;; old 4th line was `LOAD lisp/hex-util.el: ERROR void-function
+;; (eval-when-compile)'.
 (m60-imp3--check "s5/four-first-stops"
                  (m60-imp3--probe-ordered
                   "cells"
                   '("LOAD lisp/subdirs.el: ERROR void-function"
                     "LOAD lisp/cdl.el: done"
                     "LOAD lisp/obarray.el: ERROR void-function (make-obsolete-variable)"
-                    "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)")))
+                    "LOAD lisp/hex-util.el: done")))
 (m60-imp3--check "s5/features-bound"
                  (m60-imp3--probe-line "cells" "FEATURES-BOUND: #t"))
 (m60-imp3--check "s5/provide-then-cdl"
@@ -637,12 +642,16 @@ host limit is a skip, never a pass."
                   (m60-imp3--probe-line "provide" "LOAD cdl: done")
                   (m60-imp3--probe-line "provide" "featurep cdl: #t")
                   (m60-imp3--probe-line "provide" "features: (cdl)")))
+;; RE-PINNED at M60 imp-7: the pure `eval-when-compile' stub is DEAD
+;; (the real branch matches first) and STAYS in the fixture, because this
+;; mode records the chain.  The old step was
+;; `stub-eval-when-compile / hex-util: ERROR void-function (defmacro)'.
 (m60-imp3--check "s5/stub-chain"
                  (m60-imp3--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
                     "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
-                    "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)"
+                    "stub-eval-when-compile / hex-util: done"
                     "stub-ntl / subdirs: done")))
 (m60-imp3--check "s5/last-good-point"
                  (m60-imp3--all

@@ -18,8 +18,10 @@
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `require', `defs', `registration', or `language'.  Mode `defs' is the
-;;; M60 imp-6 record of rows 21 and 22 (`defconst', `defvar').  The
+;;; `require', `defs', `macros', `registration', or `language'.  Mode
+;;; `defs' is the M60 imp-6 record of rows 21 and 22 (`defconst',
+;;; `defvar').  Mode `macros' is the M60 imp-7 record of rows 23 and 24
+;;; (`defmacro' and `eval-when-compile').  The
 ;;; fixture prints `key: value' lines on stdout.  It reads the repo root
 ;;; from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
@@ -338,6 +340,63 @@ definition itself: a `memq' over the `features' list."
           (begin (eval-form '(defconst m60-probe-x))
                  (symbol-bound? 'm60-probe-x)))))
 
+;;; --- mode: macros ---------------------------------------------------
+
+;; M60 imp-7 (rows 23 and 24).  The elisp reader of (emacs reader) is
+;; resolved LAZILY: no other mode imports it, so the import can not move
+;; the lines of a mode that a corpus already pins.
+(define (read-hex-util-form1)
+  (let ((port (open-input-file (string-append root "/lisp/hex-util.el"))))
+    (dynamic-wind
+      (lambda () #t)
+      (lambda ()
+        ((module-ref (resolve-module '(emacs reader)) 'elisp-read-from-port)
+         port))
+      (lambda () (close-port port)))))
+
+;; Row 23 stores the expander in a SCHEME table, so its lookup is NOT a
+;; function cell.  Row 24 is a DECISION: the body of a
+;; `eval-when-compile' runs at LOAD time, because a source-reading loader
+;; has no compile phase.
+(define (mode-macros)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval))
+        (macro-ref (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-macro-ref)))
+    ;; The branch returns the SYMBOL, and the elisp FUNCTION cell stays
+    ;; EMPTY: `symbol-function' and `symbol-fbound?' read that cell, and
+    ;; a full Emacs owns it in C.
+    (show "defmacro ret" "~s"
+          (eval-form '(defmacro m60-probe-m (x) (quote 7))))
+    (show "defmacro fbound" "~s" (symbol-fbound? 'm60-probe-m))
+    ;; The stored expander is a procedure.  Print the stable token only:
+    ;; the printed address changes between runs.
+    (show "defmacro expander" "procedure=~s"
+          (procedure? (macro-ref 'm60-probe-m)))
+    ;; The call does NOT evaluate its argument: `(m60-probe-missing-fn)'
+    ;; would raise if it ran.  `7' proves that it did not run.
+    (show "defmacro call noeval" "~s"
+          (eval-form '(m60-probe-m (m60-probe-missing-fn))))
+    ;; M60 imp-7 fix (cr.org F3, limit L8): a later `defun' SHADOWS the
+    ;; macro.  Emacs keeps the 2 forms in ONE cell, so the table entry is
+    ;; dropped and the call reaches the function cell: `9'.
+    (eval-form '(defun m60-probe-m (x) 9))
+    (show "defun shadow expander" "~s" (macro-ref 'm60-probe-m))
+    (show "defun shadow fbound" "~s" (symbol-fbound? 'm60-probe-m))
+    (show "defun shadow call" "~s" (eval-form '(m60-probe-m 1)))
+    ;; Row 24, on the REAL file: its form 1 is the `eval-when-compile'
+    ;; block.  The branch returns the value of its LAST body form, that
+    ;; is the SYMBOL `num-to-hex-char'.
+    (show "eval-when-compile form1 ret" "~s"
+          (eval-form (read-hex-util-form1)))
+    ;; The 2 `defmacro' forms of that block are now in the table.
+    (show "stored expanders" "hex-char-to-num=~s num-to-hex-char=~s"
+          (procedure? (macro-ref 'hex-char-to-num))
+          (procedure? (macro-ref 'num-to-hex-char)))
+    ;; The whole file, on the real load path.
+    (load-line "lisp/hex-util.el")
+    (show "featurep hex-util" "~s" (elisp-featurep 'hex-util))))
+
 ;;; --- mode: registration ---------------------------------------------
 
 ;; The named blocker.  The use-modules runs in THIS fresh process and the
@@ -378,7 +437,8 @@ definition itself: a `memq' over the `features' list."
   ((noboot) (mode-noboot))
   ((require) (mode-require))
   ((defs) (mode-defs))
+  ((macros) (mode-macros))
   ((registration) (mode-registration))
   ((language) (mode-language))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|registration|language)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language)"
                      mode))))

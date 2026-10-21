@@ -445,8 +445,11 @@ host limit is a skip, never a pass."
 
 (m60-imp2--check "r1/xfaces.c-lines"
                  (eql 7741 (m60-imp2--lines "src/xfaces.c")))
+;; RE-PINNED at M60 imp-7: loader.scm 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES
+;; (rows 23 and 24; the old imp-7 value was 1,363).  reader.scm does
+;; not move.
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1328 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1398 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -561,10 +564,12 @@ host limit is a skip, never a pass."
                   "cells"
                   (concat "LOAD lisp/obarray.el: ERROR void-function"
                           " (make-obsolete-variable)")))
+;; RE-PINNED at M60 imp-7: row 24 closes the `eval-when-compile' stop
+;; and row 23 the `defmacro' stop, so lisp/hex-util.el loads to the END.
+;; The old pin was `LOAD lisp/hex-util.el: ERROR void-function
+;; (eval-when-compile)'.  Row 28 (the expansion path) STAYS OPEN.
 (m60-imp2--check "r3/hex-util-first-stop"
-                 (m60-imp2--probe-line
-                  "cells"
-                  "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)"))
+                 (m60-imp2--probe-line "cells" "LOAD lisp/hex-util.el: done"))
 
 ;; MEASURED: `features' is a C DEFVAR_LISP (src/fns.c :6372).
 ;; RE-PINNED at M60 imp-4: `init-loader' binds it (row 19), so the
@@ -586,12 +591,17 @@ host limit is a skip, never a pass."
 ;; from `void-variable (obarray-default-size)' to
 ;; `void-function (make-obsolete-variable)'.  The stub stays: this mode
 ;; records the chain.
+;; RE-PINNED at M60 imp-7: the real `eval-when-compile' branch matches
+;; FIRST, so that pure stub is DEAD (it STAYS in the fixture, because
+;; this mode records the chain) and the chain step is `done'.  The old
+;; step was `stub-eval-when-compile / hex-util: ERROR void-function
+;; (defmacro)'.
 (m60-imp2--check "r4/stub-chain-order"
                  (m60-imp2--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
                     "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
-                    "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)"
+                    "stub-eval-when-compile / hex-util: done"
                     "stub-ntl / subdirs: done")))
 
 ;; The FIRST stop that a pure stub can NOT pass was a VARIABLE, not a
@@ -604,7 +614,10 @@ host limit is a skip, never a pass."
 ;; The first stop that a stub can not pass is now the
 ;; `make-obsolete-variable' FUNCTION call (row 27).  The old check was
 ;; named `r4/defvar-stop' and pinned `void-variable
-;; (obarray-default-size)'.  `defmacro' (row 23) still has no branch.
+;; (obarray-default-size)'.
+;;
+;; RE-PINNED at M60 imp-7: row 23 adds the `defmacro' branch, so the
+;; ABSENCE pin flips to PRESENCE.
 (m60-imp2--check "r4/defvar-and-defconst-branches"
                  (m60-imp2--all (m60-imp2--probe-line
                                  "stubs"
@@ -615,7 +628,7 @@ host limit is a skip, never a pass."
                                  '("((eq? head 'defun)"
                                    "((eq? head 'defvar)"
                                    "((eq? head 'defconst)"))
-                                (m60-imp2--holds-none
+                                (m60-imp2--holds-all
                                  "mod/emacs/loader.scm"
                                  '("((eq? head 'defmacro)"))))
 

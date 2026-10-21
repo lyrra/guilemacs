@@ -527,6 +527,9 @@ host limit is a skip, never a pass."
 ;; branch matches FIRST, so the stub is dead and the obarray stop is the
 ;; `make-obsolete-variable' call (row 27); the old pin was
 ;; `void-variable (obarray-default-size)'.
+;; RE-PINNED at M60 imp-7: the real `eval-when-compile' branch matches
+;; FIRST, so that pure stub is DEAD and hex-util.el loads to the END.  The
+;; stub STAYS in the fixture: the mode records the chain.
 (m60-imp5--check "s4/stubs-blockers"
                  (m60-imp5--all
                   (m60-imp5--probe-line "stubs" "stub-provide / cdl: done")
@@ -535,7 +538,7 @@ host limit is a skip, never a pass."
                    (concat "stub-defconst / obarray: ERROR void-function"
                            " (make-obsolete-variable)"))
                   (m60-imp5--probe-line
-                   "stubs" "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)")
+                   "stubs" "stub-eval-when-compile / hex-util: done")
                   (m60-imp5--probe-line "stubs" "stub-ntl / subdirs: done")))
 
 ;; The imp-4 negative control still names the unbound sentinel.  The
@@ -575,9 +578,10 @@ host limit is a skip, never a pass."
 ;; evaluator branches of rows 21 and 22).  The other 2 counts stand.
 (setq m60-imp5--group 's5)
 
+;; RE-PINNED at M60 imp-7: 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and 24).
 (m60-imp5--check "s5/line-counts"
                  (m60-imp5--all
-                  (eql 1328 (m60-imp5--lines "mod/emacs/loader.scm"))
+                  (eql 1398 (m60-imp5--lines "mod/emacs/loader.scm"))
                   (eql 606 (m60-imp5--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp5--lines "prelude/load.scm"))))
 

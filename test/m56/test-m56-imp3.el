@@ -264,11 +264,14 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; --- Group A.  The M55 loader surface. ---
 
-;; A1: mod/emacs/loader.scm lines = 1,328.  Was 1,190 at the imp-3 base,
-;; and 1,203 in the name of this check until M60 imp-6 re-measured it:
-;; the name follows the measurement, the old value stays here (cr.org F3).
-(m56-imp3--check "loader-lines-1328"
-                 (eql 1328 (m56-imp3--lines "mod/emacs/loader.scm")))
+;; A1: mod/emacs/loader.scm lines = 1,398.  Was 1,391 and before it 1,389
+;; and 1,363 at the 2 imp-7 attempts, 1,190 at the imp-3 base,
+;; 1,203 before M60 imp-6 and 1,328 before M60 imp-7: the name follows
+;; the measurement, the old values stay here (cr.org F3).  Rows 23 and 24
+;; add the `defmacro' store and the `eval-when-compile' branch, and the
+;; L10 note of cr.org F2 adds 7 lines.
+(m56-imp3--check "loader-lines-1398"
+                 (eql 1398 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
