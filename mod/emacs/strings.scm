@@ -52,6 +52,10 @@
     elisp-string-lines
     elisp-string-pixel-width
     elisp-length
+    ;; M60 imp-5: the imp-5 require cell reuses this pure-Scheme definition
+    ;; as the `string-suffix-p' function cell on the standalone path, so
+    ;; (emacs loader) imports it with #:select.
+    elisp-string-suffix-p
     init-strings-registrations
   ))
 

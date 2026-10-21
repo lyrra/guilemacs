@@ -299,7 +299,7 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1214 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1308 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -313,11 +313,11 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; RE-MEASURED at M60 imp-4: the guarded `provide' install adds 1 to
 ;; each count -> 19 / 15 / 8.
 (m60-imp1--check "loader.scm-grep-c-counts"
-                 (and (eql 19 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                 (and (eql 22 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 15 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      (eql 18 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 8 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      (eql 9 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 ;; Unit: OCCURRENCES over src/*.[ch].
 (m60-imp1--check "tree-wide-scm-ref-267"
@@ -396,15 +396,18 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                        '("(unless (symbol-fbound? 'provide)"
                          "(set-symbol-function! 'provide elisp-provide)"))))
 
-;; MEASURED ASYMMETRY: `elisp-require' appears ONCE in the tree -- the
-;; #:export list at :26 -- and is never defined and never installed.
-;; The only caller of the install wave is the prelude, which a plain
-;; `guile -L mod' process never loads.
+;; MEASURED ASYMMETRY, CLOSED at M60 imp-5.  At imp-1 `elisp-require'
+;; appeared ONCE in the tree -- the #:export list at utils.scm :26 -- and
+;; was never defined and never installed.  imp-5 gives the name ONE home:
+;; 2 OCCURRENCES in loader.scm (the definition and the install), 0 in
+;; utils.scm, 0 in the prelude.  RE-PINNED: the utils.scm export is gone.
 (m60-imp1--check "require-asymmetry"
-                 (and (eql 1 (m60-imp1--count "mod/emacs/utils.scm"
+                 (and (eql 0 (m60-imp1--count "mod/emacs/utils.scm"
                                               "elisp-require"))
-                      (eql 26 (m60-imp1--line-of "mod/emacs/utils.scm"
-                                                 "elisp-require"))
+                      (eql 2 (m60-imp1--count "mod/emacs/loader.scm"
+                                              "elisp-require"))
+                      (eql 0 (m60-imp1--count "prelude/load.scm"
+                                              "elisp-require"))
                       ;; RE-PINNED at M60 imp-3: the prelude lost the 36
                       ;; patch lines, so this site moved 236 -> 200.
                       (eql 200 (m60-imp1--line-of
@@ -454,8 +457,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; this check: the split moved the loader guard to :1099 (it now also
 ;; tests `c-runtime-installed?') and the `emacs!' row of runtime.scm to
 ;; :788, and it DELETED the prelude read, so 0 sites stay there.
+;; M60 imp-5 RE-PINS the loader site again: the require cell and its 2
+;; `load' protocol cells add 77 lines ABOVE it, so it moves 1099 -> 1176.
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1099 (m60-imp1--line-of
+                 (and (eql 1176 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
                       (eql 788 (m60-imp1--line-of

@@ -17,6 +17,12 @@
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs utils)
   #:use-module ((emacs sequences) #:select (elisp-append))
+  ;; M60 imp-5: the elisp `load' protocol applies `string-suffix-p'
+  ;; (loader.scm :257).  In a plain `guile' process that cell is EMPTY, so
+  ;; `init-loader' installs the existing pure-Scheme definition.  The
+  ;; import is `#:select' only: (emacs strings) does not use (emacs
+  ;; loader), so the module graph stays acyclic.
+  #:use-module ((emacs strings) #:select (elisp-string-suffix-p))
   #:use-module ((emacs list) #:select (elisp-car elisp-cdr))
   #:use-module (emacs reader)
   #:export (
@@ -887,6 +893,59 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
           (apply throw key args)))))
 
 ;;;
+;;; M60 imp-5 -- row 20: `require', the C DEFUN of src/fns.c :3496
+;;;
+;;; The cell follows `Frequire' step by step: CHECK_SYMBOL, a `memq'
+;;; against `features', the elisp `load' protocol, the second `memq', and
+;;; the "Required feature" error.
+;;;
+;;; It calls `elisp-load' (:725), NOT `load-elisp' (:831).  Frequire calls
+;;; the elisp `load' protocol (:3582 `load_with_autoload_queue'), and
+;;; `elisp-load' owns that protocol: it searches the elisp `load-path'
+;;; VARIABLE and skips a file that is already being loaded.
+;;
+;; FIX-20261021-guilemacs: standalone-load cell.  A full Emacs keeps the
+;; C DEFUN, so `init-loader' installs this cell only when the function
+;; cell is EMPTY (see the guarded block of `init-loader').
+;;
+;; NOT ported (C state, named as limits in the commit message):
+;; `features_being_loaded' (src/fns.c :3488), `require_nesting_list'
+;; (:3481), `subfeatures', `Vcurrent_load_list', the `after-load-alist'
+;; hook, and the 2nd error message (:3606).
+(define* (elisp-require feature #:optional (filename #nil) (noerror #nil))
+  "If FEATURE is not loaded, load it from FILENAME, then return FEATURE.
+FILENAME defaults to the print name of FEATURE.  NOERROR returns the
+elisp nil instead of a `load' error."
+  ;; CHECK_SYMBOL (src/fns.c :3521).
+  (unless (symbol? feature)
+    (scm-error 'wrong-type-arg "require" "Wrong type argument: ~S"
+               (list feature) #f))
+  ;; Fmemq against `features'.  `features' is bound by the row-19 form of
+  ;; `init-loader' (:1238), before this cell is reachable, so no bind is
+  ;; needed here.  A loaded feature does NOT load the file again.
+  (if (memq feature (symbol-value 'features))
+      feature
+      (let* (;; NILP: both the elisp nil (#nil) and Scheme #f count as
+             ;; "no FILENAME", so the name comes from the feature symbol.
+             (from-feature? (not (elisp-loader-truthy? filename)))
+             (name (if from-feature? (symbol->string feature) filename))
+             ;; `load_with_autoload_queue' (:3582): NOMESSAGE is t,
+             ;; NOSUFFIX is nil, MUST-SUFFIX is t only when the name comes
+             ;; from the feature symbol.
+             (result (elisp-load name noerror #t #nil from-feature?)))
+        ;; NILP of the load value.  The NOERROR path of `elisp-load'
+        ;; returns Scheme #f (:785), and `(eq? #f #nil)' is false, so a
+        ;; plain nil test would read a FAILED load as a success.
+        (if (not (elisp-loader-truthy? result))
+            #nil
+            (if (memq feature (symbol-value 'features))
+                feature
+                ;; The C message names SYMBOL_NAME (feature), not FILENAME
+                ;; (src/fns.c :3604).
+                (error "Required feature `~a' was not provided"
+                       (symbol->string feature)))))))
+
+;;;
 ;;; M55 imp-2 -- the reachable runtime cells in Scheme
 ;;;
 ;;; The loader applies 7 runtime function cells on the real plain-guile
@@ -919,6 +978,24 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
   (catch #t
     (lambda () (eq? 'directory (stat:type (stat path))))
     (lambda args #f)))
+
+;; `file-name-directory' for the elisp `load' protocol.
+;;
+;; M60 imp-5, MEASURED: `elisp-process-load-file-path' (:246 ... :260)
+;; applies `string-suffix-p' and `file-name-directory' on every MUST-SUFFIX
+;; call, and both cells are EMPTY in a plain `guile' process.  A full Emacs
+;; owns the 2 C DEFUNs; `(emacs fileio)' is C-backed and is NOT reusable
+;; (brief.org section 10), so the loader holds a small Scheme path split.
+;; The Emacs contract: the directory part WITH the trailing "/"; a name
+;; with no directory part returns #nil.
+(define (elisp-loader-file-name-directory file)
+  (if (or (not (string? file)) (string-null? file))
+      #nil
+      (let loop ((i (- (string-length file) 1)))
+        (cond
+         ((< i 0) #nil)
+         ((char=? (string-ref file i) #\/) (substring file 0 (+ i 1)))
+         (else (loop (- i 1)))))))
 
 ;;;
 ;;; M55 imp-4 -- the source-reading load path (C delta 0)
@@ -1164,7 +1241,24 @@ reading the source when the elisp compiler is absent (M55 imp-4)."
     ;; Emacs already owns the C DEFUN (src/fns.c :3450), so the guard
     ;; keeps that cell.
     (unless (symbol-fbound? 'provide)
-      (set-symbol-function! 'provide elisp-provide)))
+      (set-symbol-function! 'provide elisp-provide))
+    ;; M60 imp-5 — row 20: the cell of (emacs loader) :915.  A full Emacs
+    ;; already owns the C DEFUN (src/fns.c :3496), so the guard keeps it.
+    (unless (symbol-fbound? 'require)
+      (set-symbol-function! 'require elisp-require))
+    ;; M60 imp-5 — the 2 cells of the elisp `load' protocol that `require'
+    ;; applies.  MEASURED: `elisp-load' reached them through
+    ;; `elisp-process-load-file-path' (:246 ... :260) and stopped with
+    ;; `wrong-type-arg "Wrong type to apply: #nil"' because both function
+    ;; cells are EMPTY in a plain `guile' process.  `string-suffix-p'
+    ;; reuses the pure-Scheme definition of (emacs strings) :336;
+    ;; `file-name-directory' is the small loader split (:991).  A full
+    ;; Emacs keeps the 2 C DEFUNs.
+    (unless (symbol-fbound? 'string-suffix-p)
+      (set-symbol-function! 'string-suffix-p elisp-string-suffix-p))
+    (unless (symbol-fbound? 'file-name-directory)
+      (set-symbol-function! 'file-name-directory
+                            elisp-loader-file-name-directory)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

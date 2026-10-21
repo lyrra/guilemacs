@@ -266,7 +266,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; A1: mod/emacs/loader.scm lines = 1,190.
 (m56-imp3--check "loader-lines-1203"
-                 (eql 1214 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1308 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -274,15 +274,15 @@ equality check would fail (brief.org section 5).  Return the symbol
                                           "(symbol-function '")))
 ;; A3: symbol-fbound? lines in loader.scm = 19 (`grep -c').
 (m56-imp3--check "loader-symbol-fbound-19"
-                 (eql 19 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 22 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
 (m56-imp3--check "loader-set-symbol-function-15"
-                 (eql 15 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 18 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"
-                 (eql 8 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 9 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; A6: mod/emacs/reader.scm lines = 2,021.
 (m56-imp3--check "reader-lines-2021"

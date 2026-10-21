@@ -446,7 +446,7 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/xfaces.c-lines"
                  (eql 7741 (m60-imp2--lines "src/xfaces.c")))
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1214 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1308 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -454,13 +454,13 @@ host limit is a skip, never a pass."
                  (and (eql 70 (m60-imp2--lines "mod/emacs/faces.scm"))
                       (eql 32 (m60-imp2--lines "mod/emacs-elisp/spec.scm"))))
 
-;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-4: 19 / 15 / 8.
+;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
-                 (and (eql 19 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                 (and (eql 22 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 15 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      (eql 18 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 8 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      (eql 9 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; Unit: OCCURRENCES over src/*.[ch].  MEASURED: 267.
@@ -524,13 +524,13 @@ host limit is a skip, never a pass."
                   (concat "VARS: load-path=#t load-suffixes=#t"
                           " load-file-rep-suffixes=#t load-read-function=#t")))
 
-;; MEASURED (probe mode `cells'): provide / require is STILL
-;; ASYMMETRIC.  RE-PINNED at M60 imp-4: `init-loader' now installs
-;; `provide' (row 18) and `require' is still absent, so the asymmetry is
-;; `provide=#t'.  `(elisp-require)' is exported and never defined.
+;; MEASURED (probe mode `cells'): provide / require is NO LONGER
+;; asymmetric.  RE-PINNED at M60 imp-5: `init-loader' installs `require'
+;; (row 20) as well as `provide' (row 18), so BOTH cells report #t.  The
+;; utils.scm install count is still 0: the cell has ONE home.
 (m60-imp2--check "r2/provide-require-asymmetry"
                  (m60-imp2--all (m60-imp2--probe-line
-                                 "cells" "ASYM: require=#f provide=#t")
+                                 "cells" "ASYM: require=#t provide=#t")
                                 (eql 0 (m60-imp2--count "mod/emacs/utils.scm"
                                                         "set-symbol-function! 'require"))))
 

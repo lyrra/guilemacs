@@ -347,10 +347,12 @@ symbol `m55-imp2-guile-absent'."
 ;; The 7 imp-2 new cells plus the 4 imp-4 cells (intern, concat,
 ;; substring, eval) plus the 2 pre-existing ones (load,
 ;; autoload-do-load) plus the imp-4 `defun' define site make 14
-;; set-symbol-function! sites in init-loader.
+;; set-symbol-function! sites in init-loader.  M60 imp-5 adds the
+;; `require' install and the 2 `load' protocol installs (`string-suffix-p',
+;; `file-name-directory'), so the FILE count is 18 LINES (`grep -c').
 
-(m55-imp2--check "install-cell-count-15"
-                 (eql 15 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "install-cell-count-18"
+                 (eql 18 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 
 ;;; --- S2. The REAL path (brief.org sections 3 and 6) -----------------
@@ -398,8 +400,8 @@ symbol `m55-imp2-guile-absent'."
 
 (setq m55-imp2--group 's3)
 
-(m55-imp2--check "loader.scm-lines-1214"
-                 (eql 1214 (m55-imp2--lines "mod/emacs/loader.scm")))
+(m55-imp2--check "loader.scm-lines-1308"
+                 (eql 1308 (m55-imp2--lines "mod/emacs/loader.scm")))
 (m55-imp2--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp2--lines "mod/emacs/reader.scm")))
 (m55-imp2--check "prelude-load.scm-lines-229"
@@ -407,14 +409,14 @@ symbol `m55-imp2-guile-absent'."
 (m55-imp2--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp2--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp2--check "loader.scm-symbol-fbound-guards-19"
-                 (eql 19 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-symbol-fbound-guards-22"
+                 (eql 22 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp2--check "loader.scm-set-symbol-function-15"
-                 (eql 15 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-set-symbol-function-18"
+                 (eql 18 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
-(m55-imp2--check "loader.scm-fix-markers-8"
-                 (eql 8 (m55-imp2--count-lines "mod/emacs/loader.scm"
+(m55-imp2--check "loader.scm-fix-markers-9"
+                 (eql 9 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 
 ;;; --- S4. The registration -------------------------------------------

@@ -371,12 +371,13 @@ host limit is a skip, never a pass."
 (m60-imp4--check "s3/features-is-cdl"
                  (m60-imp4--probe-line "cells" "features: (cdl)"))
 
-;; `require' is NOT part of imp-4 (row 20 is a separate commit), so the
-;; asymmetry stays.  `(elisp-require)' is exported and NEVER defined.
+;; `require' was NOT part of imp-4 (row 20 is a separate commit).
+;; RE-PINNED at M60 imp-5: row 20 installs the cell, so the imp-4
+;; asymmetry `require=#f' is gone and BOTH cells report #t.
 (m60-imp4--check "s3/asymmetry-and-features-bound"
                  (m60-imp4--all
                   (m60-imp4--probe-line "cells"
-                                        "ASYM: require=#f provide=#t")
+                                        "ASYM: require=#t provide=#t")
                   (m60-imp4--probe-line "cells" "FEATURES-BOUND: #t")))
 
 ;;; --- S4. The negative control ---------------------------------------
@@ -437,7 +438,7 @@ host limit is a skip, never a pass."
 (setq m60-imp4--group 's5)
 
 (m60-imp4--check "s5/loader-lines-1214"
-                 (eql 1214 (m60-imp4--lines "mod/emacs/loader.scm")))
+                 (eql 1308 (m60-imp4--lines "mod/emacs/loader.scm")))
 (m60-imp4--check "s5/prelude-load-lines-229"
                  (eql 229 (m60-imp4--lines "prelude/load.scm")))
 (m60-imp4--check "s5/utils-lines-606"
@@ -447,11 +448,11 @@ host limit is a skip, never a pass."
 ;; change, 19/15/8 after it.  Each count moves by 1, the 3 new lines of
 ;; the 2 forms.
 (m60-imp4--check "s5/loader-grep-c-counts"
-                 (and (eql 19 (m60-imp4--grep-c "mod/emacs/loader.scm"
+                 (and (eql 22 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 15 (m60-imp4--grep-c "mod/emacs/loader.scm"
+                      (eql 18 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 8 (m60-imp4--grep-c "mod/emacs/loader.scm"
+                      (eql 9 (m60-imp4--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;;; --- S6. The registration of THIS corpus ----------------------------

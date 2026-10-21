@@ -284,8 +284,8 @@ symbol `m55-imp5-guile-absent'."
 (setq m55-imp5--group 's1)
 
 ;; Row 1: mod/emacs/loader.scm lines = 1,187.
-(m55-imp5--check "loader.scm-lines-1214"
-                 (eql 1214 (m55-imp5--lines "mod/emacs/loader.scm")))
+(m55-imp5--check "loader.scm-lines-1308"
+                 (eql 1308 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
@@ -298,16 +298,16 @@ symbol `m55-imp5-guile-absent'."
                  (eql 74 (m55-imp5--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; Row 5: symbol-fbound? lines in loader.scm = 18 (`grep -c').
-(m55-imp5--check "loader.scm-symbol-fbound-lines-19"
-                 (eql 19 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-symbol-fbound-lines-22"
+                 (eql 22 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
-(m55-imp5--check "loader.scm-set-symbol-function-lines-15"
-                 (eql 15 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-set-symbol-function-lines-18"
+                 (eql 18 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
-(m55-imp5--check "loader.scm-fix-markers-lines-8"
-                 (eql 8 (m55-imp5--count-lines "mod/emacs/loader.scm"
+(m55-imp5--check "loader.scm-fix-markers-lines-9"
+                 (eql 9 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; Row 8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71

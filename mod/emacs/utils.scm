@@ -8,7 +8,7 @@
 ;;; EXPORTS (37+ functions):
 ;;;   Symbol properties: get, put, symbol-plist, setplist
 ;;;   Obarray: intern, intern-soft, mapatoms, unintern
-;;;   Features: featurep, provide, require
+;;;   Features: featurep, provide  (require is the cell of (emacs loader))
 ;;;   Hash tables: make-hash-table, gethash, puthash, remhash, clrhash, hash-table-count
 ;;;   Comparison: equal-including-properties
 ;;;   Other: copy-tree, fillarray
@@ -23,7 +23,7 @@
     elisp-get-load-suffixes
     elisp-get elisp-put elisp-symbol-plist elisp-setplist
     elisp-intern elisp-intern-soft elisp-mapatoms elisp-unintern
-    elisp-featurep elisp-provide elisp-require
+    elisp-featurep elisp-provide
     elisp-make-hash-table elisp-gethash elisp-puthash elisp-remhash
     elisp-clrhash elisp-hash-table-count elisp-hash-table-test
     elisp-hash-table-weakness elisp-hash-table-rehash-size

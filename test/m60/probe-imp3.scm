@@ -18,7 +18,7 @@
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `registration', or `language'.  The fixture prints `key: value'
+;;; `require', `registration', or `language'.  The fixture prints `key: value'
 ;;; lines on stdout.  It reads the repo root from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
 ;;; control; it needs its own process, because it installs a faithful
@@ -234,6 +234,65 @@ definition itself: a `memq' over the `features' list."
   (show "provide-fbound" "~s" (symbol-fbound? 'provide))
   (show "LOAD cdl" "~a" (describe (try-load "lisp/cdl.el"))))
 
+; --- mode: require --------------------------------------------------
+
+;; M60 imp-5 (row 20).  This mode needs its OWN process: it changes the
+;; `features' list and the elisp `load-path' variable.  Every value comes
+;; from the installed cell of `init-loader', so no cell is stubbed here.
+(define (call-require . args)
+  (apply (symbol-function 'require) args))
+
+;; The formatted MESSAGE of the Guile `misc-error' that `error' raises, or
+;; #f.  Guile stores the payload as (#f "~A ~S" (FORMAT . ARGS)).  NOTE: a
+;; docstring on this procedure breaks the call (measured 2026-10-21: the
+;; handler raised `Unbound variable: ~A' before the first body form), so
+;; the explanation is a comment, not a docstring.
+(define (misc-error-message key rest)
+  (cond
+   ((not (eq? key 'misc-error)) #f)
+   ((< (length rest) 3) #f)
+   ((not (list? (list-ref rest 2))) #f)
+   (else
+    (let ((fmt (car (list-ref rest 2)))
+          (vals (cdr (list-ref rest 2))))
+      (if (string? fmt) (apply format #f fmt vals) #f)))))
+
+;; Run `require' on ARGS and format the value, or the error, as a line.  A
+;; raise is caught, so the check keeps a stable shape.  A `misc-error'
+;; prints its MESSAGE, not the raw argument list: that message is what the
+;; C `error' of src/fns.c :3604 produces.
+(define (describe-require . args)
+  (catch #t
+    (lambda () (describe (list 'ok (apply call-require args))))
+    (lambda (key . rest)
+      (let ((msg (misc-error-message key rest)))
+        (if msg
+            (format #f "ERROR ~a ~a" key msg)
+            (format #f "ERROR ~a ~s" key rest))))))
+
+(define (mode-require)
+  (show "REQUIRE-FBOUND" "~s" (symbol-fbound? 'require))
+  (show "features-at-start" "~s" (symbol-value 'features))
+  ;; The acceptance observable of brief.org section 8: the feature is not
+  ;; loaded, so the cell loads lisp/cdl.el and returns the symbol.
+  (show "REQUIRE cdl" "~a" (describe-require 'cdl))
+  (show "features" "~s" (symbol-value 'features))
+  ;; Empty the ELISP variable, not %load-path: `search-elisp-load-path'
+  ;; (:709) reads the variable, and it stops the loop only on #nil.  A
+  ;; real load would now fail on the missing file, so this line proves
+  ;; that no 2nd load runs.
+  (set-symbol-value! 'load-path #nil)
+  (show "REQUIRE-AGAIN" "~a" (describe-require 'cdl))
+  ;; Step 6 of the cell: the file loads to the END and provides ANOTHER
+  ;; feature, so the second `memq' fails and the cell raises the C message
+  ;; "Required feature `%s' was not provided" (src/fns.c :3604).
+  (show "REQUIRE-NOT-PROVIDED" "~a"
+        (describe-require 'no-such-feature (string-append root "/lisp/cdl.el")))
+  ;; No file of that name: the `load' protocol raises, and NOERROR is nil.
+  (show "REQUIRE-MISSING" "~a" (describe-require 'no-such-feature))
+  ;; NOERROR is t: the failed load returns the ELISP nil, never #t.
+  (show "REQUIRE-NOERROR" "~a" (describe-require 'no-such-feature #nil #t)))
+
 ;;; --- mode: registration ---------------------------------------------
 
 ;; The named blocker.  The use-modules runs in THIS fresh process and the
@@ -272,7 +331,8 @@ definition itself: a `memq' over the `features' list."
   ((stubs) (mode-stubs))
   ((negative) (mode-negative))
   ((noboot) (mode-noboot))
+  ((require) (mode-require))
   ((registration) (mode-registration))
   ((language) (mode-language))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|registration|language)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|registration|language)"
                      mode))))

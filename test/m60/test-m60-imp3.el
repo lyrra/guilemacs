@@ -430,16 +430,16 @@ host limit is a skip, never a pass."
 ;; MEASURED 1214: the imp-3 value 1203 plus the 11 lines of the 2
 ;; guarded forms of M60 imp-4 (2 forms, 9 lines of comment).
 (m60-imp3--check "s1/loader-lines"
-                 (eql 1214 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1308 (m60-imp3--lines "mod/emacs/loader.scm")))
 
-;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-4: 19 / 15 / 8.
+;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
 (m60-imp3--check "s1/loader.scm-grep-c-counts"
-                 (and (eql 19 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                 (and (eql 22 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 15 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      (eql 18 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 8 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      (eql 9 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; brief.org F1: mod/emacs-elisp KEEPS 9 ENTRIES (`runtime/' is ONE
@@ -613,7 +613,8 @@ host limit is a skip, never a pass."
                    "cells"
                    (concat "VARS: load-path=#t load-suffixes=#t"
                            " load-file-rep-suffixes=#t load-read-function=#t"))
-                  (m60-imp3--probe-line "cells" "ASYM: require=#f provide=#t")))
+                  ;; RE-PINNED at M60 imp-5: row 20 installs `require'.
+                  (m60-imp3--probe-line "cells" "ASYM: require=#t provide=#t")))
 ;; RE-PINNED at M60 imp-4: lisp/cdl.el is no stop any more, it loads
 ;; to the END (`provide' and `features' landed).  The 3 remaining stops
 ;; keep their text.

@@ -521,8 +521,8 @@ symbol `m55-imp4-guile-absent'."
 
 (setq m55-imp4--group 's3)
 
-(m55-imp4--check "loader.scm-lines-1214"
-                 (eql 1214 (m55-imp4--lines "mod/emacs/loader.scm")))
+(m55-imp4--check "loader.scm-lines-1308"
+                 (eql 1308 (m55-imp4--lines "mod/emacs/loader.scm")))
 (m55-imp4--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp4--lines "mod/emacs/reader.scm")))
 (m55-imp4--check "prelude-load.scm-lines-229"
@@ -530,14 +530,14 @@ symbol `m55-imp4-guile-absent'."
 (m55-imp4--check "loader.scm-symbol-function-apply-74"
                  (eql 74 (m55-imp4--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
-(m55-imp4--check "loader.scm-symbol-fbound-guards-19"
-                 (eql 19 (m55-imp4--count-lines "mod/emacs/loader.scm"
+(m55-imp4--check "loader.scm-symbol-fbound-guards-22"
+                 (eql 22 (m55-imp4--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
-(m55-imp4--check "loader.scm-set-symbol-function-15"
-                 (eql 15 (m55-imp4--count-lines "mod/emacs/loader.scm"
+(m55-imp4--check "loader.scm-set-symbol-function-18"
+                 (eql 18 (m55-imp4--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
-(m55-imp4--check "loader.scm-fix-markers-8"
-                 (eql 8 (m55-imp4--count-lines "mod/emacs/loader.scm"
+(m55-imp4--check "loader.scm-fix-markers-9"
+                 (eql 9 (m55-imp4--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 
 ;;; --- S4. The registration (brief.org section 8) ---------------------
