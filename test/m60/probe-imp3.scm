@@ -527,6 +527,13 @@ definition itself: a `memq' over the `features' list."
     (show "let duplicate-value" "~s"
           (eval-form '(let ((m60-probe-dup 1) (m60-probe-dup 2)) m60-probe-dup)))
     (show "let duplicate-after" "~s" (symbol-value 'm60-probe-dup))
+    ;; cr.org F4: `let' maps EVERY init BEFORE it binds any name, so the
+    ;; 2nd INIT reads the OUTER value 1 and not the 1st binding 2.  This
+    ;; is parallel binding.  Only the `let*' order was pinned before.
+    (eval-form '(defconst m60-probe-par 1))
+    (show "let parallel-init" "~s"
+          (eval-form '(let ((m60-probe-par 2) (m60-probe-par-2 m60-probe-par))
+                        m60-probe-par-2)))
     (eval-form '(defconst m60-probe-leak 'outer))
     (show "let* init-raises" "~s"
           (catch #t

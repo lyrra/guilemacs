@@ -752,12 +752,14 @@ host limit is a skip, never a pass."
 ;; 471 -> 535 LINES (mode `control') -> 584 LINES (the cr.org fix
 ;; observables and the REAL path fixture of mode `control').
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
+;; M60 imp-9 review fix (cr.org F4) RE-PIN: probe-imp3.scm 584 -> 591 LINES
+;; (the `let parallel-init' observable of mode `control').
 (m60-imp7--check "s5/line-counts"
                  (m60-imp7--all
                   (eql 1511 (m60-imp7--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp7--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp7--lines "prelude/load.scm"))
-                  (eql 584 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
+                  (eql 591 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
 ;; values, UNCHANGED.  A macro object in the elisp function cell would

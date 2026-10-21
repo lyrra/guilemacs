@@ -35,7 +35,9 @@
 ;;; The cr.org review of this row is answered here too:
 ;;;   F3 an INIT that raises RESTORES the names that are bound already,
 ;;;      so the binding loop runs INSIDE the `dynamic-wind' body.  This
-;;;      holds for `let' AND for `let*'.
+;;;      holds for `let*', where the names are bound ONE AT A TIME: in
+;;;      `let' no name is bound when the INITS run, so there is nothing
+;;;      to restore (cr.org review of imp-9, finding F5).
 ;;;   F4 the restore thunks run LAST-IN-FIRST-OUT, so a DUPLICATE name
 ;;;      gets the OUTER value back, in both branches.
 ;;;   F5 a BARE SYMBOL binding binds elisp nil, as in Emacs.
@@ -43,6 +45,12 @@
 ;;;      `control' loads through the elisp READER and then the elisp
 ;;;      EVALUATOR, so the 3 forms are proven on the REAL path and not
 ;;;      only on hand-built datum.
+;;;
+;;; The LATER cr.org review (of commit imp-9 itself) adds 1 observable:
+;;;   F4 mode `control' pins `let parallel-init: 1'.  `let' maps EVERY
+;;;      init BEFORE it binds any name, so the 2nd INIT reads the OUTER
+;;;      value and not the 1st binding.  That is parallel binding, and
+;;;      before this check only the `let*' order was pinned.
 ;;;
 ;;; The plain-guile values are measured by test/m60/probe-imp3.scm as a
 ;;; `guile -L mod' child process with GUILE_AUTO_COMPILE=0 -- one MODE
@@ -697,6 +705,13 @@ host limit is a skip, never a pass."
                   (m60-imp9--probe-line "control" "let* init-raises: void-variable")
                   (m60-imp9--probe-line "control" "let* leak-after: outer")))
 
+;; cr.org review of imp-9, finding F4: `let' maps EVERY init BEFORE it
+;; binds any name, so the 2nd INIT reads the OUTER value 1 and not the
+;; 1st binding 2.  That is parallel binding.  Before this check only the
+;; `let*' order was pinned.
+(m60-imp9--check "s3/let-parallel-init"
+                 (m60-imp9--probe-line "control" "let parallel-init: 1"))
+
 ;; cr.org F5: a bare-symbol binding binds elisp nil, in both branches.
 (m60-imp9--check "s3/bare-symbol-binds-nil"
                  (m60-imp9--all
@@ -811,7 +826,9 @@ host limit is a skip, never a pass."
 ;; real-path section of mode `control'); utils.scm 640 UNCHANGED;
 ;; prelude/load.scm 229 UNCHANGED; probe-imp3.scm 471 -> 535 (mode
 ;; `control', its comment block, 1 dispatch clause, 1 mode name and 1
-;; header line) -> 584 (the cr.org fix observables and the real path).
+;; header line) -> 584 (the cr.org fix observables and the real path)
+;; -> 591 (cr.org F4 of the imp-9 review: the `let parallel-init'
+;; observable, its comment and its `defconst').
 (setq m60-imp9--group 's5)
 
 (m60-imp9--check "s5/line-counts"
@@ -819,7 +836,7 @@ host limit is a skip, never a pass."
                   (eql 1511 (m60-imp9--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp9--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp9--lines "prelude/load.scm"))
-                  (eql 584 (m60-imp9--lines "test/m60/probe-imp3.scm"))
+                  (eql 591 (m60-imp9--lines "test/m60/probe-imp3.scm"))
                   (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
@@ -910,12 +927,13 @@ host limit is a skip, never a pass."
 
 ;;; --- The group-total check ------------------------------------------
 
-;; MEASURED: 49 registered checks (S1 9, S2 6, S3 13, S4 7, S5 4, S6 3,
-;; S7 7) plus this deftest itself = 50 ERT tests.
+;; MEASURED: 50 registered checks (S1 9, S2 6, S3 14, S4 7, S5 4, S6 3,
+;; S7 7) plus this deftest itself = 51 ERT tests.  S3 gained 1 check in
+;; the cr.org review fix of imp-9 (finding F4).
 
-(defvar m60-imp9--min-gate-total 50
-  "The exact number of m60-imp9 ERT tests: 49 registered checks (S1 9,
-S2 6, S3 13, S4 7, S5 4, S6 3, S7 7) plus the group-total deftest
+(defvar m60-imp9--min-gate-total 51
+  "The exact number of m60-imp9 ERT tests: 50 registered checks (S1 9,
+S2 6, S3 14, S4 7, S5 4, S6 3, S7 7) plus the group-total deftest
 itself.")
 
 (ert-deftest m60-imp9/gate-m60-total ()
