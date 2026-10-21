@@ -1149,6 +1149,26 @@ elisp nil instead of a `load' error."
        (set-symbol-function! (cadr form)
                              (elisp-loader-make-procedure (caddr form)
                                                           (cdddr form))))
+      ;; M60 imp-6 -- row 21: `defconst' evaluates INIT and stores it in
+      ;; the value cell ALWAYS.  It returns the SYMBOL, not the value:
+      ;; `set-symbol-value!' returns the value, so the branch returns
+      ;; `(cadr form)' explicitly.  A 3rd element (DOC) is ignored and
+      ;; NOT evaluated.
+      ((eq? head 'defconst)
+       (set-symbol-value! (cadr form)
+                          (if (pair? (cddr form))
+                              (elisp-loader-eval (caddr form))
+                              #nil))
+       (cadr form))
+      ;; M60 imp-6 -- row 22: `defvar' stores INIT ONLY when the value
+      ;; cell is EMPTY.  `symbol-value' raises on an empty cell, so the
+      ;; `symbol-bound?' test comes FIRST.  A `defvar' with no INIT
+      ;; leaves the cell EMPTY.  It returns the SYMBOL, not the value.
+      ((eq? head 'defvar)
+       (let ((name (cadr form)))
+         (if (and (pair? (cddr form)) (not (symbol-bound? name)))
+             (set-symbol-value! name (elisp-loader-eval (caddr form))))
+         name))
       (else
        (if (symbol-fbound? head)
            (elisp-loader-apply (symbol-function head)

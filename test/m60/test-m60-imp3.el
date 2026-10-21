@@ -429,8 +429,11 @@ host limit is a skip, never a pass."
 
 ;; MEASURED 1214: the imp-3 value 1203 plus the 11 lines of the 2
 ;; guarded forms of M60 imp-4 (2 forms, 9 lines of comment).
+;; RE-MEASURED at M60 imp-6: 1214 -> 1308 at imp-5, then 1308 -> 1328.
+;; The 2 evaluator branches of rows 21 and 22 add 20 lines (5 comment
+;; lines each, and 5 code lines each).
 (m60-imp3--check "s1/loader-lines"
-                 (eql 1308 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 (eql 1328 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
@@ -616,14 +619,16 @@ host limit is a skip, never a pass."
                   ;; RE-PINNED at M60 imp-5: row 20 installs `require'.
                   (m60-imp3--probe-line "cells" "ASYM: require=#t provide=#t")))
 ;; RE-PINNED at M60 imp-4: lisp/cdl.el is no stop any more, it loads
-;; to the END (`provide' and `features' landed).  The 3 remaining stops
-;; keep their text.
+;; to the END (`provide' and `features' landed).
+;; RE-PINNED at M60 imp-6: the obarray stop moves from `(defconst)' to
+;; `(make-obsolete-variable)' (row 27).  The other 2 stops keep their
+;; text.
 (m60-imp3--check "s5/four-first-stops"
                  (m60-imp3--probe-ordered
                   "cells"
                   '("LOAD lisp/subdirs.el: ERROR void-function"
                     "LOAD lisp/cdl.el: done"
-                    "LOAD lisp/obarray.el: ERROR void-function (defconst)"
+                    "LOAD lisp/obarray.el: ERROR void-function (make-obsolete-variable)"
                     "LOAD lisp/hex-util.el: ERROR void-function (eval-when-compile)")))
 (m60-imp3--check "s5/features-bound"
                  (m60-imp3--probe-line "cells" "FEATURES-BOUND: #t"))
@@ -636,7 +641,7 @@ host limit is a skip, never a pass."
                  (m60-imp3--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
-                    "stub-defconst / obarray: ERROR void-variable (obarray-default-size)"
+                    "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
                     "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)"
                     "stub-ntl / subdirs: done")))
 (m60-imp3--check "s5/last-good-point"

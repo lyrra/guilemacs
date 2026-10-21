@@ -521,8 +521,8 @@ symbol `m55-imp4-guile-absent'."
 
 (setq m55-imp4--group 's3)
 
-(m55-imp4--check "loader.scm-lines-1308"
-                 (eql 1308 (m55-imp4--lines "mod/emacs/loader.scm")))
+(m55-imp4--check "loader.scm-lines-1328"
+                 (eql 1328 (m55-imp4--lines "mod/emacs/loader.scm")))
 (m55-imp4--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp4--lines "mod/emacs/reader.scm")))
 (m55-imp4--check "prelude-load.scm-lines-229"

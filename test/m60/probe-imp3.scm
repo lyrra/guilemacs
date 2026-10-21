@@ -18,8 +18,10 @@
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `require', `registration', or `language'.  The fixture prints `key: value'
-;;; lines on stdout.  It reads the repo root from GUILEMACS_ROOT only, so
+;;; `require', `defs', `registration', or `language'.  Mode `defs' is the
+;;; M60 imp-6 record of rows 21 and 22 (`defconst', `defvar').  The
+;;; fixture prints `key: value' lines on stdout.  It reads the repo root
+;;; from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
 ;;; control; it needs its own process, because it installs a faithful
 ;;; `provide' cell.  `noboot' skips the boot on purpose: it is the
@@ -293,6 +295,49 @@ definition itself: a `memq' over the `features' list."
   ;; NOERROR is t: the failed load returns the ELISP nil, never #t.
   (show "REQUIRE-NOERROR" "~a" (describe-require 'no-such-feature #nil #t)))
 
+;;; --- mode: defs -----------------------------------------------------
+
+;; M60 imp-6 (rows 21 and 22).  `elisp-loader-eval' is NOT in the
+;; #:export list of (emacs loader), so the fixture resolves it with
+;; `module-ref'.  The current module was restored to (guile-user) after
+;; `init-loader', so the value cells are the ordinary elisp ones.
+;;
+;; These forms change neither `features' nor `load-path', so this mode
+;; shares the boot of the other modes.
+;;
+;; The RETURN VALUE of every form is printed: `set-symbol-value!' returns
+;; the VALUE, so a branch that ends with that call would hand a loaded
+;; file the value, not the symbol.
+(define (mode-defs)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval)))
+    ;; Row 21: `defconst' stores ALWAYS.
+    (show "defconst ret" "~s / ~s"
+          (eval-form '(defconst m60-probe-c 1))
+          (eval-form '(defconst m60-probe-c 2)))
+    (show "defconst value" "~s" (symbol-value 'm60-probe-c))
+    ;; The DOC element is IGNORED and NOT evaluated: `(/ 1 0)' would
+    ;; raise if the branch evaluated the 3rd element.
+    (show "defconst doc ret" "~s"
+          (eval-form '(defconst m60-probe-d 1 (/ 1 0))))
+    (show "defconst doc value" "~s" (symbol-value 'm60-probe-d))
+    ;; Row 22: `defvar' stores ONCE and never overwrites a bound symbol.
+    (show "defvar ret" "~s / ~s"
+          (eval-form '(defvar m60-probe-v 1))
+          (eval-form '(defvar m60-probe-v 2)))
+    (show "defvar value" "~s" (symbol-value 'm60-probe-v))
+    ;; No INIT keeps the cell EMPTY.  This is the observable that
+    ;; separates the 2 rows: `defconst' BINDS the cell with #nil, even
+    ;; with no INIT, and `defvar' does not.
+    (show "defvar no-init ret" "~s" (eval-form '(defvar m60-probe-w)))
+    (show "defvar no-init bound" "~s" (symbol-bound? 'm60-probe-w))
+    ;; A1 of the review: `(defconst SYMBOL)' is NOT legal elisp (INIT is
+    ;; required).  The branch is LENIENT and binds the cell to #nil.  The
+    ;; line is pinned as a deviation, not as elisp behaviour.
+    (show "defconst no-init bound (lenient)" "~s"
+          (begin (eval-form '(defconst m60-probe-x))
+                 (symbol-bound? 'm60-probe-x)))))
+
 ;;; --- mode: registration ---------------------------------------------
 
 ;; The named blocker.  The use-modules runs in THIS fresh process and the
@@ -332,7 +377,8 @@ definition itself: a `memq' over the `features' list."
   ((negative) (mode-negative))
   ((noboot) (mode-noboot))
   ((require) (mode-require))
+  ((defs) (mode-defs))
   ((registration) (mode-registration))
   ((language) (mode-language))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|registration|language)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|registration|language)"
                      mode))))

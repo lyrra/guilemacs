@@ -299,7 +299,7 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
 (m60-imp1--check "loader.scm-lines"
-                 (eql 1308 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 (eql 1328 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -429,18 +429,26 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                        "(set-symbol-value! 'features (cons feature current-features))")))
 
 ;; The minimal evaluator `elisp-loader-eval' has a branch for `quote',
-;; `setq', `if', `progn', `let', `lambda' and `defun' -- and NO branch
-;; for `defvar', `defconst' or `defmacro'.  So a `defvar' form is never
-;; evaluated and the variable stays unbound (MEASURED: the load of
-;; lisp/obarray.el stops at (void-variable obarray-default-size)).
-(m60-imp1--check "evaluator-has-no-defvar"
+;; `setq', `if', `progn', `let', `lambda', `defun' and -- since M60
+;; imp-6 (rows 21 and 22) -- for `defvar' and `defconst'.  `defmacro'
+;; still has NO branch (row 23, imp-7).
+;;
+;; RE-PINNED at M60 imp-6: the check was named
+;; `evaluator-has-no-defvar' and pinned the ABSENCE of both branches.
+;; That was the pre-imp-6 measurement: the load of lisp/obarray.el
+;; stopped at (void-function defconst), because the `defvar' of
+;; `obarray-default-size' was never evaluated.  The stop is now
+;; (void-function make-obsolete-variable) -- row 27.
+(m60-imp1--check "evaluator-has-defvar-and-defconst"
                  (and (m60-imp1--contains-p "mod/emacs/loader.scm"
                                             "((eq? head 'defun)")
+                      (m60-imp1--contains-p "mod/emacs/loader.scm"
+                                            "((eq? head 'defvar)")
+                      (m60-imp1--contains-p "mod/emacs/loader.scm"
+                                            "((eq? head 'defconst)")
                       (m60-imp1--holds-none
                        "mod/emacs/loader.scm"
-                       '("((eq? head 'defvar)"
-                         "((eq? head 'defconst)"
-                         "((eq? head 'defmacro)"))))
+                       '("((eq? head 'defmacro)"))))
 
 ;;; --- S3. The registration (docs/m60-plan.org section 4) -----------
 
@@ -459,8 +467,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; :788, and it DELETED the prelude read, so 0 sites stay there.
 ;; M60 imp-5 RE-PINS the loader site again: the require cell and its 2
 ;; `load' protocol cells add 77 lines ABOVE it, so it moves 1099 -> 1176.
+;; M60 imp-6 RE-PINS it one more time: the 2 evaluator branches of rows
+;; 21 and 22 add 20 lines ABOVE it, so it moves 1176 -> 1196.
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1176 (m60-imp1--line-of
+                 (and (eql 1196 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
                       (eql 788 (m60-imp1--line-of

@@ -435,10 +435,14 @@ host limit is a skip, never a pass."
 ;; Unit: NEWLINES (`wc -l'), MEASURED 2026-10-20 after the change:
 ;; loader.scm 1203 + 11 (2 guarded forms, 9 comment lines),
 ;; prelude/load.scm 230 - 1, mod/emacs/utils.scm 607 - 1.
+;; RE-MEASURED at M60 imp-6: loader.scm 1308 -> 1328 (+20 lines: the 2
+;; evaluator branches of rows 21 and 22).  The other 2 counts stand.
+;; The check name follows the measurement: it said 1214 until now, and
+;; the old value 1214 stays in this comment (cr.org F3).
 (setq m60-imp4--group 's5)
 
-(m60-imp4--check "s5/loader-lines-1214"
-                 (eql 1308 (m60-imp4--lines "mod/emacs/loader.scm")))
+(m60-imp4--check "s5/loader-lines-1328"
+                 (eql 1328 (m60-imp4--lines "mod/emacs/loader.scm")))
 (m60-imp4--check "s5/prelude-load-lines-229"
                  (eql 229 (m60-imp4--lines "prelude/load.scm")))
 (m60-imp4--check "s5/utils-lines-606"

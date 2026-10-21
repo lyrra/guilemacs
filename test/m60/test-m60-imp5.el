@@ -520,14 +520,20 @@ host limit is a skip, never a pass."
                   (m60-imp5--probe-line "provide" "require-fbound: #t")
                   (m60-imp5--probe-line "provide" "features: (cdl)")))
 
-;; The ordered blocker list of the minimal evaluator does NOT move: the
-;; pure stub passes `provide' and `normal-top-level-add-to-load-path', and
-;; the load stops on `void-variable' then `void-function'.
+;; The ordered blocker list of the minimal evaluator moves at ONE
+;; point: the pure stub passes `provide' and
+;; `normal-top-level-add-to-load-path', and the load stops on
+;; `void-function' only.  RE-PINNED at M60 imp-6: the real `defconst'
+;; branch matches FIRST, so the stub is dead and the obarray stop is the
+;; `make-obsolete-variable' call (row 27); the old pin was
+;; `void-variable (obarray-default-size)'.
 (m60-imp5--check "s4/stubs-blockers"
                  (m60-imp5--all
                   (m60-imp5--probe-line "stubs" "stub-provide / cdl: done")
                   (m60-imp5--probe-line
-                   "stubs" "stub-defconst / obarray: ERROR void-variable (obarray-default-size)")
+                   "stubs"
+                   (concat "stub-defconst / obarray: ERROR void-function"
+                           " (make-obsolete-variable)"))
                   (m60-imp5--probe-line
                    "stubs" "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)")
                   (m60-imp5--probe-line "stubs" "stub-ntl / subdirs: done")))
@@ -565,11 +571,13 @@ host limit is a skip, never a pass."
 ;; Unit: NEWLINES (`wc -l'), MEASURED 2026-10-21 after the change:
 ;; loader.scm 1214 + 94, utils.scm 606 (an export NAME was removed, not a
 ;; line), prelude/load.scm 229.
+;; RE-MEASURED at M60 imp-6: loader.scm 1308 -> 1328 (+20 lines: the 2
+;; evaluator branches of rows 21 and 22).  The other 2 counts stand.
 (setq m60-imp5--group 's5)
 
 (m60-imp5--check "s5/line-counts"
                  (m60-imp5--all
-                  (eql 1308 (m60-imp5--lines "mod/emacs/loader.scm"))
+                  (eql 1328 (m60-imp5--lines "mod/emacs/loader.scm"))
                   (eql 606 (m60-imp5--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp5--lines "prelude/load.scm"))))
 

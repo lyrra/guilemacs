@@ -446,7 +446,7 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/xfaces.c-lines"
                  (eql 7741 (m60-imp2--lines "src/xfaces.c")))
 (m60-imp2--check "r1/loader-and-reader-lines"
-                 (and (eql 1308 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 (and (eql 1328 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -552,9 +552,15 @@ host limit is a skip, never a pass."
 ;; pin is not deleted; it follows the measured value.
 (m60-imp2--check "r3/cdl-first-stop"
                  (m60-imp2--probe-line "cells" "LOAD lisp/cdl.el: done"))
+;; RE-PINNED at M60 imp-6: rows 21 and 22 close the `defconst' stop.
+;; The old pin was `LOAD lisp/obarray.el: ERROR void-function
+;; (defconst)'.  The load now reaches the `make-obsolete-variable' call
+;; of lisp/obarray.el :31 -- that is row 27, NOT PROVEN.
 (m60-imp2--check "r3/obarray-first-stop"
                  (m60-imp2--probe-line
-                  "cells" "LOAD lisp/obarray.el: ERROR void-function (defconst)"))
+                  "cells"
+                  (concat "LOAD lisp/obarray.el: ERROR void-function"
+                          " (make-obsolete-variable)")))
 (m60-imp2--check "r3/hex-util-first-stop"
                  (m60-imp2--probe-line
                   "cells"
@@ -575,31 +581,43 @@ host limit is a skip, never a pass."
 ;; stub passes the first 3 stops; the 4th file needs the same stub set.
 (setq m60-imp2--group 'r4)
 
+;; RE-PINNED at M60 imp-6: the real `defconst' branch now matches
+;; FIRST, so the pure `defconst' stub is DEAD and the obarray stop moves
+;; from `void-variable (obarray-default-size)' to
+;; `void-function (make-obsolete-variable)'.  The stub stays: this mode
+;; records the chain.
 (m60-imp2--check "r4/stub-chain-order"
                  (m60-imp2--probe-ordered
                   "stubs"
                   '("stub-provide / cdl: done"
-                    "stub-defconst / obarray: ERROR void-variable (obarray-default-size)"
+                    "stub-defconst / obarray: ERROR void-function (make-obsolete-variable)"
                     "stub-eval-when-compile / hex-util: ERROR void-function (defmacro)"
                     "stub-ntl / subdirs: done")))
 
-;; The FIRST stop that a pure stub can NOT pass is a VARIABLE, not a
+;; The FIRST stop that a pure stub can NOT pass was a VARIABLE, not a
 ;; function: the minimal evaluator `elisp-loader-eval'
-;; (mod/emacs/loader.scm) has no `defvar' branch, so the form is never
-;; evaluated and the variable cell stays unbound.
-(m60-imp2--check "r4/defvar-stop"
+;; (mod/emacs/loader.scm) had no `defvar' branch, so the variable cell
+;; stayed unbound.
+;;
+;; RE-PINNED at M60 imp-6: rows 21 and 22 add the 2 branches, so
+;; `obarray-default-size' is bound and the pure `defconst' stub is dead.
+;; The first stop that a stub can not pass is now the
+;; `make-obsolete-variable' FUNCTION call (row 27).  The old check was
+;; named `r4/defvar-stop' and pinned `void-variable
+;; (obarray-default-size)'.  `defmacro' (row 23) still has no branch.
+(m60-imp2--check "r4/defvar-and-defconst-branches"
                  (m60-imp2--all (m60-imp2--probe-line
                                  "stubs"
-                                 (concat "stub-defconst / obarray: ERROR void-variable"
-                                         " (obarray-default-size)"))
+                                 (concat "stub-defconst / obarray: ERROR void-function"
+                                         " (make-obsolete-variable)"))
                                 (m60-imp2--holds-all
                                  "mod/emacs/loader.scm"
-                                 '("((eq? head 'defun)"))
+                                 '("((eq? head 'defun)"
+                                   "((eq? head 'defvar)"
+                                   "((eq? head 'defconst)"))
                                 (m60-imp2--holds-none
                                  "mod/emacs/loader.scm"
-                                 '("((eq? head 'defvar)"
-                                   "((eq? head 'defconst)"
-                                   "((eq? head 'defmacro)"))))
+                                 '("((eq? head 'defmacro)"))))
 
 ;; The LAST GOOD POINT: with the faithful `provide' cell and the
 ;; `features' variable bound, lisp/cdl.el loads to the END, the elisp
