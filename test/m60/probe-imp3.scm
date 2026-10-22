@@ -19,11 +19,14 @@
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', or `control'.  Mode `defs' is the M60 imp-6 record of
+;;; `obsolete', `control', `arith', or `put'.  Mode `defs' is the M60 imp-6 record of
 ;;; rows 21 and 22 (`defconst', `defvar').  Mode `macros' is the M60
 ;;; imp-7 record of rows 23 and 24 (`defmacro' and
 ;;; `eval-when-compile').  Mode `control' is the M60 imp-9 record of row
-;;; 28a (`cond', `let*', `while').  The
+;;; 28a (`cond', `let*', `while').  Mode `arith' is the M60 imp-10 record
+;;; of row 29 (the comparison and arithmetic cells, `length' and
+;;; `nreverse').  Mode `put' is the M60 imp-11 record of row 30 (the
+;;; `put' symbol-property cell).  The
 ;;; fixture prints `key: value' lines on stdout.  It reads the repo root
 ;;; from GUILEMACS_ROOT only, so
 ;;; a run from any working directory is the same run.  `negative' is the R4 negative
@@ -572,6 +575,199 @@ definition itself: a `memq' over the `features' list."
       (show "real while steps" "~s" (symbol-value 'm60-fixture-steps))
       (show "real while return" "~s" (symbol-value 'm60-fixture-while)))))
 
+;;; --- mode: arith ----------------------------------------------------
+
+;; M60 imp-10 (row 29).  The comparison and arithmetic function cells,
+;; plus `length' and `nreverse'.  Every name already had a pure-Scheme
+;; definition, so the work is 1 GUARDED install per name, in
+;; `init-loader'.  In a full Emacs the C DEFUN (src/data.c, src/fns.c)
+;; owns the cell; `symbol-fbound?' keeps it.
+;;
+;; The list is MEASURED, not copied: `CELLS' prints the state of every
+;; name after `init-loader' ran, and `COUNT' prints how many of them are
+;; still EMPTY.  After the imp-10 installs, `COUNT' is 0.
+;;
+;; The 3 LOAD lines are the recorded FIRST STOPS of the 3 real `.el'
+;; files of milestone.org section 2.  `lisp/color.el' stopped at `/'; it
+;; must move past that form after this row.  The other 2 stop on rows 30
+;; and 31 and stay.
+;;
+;; The CALL lines prove that the installed cell is a real elisp
+;; primitive and not only a bound cell: every value is `#t' or `#nil'.
+;; `(eq? '#nil #f)' is FALSE, so a caller must pass the value through
+;; `elisp-loader-truthy?' (loader.scm :1062).  The 2 TRUTHY lines pin
+;; that rule (F6 of the imp-10 cr.org review).
+;;
+;; L23 is MEASURED here too: `elisp-/` with 0 arguments, and
+;; `check-number-coerce-marker' on a marker (L22), reach the `signal'
+;; and `markerp' cells, and both are still EMPTY on the plain path.
+
+(define arith-names
+  '(eq eql equal null + - * / = < > 1+ 1- length nreverse))
+
+(define (arith-empty-names)
+  (let loop ((names arith-names) (acc '()))
+    (cond ((null? names) (reverse acc))
+          ((guarded-cell-empty? (car names))
+           (loop (cdr names) (cons (car names) acc)))
+          (else (loop (cdr names) acc)))))
+
+(define (arith-call name . args)
+  ;; Apply the INSTALLED function cell NAME to ARGS: the cell is what a
+  ;; real elisp caller uses, not the Scheme binding.  An EMPTY cell
+  ;; returns #nil, and `(apply #nil ARGS)' would abort the whole mode
+  ;; (measured), so the empty state prints as `unbound'.
+  (if (symbol-fbound? name)
+      (apply (symbol-function name) args)
+      'unbound))
+
+(define (mode-arith)
+  ;; F4 of the imp-10 cr.org review: the old format `~a=~s' is
+  ;; AMBIGUOUS, because `=' and `<' are NAMES: the pair `< #t' printed as
+  ;; `<==#t', which a reader can read as "the cell of `=' is bound to
+  ;; #t".  `~s' quotes the name and ` -> ' separates it from the value,
+  ;; so no name can absorb the separator.
+  (show "CELLS" "~a"
+        (string-join (map (lambda (s)
+                            (format #f "~s -> ~s" s (symbol-fbound? s)))
+                          arith-names)
+                     " "))
+  ;; The non-numeric cells.
+  (show "CALL eq" "~s" (arith-call 'eq 'a 'a))
+  (show "CALL eq-miss" "~s" (arith-call 'eq 'a 'b))
+  (show "CALL eql" "~s" (arith-call 'eql 1 1))
+  (show "CALL equal" "~s" (arith-call 'equal (list 1 2) (list 1 2)))
+  (show "CALL null" "~s" (arith-call 'null '()))
+  (show "CALL null-false" "~s" (arith-call 'null 1))
+  (show "CALL length" "~s" (arith-call 'length (list 1 2 3)))
+  (show "CALL nreverse" "~s" (arith-call 'nreverse (list 1 2 3)))
+  ;; The arithmetic and comparison cells.
+  (show "CALL +" "~s" (arith-call '+ 1 2 3))
+  (show "CALL -" "~s" (arith-call '- 10 4))
+  (show "CALL *" "~s" (arith-call '* 2 3))
+  (show "CALL /" "~s" (arith-call '/ 8 2))
+  (show "CALL 1+" "~s" (arith-call '1+ 41))
+  (show "CALL 1-" "~s" (arith-call '1- 43))
+  (show "CALL = " "~s" (arith-call '= 2 2))
+  (show "CALL <" "~s" (arith-call '< 1 2))
+  (show "CALL >" "~s" (arith-call '> 2 1))
+  (show "CALL >-false" "~s" (arith-call '> 1 2))
+  ;; F6 of the imp-10 cr.org review: a comparison cell answers `#nil',
+  ;; not `#f'.  Guile 3 also treats `#nil' as FALSE in a plain `if'
+  ;; (MEASURED), but `#nil' is NOT `#f', so a caller must not compare
+  ;; with `#f' and must use `elisp-loader-truthy?' (loader.scm :1062).
+  ;; The first line is the hazard, the second line is the required route.
+  (show "TRUTHY #nil-is-not-#f" "~s" (eq? (arith-call '> 1 2) #f))
+  (show "TRUTHY elisp-loader-truthy?" "~s"
+        ((@@ (emacs loader) elisp-loader-truthy?) (arith-call '> 1 2)))
+  ;; The 3 recorded first stops, in milestone.org section 2 order.
+  (load-line "lisp/color.el")
+  (load-line "lisp/calendar/time-date.el")
+  (load-line "lisp/subr.el")
+  ;; L15: this is the FIXED 11-name list, so it stays () and is NOT the
+  ;; proof of row 29.  The proof is the CELLS line and COUNT above.
+  (show "EMPTY-CELLS" "~s" (empty-cells))
+  (show "COUNT" "~a" (length (arith-empty-names)))
+  ;; L22 and L23: the 2 cells that a number-only caller does not reach.
+  (show "signal-fbound" "~s" (symbol-fbound? 'signal))
+  (show "markerp-fbound" "~s" (symbol-fbound? 'markerp)))
+
+
+;;; --- mode: put ------------------------------------------------------
+
+;; M60 imp-11 (row 30).  The `put' symbol-property cell.  The pure
+;; definition `elisp-put' already exists (mod/emacs/utils.scm :164) and
+;; (emacs utils) is imported as a WHOLE module (loader.scm :20), so this
+;; row adds 1 GUARDED install in `init-loader' and NO procedure and NO
+;; import.
+;;
+;; WHY `put' and not `get': `put' is the FIRST stop of a real file on the
+;; plain path.  MEASURED with a tracing install: the caller is
+;; lisp/emacs-lisp/macroexp.el :137,
+;;
+;;   (put 'macroexp--funcall-if-compiled 'byte-compile (lambda ...))
+;;
+;; lisp/calendar/time-date.el :39 does (require 'cl-lib) and
+;; cl-lib.el :87 does (require 'macroexp), so the stop is 2 requires
+;; below time-date.el.  time-date.el itself calls no `put' (measured:
+;; grep -n '(put ' finds no call).
+;;
+;; The CALL lines pin the elisp semantics (MEASURED): `put' returns the
+;; VALUE, not the plist; the elisp nil value is `#nil'; 2 properties on 1
+;; symbol are both kept; and a STRING or a NUMBER first argument raises
+;; `Wrong type argument: symbolp'.
+;;
+;; L26: the NEXT stop is `make-hash-table' (lisp/emacs-lisp/macroexp.el
+;; :168).  `elisp-make-hash-table' is EXPORTED (utils.scm :28) but has NO
+;; definition (measured: `module-ref' raises), so a later row must write
+;; that procedure first.  This row does not fix that cell.
+
+(define (put-call name . args)
+  ;; Apply the INSTALLED `put' cell, so the call goes through the same
+  ;; path as a real elisp caller.  An EMPTY cell would apply #nil.
+  (if (symbol-fbound? name)
+      (apply (symbol-function name) args)
+      'unbound))
+
+;; The MESSAGE of the Guile `misc-error' of an elisp `(error FMT . ARGS)'
+;; call, or #f.  Guile stores the payload FLAT, so the format string and
+;; its argument list are 2 ADJACENT elements.  The `misc-error-message'
+;; helper above reads a DIFFERENT shape, so this mode uses its own walk.
+;; MEASURED, not assumed:
+;;   (error "Wrong type argument: symbolp" "x")
+;;   => rest = (#f "Wrong type argument: symbolp ~S" ("x") #f)
+(define (error-text rest)
+  (let loop ((items rest))
+    (cond ((null? items) #f)
+          ((null? (cdr items)) #f)
+          ((and (string? (car items)) (list? (cadr items)))
+           (apply format #f (car items) (cadr items)))
+          (else (loop (cdr items))))))
+
+(define (describe-error thunk)
+  ;; The stable token of a raise: the Guile key and the elisp message.
+  ;; The address in an object never prints.
+  (catch #t
+    (lambda () (list 'ok (thunk)))
+    (lambda (key . rest)
+      (let ((text (error-text rest)))
+        (if text
+            (format #f "ERROR ~a ~a" key text)
+            (format #f "ERROR ~a ~s" key rest))))))
+
+(define (mode-put)
+  ;; The subject cell, then the neighbour cells that the same `require'
+  ;; chain needs.  The `get' cell is EMPTY here: row 30 installs `put'
+  ;; only (F3 owns `get' and `featurep').
+  (show "CELLS" "~s -> ~s ~s -> ~s ~s -> ~s"
+        'put (symbol-fbound? 'put)
+        'get (symbol-fbound? 'get)
+        'make-hash-table (symbol-fbound? 'make-hash-table))
+  (show "CALL put symbol-property" "~s"
+        (put-call 'put 'm60-probe-prop 'm60-probe-key 42))
+  ;; The VALUE is the return value, and (get) reads it back through the
+  ;; PLIST, not through a Scheme variable.
+  (show "CALL get after put" "~s" (elisp-get 'm60-probe-prop 'm60-probe-key))
+  ;; The elisp nil value, not #f.
+  (show "CALL put nil value" "~s" (put-call 'put 'm60-probe-prop 'm60-probe-nil #nil))
+  (show "CALL get nil value" "~s" (elisp-get 'm60-probe-prop 'm60-probe-nil))
+  ;; 2 different properties on 1 symbol are both kept.
+  (put-call 'put 'm60-probe-prop 'm60-probe-2 'second)
+  (show "CALL 2 properties" "~s ~s"
+        (elisp-get 'm60-probe-prop 'm60-probe-key)
+        (elisp-get 'm60-probe-prop 'm60-probe-2))
+  ;; A non-symbol first argument raises, as elisp does.
+  (show "CALL string first arg" "~a"
+        (describe-error (lambda () (put-call 'put "m60-probe-str" 'k 1))))
+  (show "CALL number first arg" "~a"
+        (describe-error (lambda () (put-call 'put 7 'k 1))))
+  ;; The 3 recorded FIRST STOPS.  `color.el' is done; `time-date.el'
+  ;; moves from `put' to the NEXT empty cell of its require chain, and
+  ;; `subr.el' stops on row 31.
+  (load-line "lisp/color.el")
+  (load-line "lisp/calendar/time-date.el")
+  (load-line "lisp/subr.el"))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -587,5 +783,7 @@ definition itself: a `memq' over the `features' list."
   ((language) (mode-language))
   ((obsolete) (mode-obsolete))
   ((control) (mode-control))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control)"
+  ((arith) (mode-arith))
+  ((put) (mode-put))
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put)"
                      mode))))

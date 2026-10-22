@@ -328,9 +328,11 @@ symbol `m55-imp2-guile-absent'."
 ;; (emacs list).  get-load-suffixes and symbol-value come from the
 ;; already-used (emacs utils) and (emacs-elisp runtime) modules.
 
+;; M60 imp-11 (cr.org F3) RE-PIN: row 29 EXTENDED the `#:select' list to
+;; `(elisp-append elisp-length)', so the needle drops the closing paren.
 (m55-imp2--check "imports-select-sequences-list"
                  (and (m55-imp2--contains-p "mod/emacs/loader.scm"
-                                            "#:select (elisp-append)")
+                                            "#:select (elisp-append")
                       (m55-imp2--contains-p "mod/emacs/loader.scm"
                                             "#:select (elisp-car elisp-cdr)")))
 
@@ -353,8 +355,10 @@ symbol `m55-imp2-guile-absent'."
 
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
 ;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
-(m55-imp2--check "install-cell-count-18"
-                 (eql 19 (m55-imp2--count-lines "mod/emacs/loader.scm"
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: `set-symbol-function!` 19 -> 35 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m55-imp2--check "install-cell-count"
+                 (eql 35 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 
 ;;; --- S2. The REAL path (brief.org sections 3 and 6) -----------------
@@ -411,8 +415,10 @@ symbol `m55-imp2-guile-absent'."
 ;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
 ;; block, above them, in `elisp-loader-eval-form').
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
-(m55-imp2--check "loader.scm-lines-1511"
-                 (eql 1511 (m55-imp2--lines "mod/emacs/loader.scm")))
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m55-imp2--check "loader.scm-lines"
+                 (eql 1620 (m55-imp2--lines "mod/emacs/loader.scm")))
 (m55-imp2--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp2--lines "mod/emacs/reader.scm")))
 (m55-imp2--check "prelude-load.scm-lines-229"
@@ -422,13 +428,17 @@ symbol `m55-imp2-guile-absent'."
                                           "(symbol-function '")))
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
 ;; LINES (1 guarded install, the row-18 pattern of `provide').
-(m55-imp2--check "loader.scm-symbol-fbound-guards-23"
-                 (eql 23 (m55-imp2--count-lines "mod/emacs/loader.scm"
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: `symbol-fbound?` 23 -> 39 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m55-imp2--check "loader.scm-symbol-fbound-guards"
+                 (eql 39 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
 ;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
-(m55-imp2--check "loader.scm-set-symbol-function-19"
-                 (eql 19 (m55-imp2--count-lines "mod/emacs/loader.scm"
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: `set-symbol-function!` 19 -> 35 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m55-imp2--check "loader.scm-set-symbol-function"
+                 (eql 35 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 (m55-imp2--check "loader.scm-fix-markers-9"
                  (eql 9 (m55-imp2--count-lines "mod/emacs/loader.scm"

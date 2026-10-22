@@ -668,31 +668,46 @@ host limit is a skip, never a pass."
 ;; The 3 recorded FIRST STOPS of brief.org section 3.  None of the 3 is
 ;; `cond', `let*' or `while': that is the stated deviation from the row
 ;; map.  The lines are the MEASURED stops of this host.
+;; M60 imp-10 RE-PIN: `lisp/color.el' now loads to the END in mode
+;; `control', because row 29 installs the `/` cell.  The OLD value was
+;; `LOAD lisp/color.el: ERROR void-function (/)'.  The other 2 stops stay:
+;; they are row 30 (`put') and row 31 (`eval-and-compile').
 (m60-imp9--check "s3/recorded-first-stops"
                  (m60-imp9--all
                   (m60-imp9--probe-line
                    "control"
                    "LOAD lisp/subr.el: ERROR void-function (eval-and-compile)")
+                  ;; M60 imp-11 RE-PIN: the OLD line was
+                  ;; `LOAD lisp/calendar/time-date.el: ERROR void-function
+                  ;; (put)'.  Row 30 installs the `put' cell, so mode
+                  ;; `control' records the NEXT stop of the same chain.
                   (m60-imp9--probe-line
                    "control"
-                   "LOAD lisp/calendar/time-date.el: ERROR void-function (put)")
+                   "LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg (#f \"Wrong type to apply: ~S\" (#nil) (#nil))")
                   (m60-imp9--probe-line
                    "control"
-                   "LOAD lisp/color.el: ERROR void-function (/)")))
+                   "LOAD lisp/color.el: done")))
 
 ;; The mode is registered in the 3 places of the fixture: the header
 ;; comment, the `case' dispatch and the unknown-mode text.
+;; M60 imp-10 RE-PIN: mode `arith' extends the header list and the
+;; unknown-mode text, so `control' is no longer the LAST name.  The OLD
+;; literals were "`obsolete', or `control'" and "language|obsolete|control)".
+;; M60 imp-11 RE-PIN: mode `put' is now the LAST name, so `arith' takes a
+;; comma and the unknown-mode text ends with `put'.  The OLD literals
+;; were "`obsolete', `control', or `arith'" and
+;; "language|obsolete|control|arith)".
 (m60-imp9--check "s3/mode-registration"
                  (m60-imp9--all
                   (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "`obsolete', or `control'"))
+                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', or `put'"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "((control) (mode-control))"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "(define (mode-control)"))
                   (m60-imp9--holds-all
                    "test/m60/probe-imp3.scm"
-                   '("language|obsolete|control)"))))
+                   '("language|obsolete|control|arith|put)"))))
 
 ;; cr.org F4: a DUPLICATE name gets the OUTER value 0 back, in both
 ;; branches.  cr.org F3: a raising INIT leaves the OUTER value `outer'.
@@ -831,21 +846,35 @@ host limit is a skip, never a pass."
 ;; observable, its comment and its `defconst').
 (setq m60-imp9--group 's5)
 
+;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
+;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
+;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
+;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
+;; cells that the numbers above replace.
 (m60-imp9--check "s5/line-counts"
                  (m60-imp9--all
-                  (eql 1511 (m60-imp9--lines "mod/emacs/loader.scm"))
+;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
+                  (eql 1620 (m60-imp9--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp9--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp9--lines "prelude/load.scm"))
-                  (eql 591 (m60-imp9--lines "test/m60/probe-imp3.scm"))
+;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
+                  (eql 789 (m60-imp9--lines "test/m60/probe-imp3.scm"))
                   (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
 ;; values, UNCHANGED.  A branch adds no install site and no FIX marker:
 ;; these 3 counts are the DESIGN GUARD of row 28a.
+;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
+;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
+;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
+;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
+;; cells that the numbers above replace.
 (m60-imp9--check "s5/grep-c-counts"
-                 (and (eql 23 (m60-imp9--grep-c "mod/emacs/loader.scm"
+;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
+                 (and (eql 39 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
-                      (eql 19 (m60-imp9--grep-c "mod/emacs/loader.scm"
+;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
+                      (eql 35 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -853,8 +882,13 @@ host limit is a skip, never a pass."
 ;; The `lookup-language' site moved: 1,266 at the base state, 1,337 after
 ;; the row-28a branches, 1,368 after the cr.org fix.
 ;; Unit: LINE (1-based) of mod/emacs/loader.scm.
+;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
+;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
+;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
+;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
+;; cells that the numbers above replace.
 (m60-imp9--check "s5/lookup-language-line"
-                 (eql 1368 (m60-imp9--line-of "mod/emacs/loader.scm"
+                 (eql 1385 (m60-imp9--line-of "mod/emacs/loader.scm"
                                               "(lookup-language 'emacs-elisp)")))
 
 ;; The 5 limits of brief.org section 10 are NAMED in the source.  A

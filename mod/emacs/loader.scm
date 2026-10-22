@@ -17,7 +17,18 @@
   #:use-module ((srfi srfi-1) #:select (count any remove))
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs utils)
-  #:use-module ((emacs sequences) #:select (elisp-append))
+  ;; M60 imp-10 -- row 29: the comparison and arithmetic cells, plus
+  ;; `length'.  Every name already has a pure-Scheme definition, so this
+  ;; row adds IMPORTS and GUARDED INSTALLS only.  The 2 modules import
+  ;; `(emacs-elisp runtime)' and nothing from `(emacs loader)', so the
+  ;; module graph stays acyclic.
+  #:use-module ((emacs types)
+                #:select (elisp-eq elisp-eql elisp-equal elisp-null))
+  #:use-module ((emacs numbers)
+                #:select (elisp-+ elisp-- elisp-* elisp-/
+                           elisp-= elisp-< elisp->
+                           elisp-1+ elisp-1-))
+  #:use-module ((emacs sequences) #:select (elisp-append elisp-length))
   ;; M60 imp-5: the elisp `load' protocol applies `string-suffix-p'
   ;; (loader.scm :257).  In a plain `guile' process that cell is EMPTY, so
   ;; `init-loader' installs the existing pure-Scheme definition.  The
@@ -400,12 +411,18 @@ This replicates the call4 logic from Fload (lines 1065-1067)."
 
 (define (elisp-string-length-for-load file)
   "Length of FILE for the empty-filename check in `elisp-validate-load-file'.
-FIX-20261011-guilemacs: a plain `guile' process has no Emacs C core, so
-the elisp `length' cell is EMPTY and the old `((symbol-function 'length)
-file)' apply raised `wrong-type-arg'.  This is the FIRST blocked cell on
-the real load path, reached before the file-name handler.  The loader
-POLICY tolerates the empty cell (brief.org section 4, option (a)): use
-the Scheme string primitive instead.  No C fallback is added."
+FIX-20261011-guilemacs: a plain `guile' process had no Emacs C core, so
+the elisp `length' cell was EMPTY and the old `((symbol-function 'length)
+file)' apply raised `wrong-type-arg'.  M60 imp-10 (row 29) installs
+`length' from (emacs sequences), so after `init-loader' the cell is BOUND
+on the plain path AND on the full-Emacs path (measured: (elisp-length
+\"abc\") gives 3).
+The `string-length' branch is UNREACHED on the `init-loader' path only.
+cr.org F6: it is NOT dead for every caller -- a caller that uses
+(emacs loader) WITHOUT `init-loader' still has an EMPTY `length' cell
+(NOT measured; written as a limit, not as a fact).  The branch and the
+FIX marker stay, so the FIX-marker count stays 9; a later row may delete
+both and move the count to 8.  No C delta."
   (if (symbol-fbound? 'length)
       ((symbol-function 'length) file)
       (string-length file)))
@@ -1508,4 +1525,96 @@ elisp nil instead of a `load' error."
     (set-symbol-function! 'substring elisp-loader-substring))
   (unless (symbol-fbound? 'eval)
     (set-symbol-function! 'eval elisp-loader-eval))
+
+  ;; M60 imp-10 -- row 29: the comparison and arithmetic cells, plus
+  ;; `length' and `nreverse'.  MEASURED with mode `arith' of
+  ;; test/m60/probe-imp3.scm: all 15 names are EMPTY in a plain `guile'
+  ;; process, and `lisp/color.el' stops at `void-function (/)' before
+  ;; this row.  Every name is 1 GUARDED install of an EXISTING
+  ;; pure-Scheme definition:
+  ;;
+  ;;   (emacs types)     elisp-null :147, elisp-eq :174, elisp-eql :178,
+  ;;                     elisp-equal :209
+  ;;   (emacs numbers)   elisp-+ :76, elisp-- :79, elisp-* :82,
+  ;;                     elisp-/ :91, elisp-1+ :104, elisp-1- :107, and
+  ;;                     the `let-syntax' block at :126 for elisp-=,
+  ;;                     elisp-< and elisp->
+  ;;   (emacs sequences) elisp-length :297
+  ;;   (emacs utils)     elisp-nreverse :264
+  ;;
+  ;; The guard is the row-18 pattern: a full Emacs already owns the C
+  ;; DEFUN (src/data.c, src/fns.c) in that cell.
+  ;;
+  ;; The bulk installers `init-types-registrations',
+  ;; `init-numbers-registrations' (numbers.scm :290) and
+  ;; `init-utils-registrations' (utils.scm :594) install with NO guard,
+  ;; so they overwrite the C cell.
+  ;; `init-utils-registrations' :610 is the UNGUARDED install of
+  ;; `nreverse'; it is not called on this path, and this row does not
+  ;; call it either.
+  ;;
+  ;; L24: `<=' and `>=' are NOT in the row-29 name list of
+  ;; milestone.org section 3, so they stay EMPTY here and a later row
+  ;; owns them.  Their definitions do exist (numbers.scm :126).
+  ;;
+  ;; The elisp truth values: elisp-eq, elisp-eql, elisp-equal,
+  ;; elisp-null and the 5 comparison procedures return #t or #nil, and
+  ;; `(eq? '#nil #f)' is FALSE.  A condition that comes from one of
+  ;; these cells MUST pass through `elisp-loader-truthy?' (:1062).
+  (unless (symbol-fbound? 'eq)
+    (set-symbol-function! 'eq elisp-eq))
+  (unless (symbol-fbound? 'eql)
+    (set-symbol-function! 'eql elisp-eql))
+  (unless (symbol-fbound? 'equal)
+    (set-symbol-function! 'equal elisp-equal))
+  (unless (symbol-fbound? 'null)
+    (set-symbol-function! 'null elisp-null))
+  (unless (symbol-fbound? '+)
+    (set-symbol-function! '+ elisp-+))
+  (unless (symbol-fbound? '-)
+    (set-symbol-function! '- elisp--))
+  (unless (symbol-fbound? '*)
+    (set-symbol-function! '* elisp-*))
+  (unless (symbol-fbound? '/)
+    (set-symbol-function! '/ elisp-/))
+  (unless (symbol-fbound? '=)
+    (set-symbol-function! '= elisp-=))
+  (unless (symbol-fbound? '<)
+    (set-symbol-function! '< elisp-<))
+  (unless (symbol-fbound? '>)
+    (set-symbol-function! '> elisp->))
+  (unless (symbol-fbound? '1+)
+    (set-symbol-function! '1+ elisp-1+))
+  (unless (symbol-fbound? '1-)
+    (set-symbol-function! '1- elisp-1-))
+  (unless (symbol-fbound? 'length)
+    (set-symbol-function! 'length elisp-length))
+  (unless (symbol-fbound? 'nreverse)
+    (set-symbol-function! 'nreverse elisp-nreverse))
+
+  ;; M60 imp-11 -- row 30: `put' is the FIRST stop of
+  ;; lisp/calendar/time-date.el (MEASURED: void-function (put)).  The
+  ;; caller is lisp/emacs-lisp/macroexp.el :137, through the `require'
+  ;; of cl-lib (cl-lib.el :87 requires macroexp); time-date.el itself
+  ;; calls no `put'.  The pure definition is `elisp-put'
+  ;; (utils.scm :164), and (emacs utils) is imported as a WHOLE module
+  ;; at :20, so this row adds 1 GUARDED install and NO procedure and NO
+  ;; import.
+  ;;
+  ;; The guard is the row-18 pattern: a full Emacs owns the C DEFUN
+  ;; (src/fns.c, Fput) in that cell.  The bulk installer
+  ;; `init-utils-registrations' (utils.scm :594) also writes `put' at
+  ;; :606, but with NO guard, and `init-loader' does not call it.
+  ;;
+  ;; L26: `put' returns the VALUE, and a STRING or a NUMBER first
+  ;; argument raises `Wrong type argument: symbolp'.  Both are elisp
+  ;; behaviour, so mode `put' of test/m60/probe-imp3.scm pins them.
+  ;;
+  ;; `elisp-make-hash-table' is exported (utils.scm :28) but has NO
+  ;; definition (measured: `module-ref' raises).  The NEXT stop after
+  ;; this row is `make-hash-table' at lisp/emacs-lisp/macroexp.el :168,
+  ;; so a later row must write that procedure before it can install the
+  ;; cell.
+  (unless (symbol-fbound? 'put)
+    (set-symbol-function! 'put elisp-put))
   )

@@ -276,8 +276,10 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
 ;; block, above them, in `elisp-loader-eval-form').
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
-(m56-imp3--check "loader-lines-1511"
-                 (eql 1511 (m56-imp3--lines "mod/emacs/loader.scm")))
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m56-imp3--check "loader-lines"
+                 (eql 1620 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -286,14 +288,18 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; A3: symbol-fbound? lines in loader.scm = 19 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
 ;; LINES (1 guarded install, the row-18 pattern of `provide').
-(m56-imp3--check "loader-symbol-fbound-19"
-                 (eql 23 (m56-imp3--count-lines "mod/emacs/loader.scm"
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: `symbol-fbound?` 23 -> 39 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m56-imp3--check "loader-symbol-fbound"
+                 (eql 39 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
 ;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
-(m56-imp3--check "loader-set-symbol-function-15"
-                 (eql 19 (m56-imp3--count-lines "mod/emacs/loader.scm"
+;; M60 imp-11 (cr.org F3, F5) RE-PIN: `set-symbol-function!` 19 -> 35 LINES; the check NAME drops the
+;; stale number, because it changed again (an earlier cr.org round F5).
+(m56-imp3--check "loader-set-symbol-function"
+                 (eql 35 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"
