@@ -689,9 +689,15 @@ host limit is a skip, never a pass."
                   ;; `LOAD lisp/calendar/time-date.el: ERROR void-function
                   ;; (put)'.  Row 30 installs the `put' cell, so mode
                   ;; `control' records the NEXT stop of the same chain.
+                  ;; M60 imp-13 RE-PIN: the OLD line was
+                  ;; `LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg
+                  ;; (#f "Wrong type to apply: ~S" (#nil) (#nil))'.  Row 33
+                  ;; installs the `set' cell, so the keyword path of the
+                  ;; reader runs and the load moves to the NEXT wall of the
+                  ;; same chain, `make-hash-table' (row 32, macroexp.el :168).
                   (m60-imp9--probe-line
                    "control"
-                   "LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg (#f \"Wrong type to apply: ~S\" (#nil) (#nil))")
+                   "LOAD lisp/calendar/time-date.el: ERROR void-function (make-hash-table)")
                   (m60-imp9--probe-line
                    "control"
                    "LOAD lisp/color.el: done")))
@@ -711,15 +717,19 @@ host limit is a skip, never a pass."
 ;; "language|obsolete|control|arith|put)".
 (m60-imp9--check "s3/mode-registration"
                  (m60-imp9--all
+                  ;; M60 imp-13 RE-PIN: the OLD literal was
+                  ;; "`obsolete', `control', `arith', `put', or `eac'".
+                  ;; Mode `set' (row 33) is in that list now.
                   (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', or `eac'"))
+                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', `set', or `eac'"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "((control) (mode-control))"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "(define (mode-control)"))
                   (m60-imp9--holds-all
                    "test/m60/probe-imp3.scm"
-                   '("language|obsolete|control|arith|put|eac)"))))
+                   ;; M60 imp-13 RE-PIN: mode `set' joins the list.
+                   '("language|obsolete|control|arith|put|set|eac)"))))
 
 ;; cr.org F4: a DUPLICATE name gets the OUTER value 0 back, in both
 ;; branches.  cr.org F3: a raising INIT leaves the OUTER value `outer'.
@@ -867,12 +877,15 @@ host limit is a skip, never a pass."
                  (m60-imp9--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  (eql 1642 (m60-imp9--lines "mod/emacs/loader.scm"))
-                  (eql 640 (m60-imp9--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                  (eql 1653 (m60-imp9--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
+                  (eql 662 (m60-imp9--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp9--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  (eql 825 (m60-imp9--lines "test/m60/probe-imp3.scm"))
+                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
+                  (eql 879 (m60-imp9--lines "test/m60/probe-imp3.scm"))
                   (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
@@ -885,10 +898,12 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp9--check "s5/grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 (and (eql 39 (m60-imp9--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (and (eql 40 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      (eql 35 (m60-imp9--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                      (eql 36 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))

@@ -462,7 +462,8 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/loader-and-reader-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 (and (eql 1642 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                 (and (eql 1653 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -482,10 +483,12 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 (and (eql 39 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (and (eql 40 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      (eql 35 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                      (eql 36 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -494,11 +497,12 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/tree-wide-scm-ref"
                  (eql 267 (m60-imp2--count-scm-ref)))
 
-;; Unit: FILES under test/mod (MEASURED 6: 3 suites, 1 runner, 2
+;; Unit: FILES under test/mod (MEASURED 7: 3 suites, 1 runner, 3
 ;; fixtures) and ENTRIES of mod/emacs-elisp (MEASURED 9: `runtime/' is
-;; ONE entry).
+;; ONE entry).  M60 imp-13 RE-PIN: test/mod 6 -> 7, the `:keyword'
+;; fixture standalone-keyword.el.  OLD value is 6.
 (m60-imp2--check "r1/test-mod-files-and-emacs-elisp-entries"
-                 (and (eql 6 (m60-imp2--dir-entries "test/mod"))
+                 (and (eql 7 (m60-imp2--dir-entries "test/mod"))
                       (eql 9 (m60-imp2--dir-entries "mod/emacs-elisp"))))
 
 ;; The 2 fixtures of this imp.  An absent fixture must FAIL here, not be

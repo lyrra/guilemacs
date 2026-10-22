@@ -315,7 +315,8 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 (m60-imp1--check "loader.scm-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 (eql 1642 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                 (eql 1653 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -339,19 +340,23 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; cells that the numbers above replace.
 (m60-imp1--check "loader.scm-grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 (and (eql 39 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (and (eql 40 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      (eql 35 (m60-imp1--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                      (eql 36 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp1--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 ;; Unit: OCCURRENCES over src/*.[ch].
 (m60-imp1--check "tree-wide-scm-ref-267"
                  (eql 267 (m60-imp1--count-scm-ref)))
-;; Unit: FILES under test/mod (3 suites, 1 runner, 2 fixtures).
-(m60-imp1--check "test-mod-files-6"
-                 (eql 6 (m60-imp1--dir-entries "test/mod")))
+;; Unit: FILES under test/mod (3 suites, 1 runner, 3 fixtures).
+;; M60 imp-13 RE-PIN: 6 -> 7.  Row 33 adds the `:keyword' fixture
+;; standalone-keyword.el.  OLD value is 6.
+(m60-imp1--check "test-mod-files-7"
+                 (eql 7 (m60-imp1--dir-entries "test/mod")))
 ;; Unit: ENTRIES of mod/emacs-elisp.  9, because `runtime/' is one entry.
 (m60-imp1--check "emacs-elisp-entries-9"
                  (eql 9 (m60-imp1--dir-entries "mod/emacs-elisp")))
@@ -411,7 +416,11 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                       ;; M60 imp-8 (row 27) RE-PIN: 211 -> 212.  The
                       ;; export NAME of `elisp-make-obsolete-variable'
                       ;; is 1 line above `elisp-provide'.
-                      (eql 212 (m60-imp1--line-of
+                      ;; M60 imp-13 RE-PIN: 212 -> 234.  The `elisp-set'
+                      ;; definition and its comment block (row 33) sit
+                      ;; ABOVE `elisp-provide' in utils.scm.  OLD value
+                      ;; is 212.
+                      (eql 234 (m60-imp1--line-of
                                 "mod/emacs/utils.scm"
                                 "^(define elisp-provide"))
                       ;; RE-PINNED at M60 imp-4: the install LEFT

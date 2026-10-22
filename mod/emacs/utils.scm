@@ -171,6 +171,28 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
           value))
       (error "Wrong type argument: symbolp" symbol)))
 
+;;; M60 imp-13 -- row 33: `set' writes the VALUE cell only.  C owner is
+;;; `Fset' (src/data.c :1317), which returns NEWVAL.  The reader applies
+;;; this cell for every `:keyword' form (reader.scm :1358), and the 2
+;;; read-eval loops apply it for `values' (loader.scm :132, :227).
+;;; `set-symbol-value!' (runtime.scm :357) stores and returns VALUE, and
+;;; the elisp truth values are kept (#nil stays #nil).
+;;;
+;;; The buffer-local, `varalias', `permanent-local' and watcher branches
+;;; of `set_internal' (src/data.c :1360) are NOT ported.
+;;; FIX-20261022-guilemacs: port them when a loaded file needs a
+;;; buffer-local value or a variable alias.
+;;; The SYMBOL_NOWRITE test (src/data.c :1344) is NOT ported, so a
+;;; keyword store with a DIFFERENT value succeeds instead of raising
+;;; `setting-constant'.  The reader passes the SAME value.
+;;; FIX-20261022-guilemacs: port that test when a loaded file writes a
+;;; keyword with a different value.
+(define (elisp-set symbol newval)
+  "Set SYMBOL's value to NEWVAL and return NEWVAL."
+  (if (symbol? symbol)
+      (set-symbol-value! symbol newval)
+      (error "Wrong type argument: symbolp" symbol)))
+
 ;;;
 ;;; Hash Table Operations
 ;;;

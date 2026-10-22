@@ -765,12 +765,15 @@ host limit is a skip, never a pass."
                  (m60-imp7--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  (eql 1642 (m60-imp7--lines "mod/emacs/loader.scm"))
-                  (eql 640 (m60-imp7--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                  (eql 1653 (m60-imp7--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
+                  (eql 662 (m60-imp7--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp7--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  (eql 825 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
+                  (eql 879 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
 ;; values, UNCHANGED.  A macro object in the elisp function cell would
@@ -786,10 +789,12 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp7--check "s5/grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 (and (eql 39 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (and (eql 40 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      (eql 35 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                      (eql 36 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))

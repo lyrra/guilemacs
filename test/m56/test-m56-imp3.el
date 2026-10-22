@@ -280,7 +280,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 (eql 1642 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                 (eql 1653 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -292,7 +293,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: `symbol-fbound?` 23 -> 39 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-symbol-fbound"
-                 (eql 39 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (eql 40 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -300,7 +302,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: `set-symbol-function!` 19 -> 35 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-set-symbol-function"
-                 (eql 35 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                 (eql 36 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"

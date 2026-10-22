@@ -37,7 +37,7 @@
 ;;;         the C runtime handoff, so a plain `guile' keeps the source
 ;;;         branch.
 ;;;   S5 -- no regression: the 5 probe modes reproduce the imp-2 values,
-;;;         and the pure-guile gate stays 35 cases.
+;;;         and the pure-guile gate pins the sum of the 3 suite counts.
 ;;;   S6 -- the registration of THIS corpus: the imp-3 line AFTER the
 ;;;         imp-2 line, imp-1 and imp-2 kept, (m60) after (m59), no
 ;;;         prelude key.
@@ -447,7 +447,8 @@ host limit is a skip, never a pass."
 (m60-imp3--check "s1/loader-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 (eql 1642 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                 (eql 1653 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
@@ -462,10 +463,12 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp3--check "s1/loader.scm-grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 (and (eql 39 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (and (eql 40 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      (eql 35 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                      (eql 36 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
                       (eql 9 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
@@ -693,13 +696,17 @@ host limit is a skip, never a pass."
                   (m60-imp3--probe-holds "negative" "LOAD cdl: ERROR wrong-type-arg")
                   (m60-imp3--probe-holds-none "negative" "void-function")))
 
-;; The pure-guile gate stays 35 cases: 3 + 4 + 28.  The 3 suites pin
+;; The pure-guile gate is 37 cases: 3 + 6 + 28.  The 3 suites pin
 ;; their own case count, so this check pins the SUM of the 3 constants.
-(m60-imp3--check "s5/mod-suites-pin-35"
+;; M60 imp-13 RE-PIN: this check was `s5/mod-suites-pin-35' and the
+;; standalone suite pinned 4 cases.  Row 33 adds 2 cases: the `set'
+;; cell and the `:keyword' fixture of the reader path.  The 3 suites pin
+;; 3 + 6 + 28 = 37 cases.  OLD values are 35 and 4.
+(m60-imp3--check "s5/mod-suites-pin-37"
                  (and (m60-imp3--holds-all
                        "test/mod/sequences-tests.scm" '("expected-passes 3"))
                       (m60-imp3--holds-all
-                       "test/mod/standalone-tests.scm" '("expected-passes 4"))
+                       "test/mod/standalone-tests.scm" '("expected-passes 6"))
                       (m60-imp3--holds-all
                        "test/mod/faces-tests.scm" '("expected-passes 28"))))
 

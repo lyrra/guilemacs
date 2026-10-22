@@ -298,7 +298,8 @@ symbol `m55-imp5-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp5--check "loader.scm-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 (eql 1642 (m55-imp5--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                 (eql 1653 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
@@ -316,7 +317,8 @@ symbol `m55-imp5-guile-absent'."
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: `symbol-fbound?` 23 -> 39 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp5--check "loader.scm-symbol-fbound-lines"
-                 (eql 39 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                 (eql 40 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -324,7 +326,8 @@ symbol `m55-imp5-guile-absent'."
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: `set-symbol-function!` 19 -> 35 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp5--check "loader.scm-set-symbol-function-lines"
-                 (eql 35 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                 (eql 36 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
 (m55-imp5--check "loader.scm-fix-markers-lines-9"

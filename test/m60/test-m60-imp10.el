@@ -437,9 +437,14 @@ PROCEDURE already existed before this row.")
                   ;; (put)'.  Row 30 installs the `put' cell, so the load
                   ;; moves past it to the NEXT empty cell of the same
                   ;; require chain (`make-hash-table', macroexp.el :168).
+                  ;; M60 imp-13 RE-PIN: the OLD line was
+                  ;; `LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg
+                  ;; (#f "Wrong type to apply: ~S" (#nil) (#nil))'.  Row 33
+                  ;; installs the `set' cell, so the load moves to the NEXT
+                  ;; wall, `make-hash-table' (row 32, macroexp.el :168).
                   (m60-imp10--probe-line
                    "arith"
-                   "LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg (#f \"Wrong type to apply: ~S\" (#nil) (#nil))")
+                   "LOAD lisp/calendar/time-date.el: ERROR void-function (make-hash-table)")
                   (m60-imp10--probe-line
                    "arith"
                    ;; M60 imp-12 RE-PIN: the OLD line was
@@ -484,12 +489,15 @@ PROCEDURE already existed before this row.")
                  (m60-imp10--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  (eql 1642 (m60-imp10--lines "mod/emacs/loader.scm"))
-                  (eql 640 (m60-imp10--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                  (eql 1653 (m60-imp10--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
+                  (eql 662 (m60-imp10--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp10--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  (eql 825 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
+                  (eql 879 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  23 + 15 = 38 `symbol-fbound?' and
 ;; 19 + 15 = 34 `set-symbol-function!'.  The FIX count stays 9: a guarded
@@ -497,10 +505,12 @@ PROCEDURE already existed before this row.")
 (m60-imp10--check "s3/grep-c-counts"
                  (m60-imp10--all
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                  (eql 39 (m60-imp10--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                  (eql 40 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                              "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                  (eql 35 (m60-imp10--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                  (eql 36 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                              "set-symbol-function!"))
                   (eql 9 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                             "FIX-.*guilemacs"))))

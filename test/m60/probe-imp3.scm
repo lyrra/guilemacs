@@ -19,14 +19,16 @@
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', `control', `arith', `put', or `eac'.  Mode `defs' is the
+;;; `obsolete', `control', `arith', `put', `set', or `eac'.  Mode `defs' is the
 ;;; M60 imp-6 record of rows 21 and 22 (`defconst', `defvar').  Mode
 ;;; `macros' is the M60 imp-7 record of rows 23 and 24 (`defmacro' and
 ;;; `eval-when-compile').  Mode `control' is the M60 imp-9 record of row
 ;;; 28a (`cond', `let*', `while').  Mode `arith' is the M60 imp-10 record
 ;;; of row 29 (the comparison and arithmetic cells, `length' and
 ;;; `nreverse').  Mode `put' is the M60 imp-11 record of row 30 (the
-;;; `put' symbol-property cell).  Mode `eac' is the M60 imp-12 record of
+;;; `put' symbol-property cell).  Mode `set' is the M60 imp-13 record of
+;;; row 33 (`set', the reader keyword path): the cell, the 2 values, the
+;;; 2 error shapes and the 3 next stops.  Mode `eac' is the M60 imp-12 record of
 ;;; row 31 (`eval-and-compile').  The fixture prints `key: value' lines
 ;;; on stdout.  It reads the repo root from GUILEMACS_ROOT only, so a
 ;;; run from any working directory is the same run.  `negative' is the R4 negative
@@ -768,6 +770,57 @@ definition itself: a `memq' over the `features' list."
   (load-line "lisp/calendar/time-date.el")
   (load-line "lisp/subr.el"))
 
+;;; --- mode: set ------------------------------------------------------
+
+;; M60 imp-13 -- row 33: `set' is the cell of the reader keyword path
+;; (reader.scm :1358) and of the 2 read-eval loops (loader.scm :132,
+;; :227).  C owner =src/data.c :1317: Fset stores the VALUE and returns
+;; NEWVAL.  The 4 checks of brief.org section 4 items 1 ... 4:
+;;   item 1 the cell is BOUND after `init-loader';
+;;   item 2 the return value AND the stored value are 42;
+;;   item 3 a non-symbol raises the `symbolp' shape of `elisp-put';
+;;   item 4 a REAL file with a `:keyword' form does not stop on the
+;;          #nil apply, and the NEXT stop of 2 files is recorded.
+;; `set-call' applies the INSTALLED cell, so the call goes through the
+;; same path as a real elisp caller.  An EMPTY cell would apply #nil.
+(define (set-call name . args)
+  (if (symbol-fbound? name)
+      (apply (symbol-function name) args)
+      'unbound))
+
+(define (mode-set)
+  ;; The subject cell, then the neighbours that stay OPEN (row 32 owns
+  ;; `make-hash-table', rows 34 and 24 own `defalias' and the
+  ;; comparisons).
+  (show "CELLS" "~s -> ~s ~s -> ~s"
+        'set (symbol-fbound? 'set)
+        'make-hash-table (symbol-fbound? 'make-hash-table))
+  ;; Item 2: the RETURN value is NEWVAL and the STORE is observable.
+  (show "CALL set x 42" "~s" (set-call 'set 'm60-probe-set-sym 42))
+  (show "CALL symbol-value x" "~s" (symbol-value 'm60-probe-set-sym))
+  ;; The elisp nil value is STORED as the elisp nil, not as #f.
+  (show "CALL set nil value" "~s" (set-call 'set 'm60-probe-set-nil #nil))
+  (show "CALL symbol-value nil value" "~s" (symbol-value 'm60-probe-set-nil))
+  ;; A keyword set to ITSELF is the exact call of the reader
+  ;; (reader.scm :1358): the same symbol in both argument positions.
+  (show "CALL keyword self" "~s"
+        (set-call 'set 'm60-probe-kw 'm60-probe-kw))
+  (show "CALL keyword value" "~s" (symbol-value 'm60-probe-kw))
+  ;; Item 3: a non-symbol argument raises.  Pin the 2 constructor
+  ;; arguments, the Guile key and the elisp message.
+  (show "CALL string arg" "~a"
+        (describe-error (lambda () (set-call 'set "m60-probe-str" 1))))
+  (show "CALL number arg" "~a"
+        (describe-error (lambda () (set-call 'set 7 1))))
+  ;; Item 4: 3 REAL files.  `macroexp.el' holds `:keyword' forms and its
+  ;; require chain runs the reader path, so a `wrong-type-arg' here is
+  ;; the FAIL of this row.  `startup.el' is the second real caller.
+  ;; `subr.el' is the no-regression line of row 31 (row 34 owns
+  ;; `defalias').
+  (load-line "lisp/emacs-lisp/macroexp.el")
+  (load-line "lisp/startup.el")
+  (load-line "lisp/subr.el"))
+
 ;;; --- mode: eac ------------------------------------------------------
 
 ;; M60 imp-12 -- row 31: `lisp/subr.el' form 1 is
@@ -820,6 +873,7 @@ definition itself: a `memq' over the `features' list."
   ((control) (mode-control))
   ((arith) (mode-arith))
   ((put) (mode-put))
+  ((set) (mode-set))
   ((eac) (mode-eac))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|eac)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|eac)"
                      mode))))

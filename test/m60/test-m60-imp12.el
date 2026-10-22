@@ -497,18 +497,24 @@ controlled ERT skip -- never a pass."
 ;; prelude/load.scm 229 UNCHANGED.
 (m60-imp12--check "s3/line-counts"
                  (m60-imp12--all
-                  (eql 1642 (m60-imp12--lines "mod/emacs/loader.scm"))
-                  (eql 640 (m60-imp12--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
+                  (eql 1653 (m60-imp12--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
+                  (eql 662 (m60-imp12--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp12--lines "prelude/load.scm"))
-                  (eql 825 (m60-imp12--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
+                  (eql 879 (m60-imp12--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  A branch adds 0 install sites and adds no
-;; FIX marker, so the 3 design counters stay 39 / 35 / 9.
+;; FIX marker, so the 3 design counters stay 40 / 36 / 9 (39 / 35 / 9
+;; before the row-33 install of imp-13).
 (m60-imp12--check "s3/grep-c-counts"
                  (m60-imp12--all
-                  (eql 39 (m60-imp12--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
+                  (eql 40 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                              "symbol-fbound?"))
-                  (eql 35 (m60-imp12--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
+                  (eql 36 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                              "set-symbol-function!"))
                   (eql 9 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                             "FIX-.*guilemacs"))))

@@ -1639,4 +1639,15 @@ elisp nil instead of a `load' error."
   ;; cell.
   (unless (symbol-fbound? 'put)
     (set-symbol-function! 'put elisp-put))
+
+  ;; M60 imp-13 -- row 33: `set' is the cell of the reader keyword path
+  ;; (reader.scm :1358) and of the `values' loops (:132, :227).  The
+  ;; guard is the row-18 pattern: a full Emacs owns the C DEFUN cell
+  ;; (src/data.c :1317).  The bulk installer `init-utils-registrations'
+  ;; writes cells with NO guard, so this row does not use it.  Proof is
+  ;; mode `set' of test/m60/probe-imp3.scm; `EMPTY-CELLS' (L15) is a
+  ;; fixed 11-name list and does not cover `set'.  The not-ported
+  ;; branches are at the definition (utils.scm :190).
+  (unless (symbol-fbound? 'set)
+    (set-symbol-function! 'set elisp-set))
   )
