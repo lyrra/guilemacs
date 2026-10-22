@@ -1076,10 +1076,41 @@ elisp nil instead of a `load' error."
 ;; F3 (cr.org section 4): an unbound FUNCTION raises `void-function',
 ;; like elisp.  Without this the evaluator applied #nil and returned
 ;; #nil with no error, so a broken file looked like a clean load.
+;;
+;; M60 imp-14 -- row 34: a function cell may hold a SYMBOL, and a CALL
+;; follows the chain to the procedure.  C peer is `indirect_function'
+;; (src/data.c :2209, used by `Ffuncall'): C resolves the cell at CALL
+;; time, not at `defalias' time, so `(symbol-function 'a)' stays the
+;; SYMBOL that `defalias' wrote.  The resolver below is the same order:
+;; cell first, apply second.
+;; The 100-link count is a guilemacs SAFETY, not a C port: C has no
+;; count here and a ring loops forever.  The raise names the symbol that
+;; the CALLER used, so a ring A -> B -> A reports `a', not `b'.
+;; FIX-20261022-guilemacs: the check is a link count, not a visited set.
+(define %elisp-loader-indirect-limit 100)
+
+(define (elisp-loader-resolve-function fn)
+  "Return the procedure that FN names, or #f when FN names no procedure.
+FN is a procedure, a symbol with a function cell, or a chain of symbols.
+A chain longer than `%elisp-loader-indirect-limit' raises
+`cyclic-function-indirection' with FN, the symbol of the call."
+  (let loop ((value fn) (links 0))
+    (cond
+      ((procedure? value) value)
+      ((symbol? value)
+       (if (>= links %elisp-loader-indirect-limit)
+           (throw 'cyclic-function-indirection fn)
+           (loop (symbol-function value) (+ links 1))))
+      (else #f))))
+
 (define (elisp-loader-apply fn args)
-  (if (procedure? fn)
-      (apply fn args)
-      (throw 'void-function fn)))
+  ;; FN is the HEAD symbol of the call, or a procedure.  The CALLER name
+  ;; is passed through, so `void-function' and
+  ;; `cyclic-function-indirection' report it, not the last link.
+  (let ((proc (elisp-loader-resolve-function fn)))
+    (if proc
+        (apply proc args)
+        (throw 'void-function fn))))
 
 (define (elisp-loader-eval form)
   (cond
@@ -1163,6 +1194,21 @@ elisp nil instead of a `load' error."
        (elisp-loader-apply (elisp-loader-eval head)
                            (map elisp-loader-eval (cdr form))))
       ((eq? head 'quote) (cadr form))
+      ;; M60 imp-14 -- row 34: `function' is a SPECIAL FORM (unevalled).
+      ;; It returns a SYMBOL argument as it is, so the cell of
+      ;; (defalias 'string= #'string-equal) holds the SYMBOL
+      ;; `string-equal'.  A function cell can NOT do this: the evaluator
+      ;; evaluates the arguments of a call first, so an installed
+      ;; `function' procedure would raise `void-variable string-equal'.
+      ;; C has no DEFUN ("function") in src/ (measured): only the NAME
+      ;; is interned (src/lread.c :3519) and the reader builds the list
+      ;; for `#'x' (reader.scm :831).  The reader needs no change.
+      ;; L35: a non-symbol ARG is EVALUATED, so `#'(lambda ...)' gives
+      ;; the procedure, not the raw form.  1 limit stays: a `(closure
+      ;; ...)' literal is not a value that this reader builds.
+      ((eq? head 'function)
+       (let ((arg (cadr form)))
+         (if (symbol? arg) arg (elisp-loader-eval arg))))
       ((eq? head 'setq)
        (let loop ((rest (cdr form)))
          (cond
@@ -1266,6 +1312,9 @@ elisp nil instead of a `load' error."
       ;;    is NOT the proof of row 31.  The proof is the `subr.el' load
       ;;    line.  The NEXT wall of that file is `void-function
       ;;    (defalias)' at :29, and the `defalias' row owns that wall.
+      ;; M60 imp-14: row 34 fills that cell.  The NEXT wall of
+      ;;    `subr.el' is now `void-function (defsubst)' at :315, and no
+      ;;    row of the map owns it.
       ;; M60 imp-12 -- row 31: `eval-and-compile' is a MACRO in Emacs.
       ;; boot.el :49 expands it to 2 nested `progn' forms, so a compiler
       ;; runs the body 2 TIMES.  A source-reading loader has no compile
@@ -1382,7 +1431,13 @@ elisp nil instead of a `load' error."
          (if expander
              (elisp-loader-eval (apply expander (cdr form)))
              (if (symbol-fbound? head)
-                 (elisp-loader-apply (symbol-function head)
+                 ;; M60 imp-14 -- row 34: pass the HEAD SYMBOL, not
+                 ;; (symbol-function head).  `elisp-loader-apply' follows
+                 ;; the whole cell chain (C `indirect_function'), so a
+                 ;; PRE-RESOLVED cell loses the name that the caller
+                 ;; wrote: a ring A -> B -> A would name `b' in the
+                 ;; `cyclic-function-indirection' raise.
+                 (elisp-loader-apply head
                                      (map elisp-loader-eval (cdr form)))
                  (throw 'void-function head))))))))
 
@@ -1562,16 +1617,16 @@ elisp nil instead of a `load' error."
   ;;                     the `let-syntax' block at :126 for elisp-=,
   ;;                     elisp-< and elisp->
   ;;   (emacs sequences) elisp-length :297
-  ;;   (emacs utils)     elisp-nreverse :264
+  ;;   (emacs utils)     elisp-nreverse :340
   ;;
   ;; The guard is the row-18 pattern: a full Emacs already owns the C
   ;; DEFUN (src/data.c, src/fns.c) in that cell.
   ;;
   ;; The bulk installers `init-types-registrations',
   ;; `init-numbers-registrations' (numbers.scm :290) and
-  ;; `init-utils-registrations' (utils.scm :594) install with NO guard,
+  ;; `init-utils-registrations' (utils.scm :670) install with NO guard,
   ;; so they overwrite the C cell.
-  ;; `init-utils-registrations' :610 is the UNGUARDED install of
+  ;; `init-utils-registrations' :686 is the UNGUARDED install of
   ;; `nreverse'; it is not called on this path, and this row does not
   ;; call it either.
   ;;
@@ -1619,14 +1674,14 @@ elisp nil instead of a `load' error."
   ;; caller is lisp/emacs-lisp/macroexp.el :137, through the `require'
   ;; of cl-lib (cl-lib.el :87 requires macroexp); time-date.el itself
   ;; calls no `put'.  The pure definition is `elisp-put'
-  ;; (utils.scm :164), and (emacs utils) is imported as a WHOLE module
-  ;; at :20, so this row adds 1 GUARDED install and NO procedure and NO
+  ;; (utils.scm :169), and (emacs utils) is imported as a WHOLE module
+  ;; at :19, so this row adds 1 GUARDED install and NO procedure and NO
   ;; import.
   ;;
   ;; The guard is the row-18 pattern: a full Emacs owns the C DEFUN
   ;; (src/fns.c, Fput) in that cell.  The bulk installer
-  ;; `init-utils-registrations' (utils.scm :594) also writes `put' at
-  ;; :606, but with NO guard, and `init-loader' does not call it.
+  ;; `init-utils-registrations' (utils.scm :670) also writes `put' at
+  ;; :682, but with NO guard, and `init-loader' does not call it.
   ;;
   ;; L26: `put' returns the VALUE, and a STRING or a NUMBER first
   ;; argument raises `Wrong type argument: symbolp'.  Both are elisp
@@ -1647,7 +1702,30 @@ elisp nil instead of a `load' error."
   ;; writes cells with NO guard, so this row does not use it.  Proof is
   ;; mode `set' of test/m60/probe-imp3.scm; `EMPTY-CELLS' (L15) is a
   ;; fixed 11-name list and does not cover `set'.  The not-ported
-  ;; branches are at the definition (utils.scm :190).
+  ;; branches are at the definition (utils.scm :195).
   (unless (symbol-fbound? 'set)
     (set-symbol-function! 'set elisp-set))
+
+  ;; M60 imp-14 -- row 34: `defalias' is form 2 of `lisp/subr.el' (:29),
+  ;; inside the `eval-and-compile' of :28.  The C owner is `Fdefalias'
+  ;; (src/data.c :706).  The guard is the row-18 pattern: a full Emacs
+  ;; owns the C DEFUN cell.  The bulk installer
+  ;; `init-utils-registrations' writes cells with NO guard, so this row
+  ;; does not use it.
+  ;;
+  ;; The cell holds the DEFINITION as written: `defalias' does NOT
+  ;; resolve a symbol.  `elisp-loader-apply' follows the chain at CALL
+  ;; time (C `indirect_function'), so `(symbol-function 'string=)' is the
+  ;; SYMBOL `string-equal' and `(string= "a" "a")' is still t.
+  ;;
+  ;; L31 ... L35 are named at the 2 definitions: L31 (macro table), L32
+  ;; (`defalias-fset-function' hook), L33 (pure copy) and L34 (load
+  ;; history) at `elisp-defalias' (utils.scm :235), L35 (a `(closure ...)'
+  ;; literal ARG) at the `function' branch of `elisp-loader-eval-form'.
+  ;;
+  ;; Proof is mode `alias' of test/m60/probe-imp3.scm and 2 cases of
+  ;; test/mod/standalone-tests.scm; `EMPTY-CELLS' (L15) is a fixed
+  ;; 11-name list and does not cover `defalias'.
+  (unless (symbol-fbound? 'defalias)
+    (set-symbol-function! 'defalias elisp-defalias))
   )

@@ -360,10 +360,16 @@ controlled ERT skip -- never a pass."
                    "mod/emacs/loader.scm"
                    '("The NEXT wall of that file is `void-function"
                      "`defalias' row owns that wall"))
+                  ;; M60 imp-14 RE-PIN: `((eq? head 'function)' is
+                  ;; PRESENT now: row 34 adds the UNEVALLED `function'
+                  ;; special form.  `defalias' is still a CELL, not a
+                  ;; branch, so `((eq? head 'defalias)' stays ABSENT.
+                  (m60-imp12--holds-all
+                   "mod/emacs/loader.scm"
+                   '("((eq? head 'function)"))
                   (m60-imp12--holds-none
                    "mod/emacs/loader.scm"
-                   '("((eq? head 'defalias)"
-                     "((eq? head 'function)"))))
+                   '("((eq? head 'defalias)"))))
 
 ;; REVIEW RULE (cr.org F2): the imp-12 limit block cites the LIMITS
 ;; section of its own brief, and not the record section.  A wrong
@@ -440,24 +446,34 @@ controlled ERT skip -- never a pass."
 ;; value is a FAIL.
 (m60-imp12--check "s2/subr-stop-moved"
                  (m60-imp12--all
+                  ;; M60 imp-14 RE-PIN: the OLD line was
+                  ;; `EAC load line: ERROR void-function (defalias)'.
+                  ;; Row 34 installs the cell, so the load moves PAST
+                  ;; form 2 (:29) to the NEXT wall, `defsubst' (:315).
                   (m60-imp12--probe-line
                    "eac"
-                   "EAC load line: ERROR void-function (defalias)")
-                  (m60-imp12--holds-none
-                   "mod/emacs/loader.scm"
-                   '("(set-symbol-function! 'defalias"))))
+                   "EAC load line: ERROR void-function (defsubst)")
+                  ;; M60 imp-14 RE-PIN: the OLD check was a `holds-none'
+                  ;; of `(set-symbol-function! 'defalias'.  Row 34 adds
+                  ;; that install, so the pin flips to PRESENCE.
+                  (eql 1 (m60-imp12--grep-c
+                          "mod/emacs/loader.scm"
+                          "(set-symbol-function! 'defalias"))))
 
 ;; The same stop from the 3 older modes that load `lisp/subr.el'.  This
 ;; is the no-regression proof of brief.org section 7.4: those lines are
 ;; the ONLY difference from HEAD.
 (m60-imp12--check "s2/subr-stop-in-older-modes"
                  (m60-imp12--all
+                  ;; M60 imp-14 RE-PIN: the OLD 3 lines all named
+                  ;; `void-function (defalias)'.  Row 34 moves the stop of
+                  ;; `lisp/subr.el' to `defsubst' (:315).
                   (m60-imp12--probe-line
-                   "arith" "LOAD lisp/subr.el: ERROR void-function (defalias)")
+                   "arith" "LOAD lisp/subr.el: ERROR void-function (defsubst)")
                   (m60-imp12--probe-line
-                   "control" "LOAD lisp/subr.el: ERROR void-function (defalias)")
+                   "control" "LOAD lisp/subr.el: ERROR void-function (defsubst)")
                   (m60-imp12--probe-line
-                   "put" "LOAD lisp/subr.el: ERROR void-function (defalias)")))
+                   "put" "LOAD lisp/subr.el: ERROR void-function (defsubst)")))
 
 ;; No regression: the 13 other older modes still run and keep their
 ;; lines.  Mode `registration' is NOT here: its non-zero exit status is
@@ -498,12 +514,15 @@ controlled ERT skip -- never a pass."
 (m60-imp12--check "s3/line-counts"
                  (m60-imp12--all
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp12--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp12--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp12--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp12--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp12--lines "prelude/load.scm"))
                   ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  (eql 879 (m60-imp12--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
+                  (eql 977 (m60-imp12--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  A branch adds 0 install sites and adds no
 ;; FIX marker, so the 3 design counters stay 40 / 36 / 9 (39 / 35 / 9
@@ -511,22 +530,29 @@ controlled ERT skip -- never a pass."
 (m60-imp12--check "s3/grep-c-counts"
                  (m60-imp12--all
                   ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                  (eql 40 (m60-imp12--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                  (eql 41 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                              "symbol-fbound?"))
                   ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                  (eql 36 (m60-imp12--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                  (eql 37 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                              "set-symbol-function!"))
-                  (eql 9 (m60-imp12--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                  (eql 10 (m60-imp12--grep-c "mod/emacs/loader.scm"
                                             "FIX-.*guilemacs"))))
 
 ;; No new FIX marker of this row in loader.scm.  This check is a WEAK
 ;; proxy and it tests 1 FILE only: a corpus cannot run `git'.  Acceptance
 ;; 7 (`git diff --stat -- src/' is empty) is measured in the commit
 ;; message `m60-imp12-commit-msg.txt', not here.  The name says so.
+;; M60 imp-14 RE-PIN: the OLD check was a `holds-none' of
+;; `FIX-20261022-guilemacs' in loader.scm.  Row 34 adds EXACTLY 1 marker of
+;; that date (the 100-link safety note of `elisp-loader-resolve-function'),
+;; so the check pins that count.
 (m60-imp12--check "s3/no-new-fix-marker-in-loader"
-                 (m60-imp12--holds-none
-                  "mod/emacs/loader.scm"
-                  '("FIX-20261022-guilemacs")))
+                 (eql 1 (m60-imp12--grep-c
+                         "mod/emacs/loader.scm"
+                         "FIX-20261022-guilemacs")))
 
 ;;; --- S4. The registration of THIS corpus ----------------------------
 

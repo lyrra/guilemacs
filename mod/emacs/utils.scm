@@ -32,6 +32,11 @@
     elisp-hash-table-keys elisp-hash-table-values
     elisp-equal-including-properties elisp-copy-tree elisp-fillarray
     elisp-symbol-function elisp-symbol-value elisp-set
+    ;; M60 imp-14 -- row 34: `defalias' is EXPORTED here and installed by
+    ;; `init-loader' (loader.scm) with the row-18 guard.  `elisp-fset'
+    ;; next to it is still EXPORTED with NO definition; that row stays
+    ;; OPEN.
+    elisp-defalias
     elisp-fset elisp-setq
     elisp-make-symbol elisp-gensym
     set-debug-print-flag
@@ -175,14 +180,14 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
 ;;; `Fset' (src/data.c :1317), which returns NEWVAL.  The reader applies
 ;;; this cell for every `:keyword' form (reader.scm :1358), and the 2
 ;;; read-eval loops apply it for `values' (loader.scm :132, :227).
-;;; `set-symbol-value!' (runtime.scm :357) stores and returns VALUE, and
-;;; the elisp truth values are kept (#nil stays #nil).
+;;; `set-symbol-value!' (mod/emacs-elisp/runtime.scm :357) stores and
+;;; returns VALUE, and the elisp truth values are kept (#nil stays #nil).
 ;;;
 ;;; The buffer-local, `varalias', `permanent-local' and watcher branches
 ;;; of `set_internal' (src/data.c :1360) are NOT ported.
 ;;; FIX-20261022-guilemacs: port them when a loaded file needs a
 ;;; buffer-local value or a variable alias.
-;;; The SYMBOL_NOWRITE test (src/data.c :1344) is NOT ported, so a
+;;; The SYMBOL_NOWRITE test (src/data.c :1346) is NOT ported, so a
 ;;; keyword store with a DIFFERENT value succeeds instead of raising
 ;;; `setting-constant'.  The reader passes the SAME value.
 ;;; FIX-20261022-guilemacs: port that test when a loaded file writes a
@@ -191,6 +196,55 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
   "Set SYMBOL's value to NEWVAL and return NEWVAL."
   (if (symbol? symbol)
       (set-symbol-value! symbol newval)
+      (error "Wrong type argument: symbolp" symbol)))
+
+;;; M60 imp-14 -- row 34: `defalias' writes the FUNCTION cell.  C owner is
+;;; `Fdefalias' (src/data.c :706); the worker `defalias' (:675) writes the
+;;; cell.  This port has CHECK_SYMBOL on ARG 1 (:719), the cell write
+;;; (`Ffset', :702), the `function-documentation' property (:728) and the
+;;; return value = SYMBOL (:732, bug#11686).  DEFINITION is stored AS
+;;; WRITTEN: it is NOT resolved, because C keeps an INDIRECTION there.
+;;; So `(defalias 'string= #'string-equal)' leaves the SYMBOL
+;;; `string-equal' in the cell, and `(string= "a" "a")' still gives t.
+;;;
+;;; The 4 parts that are NOT ported, each a named limit:
+;;; L31 macro table: a `defalias' does NOT drop an entry of
+;;;     `elisp-loader-macro-table' (loader.scm :1176).  Only the `defun'
+;;;     branch drops it (loader.scm :1253).  Emacs keeps ONE cell, so a
+;;;     `defalias' of a name that is a macro HERE leaves the stale
+;;;     expander.  No loaded file needs this today.
+;;; FIX-20261022-guilemacs: drop the macro entry in `defalias' too.
+;;; L32 advice hook: a non-nil `defalias-fset-function' property would
+;;;     REPLACE the cell write (:702).  It is ignored, so advice that
+;;;     uses that property does nothing on this path.
+;;; FIX-20261022-guilemacs: test the `defalias-fset-function' property
+;;; first, as the C worker does.
+;;; L33 pure copy: `Vpurify_flag' (:720) and `Fpurecopy' (:723) are not
+;;;     ported, so a definition is never copied or shared with a dump.
+;;; FIX-20261022-guilemacs: port the `Fpurecopy' step when a dump exists.
+;;; L34 load history: `LOADHIST_ATTACH' and `add_to_function_history'
+;;;     (:683, :693) are not ported, so `load-history' does not change and
+;;;     `symbol-file' does not see this definition.
+;;; FIX-20261022-guilemacs: record the definition in `load-history'.
+;;;
+;;; The 3rd argument is the DOCSTRING.  C tests `!NILP' (:727), not
+;;; `stringp', so ANY non-nil value sets the property; a string is the
+;;; only shape that a caller passes.  The elisp nil has 3 spellings
+;;; here: `#nil' (the value), the symbol `nil' and the empty list, and
+;;; all 3 leave the property EMPTY.
+(define (elisp-defalias symbol definition . maybe-doc)
+  "Set SYMBOL's function definition to DEFINITION and return SYMBOL.
+The optional 3rd argument is the DOCSTRING.  It sets SYMBOL's
+`function-documentation' property; when it is nil, SYMBOL uses the
+documentation string of DEFINITION."
+  (if (symbol? symbol)
+      (begin
+        (set-symbol-function! symbol definition)
+        (if (pair? maybe-doc)
+            (let ((doc (car maybe-doc)))
+              (if (not (or (eq? doc #nil) (eq? doc 'nil) (null? doc)))
+                  (elisp-put symbol 'function-documentation doc))))
+        symbol)
       (error "Wrong type argument: symbolp" symbol)))
 
 ;;;

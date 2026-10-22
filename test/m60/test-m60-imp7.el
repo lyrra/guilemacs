@@ -534,7 +534,7 @@ host limit is a skip, never a pass."
                           "mod/emacs/loader.scm"
                           "(define (elisp-loader-apply fn args)"))
                   (eql 1 (m60-imp7--literal-lines-in-eval-form
-                          "(elisp-loader-apply (symbol-function head)"))
+                          "(elisp-loader-apply head"))
                   (eql 2 (m60-imp7--literal-lines-in-eval-form
                           "(map elisp-loader-eval (cdr form))"))))
 
@@ -549,7 +549,7 @@ host limit is a skip, never a pass."
                      "(let ((expander (elisp-loader-macro-ref head)))"
                      "(apply expander (cdr form))"
                      "(symbol-fbound? head)"
-                     "(elisp-loader-apply (symbol-function head)"))
+                     "(elisp-loader-apply head"))
                   (eql 1 (m60-imp7--literal-lines-in-eval-form
                           "(elisp-loader-macro-ref head)"))))
 
@@ -766,14 +766,17 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp7--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp7--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp7--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp7--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp7--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
                   ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  (eql 879 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
+                  (eql 977 (m60-imp7--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
 ;; values, UNCHANGED.  A macro object in the elisp function cell would
@@ -790,13 +793,16 @@ host limit is a skip, never a pass."
 (m60-imp7--check "s5/grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (and (eql 40 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                 (and (eql 41 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                       ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      (eql 36 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                      (eql 37 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 9 (m60-imp7--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                      (eql 10 (m60-imp7--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; The limits of brief.org section 5 are NAMED in the source: L1 (the

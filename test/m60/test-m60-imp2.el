@@ -463,7 +463,8 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                 (and (eql 1653 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                 (and (eql 1731 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))
@@ -484,13 +485,16 @@ host limit is a skip, never a pass."
 (m60-imp2--check "r1/loader.scm-grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (and (eql 40 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                 (and (eql 41 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                       ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      (eql 36 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                      (eql 37 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 9 (m60-imp2--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                      (eql 10 (m60-imp2--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; Unit: OCCURRENCES over src/*.[ch].  MEASURED: 267.
@@ -502,7 +506,9 @@ host limit is a skip, never a pass."
 ;; ONE entry).  M60 imp-13 RE-PIN: test/mod 6 -> 7, the `:keyword'
 ;; fixture standalone-keyword.el.  OLD value is 6.
 (m60-imp2--check "r1/test-mod-files-and-emacs-elisp-entries"
-                 (and (eql 7 (m60-imp2--dir-entries "test/mod"))
+                 ;; M60 imp-14 RE-PIN: test/mod 7 -> 8 ENTRIES (OLD value 7:
+                 ;; +1 fixture `standalone-alias.el'; the row-32 fixture is out of scope).
+                 (and (eql 8 (m60-imp2--dir-entries "test/mod"))
                       (eql 9 (m60-imp2--dir-entries "mod/emacs-elisp"))))
 
 ;; The 2 fixtures of this imp.  An absent fixture must FAIL here, not be

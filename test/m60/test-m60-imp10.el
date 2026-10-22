@@ -358,7 +358,10 @@ PROCEDURE already existed before this row.")
 (m60-imp10--check "s1/unguarded-nreverse-named"
                  (m60-imp10--holds-all
                   "mod/emacs/loader.scm"
-                  '("init-utils-registrations' (utils.scm :594)"
+                  ;; M60 imp-14 RE-PIN: the cite is utils.scm :670, not
+                  ;; :594 (OLD value 594).  The `elisp-defalias' block
+                  ;; (row 34) sits above `init-utils-registrations'.
+                  '("init-utils-registrations' (utils.scm :670)"
                     "UNGUARDED install of")))
 
 ;; L24: `<=' and `>=' are not in the row-29 list and stay EMPTY, so this
@@ -452,7 +455,7 @@ PROCEDURE already existed before this row.")
                    ;; Row 31 adds the branch, so the load moves PAST form 1 to the
                    ;; NEXT wall, `defalias' at subr.el :29.  `subr.el' does NOT
                    ;; load: a `done' value is a FAIL.
-                   "LOAD lisp/subr.el: ERROR void-function (defalias)")))
+                   "LOAD lisp/subr.el: ERROR void-function (defsubst)")))
 
 ;; L15: the FIXED 11-name list is not the proof of this row.
 (m60-imp10--check "s2/l15-empty-cells-stays"
@@ -490,14 +493,17 @@ PROCEDURE already existed before this row.")
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp10--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp10--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp10--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp10--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp10--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
                   ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  (eql 879 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
+                  (eql 977 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  23 + 15 = 38 `symbol-fbound?' and
 ;; 19 + 15 = 34 `set-symbol-function!'.  The FIX count stays 9: a guarded
@@ -506,20 +512,27 @@ PROCEDURE already existed before this row.")
                  (m60-imp10--all
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                   ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                  (eql 40 (m60-imp10--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                  (eql 41 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                              "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                   ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                  (eql 36 (m60-imp10--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                  (eql 37 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                              "set-symbol-function!"))
-                  (eql 9 (m60-imp10--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                  (eql 10 (m60-imp10--grep-c "mod/emacs/loader.scm"
                                             "FIX-.*guilemacs"))))
 
-;; C delta 0: no C file is touched, and no FIX marker is added.
+;; C delta 0: no C file is touched.  The OLD check was a `holds-none' of
+;; `FIX-20261022-guilemacs' in loader.scm.  M60 imp-14 RE-PIN: row 34
+;; adds EXACTLY 1 marker of that date (the 100-link safety note of
+;; `elisp-loader-resolve-function'), so the check pins that count.  The
+;; proxy stays WEAK: a corpus can not run `git'.
 (m60-imp10--check "s3/no-c-delta"
-                 (m60-imp10--holds-none
-                  "mod/emacs/loader.scm"
-                  '("FIX-20261022-guilemacs")))
+                 (eql 1 (m60-imp10--grep-c
+                         "mod/emacs/loader.scm"
+                         "FIX-20261022-guilemacs")))
 
 ;;; --- S4. The registration of THIS corpus ----------------------------
 

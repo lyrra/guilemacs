@@ -558,7 +558,7 @@ host limit is a skip, never a pass."
                   (eql 1 (m60-imp9--literal-lines-in-eval-form
                           "(elisp-loader-macro-ref head)"))
                   (eql 1 (m60-imp9--literal-lines-in-eval-form
-                          "(elisp-loader-apply (symbol-function head)"))
+                          "(elisp-loader-apply head"))
                   (eql 1 (m60-imp9--literal-lines-in-eval-form
                           "(throw 'void-function head)"))))
 
@@ -684,7 +684,7 @@ host limit is a skip, never a pass."
                    ;; Row 31 adds the branch, so the load moves PAST form 1
                    ;; to the NEXT wall, `defalias' at subr.el :29.  `subr.el'
                    ;; does NOT load: a `done' value is a FAIL.
-                   "LOAD lisp/subr.el: ERROR void-function (defalias)")
+                   "LOAD lisp/subr.el: ERROR void-function (defsubst)")
                   ;; M60 imp-11 RE-PIN: the OLD line was
                   ;; `LOAD lisp/calendar/time-date.el: ERROR void-function
                   ;; (put)'.  Row 30 installs the `put' cell, so mode
@@ -721,7 +721,7 @@ host limit is a skip, never a pass."
                   ;; "`obsolete', `control', `arith', `put', or `eac'".
                   ;; Mode `set' (row 33) is in that list now.
                   (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', `set', or `eac'"))
+                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', `set', `alias', or `eac'"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "((control) (mode-control))"))
                   (eql 1 (m60-imp9--literal-lines
@@ -729,7 +729,7 @@ host limit is a skip, never a pass."
                   (m60-imp9--holds-all
                    "test/m60/probe-imp3.scm"
                    ;; M60 imp-13 RE-PIN: mode `set' joins the list.
-                   '("language|obsolete|control|arith|put|set|eac)"))))
+                   '("language|obsolete|control|arith|put|set|alias|eac)"))))
 
 ;; cr.org F4: a DUPLICATE name gets the OUTER value 0 back, in both
 ;; branches.  cr.org F3: a raising INIT leaves the OUTER value `outer'.
@@ -878,14 +878,17 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp9--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp9--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp9--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp9--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp9--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
                   ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  (eql 879 (m60-imp9--lines "test/m60/probe-imp3.scm"))
+                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
+                  (eql 977 (m60-imp9--lines "test/m60/probe-imp3.scm"))
                   (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
@@ -899,13 +902,16 @@ host limit is a skip, never a pass."
 (m60-imp9--check "s5/grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (and (eql 40 (m60-imp9--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                 (and (eql 41 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                       ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      (eql 36 (m60-imp9--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                      (eql 37 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 9 (m60-imp9--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                      (eql 10 (m60-imp9--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; The `lookup-language' site moved: 1,266 at the base state, 1,337 after
@@ -919,7 +925,7 @@ host limit is a skip, never a pass."
 ;; M60 imp-12 RE-PIN: the row-31 branch and its L27 ... L30 limit block
 ;; add 22 lines ABOVE the site, so it moves 1,385 -> 1,407.
 (m60-imp9--check "s5/lookup-language-line"
-                 (eql 1407 (m60-imp9--line-of "mod/emacs/loader.scm"
+                 (eql 1462 (m60-imp9--line-of "mod/emacs/loader.scm"
                                               "(lookup-language 'emacs-elisp)")))
 
 ;; The 5 limits of brief.org section 10 are NAMED in the source.  A

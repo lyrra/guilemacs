@@ -19,9 +19,12 @@
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', `control', `arith', `put', `set', or `eac'.  Mode `defs' is the
-;;; M60 imp-6 record of rows 21 and 22 (`defconst', `defvar').  Mode
-;;; `macros' is the M60 imp-7 record of rows 23 and 24 (`defmacro' and
+;;; `obsolete', `control', `arith', `put', `set', `alias', or `eac'.
+;;; Mode `alias' is the M60 imp-14 record of row 34 (`defalias', the
+;;; UNEVALLED `function' form and the symbol-cell indirection).  Mode
+;;; `defs' is the M60 imp-6 record of rows 21 and 22 (`defconst',
+;;; `defvar').  Mode `macros' is the M60 imp-7 record of rows 23 and 24
+;;; (`defmacro' and
 ;;; `eval-when-compile').  Mode `control' is the M60 imp-9 record of row
 ;;; 28a (`cond', `let*', `while').  Mode `arith' is the M60 imp-10 record
 ;;; of row 29 (the comparison and arithmetic cells, `length' and
@@ -597,7 +600,7 @@ definition itself: a `memq' over the `features' list."
 ;; The CALL lines prove that the installed cell is a real elisp
 ;; primitive and not only a bound cell: every value is `#t' or `#nil'.
 ;; `(eq? '#nil #f)' is FALSE, so a caller must pass the value through
-;; `elisp-loader-truthy?' (loader.scm :1062).  The 2 TRUTHY lines pin
+;; `elisp-loader-truthy?' (loader.scm :1068).  The 2 TRUTHY lines pin
 ;; that rule (F6 of the imp-10 cr.org review).
 ;;
 ;; L23 is MEASURED here too: `elisp-/` with 0 arguments, and
@@ -657,7 +660,7 @@ definition itself: a `memq' over the `features' list."
   ;; F6 of the imp-10 cr.org review: a comparison cell answers `#nil',
   ;; not `#f'.  Guile 3 also treats `#nil' as FALSE in a plain `if'
   ;; (MEASURED), but `#nil' is NOT `#f', so a caller must not compare
-  ;; with `#f' and must use `elisp-loader-truthy?' (loader.scm :1062).
+  ;; with `#f' and must use `elisp-loader-truthy?' (loader.scm :1068).
   ;; The first line is the hazard, the second line is the required route.
   (show "TRUTHY #nil-is-not-#f" "~s" (eq? (arith-call '> 1 2) #f))
   (show "TRUTHY elisp-loader-truthy?" "~s"
@@ -678,8 +681,8 @@ definition itself: a `memq' over the `features' list."
 ;;; --- mode: put ------------------------------------------------------
 
 ;; M60 imp-11 (row 30).  The `put' symbol-property cell.  The pure
-;; definition `elisp-put' already exists (mod/emacs/utils.scm :164) and
-;; (emacs utils) is imported as a WHOLE module (loader.scm :20), so this
+;; definition `elisp-put' already exists (mod/emacs/utils.scm :169) and
+;; (emacs utils) is imported as a WHOLE module (loader.scm :19), so this
 ;; row adds 1 GUARDED install in `init-loader' and NO procedure and NO
 ;; import.
 ;;
@@ -856,6 +859,100 @@ definition itself: a `memq' over the `features' list."
     ;; print `done'.
     (show "EAC load line" "~a" (describe (try-load "lisp/subr.el")))))
 
+;;; --- mode: alias ----------------------------------------------------
+
+;; M60 imp-14 -- row 34: `defalias' fills the FUNCTION cell, and that
+;; cell may hold a SYMBOL.  C owner =src/data.c :706 (`Fdefalias').  The
+;; row needs 3 changes: the cell (utils.scm :235), the UNEVALLED
+;; `function' form that `#'x' reads to (loader.scm :1209) and the
+;; symbol indirection of `elisp-loader-apply' (loader.scm :1106).
+;; The CALL below uses a FIXTURE function: the cell of `string-equal' is
+;; still EMPTY in a plain `guile' process (MEASURED, `string-equal
+;; fbound: #f'), so a call of `string=' stops 1 wall later and would NOT
+;; measure this row.  The `string=' lines record that difference.
+;;
+;; `#'x' can NOT be written in this file: the Guile reader turns it into
+;; `(syntax x)'.  The elisp reader builds `(function x)' itself
+;; (reader.scm :831), so the 2 shapes are the same form.
+(define (mode-alias)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval)))
+    ;; The subject cell, then the 2 neighbours that stay OPEN: `fset' has
+    ;; NO definition (`elisp-fset' is exported and empty), and `function'
+    ;; is a SPECIAL FORM, so it is never a cell.
+    (show "ALIAS CELLS" "defalias -> ~s   fset -> ~s   function -> ~s"
+          (symbol-fbound? 'defalias)
+          (symbol-fbound? 'fset)
+          (symbol-fbound? 'function))
+    ;; The source function, then the alias that points at it.
+    (eval-form '(defun m60-probe-alias-source (x) (+ x 1)))
+    (show "ALIAS ret" "~s"
+          (eval-form '(defalias 'm60-probe-alias-target
+                                (function m60-probe-alias-source))))
+    ;; The cell holds the SYMBOL, not the procedure: C behaviour.
+    (show "ALIAS cell" "~s" (symbol-function 'm60-probe-alias-target))
+    ;; The `function' special form returns the symbol as it is.  The read
+    ;; shape of `#'x' is a PLAIN symbol head (reader.scm :831).
+    (show "ALIAS fnform" "~s, PLAIN symbol head"
+          (eval-form '(function m60-probe-alias-source)))
+    ;; L35: a non-symbol ARG is EVALUATED, so it gives a PROCEDURE.
+    (show "ALIAS fnform lambda" "~s"
+          (procedure? (eval-form '(function (lambda (x) x)))))
+    ;; A call through a symbol cell resolves the cell FIRST and applies
+    ;; SECOND (`indirect_function').
+    (show "ALIAS call" "~s" (eval-form '(m60-probe-alias-target 41)))
+    ;; A 2-symbol chain: the cell of `hop' holds the symbol `target',
+    ;; whose cell holds the symbol `source'.
+    (eval-form '(defalias 'm60-probe-alias-hop
+                          (function m60-probe-alias-target)))
+    (show "ALIAS indirect" "~s via cell ~s"
+          (eval-form '(m60-probe-alias-hop 41))
+          (symbol-function 'm60-probe-alias-hop))
+    ;; A self loop raises, and the raise names the symbol that the CALLER
+    ;; used.  The 100-link count is a guilemacs SAFETY, not a C port:
+    ;; `indirect_function' (src/data.c :2209) has NO link count in this
+    ;; tree, so C loops.  No hang here (acceptance item 3).
+    (eval-form '(defalias 'm60-probe-alias-loop
+                          (function m60-probe-alias-loop)))
+    (show "ALIAS cycle" "~a"
+          (describe-error (lambda () (eval-form '(m60-probe-alias-loop)))))
+    ;; A 2-SYMBOL RING, A -> B -> A.  The raise still names the symbol
+    ;; that the CALLER used (`...ring-a'), never the symbol that closes
+    ;; the loop (`...ring-b'), because the call path passes the HEAD
+    ;; symbol and not a pre-resolved cell.
+    (eval-form '(defalias 'm60-probe-alias-ring-a
+                          (function m60-probe-alias-ring-b)))
+    (eval-form '(defalias 'm60-probe-alias-ring-b
+                          (function m60-probe-alias-ring-a)))
+    (show "ALIAS cycle ring" "~a"
+          (describe-error (lambda () (eval-form '(m60-probe-alias-ring-a)))))
+    ;; A non-symbol first argument raises, and the raise is the shape of
+    ;; `elisp-put' (utils.scm :169).
+    (show "ALIAS string arg" "~a"
+          (describe-error
+           (lambda () (eval-form '(defalias "m60-probe-alias-str"
+                                             (function m60-probe-alias-source))))))
+    ;; A 3rd ARG is the DOCSTRING and sets the property.  With no 3rd
+    ;; ARG the property stays EMPTY: the elisp nil.
+    (eval-form '(defalias 'm60-probe-alias-doc
+                          (function m60-probe-alias-source) "doc"))
+    (show "ALIAS docstring" "~s"
+          (elisp-get 'm60-probe-alias-doc 'function-documentation))
+    (show "ALIAS no docstring" "~s"
+          (elisp-get 'm60-probe-alias-target 'function-documentation))
+    ;; The ACCEPTANCE of row 34: `lisp/subr.el' passes form 2 (:29) and
+    ;; stops on the NEXT wall.  It must NOT be `done' and must NOT be
+    ;; `void-function (defalias)' or `void-function (function)'.
+    (show "ALIAS load line" "~a" (describe (try-load "lisp/subr.el")))
+    ;; The 2 observables of brief.org section 4, after the load.  The
+    ;; cell is the SYMBOL that form 1 wrote: C behaviour.  The CALL is
+    ;; NOT C behaviour here, because the C cell of `string-equal' is
+    ;; EMPTY in a plain `guile' process: the chain stops 1 link later.
+    ;; That is a DIFFERENT row and it stays OPEN.
+    (show "ALIAS string= cell" "~s" (symbol-function 'string=))
+    (show "ALIAS string= call" "~a"
+          (describe-error (lambda () (eval-form '(string= "a" "a")))))))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -874,6 +971,7 @@ definition itself: a `memq' over the `features' list."
   ((arith) (mode-arith))
   ((put) (mode-put))
   ((set) (mode-set))
+  ((alias) (mode-alias))
   ((eac) (mode-eac))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|eac)"
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac)"
                      mode))))

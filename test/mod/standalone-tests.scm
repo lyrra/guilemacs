@@ -6,7 +6,8 @@
 
 ;; Pinned case count.  A suite that loses a case must fail (cr.org of the
 ;; M59 imp-5 round, F3: the round file is reused, so name the round).
-(define expected-passes 6)
+;; M60 imp-14: 6 -> 8, the 2 `defalias' cases of row 34.
+(define expected-passes 8)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -113,6 +114,82 @@
                            (equal? (cadr v) 1)
                            (eq? (caddr v) (string->symbol ":keyword-b"))
                            (null? (cdddr v)))))))
+
+;;; M60 imp-14 -- row 34: the `defalias' cell (utils.scm :235), the
+;;; UNEVALLED `function' form (loader.scm :1209) and the symbol-cell
+;;; indirection of `elisp-loader-apply' (loader.scm :1106).  C owner is
+;;; `Fdefalias' (src/data.c :706).  The suite runs in plain Guile, so the
+;;; 2 cases below are the automatic gate of the row.
+
+;; The MESSAGE of the Guile `misc-error' of an elisp `(error FMT . ARGS)'
+;; call, or #f.  Guile stores the payload FLAT: the format string and its
+;; argument list are 2 ADJACENT elements.  The case above has its own
+;; copy of this walk inside its `let'; this one is shared by the 2 cases
+;; of row 34.
+(define (row34-error-text items)
+  (cond ((or (null? items) (null? (cdr items))) #f)
+        ((and (string? (car items)) (list? (cadr items)))
+         (apply format #f (car items) (cadr items)))
+        (else (row34-error-text (cdr items)))))
+
+;; Case 1 -- the CELL and the CALL.  `standalone-alias.el' is the real
+;; reader and evaluator path: `defun', `#'x' (which reads to
+;; `(function x)'), `defalias', then a CALL of the alias.  The cell must
+;; hold the SOURCE SYMBOL, not a procedure: C stores the definition as
+;; written and resolves it at CALL time (`indirect_function').  The
+;; `defalias' return value is the SYMBOL, not the definition (bug#11686).
+(let* ((alias-fn (and (symbol-fbound? 'defalias) (symbol-function 'defalias)))
+       (result (catch #t
+                 (lambda () (load-fixture "standalone-alias.el") 'loaded)
+                 (lambda (key . args) (list 'error key args))))
+       (ret (and alias-fn
+                 (apply alias-fn '(standalone-alias-return-probe
+                                   standalone-alias-source))))
+       (cell (and (symbol-fbound? 'standalone-alias-target)
+                  (symbol-function 'standalone-alias-target))))
+  (test-assert (format #f "elisp `defalias' writes the SYMBOL cell, returns SYMBOL and the CALL follows the cell (result: ~s, cell: ~s)"
+                       result cell)
+               (and (eq? 'loaded result)
+                    (eq? 'standalone-alias-source cell)
+                    (eq? 'standalone-alias-return-probe ret)
+                    (symbol-bound? 'standalone-alias-test-result)
+                    (equal? 42 (symbol-value 'standalone-alias-test-result)))))
+
+;; Case 2 -- the RAISE.  A ring A -> B -> A must raise
+;; `cyclic-function-indirection' and must NOT hang; the raise names the
+;; symbol of the CALL, not the symbol that closes the ring.  A non-symbol
+;; ARG 1 must raise the `symbolp' shape of `elisp-put'.  The 100-link
+;; count of the resolver is a guilemacs SAFETY: C has no count here.
+(let* ((alias-fn (and (symbol-fbound? 'defalias) (symbol-function 'defalias)))
+       (eval-form (module-ref (resolve-module '(emacs loader))
+                              'elisp-loader-eval))
+       (ring (and alias-fn
+                  (begin
+                    (apply alias-fn '(standalone-alias-ring-a
+                                      standalone-alias-ring-b))
+                    (apply alias-fn '(standalone-alias-ring-b
+                                      standalone-alias-ring-a)))))
+       (cycle (and ring
+                   (catch #t
+                     (lambda () (eval-form '(standalone-alias-ring-a)) 'no-error)
+                     (lambda (key . args) (cons key args)))))
+       (type-err (and alias-fn
+                      (catch #t
+                        (lambda ()
+                          (apply alias-fn '("standalone-alias-str"
+                                            standalone-alias-source))
+                          'no-error)
+                        (lambda (key . args) (cons key args)))))
+       (text (and (pair? type-err) (row34-error-text (cdr type-err)))))
+  (test-assert (format #f "elisp `defalias' raises `cyclic-function-indirection' on a symbol ring and `symbolp' on a non-symbol (cycle: ~s, type: ~s)"
+                       cycle (and (pair? type-err) (car type-err)))
+               (and (eq? 'cyclic-function-indirection (and (pair? cycle) (car cycle)))
+                    (equal? '(standalone-alias-ring-a) (cdr cycle))
+                    (eq? 'misc-error (and (pair? type-err) (car type-err)))
+                    ;; The FORMATTED text is the stable token: the
+                    ;; payload shape differs between Guile versions.
+                    (equal? "Wrong type argument: symbolp \"standalone-alias-str\""
+                            text))))
 
 (test-end "Guilemacs standalone loader and reader")
 

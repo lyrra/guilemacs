@@ -496,7 +496,7 @@ host limit is a skip, never a pass."
                           "mod/emacs/loader.scm"
                           "(elisp-loader-apply (elisp-loader-eval head)"))
                   (eql 1 (m60-imp6--literal-lines-in-eval-form
-                          "(elisp-loader-apply (symbol-function head)"))))
+                          "(elisp-loader-apply head"))))
 
 ;; RE-PINNED at M60 imp-7: row 23 CLOSED, so the pin flips from ABSENCE
 ;; to PRESENCE.  RENAMED with the assertion: the old name
@@ -670,9 +670,11 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp6--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp6--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp6--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp6--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp6--lines "prelude/load.scm"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
@@ -690,13 +692,16 @@ host limit is a skip, never a pass."
 (m60-imp6--check "s5/grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (and (eql 40 (m60-imp6--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                 (and (eql 41 (m60-imp6--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                       ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      (eql 36 (m60-imp6--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                      (eql 37 (m60-imp6--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 9 (m60-imp6--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                      (eql 10 (m60-imp6--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;;; --- S6. The registration of THIS corpus ----------------------------

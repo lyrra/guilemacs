@@ -448,7 +448,8 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                 (eql 1653 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                 (eql 1731 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.
@@ -464,13 +465,16 @@ host limit is a skip, never a pass."
 (m60-imp3--check "s1/loader.scm-grep-c-counts"
 ;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (and (eql 40 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                 (and (eql 41 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "symbol-fbound?"))
 ;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
                       ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      (eql 36 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                      (eql 37 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                 "set-symbol-function!"))
-                      (eql 9 (m60-imp3--grep-c "mod/emacs/loader.scm"
+                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                      (eql 10 (m60-imp3--grep-c "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs"))))
 
 ;; brief.org F1: mod/emacs-elisp KEEPS 9 ENTRIES (`runtime/' is ONE
@@ -702,11 +706,14 @@ host limit is a skip, never a pass."
 ;; standalone suite pinned 4 cases.  Row 33 adds 2 cases: the `set'
 ;; cell and the `:keyword' fixture of the reader path.  The 3 suites pin
 ;; 3 + 6 + 28 = 37 cases.  OLD values are 35 and 4.
-(m60-imp3--check "s5/mod-suites-pin-37"
+;; M60 imp-14 RE-PIN: the pin is 37 -> 39 cases.  The OLD name was
+;; `s5/mod-suites-pin-37' (3 + 6 + 28); row 34 adds 2 cases to the
+;; standalone suite (6 -> 8).  RENAMED with the assertion.
+(m60-imp3--check "s5/mod-suites-pin-39"
                  (and (m60-imp3--holds-all
                        "test/mod/sequences-tests.scm" '("expected-passes 3"))
                       (m60-imp3--holds-all
-                       "test/mod/standalone-tests.scm" '("expected-passes 6"))
+                       "test/mod/standalone-tests.scm" '("expected-passes 8"))
                       (m60-imp3--holds-all
                        "test/mod/faces-tests.scm" '("expected-passes 28"))))
 

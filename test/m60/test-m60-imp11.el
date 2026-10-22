@@ -395,7 +395,7 @@ controlled ERT skip -- never a pass."
                    ;; Row 31 adds the branch, so the load moves PAST form 1 to the
                    ;; NEXT wall, `defalias' at subr.el :29.  `subr.el' does NOT
                    ;; load: a `done' value is a FAIL.
-                   "LOAD lisp/subr.el: ERROR void-function (defalias)")))
+                   "LOAD lisp/subr.el: ERROR void-function (defsubst)")))
 
 ;; No regression: the older modes still run.  Mode `arith' keeps
 ;; `COUNT: 0' (row 29), mode `cells' keeps the FIXED 11-name list, and
@@ -423,13 +423,16 @@ controlled ERT skip -- never a pass."
                  (m60-imp11--all
                   ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                   ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  (eql 1653 (m60-imp11--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
+                  (eql 1731 (m60-imp11--lines "mod/emacs/loader.scm"))
                   ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  (eql 662 (m60-imp11--lines "mod/emacs/utils.scm"))
+                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
+                  (eql 716 (m60-imp11--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp11--lines "prelude/load.scm"))
                   ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
                   ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  (eql 879 (m60-imp11--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
+                  (eql 977 (m60-imp11--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  38 + 1 = 39 `symbol-fbound?' and
 ;; 34 + 1 = 35 `set-symbol-function!'.  The FIX count stays 9: a guarded
@@ -439,19 +442,26 @@ controlled ERT skip -- never a pass."
 (m60-imp11--check "s3/grep-c-counts"
                  (m60-imp11--all
                   ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                  (eql 40 (m60-imp11--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
+                  (eql 41 (m60-imp11--grep-c "mod/emacs/loader.scm"
                                              "symbol-fbound?"))
                   ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                  (eql 36 (m60-imp11--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
+                  (eql 37 (m60-imp11--grep-c "mod/emacs/loader.scm"
                                              "set-symbol-function!"))
-                  (eql 9 (m60-imp11--grep-c "mod/emacs/loader.scm"
+                  ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
+                  (eql 10 (m60-imp11--grep-c "mod/emacs/loader.scm"
                                             "FIX-.*guilemacs"))))
 
 ;; C delta 0: no C file is touched and no FIX marker is added.
+;; C delta 0: no C file is touched.  The OLD check was a `holds-none' of
+;; `FIX-20261022-guilemacs' in loader.scm.  M60 imp-14 RE-PIN: row 34
+;; adds EXACTLY 1 marker of that date (the 100-link safety note of
+;; `elisp-loader-resolve-function'), so the check pins that count.
 (m60-imp11--check "s3/no-c-delta"
-                 (m60-imp11--holds-none
-                  "mod/emacs/loader.scm"
-                  '("FIX-20261022-guilemacs")))
+                 (eql 1 (m60-imp11--grep-c
+                         "mod/emacs/loader.scm"
+                         "FIX-20261022-guilemacs")))
 
 ;;; --- S4. The registration of THIS corpus ----------------------------
 
