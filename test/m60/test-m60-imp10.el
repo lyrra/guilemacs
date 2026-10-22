@@ -442,7 +442,12 @@ PROCEDURE already existed before this row.")
                    "LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg (#f \"Wrong type to apply: ~S\" (#nil) (#nil))")
                   (m60-imp10--probe-line
                    "arith"
-                   "LOAD lisp/subr.el: ERROR void-function (eval-and-compile)")))
+                   ;; M60 imp-12 RE-PIN: the OLD line was
+                   ;; `LOAD lisp/subr.el: ERROR void-function (eval-and-compile)'.
+                   ;; Row 31 adds the branch, so the load moves PAST form 1 to the
+                   ;; NEXT wall, `defalias' at subr.el :29.  `subr.el' does NOT
+                   ;; load: a `done' value is a FAIL.
+                   "LOAD lisp/subr.el: ERROR void-function (defalias)")))
 
 ;; L15: the FIXED 11-name list is not the proof of this row.
 (m60-imp10--check "s2/l15-empty-cells-stays"
@@ -478,11 +483,13 @@ PROCEDURE already existed before this row.")
 (m60-imp10--check "s3/line-counts"
                  (m60-imp10--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  (eql 1620 (m60-imp10--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                  (eql 1642 (m60-imp10--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp10--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp10--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
-                  (eql 789 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
+                  (eql 825 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  23 + 15 = 38 `symbol-fbound?' and
 ;; 19 + 15 = 34 `set-symbol-function!'.  The FIX count stays 9: a guarded

@@ -577,7 +577,9 @@ host limit is a skip, never a pass."
                   (eql 1 (m60-imp9--literal-lines
                           "mod/emacs/loader.scm"
                           "(define (elisp-loader-apply fn args)"))
-                  (eql 2 (m60-imp9--literal-lines
+                  ;; M60 imp-12 RE-PIN: 2 -> 3 LITERAL LINES.  The
+                  ;; `eval-and-compile' branch of row 31 adds the 3rd.
+                  (eql 3 (m60-imp9--literal-lines
                           "mod/emacs/loader.scm"
                           "(elisp-loader-eval-seq (cdr form))"))))
 
@@ -670,13 +672,19 @@ host limit is a skip, never a pass."
 ;; map.  The lines are the MEASURED stops of this host.
 ;; M60 imp-10 RE-PIN: `lisp/color.el' now loads to the END in mode
 ;; `control', because row 29 installs the `/` cell.  The OLD value was
-;; `LOAD lisp/color.el: ERROR void-function (/)'.  The other 2 stops stay:
-;; they are row 30 (`put') and row 31 (`eval-and-compile').
+;; `LOAD lisp/color.el: ERROR void-function (/)'.  The other 2 stops were
+;; row 30 (`put') and row 31 (`eval-and-compile'); row 30 moved the first
+;; of them, and row 31 (M60 imp-12) moved the second one to `defalias'.
 (m60-imp9--check "s3/recorded-first-stops"
                  (m60-imp9--all
                   (m60-imp9--probe-line
                    "control"
-                   "LOAD lisp/subr.el: ERROR void-function (eval-and-compile)")
+                   ;; M60 imp-12 RE-PIN: the OLD line was
+                   ;; `LOAD lisp/subr.el: ERROR void-function (eval-and-compile)'.
+                   ;; Row 31 adds the branch, so the load moves PAST form 1
+                   ;; to the NEXT wall, `defalias' at subr.el :29.  `subr.el'
+                   ;; does NOT load: a `done' value is a FAIL.
+                   "LOAD lisp/subr.el: ERROR void-function (defalias)")
                   ;; M60 imp-11 RE-PIN: the OLD line was
                   ;; `LOAD lisp/calendar/time-date.el: ERROR void-function
                   ;; (put)'.  Row 30 installs the `put' cell, so mode
@@ -697,17 +705,21 @@ host limit is a skip, never a pass."
 ;; comma and the unknown-mode text ends with `put'.  The OLD literals
 ;; were "`obsolete', `control', or `arith'" and
 ;; "language|obsolete|control|arith)".
+;; M60 imp-12 RE-PIN: mode `eac' is now the LAST name, so `put' takes a
+;; comma and the unknown-mode text ends with `eac'.  The OLD literals
+;; were "`obsolete', `control', `arith', or `put'" and
+;; "language|obsolete|control|arith|put)".
 (m60-imp9--check "s3/mode-registration"
                  (m60-imp9--all
                   (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', or `put'"))
+                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', or `eac'"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "((control) (mode-control))"))
                   (eql 1 (m60-imp9--literal-lines
                           "test/m60/probe-imp3.scm" "(define (mode-control)"))
                   (m60-imp9--holds-all
                    "test/m60/probe-imp3.scm"
-                   '("language|obsolete|control|arith|put)"))))
+                   '("language|obsolete|control|arith|put|eac)"))))
 
 ;; cr.org F4: a DUPLICATE name gets the OUTER value 0 back, in both
 ;; branches.  cr.org F3: a raising INIT leaves the OUTER value `outer'.
@@ -854,11 +866,13 @@ host limit is a skip, never a pass."
 (m60-imp9--check "s5/line-counts"
                  (m60-imp9--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  (eql 1620 (m60-imp9--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                  (eql 1642 (m60-imp9--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp9--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp9--lines "prelude/load.scm"))
 ;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
-                  (eql 789 (m60-imp9--lines "test/m60/probe-imp3.scm"))
+                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
+                  (eql 825 (m60-imp9--lines "test/m60/probe-imp3.scm"))
                   (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
 ;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
@@ -887,8 +901,10 @@ host limit is a skip, never a pass."
 ;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
 ;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
 ;; cells that the numbers above replace.
+;; M60 imp-12 RE-PIN: the row-31 branch and its L27 ... L30 limit block
+;; add 22 lines ABOVE the site, so it moves 1,385 -> 1,407.
 (m60-imp9--check "s5/lookup-language-line"
-                 (eql 1385 (m60-imp9--line-of "mod/emacs/loader.scm"
+                 (eql 1407 (m60-imp9--line-of "mod/emacs/loader.scm"
                                               "(lookup-language 'emacs-elisp)")))
 
 ;; The 5 limits of brief.org section 10 are NAMED in the source.  A

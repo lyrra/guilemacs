@@ -19,17 +19,17 @@
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', `control', `arith', or `put'.  Mode `defs' is the M60 imp-6 record of
-;;; rows 21 and 22 (`defconst', `defvar').  Mode `macros' is the M60
-;;; imp-7 record of rows 23 and 24 (`defmacro' and
+;;; `obsolete', `control', `arith', `put', or `eac'.  Mode `defs' is the
+;;; M60 imp-6 record of rows 21 and 22 (`defconst', `defvar').  Mode
+;;; `macros' is the M60 imp-7 record of rows 23 and 24 (`defmacro' and
 ;;; `eval-when-compile').  Mode `control' is the M60 imp-9 record of row
 ;;; 28a (`cond', `let*', `while').  Mode `arith' is the M60 imp-10 record
 ;;; of row 29 (the comparison and arithmetic cells, `length' and
 ;;; `nreverse').  Mode `put' is the M60 imp-11 record of row 30 (the
-;;; `put' symbol-property cell).  The
-;;; fixture prints `key: value' lines on stdout.  It reads the repo root
-;;; from GUILEMACS_ROOT only, so
-;;; a run from any working directory is the same run.  `negative' is the R4 negative
+;;; `put' symbol-property cell).  Mode `eac' is the M60 imp-12 record of
+;;; row 31 (`eval-and-compile').  The fixture prints `key: value' lines
+;;; on stdout.  It reads the repo root from GUILEMACS_ROOT only, so a
+;;; run from any working directory is the same run.  `negative' is the R4 negative
 ;;; control; it needs its own process, because it installs a faithful
 ;;; `provide' cell.  `noboot' skips the boot on purpose: it is the
 ;;; MEASUREMENT that shapes the control (M60 imp-4).
@@ -768,6 +768,41 @@ definition itself: a `memq' over the `features' list."
   (load-line "lisp/calendar/time-date.el")
   (load-line "lisp/subr.el"))
 
+;;; --- mode: eac ------------------------------------------------------
+
+;; M60 imp-12 -- row 31: `lisp/subr.el' form 1 is
+;;   (eval-and-compile (defalias 'string= #'string-equal))
+;; Emacs has `eval-and-compile' as a MACRO (boot.el :49) that expands to 2
+;; nested `progn' forms, so a compiler runs the body 2 TIMES.  This loader
+;; has no compile phase, so the branch runs the body ONE time at LOAD time
+;; (limits L27 ... L30 of loader.scm).  The 6 values below are the
+;; observables of that DECISION.
+(define (mode-eac)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval)))
+    ;; The value of the LAST body form, for 3 body lengths.
+    (show "EAC ret" "~s" (eval-form '(eval-and-compile 1 2 3)))
+    (show "EAC one form ret" "~s" (eval-form '(eval-and-compile 7)))
+    ;; An EMPTY body gives the elisp nil, not #f.
+    (show "EAC empty ret" "~s" (eval-form '(eval-and-compile)))
+    ;; R5: the body runs ONE time.  A `progn' rewrite of the 2 nested
+    ;; forms of boot.el :49 gives 5, not 3, in `m60-probe-eac-v'.
+    (eval-form '(defvar m60-probe-eac-v 0))
+    (eval-form '(setq m60-probe-eac-v 1))
+    (show "EAC side effects" "~s m60-probe-eac-v=~s"
+          (eval-form '(eval-and-compile
+                       (setq m60-probe-eac-v (+ m60-probe-eac-v 1))
+                       (setq m60-probe-eac-v (+ m60-probe-eac-v 1))
+                       m60-probe-eac-v))
+          (symbol-value 'm60-probe-eac-v))
+    ;; Row 31 is a SPECIAL FORM, not an install: the elisp function cell
+    ;; stays EMPTY (measured at HEAD and with the branch).
+    (show "EAC is not a cell" "~s" (symbol-fbound? 'eval-and-compile))
+    ;; The ACCEPTANCE of row 31: the branch runs, and the load of the
+    ;; base file stops on the NEXT wall, `defalias' at :29.  It MUST NOT
+    ;; print `done'.
+    (show "EAC load line" "~a" (describe (try-load "lisp/subr.el")))))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -785,5 +820,6 @@ definition itself: a `memq' over the `features' list."
   ((control) (mode-control))
   ((arith) (mode-arith))
   ((put) (mode-put))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put)"
+  ((eac) (mode-eac))
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|eac)"
                      mode))))

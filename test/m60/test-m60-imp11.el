@@ -376,7 +376,7 @@ controlled ERT skip -- never a pass."
 
 ;; The 3 recorded FIRST STOPS after this row: color.el is done,
 ;; time-date.el moves PAST `put' to the next empty cell, and the subr.el
-;; stop is row 31 and stands.
+;; stop MOVED at row 31 (M60 imp-12) to the next wall, `defalias'.
 (m60-imp11--check "s2/recorded-first-stops"
                  (m60-imp11--all
                   (m60-imp11--probe-line "put" "LOAD lisp/color.el: done")
@@ -385,11 +385,17 @@ controlled ERT skip -- never a pass."
                    "LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg (#f \"Wrong type to apply: ~S\" (#nil) (#nil))")
                   (m60-imp11--probe-line
                    "put"
-                   "LOAD lisp/subr.el: ERROR void-function (eval-and-compile)")))
+                   ;; M60 imp-12 RE-PIN: the OLD line was
+                   ;; `LOAD lisp/subr.el: ERROR void-function (eval-and-compile)'.
+                   ;; Row 31 adds the branch, so the load moves PAST form 1 to the
+                   ;; NEXT wall, `defalias' at subr.el :29.  `subr.el' does NOT
+                   ;; load: a `done' value is a FAIL.
+                   "LOAD lisp/subr.el: ERROR void-function (defalias)")))
 
 ;; No regression: the older modes still run.  Mode `arith' keeps
 ;; `COUNT: 0' (row 29), mode `cells' keeps the FIXED 11-name list, and
-;; the row-31 / F3 stops of mode `arith' are unchanged.
+;; the F3 stop of mode `arith' is unchanged.  The row-31 stop of modes
+;; `arith', `control' and `put' MOVED at M60 imp-12.
 (m60-imp11--check "s2/no-regression-on-older-modes"
                  (m60-imp11--all
                   (m60-imp11--probe-line "arith" "COUNT: 0")
@@ -410,10 +416,12 @@ controlled ERT skip -- never a pass."
 ;; and utils.scm 640 / prelude/load.scm 229 UNCHANGED.
 (m60-imp11--check "s3/line-counts"
                  (m60-imp11--all
-                  (eql 1620 (m60-imp11--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                  (eql 1642 (m60-imp11--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp11--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp11--lines "prelude/load.scm"))
-                  (eql 789 (m60-imp11--lines "test/m60/probe-imp3.scm"))))
+                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
+                  (eql 825 (m60-imp11--lines "test/m60/probe-imp3.scm"))))
 
 ;; Unit: LINES (`grep -c').  38 + 1 = 39 `symbol-fbound?' and
 ;; 34 + 1 = 35 `set-symbol-function!'.  The FIX count stays 9: a guarded

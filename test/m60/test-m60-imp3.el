@@ -446,7 +446,8 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp3--check "s1/loader-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                 (eql 1620 (m60-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (eql 1642 (m60-imp3--lines "mod/emacs/loader.scm")))
 
 ;; Unit: LINES (`grep -c').  RE-MEASURED at M60 imp-5: 22 / 18 / 9.
 ;; The 2 landed cells add 1 guarded install, 1 install and 1 FIX line.

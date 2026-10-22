@@ -461,7 +461,8 @@ host limit is a skip, never a pass."
 ;; cells that the numbers above replace.
 (m60-imp2--check "r1/loader-and-reader-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                 (and (eql 1620 (m60-imp2--lines "mod/emacs/loader.scm"))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (and (eql 1642 (m60-imp2--lines "mod/emacs/loader.scm"))
                       (eql 2021 (m60-imp2--lines "mod/emacs/reader.scm"))))
 (m60-imp2--check "r1/prelude-load-lines"
                  (eql 229 (m60-imp2--lines "prelude/load.scm")))

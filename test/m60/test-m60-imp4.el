@@ -456,7 +456,8 @@ host limit is a skip, never a pass."
 ;; M60 imp-11 (cr.org F5) RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD
 ;; value 1,588), and the check NAME drops the stale number 1511.
 (m60-imp4--check "s5/loader-lines"
-                 (eql 1620 (m60-imp4--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (eql 1642 (m60-imp4--lines "mod/emacs/loader.scm")))
 (m60-imp4--check "s5/prelude-load-lines-229"
                  (eql 229 (m60-imp4--lines "prelude/load.scm")))
 ;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the

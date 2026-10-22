@@ -477,7 +477,9 @@ host limit is a skip, never a pass."
                           "((pair? form) (elisp-loader-eval-form form))"))
                   ;; RE-PINNED at M60 imp-7: 1 -> 2 LITERAL LINES.  The
                   ;; `eval-when-compile' branch of row 24 adds the 2nd.
-                  (eql 2 (m60-imp6--literal-lines
+                  ;; M60 imp-12 RE-PIN: 2 -> 3 LITERAL LINES.  The
+                  ;; `eval-and-compile' branch of row 31 adds the 3rd.
+                  (eql 3 (m60-imp6--literal-lines
                           "mod/emacs/loader.scm"
                           "(elisp-loader-eval-seq (cdr form))"))))
 
@@ -666,7 +668,8 @@ host limit is a skip, never a pass."
 (m60-imp6--check "s5/line-counts"
                  (m60-imp6--all
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  (eql 1620 (m60-imp6--lines "mod/emacs/loader.scm"))
+                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                  (eql 1642 (m60-imp6--lines "mod/emacs/loader.scm"))
                   (eql 640 (m60-imp6--lines "mod/emacs/utils.scm"))
                   (eql 229 (m60-imp6--lines "prelude/load.scm"))))
 

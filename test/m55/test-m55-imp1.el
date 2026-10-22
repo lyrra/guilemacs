@@ -313,7 +313,8 @@ symbol `m55-imp1-guile-absent'."
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp1--check "loader.scm-lines"
-                 (eql 1620 (m55-imp1--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (eql 1642 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
 (m55-imp1--check "prelude-load.scm-lines-229"

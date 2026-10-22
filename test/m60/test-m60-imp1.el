@@ -314,7 +314,8 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; cells that the numbers above replace.
 (m60-imp1--check "loader.scm-lines"
 ;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                 (eql 1620 (m60-imp1--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (eql 1642 (m60-imp1--lines "mod/emacs/loader.scm")))
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -517,8 +518,11 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
 ;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
 ;; cells that the numbers above replace.
+;; M60 imp-12 RE-PIN: the `eval-and-compile' branch of row 31 and its
+;; L27 ... L30 limit block add 22 lines ABOVE the site, so it moves
+;; 1,385 -> 1,407.  The runtime.scm site stays at 788.
 (m60-imp1--check "lookup-language-sites"
-                 (and (eql 1385 (m60-imp1--line-of
+                 (and (eql 1407 (m60-imp1--line-of
                                  "mod/emacs/loader.scm"
                                  "(lookup-language 'emacs-elisp)"))
                       (eql 788 (m60-imp1--line-of

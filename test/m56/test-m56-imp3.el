@@ -279,7 +279,8 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-lines"
-                 (eql 1620 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
+                 (eql 1642 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"

@@ -1251,6 +1251,28 @@ elisp nil instead of a `load' error."
       ;; INTERPRETER behaviour; a compiler drops the body.
       ((eq? head 'eval-when-compile)
        (elisp-loader-eval-seq (cdr form)))
+      ;; M60 imp-12 LIMITS of row 31 (brief.org section 9).  Named
+      ;; limits, never claims.  The corpus owns the row-map status.
+      ;; L27 a compiler drops the body of `eval-when-compile' and runs
+      ;;    the body of `eval-and-compile' 2 times.  This loader has no
+      ;;    compile phase, so it runs the body ONE time for BOTH rows.
+      ;; L28 the body runs under the DYNAMIC binding model of this
+      ;;    evaluator (L3), not under the lexical model of a compiler.
+      ;; L29 the branch does not strip a DOC string and does not warn on
+      ;;    a non-macro use.
+      ;; L30 the value is the value of the last body form at LOAD time.
+      ;;    The return value of the BYTE-COMPILED form is out of scope.
+      ;; L15 still holds: `EMPTY-CELLS' is a FIXED 11-name list, so it
+      ;;    is NOT the proof of row 31.  The proof is the `subr.el' load
+      ;;    line.  The NEXT wall of that file is `void-function
+      ;;    (defalias)' at :29, and the `defalias' row owns that wall.
+      ;; M60 imp-12 -- row 31: `eval-and-compile' is a MACRO in Emacs.
+      ;; boot.el :49 expands it to 2 nested `progn' forms, so a compiler
+      ;; runs the body 2 TIMES.  A source-reading loader has no compile
+      ;; phase: the body RUNS ONE time at LOAD time and the value of its
+      ;; last form is the value.  DECISION, not a port (L27 ... L30).
+      ((eq? head 'eval-and-compile)
+       (elisp-loader-eval-seq (cdr form)))
       ;; M60 imp-7 -- row 23: `defmacro' STORES an expander and does NOT
       ;; evaluate the argument forms.  The expander goes into the macro
       ;; table above, built with the same call that `defun' makes.  The
