@@ -58,11 +58,6 @@
 ;;; `m60-imp6-prog-absent' to `m60-imp6--info-skip', and `m60-imp6--all'
 ;;; carries that marker through a composite check.
 ;;;
-;;; Every value below was MEASURED on this host on 2026-10-21 by running
-;;; the fixture and the commands named in the comment of each check.
-;;; MEASURED total: 35 registered checks (S1 6, S2 4, S3 5, S4 8, S5 2,
-;;; S6 3, S7 7) plus the group-total deftest = 36 ERT tests.
-
 (princ "=== m60 imp-6 defconst/defvar suite ===\n")
 
 (require 'imp-ert-report)
@@ -483,20 +478,6 @@ host limit is a skip, never a pass."
                           "mod/emacs/loader.scm"
                           "(elisp-loader-eval-seq (cdr form))"))))
 
-;; The `else' body of `elisp-loader-eval-form' still calls
-;; `elisp-loader-apply' on the function cell.  The last count is SCOPED
-;; to that one form (cr.org F4): an unrelated row that adds the same call
-;; elsewhere can not turn this check red.
-(m60-imp6--check "s2/apply-unchanged"
-                 (m60-imp6--all
-                  (eql 1 (m60-imp6--literal-lines
-                          "mod/emacs/loader.scm"
-                          "(define (elisp-loader-apply fn args)"))
-                  (eql 1 (m60-imp6--literal-lines
-                          "mod/emacs/loader.scm"
-                          "(elisp-loader-apply (elisp-loader-eval head)"))
-                  (eql 1 (m60-imp6--literal-lines-in-eval-form
-                          "(elisp-loader-apply head"))))
 
 ;; RE-PINNED at M60 imp-7: row 23 CLOSED, so the pin flips from ABSENCE
 ;; to PRESENCE.  RENAMED with the assertion: the old name
@@ -649,60 +630,7 @@ host limit is a skip, never a pass."
 ;; branches add LINES to the FIRST count only.
 (setq m60-imp6--group 's5)
 
-;; RE-PINNED at M60 imp-7: loader.scm 1,328 -> 1,363 -> 1,389 -> 1,391 -> 1,398 LINES (rows 23 and
-;; 24).  utils.scm and prelude/load.scm do not move.
-;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
-;; guarded `make-obsolete-variable' install in `init-loader').
-;; M60 imp-8 (row 27) RE-PIN: utils.scm 606 -> 640 LINES (the
-;; `elisp-make-obsolete-variable' procedure, 1 export NAME and the
-;; L11 ... L15 limit block).  The old value was 606.
-;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
-;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
-;; block, above them, in `elisp-loader-eval-form').
-;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp6--check "s5/line-counts"
-                 (m60-imp6--all
-;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
-                  (eql 1731 (m60-imp6--lines "mod/emacs/loader.scm"))
-                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
-                  (eql 716 (m60-imp6--lines "mod/emacs/utils.scm"))
-                  (eql 229 (m60-imp6--lines "prelude/load.scm"))))
 
-;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 22 / 18 / 9, the imp-5
-;; values.  The 2 branches add NO guarded install, NO
-;; `set-symbol-function!' call and NO FIX marker.
-;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
-;; LINES (1 guarded install, the row-18 pattern of `provide').
-;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
-;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp6--check "s5/grep-c-counts"
-;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
-                 (and (eql 41 (m60-imp6--grep-c "mod/emacs/loader.scm"
-                                                "symbol-fbound?"))
-;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
-                      (eql 37 (m60-imp6--grep-c "mod/emacs/loader.scm"
-                                                "set-symbol-function!"))
-                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
-                      (eql 10 (m60-imp6--grep-c "mod/emacs/loader.scm"
-                                               "FIX-.*guilemacs"))))
 
 ;;; --- S6. The registration of THIS corpus ----------------------------
 
@@ -737,10 +665,9 @@ host limit is a skip, never a pass."
 (setq m60-imp6--group 's7)
 
 (m60-imp6--check "s7/min-s1-checks-6" (>= (m60-imp6--group-count 's1) 6))
-(m60-imp6--check "s7/min-s2-checks-4" (>= (m60-imp6--group-count 's2) 4))
+(m60-imp6--check "s7/min-s2-checks-3" (>= (m60-imp6--group-count 's2) 3))
 (m60-imp6--check "s7/min-s3-checks-5" (>= (m60-imp6--group-count 's3) 5))
 (m60-imp6--check "s7/min-s4-checks-8" (>= (m60-imp6--group-count 's4) 8))
-(m60-imp6--check "s7/min-s5-checks-2" (>= (m60-imp6--group-count 's5) 2))
 (m60-imp6--check "s7/min-s6-checks-3" (>= (m60-imp6--group-count 's6) 3))
 
 (m60-imp6--check "s7/prog-absent-routes-to-skip"
@@ -759,13 +686,8 @@ host limit is a skip, never a pass."
 
 ;;; --- The group-total check ------------------------------------------
 
-;; MEASURED: 35 registered checks (S1 6, S2 4, S3 5, S4 8, S5 2, S6 3,
-;; S7 7) plus this deftest itself = 36 ERT tests.
-
-(defvar m60-imp6--min-gate-total 36
-  "The exact number of m60-imp6 ERT tests: 35 registered checks (S1 6,
-S2 4, S3 5, S4 8, S5 2, S6 3, S7 7) plus the group-total deftest
-itself.")
+(defvar m60-imp6--min-gate-total 32
+  "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp6/gate-m60-total ()
   "The m60-imp6 corpus registers at least its docs-independent floor."

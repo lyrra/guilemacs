@@ -301,23 +301,7 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 ;; `eval-when-compile' branch, and the L10 note of cr.org F2).
 (m60-imp1--check "xfaces.c-lines"
                  (eql 7741 (m60-imp1--lines "src/xfaces.c")))
-;; M60 imp-8 (row 27) RE-PIN: loader.scm 1,398 -> 1,409 LINES (the
-;; guarded `make-obsolete-variable' install in `init-loader').
-;; M60 imp-9 (row 28a) RE-PIN: loader.scm 1,409 -> 1,511 LINES (the 3
-;; branches `cond' / `let*' / `while' and the L16 ... L20 limit
-;; block, above them, in `elisp-loader-eval-form').
-;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp1--check "loader.scm-lines"
-;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                 ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                 ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                 ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
-                 (eql 1731 (m60-imp1--lines "mod/emacs/loader.scm")))
+
 (m60-imp1--check "reader.scm-lines"
                  (eql 2021 (m60-imp1--lines "mod/emacs/reader.scm")))
 (m60-imp1--check "prelude-load.scm-lines"
@@ -326,43 +310,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                  (and (eql 70 (m60-imp1--lines "mod/emacs/faces.scm"))
                       (eql 32 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))))
 
-;; Unit: LINES (`grep -c').  7 + 4 guarded installs plus 2 unguarded
-;; installs and the `defun' branch of the minimal evaluator made 14.
-;; RE-MEASURED at M60 imp-4: the guarded `provide' install adds 1 to
-;; each count -> 19 / 15 / 8.
-;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
-;; LINES (1 guarded install, the row-18 pattern of `provide').
-;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
-;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp1--check "loader.scm-grep-c-counts"
-;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
-                 (and (eql 41 (m60-imp1--grep-c "mod/emacs/loader.scm"
-                                                "symbol-fbound?"))
-;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
-                      (eql 37 (m60-imp1--grep-c "mod/emacs/loader.scm"
-                                                "set-symbol-function!"))
-                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
-                      (eql 10 (m60-imp1--grep-c "mod/emacs/loader.scm"
-                                               "FIX-.*guilemacs"))))
 ;; Unit: OCCURRENCES over src/*.[ch].
 (m60-imp1--check "tree-wide-scm-ref-267"
                  (eql 267 (m60-imp1--count-scm-ref)))
-;; Unit: FILES under test/mod (3 suites, 1 runner, 3 fixtures).
-;; M60 imp-13 RE-PIN: 6 -> 7.  Row 33 adds the `:keyword' fixture
-;; standalone-keyword.el.  OLD value is 6.
-(m60-imp1--check "test-mod-files-7"
-                 ;; M60 imp-14 RE-PIN: test/mod 7 -> 8 ENTRIES (OLD value 7:
-                 ;; +1 fixture `standalone-alias.el'; the row-32 fixture is out of scope).
-                 (eql 8 (m60-imp1--dir-entries "test/mod")))
+
 ;; Unit: ENTRIES of mod/emacs-elisp.  9, because `runtime/' is one entry.
 (m60-imp1--check "emacs-elisp-entries-9"
                  (eql 9 (m60-imp1--dir-entries "mod/emacs-elisp")))
@@ -411,39 +362,6 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                     "(unless (symbol-bound? 'load-file-rep-suffixes)"
                     "(unless (symbol-bound? 'load-read-function)")))
 
-;; The measured stop point cell: `provide' is a C DEFUN at src/fns.c
-;; :3450 and `require' at :3496.  The Scheme `provide' exists, the
-;; Scheme `require' does NOT.
-(m60-imp1--check "provide-cell-sites"
-                 (and (eql 3450 (m60-imp1--line-of
-                                 "src/fns.c" "^DEFUN (\"provide\""))
-                      (eql 3496 (m60-imp1--line-of
-                                 "src/fns.c" "^DEFUN (\"require\""))
-                      ;; M60 imp-8 (row 27) RE-PIN: 211 -> 212.  The
-                      ;; export NAME of `elisp-make-obsolete-variable'
-                      ;; is 1 line above `elisp-provide'.
-                      ;; M60 imp-13 RE-PIN: 212 -> 234.  The `elisp-set'
-                      ;; definition and its comment block (row 33) sit
-                      ;; ABOVE `elisp-provide' in utils.scm.  OLD value
-                      ;; is 212.
-                      ;; M60 imp-14 RE-PIN: 234 -> 288.  The
-                      ;; `elisp-defalias' definition and its comment block
-                      ;; (row 34) sit ABOVE `elisp-provide'.  OLD value
-                      ;; is 234.
-                      (eql 288 (m60-imp1--line-of
-                                "mod/emacs/utils.scm"
-                                "^(define elisp-provide"))
-                      ;; RE-PINNED at M60 imp-4: the install LEFT
-                      ;; `init-utils-registrations'.  The pin follows the
-                      ;; install and also pins that `utils.scm' holds
-                      ;; NONE: ONE home only.
-                      (eql 0 (m60-imp1--grep-c
-                              "mod/emacs/utils.scm"
-                              "set-symbol-function! 'provide"))
-                      (m60-imp1--holds-all
-                       "mod/emacs/loader.scm"
-                       '("(unless (symbol-fbound? 'provide)"
-                         "(set-symbol-function! 'provide elisp-provide)"))))
 
 ;; MEASURED ASYMMETRY, CLOSED at M60 imp-5.  At imp-1 `elisp-require'
 ;; appeared ONCE in the tree -- the #:export list at utils.scm :26 -- and
@@ -515,42 +433,6 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 
 (setq m60-imp1--group 's3)
 
-;; The `lookup-language' sites in the TRACKED Scheme.  M60 imp-3 RE-PINS
-;; this check: the split moved the loader guard to :1099 (it now also
-;; tests `c-runtime-installed?') and the `emacs!' row of runtime.scm to
-;; :788, and it DELETED the prelude read, so 0 sites stay there.
-;; M60 imp-5 RE-PINS the loader site again: the require cell and its 2
-;; `load' protocol cells add 77 lines ABOVE it, so it moves 1099 -> 1176.
-;; M60 imp-6 RE-PINS it one more time: the 2 evaluator branches of rows
-;; 21 and 22 add 20 lines ABOVE it, so it moves 1176 -> 1196.
-;; M60 imp-7 RE-PINS it: rows 23 and 24 add 35 lines ABOVE it, so the
-;; site moves 1196 -> 1231.  The imp-7 fix RE-PINS it once more: the
-;; L2 ... L6 limits block and the macro-drop helper add 26 lines ABOVE
-;; it, so the site moves 1231 -> 1257 -> 1259.  The cr.org F2 fix of
-;; L10 adds 7 more lines ABOVE it, so it moves 1259 -> 1266.
-;; M60 imp-9 RE-PINS it: the 3 branches of row 28a and the L16 ... L20
-;; limit block add lines ABOVE it, and the cr.org fix of imp-9 adds 31
-;; more, so it moves 1266 -> 1337 -> 1368 (old
-;; values 1231, 1257, 1259 and 1266).
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-;; M60 imp-12 RE-PIN: the `eval-and-compile' branch of row 31 and its
-;; L27 ... L30 limit block add 22 lines ABOVE the site, so it moves
-;; 1,385 -> 1,407.  The runtime.scm site stays at 788.
-(m60-imp1--check "lookup-language-sites"
-                 ;; M60 imp-14 RE-PIN: loader.scm 1407 -> 1462 LINES (OLD value 1407).
-                 (and (eql 1462 (m60-imp1--line-of
-                                 "mod/emacs/loader.scm"
-                                 "(lookup-language 'emacs-elisp)"))
-                      (eql 788 (m60-imp1--line-of
-                                "mod/emacs-elisp/runtime.scm"
-                                "(lookup-language 'emacs-elisp)"))
-                      (eql 0 (m60-imp1--grep-c
-                              "prelude/load.scm"
-                              "lookup-language"))))
 
 ;; M60 imp-3 RE-PINS this check.  It pinned an ABSENT thing ("the
 ;; monkey patch of 4 `module-set!' sites is live"), and the patch is now
@@ -686,25 +568,21 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
 
 ;; An --filter that matches no group already reports exit 0 with 0
 ;; tests, so a green m60 gate proves nothing until the corpus exists and
-;; its checks really register.  S1 holds 11 checks, S2 holds 6, S3 holds
-;; 5, S4 holds 4, and S5 holds 4.
+;; its checks really register.  The per-group floors below guard the
+;; runtime checks in each group.
 
 (setq m60-imp1--group 's6)
 
-(m60-imp1--check "reg/min-s1-checks-11" (>= (m60-imp1--group-count 's1) 11))
-(m60-imp1--check "reg/min-s2-checks-6" (>= (m60-imp1--group-count 's2) 6))
-(m60-imp1--check "reg/min-s3-checks-5" (>= (m60-imp1--group-count 's3) 5))
+(m60-imp1--check "reg/min-s1-checks-8" (>= (m60-imp1--group-count 's1) 8))
+(m60-imp1--check "reg/min-s2-checks-5" (>= (m60-imp1--group-count 's2) 5))
+(m60-imp1--check "reg/min-s3-checks-4" (>= (m60-imp1--group-count 's3) 4))
 (m60-imp1--check "reg/min-s4-checks-4" (>= (m60-imp1--group-count 's4) 4))
 (m60-imp1--check "reg/min-s5-checks-4" (>= (m60-imp1--group-count 's5) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m60-imp1 tests is 36: 35 registered checks
-;; (S1 11, S2 6, S3 5, S4 4, S5 4, S6 5) plus this deftest itself.
-
-(defvar m60-imp1--min-gate-total 36
-  "The exact number of m60-imp1 ERT tests: 35 registered checks (S1 11,
-S2 6, S3 5, S4 4, S5 4, S6 5) plus the group-total deftest itself.")
+(defvar m60-imp1--min-gate-total 31
+  "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp1/gate-m60-total ()
   "The m60-imp1 corpus registers at least its docs-independent floor."

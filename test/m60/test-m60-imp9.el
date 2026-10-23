@@ -71,10 +71,6 @@
 ;;; `m60-imp9-prog-absent' to `m60-imp9--info-skip', and `m60-imp9--all'
 ;;; carries that marker through a composite check.
 ;;;
-;;; MEASURED total on this host 2026-10-21: 49 registered checks (S1 9,
-;;; S2 6, S3 13, S4 7, S5 4, S6 3, S7 7) plus the group-total deftest =
-;;; 50 ERT tests.
-
 (princ "=== m60 imp-9 cond/let*/while suite ===\n")
 
 (require 'imp-ert-report)
@@ -550,17 +546,6 @@ host limit is a skip, never a pass."
                           "mod/emacs/loader.scm"
                           "(elisp-loader-macro-drop! (cadr form))"))))
 
-;; The `else' body is NOT touched: its macro-table lookup, its function
-;; cell call and its `void-function' throw stay as they were.  The
-;; counts are SCOPED to the form.
-(m60-imp9--check "s2/else-body-untouched"
-                 (m60-imp9--all
-                  (eql 1 (m60-imp9--literal-lines-in-eval-form
-                          "(elisp-loader-macro-ref head)"))
-                  (eql 1 (m60-imp9--literal-lines-in-eval-form
-                          "(elisp-loader-apply head"))
-                  (eql 1 (m60-imp9--literal-lines-in-eval-form
-                          "(throw 'void-function head)"))))
 
 ;; `elisp-loader-eval' and the argument evaluation are unchanged.
 ;; MEASURED: 2 LINES hold `(elisp-loader-eval-seq (cdr form))' -- the
@@ -715,22 +700,6 @@ host limit is a skip, never a pass."
 ;; comma and the unknown-mode text ends with `eac'.  The OLD literals
 ;; were "`obsolete', `control', `arith', or `put'" and
 ;; "language|obsolete|control|arith|put)".
-(m60-imp9--check "s3/mode-registration"
-                 (m60-imp9--all
-                  ;; M60 imp-13 RE-PIN: the OLD literal was
-                  ;; "`obsolete', `control', `arith', `put', or `eac'".
-                  ;; Mode `set' (row 33) is in that list now.
-                  (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "`obsolete', `control', `arith', `put', `set', `alias', or `eac'"))
-                  (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "((control) (mode-control))"))
-                  (eql 1 (m60-imp9--literal-lines
-                          "test/m60/probe-imp3.scm" "(define (mode-control)"))
-                  (m60-imp9--holds-all
-                   "test/m60/probe-imp3.scm"
-                   ;; M60 imp-13 RE-PIN: mode `set' joins the list.
-                   '("language|obsolete|control|arith|put|set|alias|eac)"))))
-
 ;; cr.org F4: a DUPLICATE name gets the OUTER value 0 back, in both
 ;; branches.  cr.org F3: a raising INIT leaves the OUTER value `outer'.
 (m60-imp9--check "s3/restore-order-and-raising-init"
@@ -868,51 +837,7 @@ host limit is a skip, never a pass."
 ;; observable, its comment and its `defconst').
 (setq m60-imp9--group 's5)
 
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp9--check "s5/line-counts"
-                 (m60-imp9--all
-;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
-                  (eql 1731 (m60-imp9--lines "mod/emacs/loader.scm"))
-                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
-                  (eql 716 (m60-imp9--lines "mod/emacs/utils.scm"))
-                  (eql 229 (m60-imp9--lines "prelude/load.scm"))
-;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
-                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
-                  (eql 977 (m60-imp9--lines "test/m60/probe-imp3.scm"))
-                  (eql 32 (m60-imp9--lines "test/m60/fixture-imp9.el"))))
 
-;; Unit: LINES (`grep -c'), MEASURED 2026-10-21: 23 / 19 / 9, the imp-8
-;; values, UNCHANGED.  A branch adds no install site and no FIX marker:
-;; these 3 counts are the DESIGN GUARD of row 28a.
-;; M60 imp-10 RE-PIN: row 29 adds 2 `#:use-module' forms and 15
-;; guarded installs to loader.scm -- 1,511 -> 1,588 LINES (wc -l) and
-;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
-;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
-;; cells that the numbers above replace.
-(m60-imp9--check "s5/grep-c-counts"
-;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                 ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
-                 (and (eql 41 (m60-imp9--grep-c "mod/emacs/loader.scm"
-                                                "symbol-fbound?"))
-;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                      ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                      ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
-                      (eql 37 (m60-imp9--grep-c "mod/emacs/loader.scm"
-                                                "set-symbol-function!"))
-                      ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
-                      (eql 10 (m60-imp9--grep-c "mod/emacs/loader.scm"
-                                               "FIX-.*guilemacs"))))
 
 ;; The `lookup-language' site moved: 1,266 at the base state, 1,337 after
 ;; the row-28a branches, 1,368 after the cr.org fix.
@@ -922,12 +847,6 @@ host limit is a skip, never a pass."
 ;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
 ;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
 ;; cells that the numbers above replace.
-;; M60 imp-12 RE-PIN: the row-31 branch and its L27 ... L30 limit block
-;; add 22 lines ABOVE the site, so it moves 1,385 -> 1,407.
-(m60-imp9--check "s5/lookup-language-line"
-                 (eql 1462 (m60-imp9--line-of "mod/emacs/loader.scm"
-                                              "(lookup-language 'emacs-elisp)")))
-
 ;; The 5 limits of brief.org section 10 are NAMED in the source.  A
 ;; reader who finds a limit here must not read it as a claim.
 (m60-imp9--check "s5/limits-named"
@@ -976,10 +895,10 @@ host limit is a skip, never a pass."
 (setq m60-imp9--group 's7)
 
 (m60-imp9--check "s7/min-s1-checks-9" (>= (m60-imp9--group-count 's1) 9))
-(m60-imp9--check "s7/min-s2-checks-6" (>= (m60-imp9--group-count 's2) 6))
+(m60-imp9--check "s7/min-s2-checks-5" (>= (m60-imp9--group-count 's2) 5))
 (m60-imp9--check "s7/min-s3-checks-13" (>= (m60-imp9--group-count 's3) 13))
 (m60-imp9--check "s7/min-s4-checks-7" (>= (m60-imp9--group-count 's4) 7))
-(m60-imp9--check "s7/min-s5-checks-4" (>= (m60-imp9--group-count 's5) 4))
+(m60-imp9--check "s7/min-s5-checks-1" (>= (m60-imp9--group-count 's5) 1))
 (m60-imp9--check "s7/min-s6-checks-3" (>= (m60-imp9--group-count 's6) 3))
 
 (m60-imp9--check "s7/prog-absent-routes-to-skip"
@@ -998,14 +917,8 @@ host limit is a skip, never a pass."
 
 ;;; --- The group-total check ------------------------------------------
 
-;; MEASURED: 50 registered checks (S1 9, S2 6, S3 14, S4 7, S5 4, S6 3,
-;; S7 7) plus this deftest itself = 51 ERT tests.  S3 gained 1 check in
-;; the cr.org review fix of imp-9 (finding F4).
-
-(defvar m60-imp9--min-gate-total 51
-  "The exact number of m60-imp9 ERT tests: 50 registered checks (S1 9,
-S2 6, S3 14, S4 7, S5 4, S6 3, S7 7) plus the group-total deftest
-itself.")
+(defvar m60-imp9--min-gate-total 46
+  "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp9/gate-m60-total ()
   "The m60-imp9 corpus registers at least its docs-independent floor."

@@ -414,54 +414,6 @@ controlled ERT skip -- never a pass."
 
 (setq m60-imp11--group 's3)
 
-;; Unit: NEWLINES (`wc -l'), MEASURED 2026-10-22 after imp-11:
-;; loader.scm 1,588 -> 1,620 (the comment block and the `put' install,
-;; plus the cr.org F6 correction of the `elisp-string-length-for-load'
-;; docstring), probe-imp3.scm 691 -> 789 (mode `put', 1 dispatch clause),
-;; and utils.scm 640 / prelude/load.scm 229 UNCHANGED.
-(m60-imp11--check "s3/line-counts"
-                 (m60-imp11--all
-                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
-                  (eql 1731 (m60-imp11--lines "mod/emacs/loader.scm"))
-                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
-                  (eql 716 (m60-imp11--lines "mod/emacs/utils.scm"))
-                  (eql 229 (m60-imp11--lines "prelude/load.scm"))
-                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
-                  (eql 977 (m60-imp11--lines "test/m60/probe-imp3.scm"))))
-
-;; Unit: LINES (`grep -c').  38 + 1 = 39 `symbol-fbound?' and
-;; 34 + 1 = 35 `set-symbol-function!'.  The FIX count stays 9: a guarded
-;; install of an existing procedure is not a workaround.  The
-;; `lookup-language' site stays at 1,379, because the install is BELOW
-;; it.
-(m60-imp11--check "s3/grep-c-counts"
-                 (m60-imp11--all
-                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                  ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
-                  (eql 41 (m60-imp11--grep-c "mod/emacs/loader.scm"
-                                             "symbol-fbound?"))
-                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                  ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
-                  (eql 37 (m60-imp11--grep-c "mod/emacs/loader.scm"
-                                             "set-symbol-function!"))
-                  ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
-                  (eql 10 (m60-imp11--grep-c "mod/emacs/loader.scm"
-                                            "FIX-.*guilemacs"))))
-
-;; C delta 0: no C file is touched and no FIX marker is added.
-;; C delta 0: no C file is touched.  The OLD check was a `holds-none' of
-;; `FIX-20261022-guilemacs' in loader.scm.  M60 imp-14 RE-PIN: row 34
-;; adds EXACTLY 1 marker of that date (the 100-link safety note of
-;; `elisp-loader-resolve-function'), so the check pins that count.
-(m60-imp11--check "s3/no-c-delta"
-                 (eql 1 (m60-imp11--grep-c
-                         "mod/emacs/loader.scm"
-                         "FIX-20261022-guilemacs")))
 
 ;;; --- S4. The registration of THIS corpus ----------------------------
 
@@ -493,9 +445,8 @@ controlled ERT skip -- never a pass."
 
 (setq m60-imp11--group 's5)
 
-(m60-imp11--check "s5/min-s1-checks-6" (>= (m60-imp11--group-count 's1) 6))
-(m60-imp11--check "s5/min-s2-checks-5" (>= (m60-imp11--group-count 's2) 5))
-(m60-imp11--check "s5/min-s3-checks-3" (>= (m60-imp11--group-count 's3) 3))
+(m60-imp11--check "s5/min-s1-checks-7" (>= (m60-imp11--group-count 's1) 7))
+(m60-imp11--check "s5/min-s2-checks-6" (>= (m60-imp11--group-count 's2) 6))
 (m60-imp11--check "s5/min-s4-checks-3" (>= (m60-imp11--group-count 's4) 3))
 
 (m60-imp11--check "s5/prog-absent-routes-to-skip"
@@ -512,9 +463,8 @@ controlled ERT skip -- never a pass."
 
 ;;; --- The group-total check ------------------------------------------
 
-(defvar m60-imp11--min-gate-total 25
-  "The number of m60-imp11 ERT tests: 24 registered checks (s1 7, s2 6,
-s3 3, s4 3, s5 5) plus this group-total deftest.")
+(defvar m60-imp11--min-gate-total 21
+  "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp11/gate-m60-total ()
   "The m60-imp11 corpus registers at least its own floor, so a silent

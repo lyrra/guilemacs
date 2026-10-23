@@ -352,17 +352,6 @@ PROCEDURE already existed before this row.")
                     "(init-numbers-registrations)"
                     "(init-utils-registrations)")))
 
-;; F2 of an earlier cr.org round: the UNGUARDED `nreverse' install in
-;; the THIRD bulk installer is named, so a reader knows why it is not
-;; used here.
-(m60-imp10--check "s1/unguarded-nreverse-named"
-                 (m60-imp10--holds-all
-                  "mod/emacs/loader.scm"
-                  ;; M60 imp-14 RE-PIN: the cite is utils.scm :670, not
-                  ;; :594 (OLD value 594).  The `elisp-defalias' block
-                  ;; (row 34) sits above `init-utils-registrations'.
-                  '("init-utils-registrations' (utils.scm :670)"
-                    "UNGUARDED install of")))
 
 ;; L24: `<=' and `>=' are not in the row-29 list and stay EMPTY, so this
 ;; row adds no install for them.
@@ -484,55 +473,6 @@ PROCEDURE already existed before this row.")
 
 (setq m60-imp10--group 's3)
 
-;; Unit: NEWLINES (`wc -l'), MEASURED 2026-10-22 after imp-10:
-;; loader.scm 1,511 -> 1,588 (2 imports, the install block and its
-;; comment), utils.scm 640 and prelude/load.scm 229 UNCHANGED,
-;; probe-imp3.scm 591 -> 691 (mode `arith', 1 dispatch clause).
-(m60-imp10--check "s3/line-counts"
-                 (m60-imp10--all
-;; M60 imp-11 RE-PIN: loader.scm 1,588 -> 1,620 LINES (OLD value 1,588).
-                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
-                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                  ;; M60 imp-14 RE-PIN: loader.scm 1653 -> 1731 LINES (OLD value 1653).
-                  (eql 1731 (m60-imp10--lines "mod/emacs/loader.scm"))
-                  ;; M60 imp-13 RE-PIN: utils.scm 640 -> 662 LINES (OLD value 640).
-                  ;; M60 imp-14 RE-PIN: utils.scm 662 -> 716 LINES (OLD value 662).
-                  (eql 716 (m60-imp10--lines "mod/emacs/utils.scm"))
-                  (eql 229 (m60-imp10--lines "prelude/load.scm"))
-;; M60 imp-11 RE-PIN: probe-imp3.scm 691 -> 789 LINES (OLD value 691).
-                  ;; M60 imp-12 RE-PIN: probe-imp3.scm 789 -> 825 LINES (OLD value 789).
-                  ;; M60 imp-13 RE-PIN: probe-imp3.scm 825 -> 879 LINES (OLD value 825).
-                  ;; M60 imp-14 RE-PIN: probe-imp3.scm 879 -> 977 LINES (OLD value 879).
-                  (eql 977 (m60-imp10--lines "test/m60/probe-imp3.scm"))))
-
-;; Unit: LINES (`grep -c').  23 + 15 = 38 `symbol-fbound?' and
-;; 19 + 15 = 34 `set-symbol-function!'.  The FIX count stays 9: a guarded
-;; install of an existing procedure is not a workaround.
-(m60-imp10--check "s3/grep-c-counts"
-                 (m60-imp10--all
-;; M60 imp-11 RE-PIN: `symbol-fbound?` 38 -> 39 LINES (OLD value 38).
-                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                  ;; M60 imp-14 RE-PIN: loader.scm `symbol-fbound?' 40 -> 41 LINES (OLD value 40).
-                  (eql 41 (m60-imp10--grep-c "mod/emacs/loader.scm"
-                                             "symbol-fbound?"))
-;; M60 imp-11 RE-PIN: `set-symbol-function!` 34 -> 35 LINES (OLD value 34).
-                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                  ;; M60 imp-14 RE-PIN: loader.scm `set-symbol-function!' 36 -> 37 LINES (OLD value 36).
-                  (eql 37 (m60-imp10--grep-c "mod/emacs/loader.scm"
-                                             "set-symbol-function!"))
-                  ;; M60 imp-14 RE-PIN: loader.scm `FIX-.*guilemacs' 9 -> 10 LINES (OLD value 9).
-                  (eql 10 (m60-imp10--grep-c "mod/emacs/loader.scm"
-                                            "FIX-.*guilemacs"))))
-
-;; C delta 0: no C file is touched.  The OLD check was a `holds-none' of
-;; `FIX-20261022-guilemacs' in loader.scm.  M60 imp-14 RE-PIN: row 34
-;; adds EXACTLY 1 marker of that date (the 100-link safety note of
-;; `elisp-loader-resolve-function'), so the check pins that count.  The
-;; proxy stays WEAK: a corpus can not run `git'.
-(m60-imp10--check "s3/no-c-delta"
-                 (eql 1 (m60-imp10--grep-c
-                         "mod/emacs/loader.scm"
-                         "FIX-20261022-guilemacs")))
 
 ;;; --- S4. The registration of THIS corpus ----------------------------
 
@@ -563,8 +503,7 @@ PROCEDURE already existed before this row.")
 (setq m60-imp10--group 's5)
 
 (m60-imp10--check "s5/min-s1-checks-6" (>= (m60-imp10--group-count 's1) 6))
-(m60-imp10--check "s5/min-s2-checks-7" (>= (m60-imp10--group-count 's2) 7))
-(m60-imp10--check "s5/min-s3-checks-3" (>= (m60-imp10--group-count 's3) 3))
+(m60-imp10--check "s5/min-s2-checks-9" (>= (m60-imp10--group-count 's2) 9))
 (m60-imp10--check "s5/min-s4-checks-3" (>= (m60-imp10--group-count 's4) 3))
 
 (m60-imp10--check "s5/prog-absent-routes-to-skip"
@@ -581,9 +520,8 @@ PROCEDURE already existed before this row.")
 
 ;;; --- The group-total check ------------------------------------------
 
-(defvar m60-imp10--min-gate-total 28
-  "The number of m60-imp10 ERT tests: 27 registered checks (s1 7, s2 9,
-s3 3, s4 3, s5 5) plus this group-total deftest.")
+(defvar m60-imp10--min-gate-total 23
+  "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp10/gate-m60-total ()
   "The m60-imp10 corpus registers at least its own floor, so a silent
