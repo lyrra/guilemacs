@@ -299,7 +299,9 @@ symbol `m55-imp5-guile-absent'."
 (m55-imp5--check "loader.scm-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                 (eql 1653 (m55-imp5--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
+                 ;; count and its 4 counters.  OLD: 1,653 lines, 74, 40, 36 and 9.
+                 (eql 1792 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
@@ -309,7 +311,7 @@ symbol `m55-imp5-guile-absent'."
 ;; Row 4: (symbol-function 'X) applies in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m55-imp5--check "loader.scm-symbol-function-apply-74"
-                 (eql 74 (m55-imp5--count "mod/emacs/loader.scm"
+                 (eql 76 (m55-imp5--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; Row 5: symbol-fbound? lines in loader.scm = 18 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
@@ -318,7 +320,7 @@ symbol `m55-imp5-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp5--check "loader.scm-symbol-fbound-lines"
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (eql 40 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 (eql 55 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -327,11 +329,11 @@ symbol `m55-imp5-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp5--check "loader.scm-set-symbol-function-lines"
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                 (eql 36 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 (eql 51 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
 (m55-imp5--check "loader.scm-fix-markers-lines-9"
-                 (eql 9 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 (eql 10 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; Row 8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71

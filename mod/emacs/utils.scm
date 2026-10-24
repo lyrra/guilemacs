@@ -260,9 +260,227 @@ documentation string of DEFINITION."
 (define (elisp-clrhash table)
   "Clear hash table TABLE and return it."
   (if (hash-table? table)
+      ;; M60 imp-15 (row 32) FIX: `(srfi srfi-69)' of THIS Guile does NOT
+      ;; export `hash-table-clear!' (measured: `module-defined?' is #f),
+      ;; so the first definition raised `unbound-variable' on every call.
+      ;; The keys walk and `hash-table-delete!' replace it; the TABLE
+      ;; object stays the same, as C `Fclrhash' (:5445) returns it.
       (begin
-        (hash-table-clear! table)
+        (for-each (lambda (key) (hash-table-delete! table key))
+                  (hash-table-keys table))
         table)
+      (error "Wrong type argument: hash-table-p" table)))
+
+;; M60 imp-15 -- row 32: the `make-hash-table' family.  The C owner is
+;; `Fmake_hash_table' (src/fns.c :5253).  A real file reaches it first
+;; at `lisp/emacs-lisp/macroexp.el' :165, the `defvar' of
+;; `macroexp--warned'.
+;;
+;; D1: 1 SRFI-69 table IS the elisp hash table.  `(srfi srfi-69)' is
+;; imported above, and `elisp-hash-table-p' (types.scm :444) plus the 2
+;; procedures above test the object with `hash-table?', so a second
+;; representation would break 3 live sites.  No record, no wrapper, no
+;; FFI.
+;;
+;; D4: a `:keyword' is SELF-EVALUATING (`set' at reader.scm :1359, the
+;; body of `elisp-intern-and-make-keyword' :1354), so it arrives
+;; here as the elisp SYMBOL named ":test", NOT as a Guile keyword.
+;; `#'equal' arrives as the symbol `equal' (row 34 passes the head
+;; symbol), and `'key' arrives as the symbol `key'.
+;;
+;; FIX-20261024-guilemacs: LIMIT L37 (D3).  A valid `:weakness' argument
+;; is PARSED and then IGNORED, so every table is STRONG.  This SRFI-69
+;; does have weak constructors (measured: `make-weak-key-hash-table' is a
+;; procedure), but a weak table is a different port.  Row 32 must not
+;; become that port, so `hash-table-weakness' answers the elisp nil.
+;;
+;; FIX-20261024-guilemacs: LIMIT L38 (D6).  `hash-table-size' answers
+;; the number of ENTRIES.  C answers the ALLOCATION size (src/fns.c
+;; :5391), and SRFI-69 `hash-table-size' counts entries (measured: 2
+;; after 2 inserts).  A caller that wants the count gets it.
+
+;; SRFI-69 calls a table's hash function with 2 arguments, (KEY BOUND)
+;; (measured: a 1-argument lambda raised "Wrong number of arguments").
+;; Guile `hashq' and `hashv' have exactly that arity, so the test table
+;; passes them as they are.
+(define %hash-default-size 64)
+
+;; A private object that no elisp key or value can be: it separates an
+;; ABSENT key from a stored elisp nil.
+(define %hash-absent (list 'hash-absent))
+
+;; The elisp nil is 1 object on this path, but the literal path can give
+;; the symbol `nil' or the empty list too.  Same test as `elisp-defalias'
+;; (utils.scm :236).
+(define (elisp-hash-nil? obj)
+  (or (eq? obj #nil) (eq? obj 'nil) (null? obj)))
+
+;; D2: the 3 predefined tests of C (`src/fns.c' :5314 ... :5322), as 1
+;; pair of EQUIVALENCE and HASH.  The hash function must MATCH the
+;; equivalence, or 2 `eq?' keys can land in different buckets.  An
+;; unknown test raises like C `get_hash_table_user_test' (:5230); there
+;; is no user test registry on this path.
+(define (elisp-hash-test-functions test)
+  (cond ((eq? test (string->symbol "eq")) (cons eq? hashq))
+        ((eq? test (string->symbol "eql")) (cons eqv? hashv))
+        ((eq? test (string->symbol "equal")) (cons equal? hash))
+        (else (error "Invalid hash table test" test))))
+
+;; The keyword symbols of the C decode loop (`src/fns.c' :5296 ... :5309).
+(define %hash-kw-test (string->symbol ":test"))
+(define %hash-kw-weakness (string->symbol ":weakness"))
+(define %hash-kw-size (string->symbol ":size"))
+(define %hash-kw-purecopy (string->symbol ":purecopy"))
+(define %hash-kw-rehash-size (string->symbol ":rehash-size"))
+(define %hash-kw-rehash-threshold (string->symbol ":rehash-threshold"))
+
+;; A valid `:weakness' value, or a raise like C :5344.  The value is NOT
+;; honored (L37): only the validation is ported.
+(define (elisp-hash-check-weakness weakness)
+  (cond ((elisp-hash-nil? weakness) #nil)
+        ((or (eq? weakness (string->symbol "key"))
+             (eq? weakness (string->symbol "value"))
+             (eq? weakness (string->symbol "key-or-value"))
+             (eq? weakness (string->symbol "key-and-value"))
+             (eq? weakness #t)
+             (eq? weakness 't))
+         weakness)
+        (else (error "Invalid hash table weakness" weakness))))
+
+(define (elisp-make-hash-table . args)
+  "Create and return a new hash table.  Port of `Fmake_hash_table'."
+  (if (odd? (length args))
+      ;; C: `if (nargs & 1) error ("Odd number of arguments")' (:5293).
+      (error "Odd number of arguments")
+      ;; The C loop `while (nargs >= 2)' (:5294) reads the argument
+      ;; vector RIGHT to LEFT, so a REPEATED keyword keeps the FIRST
+      ;; value.  The REVERSE below gives that same order, and the last
+      ;; assignment of a keyword is then its FIRST pair.
+      (let loop ((rest (reverse args))
+                 (test #nil) (weakness #nil) (size #nil) (purecopy #nil))
+        (if (null? rest)
+            (let* ((test-key (if (elisp-hash-nil? test)
+                                 (string->symbol "eql")   ; default :5314
+                                 test))
+                   (test-fn (elisp-hash-test-functions test-key))
+                   (size-n (cond ((elisp-hash-nil? size)
+                                  %hash-default-size)
+                                 ((and (exact-integer? size) (>= size 0)) size)
+                                 (else (error "Invalid hash table size" size))))
+                   ;; The weakness check runs BEFORE the constructor,
+                   ;; like C (:5344 then :5346).  The result is unused:
+                   ;; a valid value is ignored (L37).
+                   (_ (elisp-hash-check-weakness weakness)))
+              ;; `purecopy' is read and ignored (D5): C copies a table to
+              ;; pure storage only during a dump.
+              ;; The `:size' value is a HINT and passes through
+              ;; unchanged: C also accepts 0 (`FIXNATP', :5327), so no
+              ;; `max' clamps it to 1.
+              (make-hash-table (car test-fn) (cdr test-fn) size-n))
+            ;; After the `reverse', the FIRST element is the VALUE and
+            ;; the second is the KEYWORD.  C reads the same 2 slots in
+            ;; that same order (:5296: `arg = args[--nargs]' then
+            ;; `keyword = args[--nargs]').
+            (let ((value (car rest))
+                  (keyword (and (pair? (cdr rest)) (cadr rest))))
+              (cond ((eq? keyword %hash-kw-test)
+                     (loop (cddr rest) value weakness size purecopy))
+                    ((eq? keyword %hash-kw-weakness)
+                     (loop (cddr rest) test value size purecopy))
+                    ((eq? keyword %hash-kw-size)
+                     (loop (cddr rest) test weakness value purecopy))
+                    ((eq? keyword %hash-kw-purecopy)
+                     (loop (cddr rest) test weakness size value))
+                    ;; The 2 obsolete keywords are read and ignored
+                    ;; (C: `;/* ignore obsolete keyword arguments */').
+                    ((or (eq? keyword %hash-kw-rehash-size)
+                         (eq? keyword %hash-kw-rehash-threshold))
+                     (loop (cddr rest) test weakness size purecopy))
+                    (else (error "Invalid keyword argument" keyword))))))))
+
+;; `gethash' of C is 2 ... 3 args (`Fgethash', src/fns.c :5457).  It
+;; returns the value of KEY in TABLE, or DEFAULT when KEY is absent.  A
+;; 2-argument call passes the elisp nil as DEFAULT.
+(define elisp-gethash
+  (case-lambda
+    ((key table)
+     (elisp-gethash key table #nil))
+    ((key table default)
+     (if (hash-table? table)
+         (let ((value (hash-table-ref/default table key %hash-absent)))
+           (if (eq? value %hash-absent) default value))
+         (error "Wrong type argument: hash-table-p" table)))))
+
+(define (elisp-puthash key value table)
+  "Associate KEY with VALUE in TABLE and return VALUE.
+C owner: `Fputhash' (src/fns.c :5471)."
+  (if (hash-table? table)
+      (begin
+        (hash-table-set! table key value)
+        value)
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-remhash key table)
+  "Remove KEY from TABLE.  C owner `Fremhash' (src/fns.c :5491) returns
+the elisp nil in BOTH cases: the C body calls `hash_remove_from_table'
+and then returns Qnil, with no test for presence."
+  (if (hash-table? table)
+      (begin
+        (hash-table-delete! table key)
+        #nil)
+      (error "Wrong type argument: hash-table-p" table)))
+
+;; D6: a SRFI-69 table reports its own equivalence function (measured:
+;; `hash-table-equivalence-function' is a procedure), so the elisp test
+;; symbol is recoverable and no side table is needed.
+;;
+;; FIX-20261024-guilemacs: this is NOT a tracker limit (it has no L
+;; number).  A table whose equivalence function is NOT one of the 3 pairs
+;; answers the elisp nil.  C answers the user test SYMBOL (:5407).  This
+;; path has no user test registry, so only the 3 predefined tests exist.
+;; Low risk: only row 32 builds tables today.
+(define (elisp-hash-table-test table)
+  "Return the test symbol that TABLE uses.  C owner :5407."
+  (if (hash-table? table)
+      (let ((equiv (hash-table-equivalence-function table)))
+        (cond ((eq? equiv eq?) (string->symbol "eq"))
+              ((eq? equiv equal?) (string->symbol "equal"))
+              ((eq? equiv eqv?) (string->symbol "eql"))
+              (else #nil)))
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-weakness table)
+  "Return the weakness of TABLE.  C owner :5428.  Every table of this
+port is STRONG (L37), so the answer is the elisp nil."
+  (if (hash-table? table)
+      #nil
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-size table)
+  "Return the number of entries of TABLE (L38: C answers the allocation
+size).  C owner :5391."
+  (if (hash-table? table)
+      (hash-table-size table)
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-rehash-size table)
+  "The obsolete nominal constant of C :5375."
+  (if (hash-table? table) 1.5 (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-rehash-threshold table)
+  "The obsolete nominal constant of C :5387."
+  (if (hash-table? table) 0.8125 (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-keys table)
+  "Return the keys of TABLE as a list."
+  (if (hash-table? table)
+      (hash-table-keys table)
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-hash-table-values table)
+  "Return the values of TABLE as a list."
+  (if (hash-table? table)
+      (hash-table-values table)
       (error "Wrong type argument: hash-table-p" table)))
 
 ;;;

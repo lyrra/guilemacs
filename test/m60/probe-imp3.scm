@@ -19,7 +19,11 @@
 ;;;
 ;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
 ;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', `control', `arith', `put', `set', `alias', or `eac'.
+;;; `obsolete', `control', `arith', `put', `set', `alias', `hash', or
+;;; `eac'.
+;;; Mode `hash' is the M60 imp-15 record of row 32 (the
+;;; `make-hash-table' family, its keyword decode and its 5 raise texts);
+;;; it also records the NEXT stop of lisp/emacs-lisp/macroexp.el.
 ;;; Mode `alias' is the M60 imp-14 record of row 34 (`defalias', the
 ;;; UNEVALLED `function' form and the symbol-cell indirection).  Mode
 ;;; `defs' is the M60 imp-6 record of rows 21 and 22 (`defconst',
@@ -702,10 +706,10 @@ definition itself: a `memq' over the `features' list."
 ;; symbol are both kept; and a STRING or a NUMBER first argument raises
 ;; `Wrong type argument: symbolp'.
 ;;
-;; L26: the NEXT stop is `make-hash-table' (lisp/emacs-lisp/macroexp.el
-;; :168).  `elisp-make-hash-table' is EXPORTED (utils.scm :28) but has NO
-;; definition (measured: `module-ref' raises), so a later row must write
-;; that procedure first.  This row does not fix that cell.
+;;; L26 is CLOSED by row 32 (M60 imp-15): the NEXT stop of this file was
+;; `make-hash-table' (lisp/emacs-lisp/macroexp.el :165), that procedure
+;; now exists (utils.scm) and `init-loader' installs the cell, so a later
+;; row must not treat the cell as empty.
 
 (define (put-call name . args)
   ;; Apply the INSTALLED `put' cell, so the call goes through the same
@@ -953,6 +957,149 @@ definition itself: a `memq' over the `features' list."
     (show "ALIAS string= call" "~a"
           (describe-error (lambda () (eval-form '(string= "a" "a")))))))
 
+;;; --- mode: hash -----------------------------------------------------
+
+;; M60 imp-15 -- row 32: the `make-hash-table' family.  The C owner is
+;; `Fmake_hash_table' (src/fns.c :5253) and the first real caller is the
+;; `defvar' of `macroexp--warned' at lisp/emacs-lisp/macroexp.el :165.
+;; 1 SRFI-69 table IS the elisp object, so `hash-table-p' is the existing
+;; `elisp-hash-table-p' (types.scm :444) and the 2 procedures of the
+;; previous rounds are reused.  `hash-call' applies the INSTALLED cell,
+;; so every call below goes through the same path as a real elisp
+;; caller.  The elisp nil is #nil and the elisp test symbols are the
+;; symbols `eq', `eql' and `equal' (D4).
+(define (hash-call name . args)
+  (if (symbol-fbound? name)
+      (apply (symbol-function name) args)
+      'unbound))
+
+(define (elisp-sym name)
+  (string->symbol name))
+
+(define (hash-new . keywords)
+  (apply hash-call 'make-hash-table keywords))
+
+(define (mode-hash)
+  ;; Point 1: the 14 cells of the row.  The 7 accessors of P1 are part of
+  ;; the list, so a MISSING install shows here.
+  (show "HASH CELLS" "~a"
+        (string-join
+         (map (lambda (s) (format #f "~a=~s" s (symbol-fbound? s)))
+              '(make-hash-table gethash puthash remhash clrhash
+                hash-table-p hash-table-count
+                hash-table-test hash-table-weakness hash-table-size
+                hash-table-keys hash-table-values
+                hash-table-rehash-size hash-table-rehash-threshold))
+         " "))
+  ;; Point 2 (D2): an `equal' table FINDS a key that is `equal?' but not
+  ;; `eq?' to the stored key.
+  (let ((table (hash-new (elisp-sym ":test") (elisp-sym "equal"))))
+    (hash-call 'puthash (list 1 2) 'v table)
+    (show "HASH equal hit" "~s"
+          (hash-call 'gethash (list 1 2) table 'absent)))
+  ;; Point 3 (D2): an `eq' table does NOT find that shape, and 2 equal
+  ;; but not `eq' keys are 2 ENTRIES.
+  (let ((table (hash-new (elisp-sym ":test") (elisp-sym "eq"))))
+    (hash-call 'puthash (list 1 2) 'v table)
+    (show "HASH eq miss" "~s"
+          (hash-call 'gethash (list 1 2) table 'absent))
+    (hash-call 'puthash (list 1 2) 'w table)
+    (show "HASH eq entries" "~s" (hash-call 'hash-table-count table)))
+  ;; Point 4: the DEFAULT test is `eql' (C :5314), so a bare table and a
+  ;; `:test nil' table both keep 2 equal but not `eq' keys.
+  (let ((bare (hash-new)))
+    (hash-call 'puthash (list 1 2) 'a bare)
+    (hash-call 'puthash (list 1 2) 'b bare)
+    (show "HASH default eql entries" "~s" (hash-call 'hash-table-count bare)))
+  (let ((nil-test (hash-new (elisp-sym ":test") #nil)))
+    (hash-call 'puthash (list 1 2) 'a nil-test)
+    (hash-call 'puthash (list 1 2) 'b nil-test)
+    (show "HASH nil test entries" "~s"
+          (hash-call 'hash-table-count nil-test)))
+  ;; Point 5 (D2): the keyword loop reads RIGHT to LEFT (C :5294), so a
+  ;; REPEATED keyword keeps the FIRST value.  With `eq' first, the 2
+  ;; equal but not `eq' keys stay 2 entries.
+  (let ((repeat (hash-new (elisp-sym ":test") (elisp-sym "eq")
+                          (elisp-sym ":test") (elisp-sym "equal"))))
+    (hash-call 'puthash (list 1 2) 'a repeat)
+    (hash-call 'puthash (list 1 2) 'b repeat)
+    (show "HASH repeat keeps first" "~s entries"
+          (hash-call 'hash-table-count repeat)))
+  ;; Point 6: the accessors.  D6 takes the SRFI-69 equivalence function,
+  ;; L37 answers the elisp nil for every weakness, and L38 answers the
+  ;; entry count for the size.
+  (let ((table (hash-new (elisp-sym ":test") (elisp-sym "equal")
+                         (elisp-sym ":weakness") (elisp-sym "key")
+                         (elisp-sym ":size") 7
+                         (elisp-sym ":purecopy") #t
+                         (elisp-sym ":rehash-size") 100
+                         (elisp-sym ":rehash-threshold") 0.5)))
+    (hash-call 'puthash 'k 1 table)
+    ;; The accessors are read through the INSTALLED cells, so this line is
+    ;; the real elisp path (no `module-ref' of the module).
+    (show "HASH keywords accepted" "table=~s test=~s weakness=~s size=~s keys=~s values=~s rehash=~s/~s"
+          (hash-call 'hash-table-p table)
+          (hash-call 'hash-table-test table)
+          (hash-call 'hash-table-weakness table)
+          (hash-call 'hash-table-size table)
+          (hash-call 'hash-table-keys table)
+          (hash-call 'hash-table-values table)
+          (hash-call 'hash-table-rehash-size table)
+          (hash-call 'hash-table-rehash-threshold table)))
+  ;; Point 6b (P4): `:size 0' is a valid HINT and is NOT clamped to 1.
+  ;; C accepts 0 too (`FIXNATP', src/fns.c :5327).
+  (let ((zero (hash-new (elisp-sym ":size") 0)))
+    (hash-call 'puthash 'k 1 zero)
+    (show "HASH size zero" "table=~s entries=~s"
+          (hash-call 'hash-table-p zero)
+          (hash-call 'hash-table-count zero)))
+  ;; Point 7: `gethash' gives the DEFAULT for an absent key, and the
+  ;; elisp nil when no DEFAULT is given.  `puthash' returns the VALUE.
+  (let ((table (hash-new)))
+    (hash-call 'puthash 'k 42 table)
+    (show "HASH gethash default" "absent=~s absent-nil=~s found=~s"
+          (hash-call 'gethash 'nope table 'fallback)
+          (hash-call 'gethash 'nope table)
+          (hash-call 'gethash 'k table))
+    (show "HASH puthash returns" "~s" (hash-call 'puthash 'k2 43 table)))
+  ;; Point 8: `remhash' returns the elisp nil in BOTH cases (C :5491
+  ;; calls `hash_remove_from_table' and then returns Qnil), and the
+  ;; count follows.
+  (let ((table (hash-new)))
+    (hash-call 'puthash 'k 1 table)
+    (show "HASH remhash" "present=~s absent=~s entries=~s"
+          (hash-call 'remhash 'k table)
+          (hash-call 'remhash 'k table)
+          (hash-call 'hash-table-count table)))
+  ;; Point 9: `clrhash' returns the SAME table and the count is 0 after
+  ;; it.
+  (let ((table (hash-new)))
+    (hash-call 'puthash 'k 1 table)
+    (let ((cleared (hash-call 'clrhash table)))
+      (show "HASH clrhash" "same=~s entries=~s"
+            (eq? cleared table) (hash-call 'hash-table-count cleared))))
+  ;; Point 10: the predicate.
+  (show "HASH predicate" "table=~s list=~s"
+        (hash-call 'hash-table-p (hash-new))
+        (hash-call 'hash-table-p '(1 2)))
+  ;; Point 11: the 5 RAISE shapes (C :5293, :5309, :5330, :5344 and
+  ;; `check_hash_table').  A raise aborts an elisp LOAD, so the probe
+  ;; owns them and the fixture does not.
+  (show "HASH raise odd" "~a"
+        (describe-error (lambda () (hash-new (elisp-sym ":test")))))
+  (show "HASH raise keyword" "~a"
+        (describe-error (lambda () (hash-new (elisp-sym ":bogus") 1))))
+  (show "HASH raise size" "~a"
+        (describe-error (lambda () (hash-new (elisp-sym ":size") "x"))))
+  (show "HASH raise weakness" "~a"
+        (describe-error (lambda () (hash-new (elisp-sym ":weakness") 'weird))))
+  (show "HASH raise table" "~a"
+        (describe-error (lambda () (hash-call 'gethash 'k '(1 2)))))
+  ;; Point 12: the ACCEPTANCE.  `macroexp.el' passes form 2 (:165), so
+  ;; its stop
+  ;; MOVES to the NEXT wall.
+  (load-line "lisp/emacs-lisp/macroexp.el"))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -973,5 +1120,6 @@ definition itself: a `memq' over the `features' list."
   ((set) (mode-set))
   ((alias) (mode-alias))
   ((eac) (mode-eac))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac)"
+  ((hash) (mode-hash))
+  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash)"
                      mode))))

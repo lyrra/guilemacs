@@ -679,10 +679,13 @@ host limit is a skip, never a pass."
                   ;; (#f "Wrong type to apply: ~S" (#nil) (#nil))'.  Row 33
                   ;; installs the `set' cell, so the keyword path of the
                   ;; reader runs and the load moves to the NEXT wall of the
-                  ;; same chain, `make-hash-table' (row 32, macroexp.el :168).
+                  ;; same chain, `make-hash-table' (row 32, macroexp.el
+                  ;; :165); row 32 CLOSED that stop.
                   (m60-imp9--probe-line
                    "control"
-                   "LOAD lisp/calendar/time-date.el: ERROR void-function (make-hash-table)")
+                  ;; M60 imp-15 RE-PIN: row 32 installs the
+                  ;; `make-hash-table' family, so this wall MOVED.
+                   "LOAD lisp/calendar/time-date.el: ERROR void-function (define-obsolete-function-alias)")
                   (m60-imp9--probe-line
                    "control"
                    "LOAD lisp/color.el: done")))

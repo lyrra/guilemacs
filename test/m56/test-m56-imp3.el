@@ -281,11 +281,13 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "loader-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
-                 (eql 1653 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
+                 ;; count and its 4 counters.  OLD: 1,653 lines, 74, 40, 36 and 9.
+                 (eql 1792 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
-                 (eql 74 (m56-imp3--count "mod/emacs/loader.scm"
+                 (eql 76 (m56-imp3--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
 ;; A3: symbol-fbound? lines in loader.scm = 19 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `symbol-fbound?' 22 -> 23
@@ -294,7 +296,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-symbol-fbound"
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (eql 40 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 55 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -303,11 +305,11 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m56-imp3--check "loader-set-symbol-function"
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                 (eql 36 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 51 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"
-                 (eql 9 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 (eql 10 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; A6: mod/emacs/reader.scm lines = 2,021.
 (m56-imp3--check "reader-lines-2021"

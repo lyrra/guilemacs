@@ -23,7 +23,11 @@
   ;; `(emacs-elisp runtime)' and nothing from `(emacs loader)', so the
   ;; module graph stays acyclic.
   #:use-module ((emacs types)
-                #:select (elisp-eq elisp-eql elisp-equal elisp-null))
+                #:select (elisp-eq elisp-eql elisp-equal elisp-null
+                           ;; M60 imp-15 -- row 32: 1 SRFI-69 table IS
+                           ;; the elisp hash table, so the existing
+                           ;; predicate of types.scm :444 is the cell.
+                           elisp-hash-table-p))
   #:use-module ((emacs numbers)
                 #:select (elisp-+ elisp-- elisp-* elisp-/
                            elisp-= elisp-< elisp->
@@ -1624,9 +1628,9 @@ A chain longer than `%elisp-loader-indirect-limit' raises
   ;;
   ;; The bulk installers `init-types-registrations',
   ;; `init-numbers-registrations' (numbers.scm :290) and
-  ;; `init-utils-registrations' (utils.scm :670) install with NO guard,
+  ;; `init-utils-registrations' (utils.scm :888) install with NO guard,
   ;; so they overwrite the C cell.
-  ;; `init-utils-registrations' :686 is the UNGUARDED install of
+  ;; `init-utils-registrations' :904 is the UNGUARDED install of
   ;; `nreverse'; it is not called on this path, and this row does not
   ;; call it either.
   ;;
@@ -1680,18 +1684,16 @@ A chain longer than `%elisp-loader-indirect-limit' raises
   ;;
   ;; The guard is the row-18 pattern: a full Emacs owns the C DEFUN
   ;; (src/fns.c, Fput) in that cell.  The bulk installer
-  ;; `init-utils-registrations' (utils.scm :670) also writes `put' at
-  ;; :682, but with NO guard, and `init-loader' does not call it.
+  ;; `init-utils-registrations' (utils.scm :888) also writes `put' at
+  ;; :900, but with NO guard, and `init-loader' does not call it.
   ;;
   ;; L26: `put' returns the VALUE, and a STRING or a NUMBER first
   ;; argument raises `Wrong type argument: symbolp'.  Both are elisp
   ;; behaviour, so mode `put' of test/m60/probe-imp3.scm pins them.
   ;;
-  ;; `elisp-make-hash-table' is exported (utils.scm :28) but has NO
-  ;; definition (measured: `module-ref' raises).  The NEXT stop after
-  ;; this row is `make-hash-table' at lisp/emacs-lisp/macroexp.el :168,
-  ;; so a later row must write that procedure before it can install the
-  ;; cell.
+  ;; The NEXT stop after this row was `make-hash-table' at
+  ;; lisp/emacs-lisp/macroexp.el :165.  Row 32 installed that family in
+  ;; the block below (M60 imp-15), so the stop moved.
   (unless (symbol-fbound? 'put)
     (set-symbol-function! 'put elisp-put))
 
@@ -1728,4 +1730,63 @@ A chain longer than `%elisp-loader-indirect-limit' raises
   ;; 11-name list and does not cover `defalias'.
   (unless (symbol-fbound? 'defalias)
     (set-symbol-function! 'defalias elisp-defalias))
+
+  ;; M60 imp-15 -- row 32: the `make-hash-table' family.  The C owners
+  ;; are the 12 DEFUNs of src/fns.c :5253 ... :5491; `hash-table-keys'
+  ;; and `hash-table-values' have no C DEFUN, so they are pure-Scheme
+  ;; cells of utils.scm.  The first real caller is the `defvar' of
+  ;; `macroexp--warned' at lisp/emacs-lisp/macroexp.el :165.  The guard
+  ;; is the row-18 pattern: a full Emacs owns the C DEFUN cells.
+  ;;
+  ;; TWO bulk installers write hash cells with NO guard:
+  ;; `init-utils-registrations' (utils.scm :888) writes
+  ;; `hash-table-count' and `clrhash', and `init-types-registrations'
+  ;; (types.scm :503) writes `hash-table-p' (:510).  So this row does not
+  ;; use them: each of the 14 names has ONE install site, the guarded
+  ;; block below.
+  ;;
+  ;; 1 SRFI-69 table IS the elisp object, so `hash-table-p' is the
+  ;; existing `elisp-hash-table-p' of types.scm :444.  The 2 LIMITS are
+  ;; named at the definitions (utils.scm :274 ... :297 section): L37 (a
+  ;; valid `:weakness' is parsed and IGNORED, every table is STRONG) and
+  ;; L38 (`hash-table-size' answers the entry count, C answers the
+  ;; allocation size).  Proof is mode `hash' of test/m60/probe-imp3.scm
+  ;; and the row-32 cases of test/mod/standalone-tests.scm.
+  ;;
+  ;; MEASURED after the 14 installs: `lisp/emacs-lisp/macroexp.el' passes
+  ;; form 2 (:165) and stops on the NEXT wall,
+  ;; `void-function (define-obsolete-function-alias)'.
+  (unless (symbol-fbound? 'make-hash-table)
+    (set-symbol-function! 'make-hash-table elisp-make-hash-table))
+  (unless (symbol-fbound? 'gethash)
+    (set-symbol-function! 'gethash elisp-gethash))
+  (unless (symbol-fbound? 'puthash)
+    (set-symbol-function! 'puthash elisp-puthash))
+  (unless (symbol-fbound? 'remhash)
+    (set-symbol-function! 'remhash elisp-remhash))
+  (unless (symbol-fbound? 'clrhash)
+    (set-symbol-function! 'clrhash elisp-clrhash))
+  (unless (symbol-fbound? 'hash-table-p)
+    (set-symbol-function! 'hash-table-p elisp-hash-table-p))
+  (unless (symbol-fbound? 'hash-table-count)
+    (set-symbol-function! 'hash-table-count elisp-hash-table-count))
+  ;; The 7 accessor cells.  An elisp file that calls
+  ;; `(hash-table-size table)' or `(hash-table-test table)' reads THESE
+  ;; cells, not a `module-ref'.
+  (unless (symbol-fbound? 'hash-table-test)
+    (set-symbol-function! 'hash-table-test elisp-hash-table-test))
+  (unless (symbol-fbound? 'hash-table-weakness)
+    (set-symbol-function! 'hash-table-weakness elisp-hash-table-weakness))
+  (unless (symbol-fbound? 'hash-table-size)
+    (set-symbol-function! 'hash-table-size elisp-hash-table-size))
+  (unless (symbol-fbound? 'hash-table-keys)
+    (set-symbol-function! 'hash-table-keys elisp-hash-table-keys))
+  (unless (symbol-fbound? 'hash-table-values)
+    (set-symbol-function! 'hash-table-values elisp-hash-table-values))
+  (unless (symbol-fbound? 'hash-table-rehash-size)
+    (set-symbol-function! 'hash-table-rehash-size
+                          elisp-hash-table-rehash-size))
+  (unless (symbol-fbound? 'hash-table-rehash-threshold)
+    (set-symbol-function! 'hash-table-rehash-threshold
+                          elisp-hash-table-rehash-threshold))
   )

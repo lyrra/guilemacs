@@ -5,6 +5,10 @@
 
 (define-module (emacs types)
   #:use-module (emacs-elisp runtime)
+  ;; M60 imp-15 -- row 32: 1 SRFI-69 table IS the elisp hash table, so
+  ;; `elisp-hash-table-p' (:444) needs the SRFI-69 predicate.  The prefix
+  ;; keeps the `hash-table?' of `(emacs-elisp runtime)' in place.
+  #:use-module ((srfi srfi-69) #:prefix srfi69:)
   #:export (
     ;; Scheme implementation functions
     elisp-symbolp
@@ -439,8 +443,13 @@ of strings.  (`equal' ignores text properties.)"
 
 (define (elisp-hash-table-p obj)
   "Return t if OBJ is a Lisp hash table object."
-  ;; Check if it's a Guile hash table
-  (if (hash-table? obj) #t #nil))
+  ;; M60 imp-15 (row 32) FIX: the `hash-table?' that this module sees is
+  ;; the one of `(emacs-elisp runtime)', and it does NOT recognize an
+  ;; SRFI-69 table (measured: `(elisp-hash-table-p (make-hash-table))'
+  ;; answered the elisp nil).  1 SRFI-69 table IS the elisp hash table
+  ;; (utils.scm :252 section), so the predicate uses the SRFI-69 one.  The
+  ;; prefix avoids a duplicate binding of the name above.
+  (if (srfi69:hash-table? obj) #t #nil))
 
 (define (elisp-integer-or-marker-p object)
   "Return t if OBJECT is an integer or a marker."

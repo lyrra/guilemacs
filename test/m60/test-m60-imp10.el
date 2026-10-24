@@ -312,7 +312,13 @@ PROCEDURE already existed before this row.")
                   (m60-imp10--holds-all
                    "mod/emacs/loader.scm"
                    '("#:use-module ((emacs types)"
-                     "#:select (elisp-eq elisp-eql elisp-equal elisp-null))"
+                     ;; M60 imp-15 RE-PIN: the OLD pin was
+                     ;; "#:select (elisp-eq elisp-eql elisp-equal elisp-null))".
+                     ;; Row 32 imports the hash-table predicate from the
+                     ;; same module, so the select list is longer and it
+                     ;; spans 2 lines.
+                     "#:select (elisp-eq elisp-eql elisp-equal elisp-null"
+                     "elisp-hash-table-p))"
                      "#:use-module ((emacs numbers)"
                      "#:use-module ((emacs sequences) #:select (elisp-append elisp-length))"))))
 
@@ -428,15 +434,17 @@ PROCEDURE already existed before this row.")
                   ;; `LOAD lisp/calendar/time-date.el: ERROR void-function
                   ;; (put)'.  Row 30 installs the `put' cell, so the load
                   ;; moves past it to the NEXT empty cell of the same
-                  ;; require chain (`make-hash-table', macroexp.el :168).
+                  ;; require chain (`make-hash-table', macroexp.el :165).
                   ;; M60 imp-13 RE-PIN: the OLD line was
                   ;; `LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg
                   ;; (#f "Wrong type to apply: ~S" (#nil) (#nil))'.  Row 33
                   ;; installs the `set' cell, so the load moves to the NEXT
-                  ;; wall, `make-hash-table' (row 32, macroexp.el :168).
+                  ;; wall, `make-hash-table' (row 32, macroexp.el :165).
                   (m60-imp10--probe-line
                    "arith"
-                   "LOAD lisp/calendar/time-date.el: ERROR void-function (make-hash-table)")
+                  ;; M60 imp-15 RE-PIN: row 32 installs the
+                  ;; `make-hash-table' family, so this wall MOVED.
+                   "LOAD lisp/calendar/time-date.el: ERROR void-function (define-obsolete-function-alias)")
                   (m60-imp10--probe-line
                    "arith"
                    ;; M60 imp-12 RE-PIN: the OLD line was

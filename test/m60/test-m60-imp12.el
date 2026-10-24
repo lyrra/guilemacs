@@ -430,7 +430,13 @@ controlled ERT skip -- never a pass."
 (m60-imp12--check "s2/subr-stop-moved"
                  (m60-imp12--probe-line
                   "eac"
-                  "EAC load line: ERROR void-function (defsubst)")
+                  "EAC load line: ERROR void-function (defsubst)"))
+;; M60 imp-15 FIX: commit bf0eff759 removed the second arm of this check
+;; and left the form UNCLOSED, so the ERT scan of this file raised
+;; `end of input' and the whole m60 batch runner never completed.  The
+;; repair closes the form and keeps the 1 arm that is still pinned.  The
+;; check below is a DIFFERENT pin (the `LOAD' line of the 3 older modes),
+;; not a duplicate of this one.
 
 ;; The same stop from the 3 older modes that load `lisp/subr.el'.  This
 ;; is the no-regression proof of brief.org section 7.4: those lines are
@@ -458,7 +464,9 @@ controlled ERT skip -- never a pass."
                   (m60-imp12--probe-line "control" "cond empty: #nil")
                   (m60-imp12--probe-line "arith" "COUNT: 0")
                   (m60-imp12--probe-line
-                   "put" "CELLS: put -> #t get -> #f make-hash-table -> #f")
+                   ;; M60 imp-15 RE-PIN: row 32 installs the `make-hash-table' family,
+                   ;; so this wall MOVED and the old pin was an ABSENCE pin.
+                   "put" "CELLS: put -> #t get -> #f make-hash-table -> #t")
                   (m60-imp12--probe-line
                    "language" "LANGUAGE-NAME: emacs-elisp")))
 

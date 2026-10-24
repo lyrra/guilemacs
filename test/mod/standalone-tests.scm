@@ -7,7 +7,9 @@
 ;; Pinned case count.  A suite that loses a case must fail (cr.org of the
 ;; M59 imp-5 round, F3: the round file is reused, so name the round).
 ;; M60 imp-14: 6 -> 8, the 2 `defalias' cases of row 34.
-(define expected-passes 8)
+;; M60 imp-15: 8 -> 12, the 4 hash cases of row 32; 12 -> 13 for the
+;; ACCESSOR case of brief.org P1.
+(define expected-passes 13)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -190,6 +192,139 @@
                     ;; payload shape differs between Guile versions.
                     (equal? "Wrong type argument: symbolp \"standalone-alias-str\""
                             text))))
+
+;;; M60 imp-15 -- row 32: the `make-hash-table' family.  The C owner is
+;;; `Fmake_hash_table' (src/fns.c :5253).  1 SRFI-69 table IS the elisp
+;;; object (D1), so the 5 `Hash case' blocks below run the INSTALLED cells
+;;; that `init-loader' put in place, and `standalone-hash.el' is the real
+;;; reader and evaluator path of the same cells.  These blocks and the 7
+;;; fixture blocks use 1 numbering: each case names the fixture blocks
+;;; that it reads.
+
+;; `every' is NOT bound in this module (measured: the call raised), and
+;; the suite imports no list library, so this loop is local.
+(define (all-fbound? names)
+  (or (null? names)
+      (and (eq? #t (symbol-fbound? (car names)))
+           (all-fbound? (cdr names)))))
+
+;; Hash case 1 -- the CELLS, the call and the `equal'/`eq' test mapping
+;; (D2).  It reads fixture `Hash case 1' and `Hash case 2'.
+;; `standalone-hash.el' stores every result, so a reader or evaluator
+;; defect fails here too.  The 14 names are the 13 exports of
+;; (emacs utils) plus `hash-table-p'.
+(let ((cells '(make-hash-table gethash puthash remhash clrhash
+                hash-table-p hash-table-count))
+      (result (catch #t
+                (lambda () (load-fixture "standalone-hash.el") 'loaded)
+                (lambda (key . args) (list 'error key args))))
+      (value (lambda (sym)
+               (and (symbol-bound? sym) (symbol-value sym)))))
+  (test-assert (format #f "row 32 hash cells are installed and the fixture loads (result: ~s)"
+                       result)
+               (and (eq? 'loaded result)
+                    (all-fbound? cells)
+                    ;; `puthash' returns the VALUE, twice.
+                    (equal? 42 (value 'standalone-hash-put-ret))
+                    (equal? 43 (value 'standalone-hash-put-ret-2))
+                    (equal? 42 (value 'standalone-hash-found))
+                    ;; An absent key gives the elisp nil, and the DEFAULT
+                    ;; when the caller gives one.
+                    (eq? #nil (value 'standalone-hash-absent))
+                    (eq? 'standalone-hash-fallback
+                         (value 'standalone-hash-default))
+                    ;; The `equal' table finds an `equal?' but not `eq?'
+                    ;; copy; the `eq' table does not.
+                    (eq? 'standalone-hash-list-value
+                         (value 'standalone-hash-equal-hit))
+                    (eq? 'standalone-hash-absent
+                         (value 'standalone-hash-eq-miss))
+                    (equal? 2 (value 'standalone-hash-eq-count))
+                    (equal? 2 (value 'standalone-hash-count))
+                    ;; `hash-table-p': t for a table, nil for a list.
+                    (eq? #t (value 'standalone-hash-p))
+                    (eq? #nil (value 'standalone-hash-list-p)))))
+
+;; Hash case 2 -- the DEFAULT test is `eql' (C :5314), and a REPEATED
+;; keyword keeps the FIRST value, because the C loop :5294 reads the
+;; argument vector RIGHT to LEFT.  `eq' first means the 2 `equal?' keys stay 2.
+;; It reads fixture `Hash case 3', `Hash case 4' and `Hash case 5'.
+(let ((value (lambda (sym)
+               (and (symbol-bound? sym) (symbol-value sym)))))
+  (test-assert "row 32 hash: the default test is eql and a repeated keyword keeps the first value"
+               (and (equal? 2 (value 'standalone-hash-default-count))
+                    (equal? 2 (value 'standalone-hash-nil-test-count))
+                    (equal? 2 (value 'standalone-hash-repeat-count))
+                    ;; A valid `:weakness', `:purecopy' and the 2
+                    ;; obsolete rehash keywords are ACCEPTED, and the
+                    ;; result is still a table.
+                    (eq? #t (value 'standalone-hash-keywords-p)))))
+
+;; Hash case 3 -- the 7 ACCESSOR cells of brief.org P1, called through the
+;; elisp path (fixture `Hash case 7').  Before this repair the ONLY reach
+;; was `module-ref', which is a module-load proof, not an elisp call.
+(let ((value (lambda (sym)
+               (and (symbol-bound? sym) (symbol-value sym)))))
+  (test-assert "row 32 hash: the 7 accessor cells answer through the elisp path"
+               (and (eq? 'equal (value 'standalone-hash-accessor-test))
+                    ;; L38: the ENTRY count, not the allocation size.
+                    (equal? 1 (value 'standalone-hash-accessor-size))
+                    ;; L37: every table is STRONG.
+                    (eq? #nil (value 'standalone-hash-accessor-weakness))
+                    (equal? 1.5 (value 'standalone-hash-accessor-rehash-size))
+                    (equal? 0.8125
+                            (value 'standalone-hash-accessor-rehash-threshold))
+                    (pair? (value 'standalone-hash-accessor-keys))
+                    (eq? 'standalone-hash-ak
+                         (car (value 'standalone-hash-accessor-keys)))
+                    (pair? (value 'standalone-hash-accessor-values))
+                    (eq? 7
+                         (car (value 'standalone-hash-accessor-values))))))
+
+;; Hash case 4 -- `remhash' returns the elisp nil in BOTH cases (C :5491
+;; returns Qnil with no test for presence), and `clrhash' returns the
+;; SAME table with 0 entries.
+(let ((value (lambda (sym)
+               (and (symbol-bound? sym) (symbol-value sym)))))
+  (test-assert "row 32 hash: remhash returns nil in both cases and clrhash returns the same table"
+               (and (eq? #nil (value 'standalone-hash-remhash-ret))
+                    (eq? #nil (value 'standalone-hash-remhash-absent))
+                    (equal? 1 (value 'standalone-hash-count-after-remhash))
+                    (eq? #t (value 'standalone-hash-clear-same))
+                    (equal? 0 (value 'standalone-hash-count-after-clear)))))
+
+;; Hash case 5 -- the 5 RAISE shapes that the C constructor and the C
+;; accessors own: odd count (:5293), unknown keyword (:5309), invalid
+;; size (:5330), invalid weakness (:5344) and a non-table argument.
+;; A raise aborts an elisp LOAD, so the calls are Scheme-level calls of
+;; the SAME cells that the reader installed.
+(let* ((make-fn (and (symbol-fbound? 'make-hash-table)
+                     (symbol-function 'make-hash-table)))
+       (gethash-fn (and (symbol-fbound? 'gethash)
+                        (symbol-function 'gethash)))
+       (kw (lambda (name) (string->symbol name)))
+       (text (lambda (thunk)
+               (let ((err (catch #t
+                            (lambda () (thunk) 'no-error)
+                            (lambda (key . args) (cons key args)))))
+                 (and (pair? err) (row34-error-text (cdr err)))))))
+  (test-assert "row 32 hash: the 5 raise shapes match the C texts"
+               (and (equal? "Odd number of arguments"
+                            (and make-fn
+                                 (text (lambda () (make-fn (kw ":test"))))))
+                    (equal? "Invalid keyword argument :bogus"
+                            (and make-fn
+                                 (text (lambda () (make-fn (kw ":bogus") 1)))))
+                    (equal? "Invalid hash table size \"x\""
+                            (and make-fn
+                                 (text (lambda () (make-fn (kw ":size") "x")))))
+                    (equal? "Invalid hash table weakness weird"
+                            (and make-fn
+                                 (text (lambda ()
+                                         (make-fn (kw ":weakness") 'weird)))))
+                    (equal? "Wrong type argument: hash-table-p (1 2)"
+                            (and gethash-fn
+                                 (text (lambda () (gethash-fn 'k '(1 2)))))))))
 
 (test-end "Guilemacs standalone loader and reader")
 

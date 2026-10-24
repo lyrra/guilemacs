@@ -35,12 +35,12 @@
 ;;;   L15 `EMPTY-CELLS' is a FIXED 11-name list, so it does not hold
 ;;;       `put'.  It is NOT the proof of row 30; the proof is the
 ;;;       `CELLS' line of mode `put'.
-;;;   L26 the NEXT stop is `make-hash-table'
-;;;       (lisp/emacs-lisp/macroexp.el :168).
-;;;       `elisp-make-hash-table' is EXPORTED (utils.scm :28) but has NO
-;;;       definition (measured: `module-ref' raises), so a later row must
-;;;       write that procedure before it can install the cell.  This row
-;;;       does not fix that cell.
+;;;   L26 (CLOSED by row 32) the NEXT stop after row 30 was
+;;;       `make-hash-table' (lisp/emacs-lisp/macroexp.el :165).
+;;;       M60 imp-15: row 32 wrote the family and installed its 14 cells,
+;;;       so the stop MOVED.  The check `s1/next-stop-named' and the 2
+;;;       observable pins name the NEXT wall,
+;;;       `void-function (define-obsolete-function-alias)'.
 ;;;   A `put' on a STRING or a NUMBER first argument raises `Wrong type
 ;;;       argument: symbolp'.  That is elisp behaviour, so it is pinned
 ;;;       as CORRECT.
@@ -326,15 +326,16 @@ controlled ERT skip -- never a pass."
                    '("lisp/emacs-lisp/macroexp.el :137"
                      "cl-lib.el :87 requires macroexp"))))
 
-;; L26: the NEXT stop and its named blocker are in the source comment.
+;; The NEXT stop and its named blocker are in the source comment.
+;; M60 imp-15 RE-PIN: L26 (`make-hash-table') is CLOSED by row 32, so
+;; this check now names the wall that row 32 exposes, and the old pin
+;; named the exported-but-empty trap.
 (m60-imp11--check "s1/next-stop-named"
                  (m60-imp11--all
                   (m60-imp11--holds-all
                    "mod/emacs/loader.scm"
-                   '("lisp/emacs-lisp/macroexp.el :168"
-                     "elisp-make-hash-table' is exported"
-                     "NO"
-                     "definition"))))
+                   '("lisp/emacs-lisp/macroexp.el :165"
+                     "void-function (define-obsolete-function-alias)"))))
 
 ;;; --- S2. The observables (live `guile' child, mode `put') -----------
 
@@ -346,7 +347,9 @@ controlled ERT skip -- never a pass."
 (m60-imp11--check "s2/cell-bound"
                  (m60-imp11--probe-line
                   "put"
-                  "CELLS: put -> #t get -> #f make-hash-table -> #f"))
+                  ;; M60 imp-15 RE-PIN: row 32 installs the
+                  ;; `make-hash-table' family, so this wall MOVED.
+                  "CELLS: put -> #t get -> #f make-hash-table -> #t"))
 
 ;; The installed cell stores a property and RETURNS the VALUE, not the
 ;; plist, and `get' reads the same property back.
@@ -384,10 +387,13 @@ controlled ERT skip -- never a pass."
                   ;; `LOAD lisp/calendar/time-date.el: ERROR wrong-type-arg
                   ;; (#f "Wrong type to apply: ~S" (#nil) (#nil))'.  Row 33
                   ;; installs the `set' cell, so the load moves to the NEXT
-                  ;; wall, `make-hash-table' (row 32, macroexp.el :168).
+                  ;; wall, `make-hash-table' (row 32, macroexp.el
+                  ;; :165); row 32 CLOSED that stop.
                   (m60-imp11--probe-line
                    "put"
-                   "LOAD lisp/calendar/time-date.el: ERROR void-function (make-hash-table)")
+                  ;; M60 imp-15 RE-PIN: row 32 installs the
+                  ;; `make-hash-table' family, so this wall MOVED.
+                   "LOAD lisp/calendar/time-date.el: ERROR void-function (define-obsolete-function-alias)")
                   (m60-imp11--probe-line
                    "put"
                    ;; M60 imp-12 RE-PIN: the OLD line was
@@ -454,7 +460,9 @@ controlled ERT skip -- never a pass."
                       (eq 'skip (m60-imp11--verdict
                                  (m60-imp11--all
                                   'm60-imp11-prog-absent
-                                  (m60-imp11--probe-line "put" "CELLS: put -> #t get -> #f make-hash-table -> #f"))))
+                  ;; M60 imp-15 RE-PIN: row 32 installs the
+                  ;; `make-hash-table' family, so this wall MOVED.
+                                  (m60-imp11--probe-line "put" "CELLS: put -> #t get -> #f make-hash-table -> #t"))))
                       (eq 'absent (m60-imp11--verdict 'm60-imp11-absent))
                       (eq 'pass (m60-imp11--verdict t))
                       (eq 'fail (m60-imp11--verdict nil))
