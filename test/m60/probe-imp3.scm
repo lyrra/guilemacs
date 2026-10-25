@@ -168,10 +168,13 @@ definition itself: a `memq' over the `features' list."
   (set-symbol-value! 'default-directory (string-append root "/lisp/"))
   (load-line "lisp/subdirs.el")
   (load-line "lisp/cdl.el")
-  ;; M60 imp-4 acceptance: mode `cells' never installs the 2 cells, so
-  ;; these 3 words come from the 2 guarded forms of `init-loader' and
-  ;; from NOWHERE else.  `featurep' is a C DEFUN, so its own cell is
-  ;; empty here and the plain-Scheme definition is used.
+  (show "featurep via cell" "~s"
+        ((symbol-function 'featurep) 'cdl))
+  ;; M60 imp-17 -- F3: the `featurep' cell is BOUND after `init-loader'
+  ;; now (guarded install, the row-18 pattern).  In a full Emacs the owner
+  ;; is the C DEFUN `Ffeaturep' (src/fns.c :3432), and the guard keeps it
+  ;; there.  The 3 words below come from the guarded forms of
+  ;; `init-loader' and from NOWHERE else.
   (show "featurep-fbound" "~s" (symbol-fbound? 'featurep))
   (show "featurep cdl" "~s" (elisp-featurep 'cdl))
   (show "features" "~s" (symbol-value 'features))

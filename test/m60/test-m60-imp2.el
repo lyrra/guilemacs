@@ -505,6 +505,17 @@ host limit is a skip, never a pass."
                                 (eql 0 (m60-imp2--count "mod/emacs/utils.scm"
                                                         "set-symbol-function! 'require"))))
 
+;; M60 imp-17 (row F3): the guarded install of `featurep' moves this
+;; line.  MEASURED (probe mode `provide'): `featurep-fbound: #t'.  OLD
+;; value: `featurep-fbound: #f'.  Mode `provide' is a FIXTURE that
+;; installs `provide' and binds `features' itself, so it measures the
+;; LOAD; the flip comes from `init-loader' only.  cr.org F3 of the
+;; imp-17 round: mode `provide' had NO pin for this line, so it could go
+;; stale without a FAIL.  Mode `stubs' holds the same line (R4) and mode
+;; `cells' is the proof of F3.
+(m60-imp2--check "r2/featurep-fbound-provide"
+                 (m60-imp2--probe-line "provide" "featurep-fbound: #t"))
+
 ;;; --- R3. The 4 first stops ------------------------------------------
 
 ;; One REAL lisp/ file per check.  MEASURED (probe mode `cells'): each
@@ -610,11 +621,16 @@ host limit is a skip, never a pass."
 ;; The LAST GOOD POINT: with the faithful `provide' cell and the
 ;; `features' variable bound, lisp/cdl.el loads to the END, the elisp
 ;; `featurep' of `cdl' is #t, and `features' is (cdl).  (`featurep'
-;; itself is a C DEFUN, so its own cell is empty here; the fixture uses
-;; the elisp definition, a `memq' over `features'.)
+;; itself is a C DEFUN in a full Emacs, and `init-loader' now installs
+;; the elisp cell with the row-18 guard (M60 imp-17, F3), so the cell is
+;; BOUND here; the `featurep cdl' line still calls the elisp definition,
+;; a `memq' over `features'.)
 (m60-imp2--check "r4/last-good-point"
                  (m60-imp2--all (m60-imp2--probe-line "stubs" "faithful-provide / cdl: done")
-                                (m60-imp2--probe-line "stubs" "featurep-fbound: #f")
+                                ;; M60 imp-17 (row F3) RE-PIN: `featurep-fbound'
+                                ;; flips #f -> #t in mode `stubs' (the guarded
+                                ;; install in `init-loader').  OLD value #f.
+                                (m60-imp2--probe-line "stubs" "featurep-fbound: #t")
                                 (m60-imp2--probe-line "stubs" "featurep cdl: #t")
                                 (m60-imp2--probe-line "stubs" "features: (cdl)")))
 

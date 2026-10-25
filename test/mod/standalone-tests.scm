@@ -13,7 +13,9 @@
 ;; (`normal-top-level-add-to-load-path'): 1 negative and 1 positive.
 ;; cr.org F1 fix: 15 -> 17, the TAIL-cell anchor case and the ABSENT
 ;; anchor case (the elisp loop splices at the tail cell too).
-(define expected-passes 17)
+;; M60 imp-17: 17 -> 19, the 2 cases of F3 (the guarded `featurep'
+;; install): 1 for the cell and 1 for its 2 answers.
+(define expected-passes 19)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -49,6 +51,48 @@
 (test-assert (format #f "init-loader starts in plain Guile (result: ~s)"
                      init-result)
              (eq? #t init-result))
+
+;;; M60 imp-17 -- F3: the `featurep' cell of (emacs utils) :493, installed
+;;; by the guarded block of `init-loader'.  The C owner is `Ffeaturep'
+;;; (src/fns.c :3432); the guard keeps that cell in a full Emacs.  The
+;;; suite imports (emacs loader) and (emacs-elisp runtime) only, so the
+;;; cases call the INSTALLED cells, not the `elisp-*' names.
+
+;; Case 1 -- the CELL is present after `init-loader'.
+(test-assert "row F3: `init-loader' installs the `featurep' cell"
+             (eq? #t (symbol-fbound? 'featurep)))
+
+;; Case 2 -- the CELL answers.  `provide' adds the feature to the
+;; `features' list that the cell reads, so this case does not rely on that
+;; bind alone (F4 keeps the bind `()').  An absent feature must give
+;; `#nil', and `(eq? #nil #f)' is FALSE, so the 2 words are pinned apart.
+;; cr.org F4 of this round: `provide' MUTATES the global `features' list,
+;; so the case SAVES the list and RESTORES it.  No later case sees
+;; `m60-imp17', and the restore is part of the assertion.
+(let* ((features-before (and (symbol-bound? 'features)
+                             (symbol-value 'features)))
+       (provide-cell (and (symbol-fbound? 'provide)
+                          (symbol-function 'provide)))
+       (featurep-cell (and (symbol-fbound? 'featurep)
+                           (symbol-function 'featurep)))
+       (added (and provide-cell
+                   (apply provide-cell '(m60-imp17))))
+       (present (and featurep-cell
+                     (apply featurep-cell '(m60-imp17))))
+       (absent (and featurep-cell
+                    (apply featurep-cell '(m60-imp17-absent))))
+       (answers? (and added
+                      (eq? #t present)
+                      (eq? #nil absent))))
+  (when (symbol-bound? 'features)
+    (set-symbol-value! 'features features-before))
+  (test-assert (format #f "row F3: the installed `featurep' cell answers #t for a provided feature and #nil for an absent one (present: ~s, absent: ~s, features restored: ~s)"
+                       present absent
+                       (and (symbol-bound? 'features)
+                            (equal? features-before (symbol-value 'features))))
+               (and answers?
+                    (symbol-bound? 'features)
+                    (equal? features-before (symbol-value 'features)))))
 
 ;; This fixture defines and calls an Elisp function, then stores its result.
 (let ((result

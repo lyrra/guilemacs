@@ -972,7 +972,9 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'put elisp-put)
   (set-symbol-function! 'hash-table-count elisp-hash-table-count)
   (set-symbol-function! 'clrhash elisp-clrhash)
-  (set-symbol-function! 'featurep elisp-featurep)
+  ;; M60 imp-17 -- F3: the `featurep' install moved to `init-loader',
+  ;; with the row-18 guard (loader.scm).  `init-loader' does not call
+  ;; this function.
   (set-symbol-function! 'nreverse elisp-nreverse)
   (set-symbol-function! 'markerp elisp-markerp)
   (set-symbol-function! 'keywordp elisp-keywordp)

@@ -1561,7 +1561,7 @@ A chain longer than `%elisp-loader-indirect-limit' raises
       (set-symbol-function! 'make-obsolete-variable
                             elisp-make-obsolete-variable))
     ;; M60 imp-16 -- row 25: the cell of (emacs utils), the row-18 pattern
-    ;; of `provide' (:1554) and `make-obsolete-variable' (:1560): 1
+    ;; of `provide' (:1533) and `make-obsolete-variable' (:1560): 1
     ;; install site, 1 guard, 0 new evaluator branches, 0 FIX markers.
     ;; The owner is the elisp Lisp function of lisp/startup.el :479, and
     ;; the 1 caller is lisp/subdirs.el :3.  That caller BINDS
@@ -1580,7 +1580,27 @@ A chain longer than `%elisp-loader-indirect-limit' raises
     ;; Limits: L39 ... L43, named at the definition in (emacs utils).
     (unless (symbol-fbound? 'normal-top-level-add-to-load-path)
       (set-symbol-function! 'normal-top-level-add-to-load-path
-                            elisp-normal-top-level-add-to-load-path)))
+                            elisp-normal-top-level-add-to-load-path))
+    ;; M60 imp-17 -- F3, the row of milestone.org section 3: the cell of
+    ;; (emacs utils) :493, the row-18 pattern of `provide' (:1533) and
+    ;; `make-obsolete-variable' (:1560): 1 install site, 1 guard, 0 new
+    ;; evaluator branches, 0 FIX markers.  The C owner is
+    ;; `DEFUN ("featurep", Ffeaturep, Sfeaturep, 1, 2, 0)' at
+    ;; src/fns.c :3432.  A full Emacs already owns that cell, so this
+    ;; guard keeps the C DEFUN there.
+    ;; The old site was UNGUARDED: `utils.scm' :975 inside
+    ;; `init-utils-registrations' (:960), a function that this
+    ;; `init-loader' does not call.  The deletion therefore changes no
+    ;; other path.
+    ;; Truth values: `elisp-featurep' answers `#t' or `#nil'.
+    ;; `(eq? #nil #f)' is FALSE, so a condition that comes from this
+    ;; cell must pass through `elisp-loader-truthy?' (:1072).
+    ;; L15: `EMPTY-CELLS' of test/m60/probe-imp3.scm is a FIXED list of
+    ;; 11 guarded names and does NOT hold `featurep', so that line is
+    ;; not the proof of F3.  The proof is the `featurep-fbound' line of
+    ;; that fixture.
+    (unless (symbol-fbound? 'featurep)
+      (set-symbol-function! 'featurep elisp-featurep)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

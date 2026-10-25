@@ -305,7 +305,8 @@ symbol `m55-imp5-guile-absent'."
                  ;; `normal-top-level-add-to-load-path' install in `init-loader';
                  ;; `symbol-fbound?' 55 -> 56, `set-symbol-function!' 51 -> 52,
                  ;; `FIX-*' stays 10).
-                 (eql 1813 (m55-imp5--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-17 (row F3) RE-PIN: 1,813 -> 1,833 LINES (OLD value 1,813).
+                 (eql 1833 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
@@ -326,7 +327,8 @@ symbol `m55-imp5-guile-absent'."
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
                  ;; M60 imp-16 RE-PIN: 55 -> 56 LINES (OLD value 55; the row-25
                  ;; guarded install in `init-loader').
-                 (eql 56 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-17 (row F3) RE-PIN: `symbol-fbound?' 56 -> 57 LINES (OLD value 56).
+                 (eql 57 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; Row 6: set-symbol-function! lines in loader.scm = 14 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -337,7 +339,8 @@ symbol `m55-imp5-guile-absent'."
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
                  ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51; the same
                  ;; row-25 guarded install).
-                 (eql 52 (m55-imp5--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-17 (row F3) RE-PIN: `set-symbol-function!' 52 -> 53 LINES (OLD value 52).
+                 (eql 53 (m55-imp5--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; Row 7: FIX-*-guilemacs lines in loader.scm = 7 (`grep -c').
 (m55-imp5--check "loader.scm-fix-markers-lines-9"

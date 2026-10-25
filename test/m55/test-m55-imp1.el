@@ -319,7 +319,8 @@ symbol `m55-imp1-guile-absent'."
                  ;; count and its 4 counters.  OLD: 1,653 lines, 74, 40, 36 and 9.
                  ;; M60 imp-16 (row 25) RE-PIN: 1,792 -> 1,813 LINES (the guarded
                  ;; `normal-top-level-add-to-load-path' install in `init-loader').
-                 (eql 1813 (m55-imp1--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-17 (row F3) RE-PIN: 1,813 -> 1,833 LINES (OLD value 1,813).
+                 (eql 1833 (m55-imp1--lines "mod/emacs/loader.scm")))
 (m55-imp1--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
 (m55-imp1--check "prelude-load.scm-lines-229"
@@ -335,7 +336,8 @@ symbol `m55-imp1-guile-absent'."
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
                  ;; M60 imp-16 RE-PIN: 55 -> 56 LINES (OLD value 55; the row-25
                  ;; guarded install in `init-loader').
-                 (eql 56 (m55-imp1--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-17 (row F3) RE-PIN: `symbol-fbound?' 56 -> 57 LINES (OLD value 56).
+                 (eql 57 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 (m55-imp1--check "prelude-load.scm-use-modules-71"
                  (eql 71 (m55-imp1--count-lines "prelude/load.scm"
@@ -350,7 +352,8 @@ symbol `m55-imp1-guile-absent'."
 (m55-imp1--check "loader.scm-set-symbol-function"
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
                  ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51).
-                 (eql 52 (m55-imp1--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-17 (row F3) RE-PIN: `set-symbol-function!' 52 -> 53 LINES (OLD value 52).
+                 (eql 53 (m55-imp1--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 (m55-imp1--check "loader.scm-fix-markers-9"
                  (eql 10 (m55-imp1--count-lines "mod/emacs/loader.scm"
