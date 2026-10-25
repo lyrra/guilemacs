@@ -318,7 +318,11 @@ PROCEDURE already existed before this row.")
                      ;; same module, so the select list is longer and it
                      ;; spans 2 lines.
                      "#:select (elisp-eq elisp-eql elisp-equal elisp-null"
-                     "elisp-hash-table-p))"
+                     ;; M60 imp-18 (row 35) RE-PIN: the OLD pin was
+                     ;; "elisp-hash-table-p))".  Row 35 adds 1 name to the
+                     ;; same select list, so the list ends on that name.
+                     "elisp-hash-table-p"
+                     "elisp-bare-symbol))"
                      "#:use-module ((emacs numbers)"
                      "#:use-module ((emacs sequences) #:select (elisp-append elisp-length))"))))
 

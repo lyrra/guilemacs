@@ -20,7 +20,7 @@
 ;;; MODE is one of `cells', `subdirs', `subdirs-neg', `provide', `stubs',
 ;;; `negative', `noboot', `require', `defs', `macros', `registration',
 ;;; `language', `obsolete', `control', `arith', `put', `set', `alias',
-;;; `hash', or `eac'.
+;;; `hash', `baresym', or `eac'.
 ;;; Mode `subdirs' is the M60 imp-16 record of row 25
 ;;; (`normal-top-level-add-to-load-path'): the 24-name expansion of
 ;;; lisp/subdirs.el :3 and the 14 -> 38 `load-path' delta.  Mode
@@ -30,6 +30,9 @@
 ;;; Mode `hash' is the M60 imp-15 record of row 32 (the
 ;;; `make-hash-table' family, its keyword decode and its 5 raise texts);
 ;;; it also records the NEXT stop of lisp/emacs-lisp/macroexp.el.
+;;; Mode `baresym' is the M60 imp-18 record of row 35 (the identity cell
+;;; `bare-symbol'): the cell, its 3 call results, and the first stop of
+;;; byte-run.el, macroexp.el, custom.el and startup.el.
 ;;; Mode `alias' is the M60 imp-14 record of row 34 (`defalias', the
 ;;; UNEVALLED `function' form and the symbol-cell indirection).  Mode
 ;;; `defs' is the M60 imp-6 record of rows 21 and 22 (`defconst',
@@ -1164,6 +1167,86 @@ definition itself: a `memq' over the `features' list."
   ;; MOVES to the NEXT wall.
   (load-line "lisp/emacs-lisp/macroexp.el"))
 
+;;; --- mode: baresym --------------------------------------------------
+
+;; M60 imp-18 -- row 35 record.  The C DEFUN of src/data.c :599 is the
+;; IDENTITY: the argument vector 1, 1, 0 names no type predicate, so a
+;; number and the elisp nil both come back unchanged and raise nothing.
+;; The 7 keys below are the observables of brief.org section 5.
+;;
+;; MEASURED at imp-18 (plain `guile -L mod', GUILE_AUTO_COMPILE=0):
+;;   byte-run.el loads to `done`.  Row 35 IS the wall of that file:
+;;   CONTROL run (mod/ of d7f0b40dd, the same probe) gives
+;;   `BARESYM cell: #f' and
+;;   `LOAD lisp/emacs-lisp/byte-run.el: ERROR void-function (bare-symbol)'.
+;;   The wall is the TOP-LEVEL call at :112, not the :51 pattern line:
+;;   `(function-put 'defmacro 'doc-string-elt 3)` runs at LOAD time, so
+;;   the body at :111 `(put (bare-symbol function) prop value)` calls
+;;   `bare-symbol`.  :51 is a `#'(lambda ...)` body of
+;;   `byte-run--strip-list` (:43); a plain load defines that lambda and
+;;   does NOT evaluate :51, so the old table row of milestone.org
+;;   section 2.1 (`bare-symbol` at :51) was a PATTERN measure and :51 is
+;;   not the cause of the old stop.  No form count is printed: `done`
+;;   is the observable.
+;;   The NEXT wall of the chain is ONE cause, the limit L4 of
+;;   `elisp-loader-make-procedure` (loader.scm :1295): no `&optional` and
+;;   no `&rest` in a parameter list.  `elisp-loader-bind-params!` walks
+;;   the params and calls `(cdr as)` past the end of a short argument
+;;   list, so the raise is `wrong-type-arg ("cdr" ... ())`.
+;;   The 3 measured stops: macroexp.el form 16
+;;   (`define-obsolete-function-alias` :178), custom.el form 1
+;;   (`(require 'widget)` :36, so widget.el form 3
+;;   `define-obsolete-function-alias` :60 is the leaf), startup.el
+;;   `void-function (defgroup)` (`defgroup` is custom.el :517, a
+;;   `&rest args` `defmacro`, so custom.el must load first).
+;;
+;; NOTE on key 6: `defmacro` stores an EXPANDER in the macro table and
+;; does NOT touch the elisp function cell (row 23, loader.scm :1345;
+;; limit L10).  So the 2 names below answer #f to `symbol-fbound?` while
+;; a CALL of them expands.  The macro table is the real state.
+(define (mode-baresym)
+  (let ((eval-form (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-eval))
+        (macro-ref (module-ref (resolve-module '(emacs loader))
+                               'elisp-loader-macro-ref)))
+  ;; 1. The cell is EMPTY at HEAD and BOUND after `init-loader'.
+  (show "BARESYM cell" "~s" (symbol-fbound? 'bare-symbol))
+  ;; 2. The cell returns the SAME symbol (`eq?', not `equal?').
+  (let ((cell (and (symbol-fbound? 'bare-symbol)
+                   (symbol-function 'bare-symbol))))
+    (show "BARESYM symbol" "~s same=~s"
+          (and cell (cell 'm60-probe-sym))
+          (and cell (eq? (cell 'm60-probe-sym) 'm60-probe-sym)))
+    ;; 3. A number and the elisp nil: the argument comes back and NOTHING
+    ;; raises.  A raise here is a defect (no type predicate in C).
+    (show "BARESYM number" "~a" (describe-error (lambda () (cell 42))))
+    (show "BARESYM nil" "~a" (describe-error (lambda () (cell #nil)))))
+  ;; 4. The load of lisp/emacs-lisp/byte-run.el and its result line.
+  (load-line "lisp/emacs-lisp/byte-run.el")
+  ;; 5. The NEXT stop of each file in the chain, 1 line per file.
+  (load-line "lisp/emacs-lisp/macroexp.el")
+  (load-line "lisp/custom.el")
+  (load-line "lisp/startup.el")
+  ;; 6. The 2 definitions that byte-run.el and custom.el own: the elisp
+  ;; function cell, then the macro table of this loader.
+  (show "BARESYM defs" "define-obsolete-function-alias fbound=~s macro=~s"
+        (symbol-fbound? 'define-obsolete-function-alias)
+        (procedure? (macro-ref 'define-obsolete-function-alias)))
+  (show "BARESYM defgroup" "defgroup fbound=~s macro=~s"
+        (symbol-fbound? 'defgroup)
+        (procedure? (macro-ref 'defgroup)))
+  ;; The 2 names EXPAND, so the #f above is the row-23 split and not a
+  ;; missing definition.  The expansion itself stops on the L4 wall (the
+  ;; expander params are `(obsolete-name current-name when &optional
+  ;; docstring)'), and that raise IS the measured cause of the chain
+  ;; stop, not a defect of this row.
+  (show "BARESYM expand" "~s"
+        (describe-error
+         (lambda () (eval-form '(define-obsolete-function-alias
+                                  'm60-probe-old 'm60-probe-new "1.0")))))
+  ;; 7. F3 does not regress.
+  (show "BARESYM featurep-fbound" "~s" (symbol-fbound? 'featurep))))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -1187,5 +1270,6 @@ definition itself: a `memq' over the `features' list."
   ((alias) (mode-alias))
   ((eac) (mode-eac))
   ((hash) (mode-hash))
-  (else (die (format #f "unknown mode ~a (cells|subdirs|subdirs-neg|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash)"
+  ((baresym) (mode-baresym))
+  (else (die (format #f "unknown mode ~a (cells|subdirs|subdirs-neg|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash|baresym)"
                      mode))))

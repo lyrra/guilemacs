@@ -509,10 +509,16 @@ presence or absence of Emacs or environment extensions."
 ;; M60 imp-16 -- row 25.  The owner is the elisp Lisp function of
 ;; lisp/startup.el :479 (`normal-top-level-add-to-load-path'), not a C
 ;; DEFUN: `grep -rn normal-top-level-add-to-load-path src/' gives 0 hits.
-;; The 1 caller is lisp/subdirs.el :3.  `startup.el' can not load yet (it
-;; stops on the C cell `bare-symbol', row 35, and it needs the `defgroup'
-;; macro of lisp/custom.el), so the port lives here and `init-loader'
-;; installs it with 1 guard (the row-18 pattern, loader.scm).
+;; The 1 caller is lisp/subdirs.el :3.  `startup.el' can not load yet: it
+;; stops on `void-function (defgroup)' (`defgroup' is a `&rest args'
+;; `defmacro' of lisp/custom.el :517, and `custom.el' stops on the
+;; `&optional' / `&rest' wall L4 of loader.scm), so the port lives here
+;; and `init-loader' installs it with 1 guard (the row-18 pattern,
+;; loader.scm).
+;; M60 imp-18 (row 35): the old blocker named here, the C cell
+;; `bare-symbol', is CLOSED -- `lisp/emacs-lisp/byte-run.el' loads to the
+;; END now (27 forms of 27, measured).  The `defgroup' stop above is the
+;; MEASURED next one.
 ;;
 ;; The port holds the DECISION, not a wrapper: the anchor search, the
 ;; trailing-"/" strip and the splice are Scheme.  No C leaf is called and

@@ -38,6 +38,7 @@
     elisp-identity
     elisp-char-table-p
     elisp-bare-symbol-p
+    elisp-bare-symbol
     elisp-boundp
     elisp-condition-variable-p
     elisp-hash-table-p
@@ -421,6 +422,18 @@ of strings.  (`equal' ignores text properties.)"
   ;; In Guile implementation, symbols don't have position information
   ;; so this is the same as symbolp for now
   (if (symbol? object) #t #nil))
+
+(define (elisp-bare-symbol sym)
+  "Extract, if need be, the bare symbol from SYM."
+  ;; M60 imp-18 -- row 35: the C DEFUN of src/data.c :599 is
+  ;; `return sym;' with the argument vector 1, 1, 0, so it has NO type
+  ;; predicate and raises NO error.  Guilemacs has no symbol-with-pos
+  ;; wrapper (`elisp-symbol-with-pos-p' always answers #nil), so this is
+  ;; the identity.
+  ;; Limit L44: no symbol-with-pos type exists in Guilemacs, so the
+  ;; wrapper case of this call is not observable, and `position-symbol'
+  ;; and `remove-pos-from-symbol' stay out of this row.
+  sym)
 
 (define (elisp-boundp symbol)
   "Return t if SYMBOL's value is not void."

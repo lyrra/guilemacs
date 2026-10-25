@@ -15,7 +15,10 @@
 ;; anchor case (the elisp loop splices at the tail cell too).
 ;; M60 imp-17: 17 -> 19, the 2 cases of F3 (the guarded `featurep'
 ;; install): 1 for the cell and 1 for its 2 answers.
-(define expected-passes 19)
+;; M60 imp-18 (19 -> 22): the 3 cases of row 35 (the guarded
+;; `bare-symbol' install): 1 for the cell, 1 for the identity, and 1 for
+;; the elisp nil (the 3rd truth value).
+(define expected-passes 22)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -93,6 +96,44 @@
                (and answers?
                     (symbol-bound? 'features)
                     (equal? features-before (symbol-value 'features)))))
+
+;;; M60 imp-18 -- row 35: the `bare-symbol' cell of (emacs types) :426,
+;;; installed by the guarded block of `init-loader'.  The C owner is
+;;; `Fbare_symbol' (src/data.c :599) and its argument vector 1, 1, 0
+;;; names NO type predicate, so the function is the IDENTITY.
+
+;; Case 1 -- the CELL is present after `init-loader'.
+(test-assert "row 35: `init-loader' installs the `bare-symbol' cell"
+             (eq? #t (symbol-fbound? 'bare-symbol)))
+
+;; Case 2 -- the CELL is the IDENTITY.  It answers the SAME symbol
+;; (`eq?', not `equal?'), and a NUMBER comes back unchanged with NO
+;; raise: the C function has no type predicate, so `wrong-type-argument'
+;; here would be a defect.
+(let* ((cell (and (symbol-fbound? 'bare-symbol)
+                  (symbol-function 'bare-symbol)))
+       (sym (and cell (apply cell '(m60-imp18))))
+       (num (and cell
+                 (catch #t
+                   (lambda () (list 'ok (apply cell '(42))))
+                   (lambda (key . args) (cons 'error (cons key args)))))))
+  (test-assert (format #f "row 35: the installed `bare-symbol' cell returns the SAME symbol and a number unchanged, with no raise (sym: ~s, num: ~s)"
+                       sym num)
+               (and (eq? sym 'm60-imp18)
+                    (equal? num '(ok 42)))))
+
+;; Case 3 -- the elisp nil passes through unchanged with NO raise.  The
+;; C DEFUN has no type predicate, so a raise here would be a defect, and
+;; `#nil' must stay `#nil' (`equal?', the 3 truth values are kept).
+(let ((result (and (symbol-fbound? 'bare-symbol)
+                   (catch #t
+                     (lambda ()
+                       (list 'ok (apply (symbol-function 'bare-symbol)
+                                        (list #nil))))
+                     (lambda (key . args) (cons 'error (cons key args)))))))
+  (test-assert (format #f "row 35: the elisp nil passes through the installed `bare-symbol' cell unchanged, with no raise (result: ~s)"
+                       result)
+               (equal? result (list 'ok #nil))))
 
 ;; This fixture defines and calls an Elisp function, then stores its result.
 (let ((result

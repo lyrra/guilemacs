@@ -27,7 +27,10 @@
                            ;; M60 imp-15 -- row 32: 1 SRFI-69 table IS
                            ;; the elisp hash table, so the existing
                            ;; predicate of types.scm :444 is the cell.
-                           elisp-hash-table-p))
+                           elisp-hash-table-p
+                           ;; M60 imp-18 -- row 35: the identity of
+                           ;; types.scm :426, guarded install below.
+                           elisp-bare-symbol))
   #:use-module ((emacs numbers)
                 #:select (elisp-+ elisp-- elisp-* elisp-/
                            elisp-= elisp-< elisp->
@@ -1600,7 +1603,18 @@ A chain longer than `%elisp-loader-indirect-limit' raises
     ;; not the proof of F3.  The proof is the `featurep-fbound' line of
     ;; that fixture.
     (unless (symbol-fbound? 'featurep)
-      (set-symbol-function! 'featurep elisp-featurep)))
+      (set-symbol-function! 'featurep elisp-featurep))
+    ;; M60 imp-18 -- row 35: the row-18 pattern of `provide' (:1533)
+    ;; and `make-obsolete-variable' (:1560): 1 install site, 1 guard,
+    ;; 0 new evaluator branches, 0 FIX markers.  The C owner is
+    ;; `DEFUN ("bare-symbol", Fbare_symbol, Sbare_symbol, 1, 1, 0)' at
+    ;; src/data.c :599; a full Emacs keeps that cell.
+    ;; The argument vector 1, 1, 0 names NO type predicate, so the C
+    ;; function is the identity and raises no `wrong-type-argument'.
+    ;; The port (types.scm :426) copies that shape: it answers its
+    ;; argument for a symbol, a number and `#nil' alike.
+    (unless (symbol-fbound? 'bare-symbol)
+      (set-symbol-function! 'bare-symbol elisp-bare-symbol)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)
