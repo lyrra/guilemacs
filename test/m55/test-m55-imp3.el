@@ -323,7 +323,9 @@ symbol `m55-imp3-guile-absent'."
                  ;; M60 imp-17 (row F3) RE-PIN: 1,813 -> 1,833 LINES (OLD value 1,813).
                  ;; M60 imp-18 (row 35) RE-PIN: 1,833 -> 1,847 LINES (OLD value 1,833).
                  ;; M60 imp-19 (limit L4) RE-PIN: 1,847 -> 1,889 LINES (OLD value 1,847).
-                 (eql 1889 (m55-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-20 (row 36) RE-PIN: 1,889 -> 1,914 LINES (OLD value 1,889;
+                 ;; the `declare' branch and its comment lines, no counter changes).
+                 (eql 1914 (m55-imp3--lines "mod/emacs/loader.scm")))
 (m55-imp3--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp3--lines "mod/emacs/reader.scm")))
 (m55-imp3--check "prelude-load.scm-lines-229"

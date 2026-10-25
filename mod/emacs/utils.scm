@@ -612,9 +612,13 @@ particular subfeatures supported in this version of FEATURE."
 ;;        `t' guard of the C path: the mark is stored for every
 ;;        OBSOLETE-NAME, and ACCESS-TYPE is not checked.
 ;;   L14: lisp/obarray.el :35 holds `(declare (obsolete ...))' in the
-;;        BODY of `obarray-size'.  The loader has no `declare' branch.
-;;        The LOAD passes, because `defun' does not evaluate the body.  A
-;;        CALL of `obarray-size' raises `void-function declare'.
+;;        BODY of `obarray-size'.  Since M60 imp-20 (row 36) the loader
+;;        HAS a `declare' branch that returns `#nil' and reads no
+;;        element, so the LOAD passes and a CALL answers the body value.
+;;        MEASURED on a scratch `defun', HEAD = 812559b56: the cell is
+;;        bound and the call answers 7.  It does not store the mark: see
+;;        L49 (no content stored), L50 (no warning channel) and L51 (no
+;;        shape check) of row 36.
 (define elisp-make-obsolete-variable
   (case-lambda
     ((obsolete-name current-name when)

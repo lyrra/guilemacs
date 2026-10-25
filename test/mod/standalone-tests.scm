@@ -23,7 +23,16 @@
 ;; cases.  cr.org FIX of the imp-19 round (32 -> 36, OLD value 32): cases
 ;; 11 ... 14 gate the 2 limits that had no case, L45 (lenient arity) and
 ;; L46 (a non-list parameter list), plus D1 for several `&optional' names.
-(define expected-passes 36)
+;; M60 imp-20 (36 -> 42): the 6 cases of row 36 (the `declare' form is
+;; data): the fixture loads, the value is the elisp nil, the argument is
+;; not evaluated, a DOTTED shape is legal too, a declaration as the first
+;; body form of a macro is ignored, and the load continues.  The dotted
+;; case answers cr.org of the imp-20 round, F8: L51 stated that property
+;; and no case loaded it.
+;; cr.org F7 fix of the imp-20 round (42 -> 43, OLD value 42): case 7
+;; gates limit L14 at CALL time: a declaration in the body of a `defun'
+;; is data, so the call answers the body value and does not raise.
+(define expected-passes 43)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -718,6 +727,69 @@
                     (m19-elems? (cadr half) '(1 2 #nil))
                     (eq? 'ok (car long))
                     (m19-elems? (cadr long) '(1 2 3)))))
+
+;;; M60 imp-20 -- row 36: the `declare' form is DATA for the byte
+;;; compiler.  The loader branch `((eq? head 'declare) #nil)' of
+;;; `elisp-loader-eval-form' (mod/emacs/loader.scm) ignores the form and
+;;; evaluates NO element.  The C tree owns the name nowhere (0 `defmacro
+;;; declare' in lisp/; src/eval.c has no DEFUN and no code branch), so
+;;; this is a DECISION, not a port.  The reachable shape is a
+;;; DECLARATION BODY FORM of a `defmacro' expander, evaluated at
+;;; EXPANSION time.
+;;
+;; The 7 cases load `standalone-declare.el' ONE time: the argument is
+;; not evaluated, the value is the elisp nil, a dotted shape is legal, a
+;; body form of an expander is ignored, the load continues, and a
+;; declaration in a `defun' body does not raise at CALL time.  `eq?'
+;; against #nil is the test, never `null?' or `not': `(eq? #nil '())' is
+;; false.
+(let* ((load-result (m19-try (lambda ()
+                               (load-fixture "standalone-declare.el")
+                               'loaded)))
+       (loaded (eq? 'loaded (cadr load-result)))
+       (empty (and loaded (m19-cell 'm60-declare-empty)))
+       (value (and loaded (m19-cell 'm60-declare-value)))
+       (dotted (and loaded (m19-cell 'm60-declare-dotted)))
+       (expand (and loaded (m19-cell 'm60-declare-expand)))
+       (tail (and loaded (m19-cell 'm60-declare-tail)))
+       (call (and loaded (m19-cell 'm60-declare-call))))
+  ;; Case 1 -- the fixture loads: the top-level `(declare)' does not
+  ;; raise on the real load path.
+  (test-assert (format #f "row 36 case 1: `standalone-declare.el' loads, so a top-level `(declare)' does not raise (result: ~s)"
+                       load-result)
+               loaded)
+  ;; Case 2 -- 0 arguments are legal and the value is the elisp nil.
+  (test-assert (format #f "row 36 case 2: `(declare)' returns the elisp nil (value: ~s, Scheme (): ~s)"
+                       empty (and loaded (eq? '() empty)))
+               (and loaded (eq? #nil empty)))
+  ;; Case 3 -- the argument is NOT evaluated: it names an unbound
+  ;; function, and the value is still the elisp nil (L51).
+  (test-assert (format #f "row 36 case 3: the argument is not evaluated, although `m60-declare-must-not-run' is unbound (value: ~s, unbound: ~s)"
+                       value (not (symbol-fbound? 'm60-declare-must-not-run)))
+               (and loaded
+                    (eq? #nil value)
+                    (not (symbol-fbound? 'm60-declare-must-not-run))))
+  ;; Case 4 -- the declaration as the FIRST body form of an expander is
+  ;; ignored, and the rest of the body still runs: the expansion is 42.
+  (test-assert (format #f "row 36 case 4: a declaration as the first body form of a macro is ignored and the expansion is 42 (value: ~s)"
+                       expand)
+               (and loaded (eqv? 42 expand)))
+  ;; Case 5 -- a DOTTED shape is legal too: the branch reads no element
+  ;; of the form, so the value is the elisp nil and nothing raises (L51).
+  (test-assert (format #f "row 36 case 5: a dotted `declare' shape returns the elisp nil (value: ~s)"
+                       dotted)
+               (and loaded (eq? #nil dotted)))
+  ;; Case 6 -- the load continues past the forms above.
+  (test-assert (format #f "row 36 case 6: the load continues after the declarations (tail: ~s)"
+                       tail)
+               (and loaded (eq? #t tail)))
+  ;; Case 7 -- L14 at CALL time: `lisp/obarray.el' :35 puts the
+  ;; declaration in the BODY of a `defun'.  A load does not evaluate a
+  ;; body, so the CALL is the shape that must not raise: it answers the
+  ;; body value 7.
+  (test-assert (format #f "row 36 case 7: a declaration in a `defun' body is data at CALL time and the call answers 7 (value: ~s)"
+                       call)
+               (and loaded (eqv? 7 call))))
 
 (test-end "Guilemacs standalone loader and reader")
 

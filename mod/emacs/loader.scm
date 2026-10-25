@@ -1471,6 +1471,31 @@ A chain longer than `%elisp-loader-indirect-limit' raises
          (if (elisp-loader-truthy? (elisp-loader-eval (cadr form)))
              (begin (elisp-loader-eval-seq (cddr form)) (loop))
              #nil)))
+      ;; M60 imp-20 -- row 36: `declare' is DATA for the byte compiler.
+      ;; This loader has no compile phase, so it IGNORES the form.  No
+      ;; branch of the map owned the name: the tree defines no `declare'
+      ;; (0 `defmacro declare' in lisp/; src/eval.c has no DEFUN and no
+      ;; code branch), and `byte-run.el' :323 reads the form as a body
+      ;; MARK.  The reachable shape is a DECLARATION BODY FORM of a
+      ;; `defmacro' expander, not a top-level form:
+      ;; `define-obsolete-function-alias' (:559) is the first one that a
+      ;; loaded file reaches.  DECISION, not a port.
+      ;; LIMITS of this row.  These are NAMED limits, never claims:
+      ;; L49 the CONTENT of a `(declare ...)' form is NOT stored.  No
+      ;;    indenter mark, no `debug' spec, no `pure' /
+      ;;    `side-effect-free' flag, no `obsolete' mark.
+      ;; L50 there is no warning channel (L11 ... L13, defined in
+      ;;    utils.scm :607), so a `(declare (obsolete ...))' form
+      ;;    produces NO warning.
+      ;; L51 there is no SHAPE check.  `(declare)', `(declare a b)' and a
+      ;;    dotted form all return the elisp nil and never raise.  The
+      ;;    branch also SHADOWS a macro named `declare': it is tested
+      ;;    BEFORE the macro table, so such an expander can never run.
+      ;;    No file of lisp/ defines that macro.
+      ;; L52 `declare-function', `cl-declare' and the `:documentation'
+      ;;    mark are OTHER names.  This branch does not cover them.
+      ;; The form is UNEVALLED: no element of it is evaluated (L51).
+      ((eq? head 'declare) #nil)
       (else
        ;; M60 imp-7 -- row 23: the macro table is tested BEFORE the
        ;; function cell.  The expander gets the UNEVALUATED argument
