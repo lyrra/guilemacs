@@ -287,7 +287,8 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; `normal-top-level-add-to-load-path' install in `init-loader').
                  ;; M60 imp-17 (row F3) RE-PIN: 1,813 -> 1,833 LINES (OLD value 1,813).
                  ;; M60 imp-18 (row 35) RE-PIN: 1,833 -> 1,847 LINES (OLD value 1,833).
-                 (eql 1847 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-19 (limit L4) RE-PIN: 1,847 -> 1,889 LINES (OLD value 1,847).
+                 (eql 1889 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"

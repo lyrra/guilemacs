@@ -219,7 +219,7 @@ definition itself: a `memq' over the `features' list."
 ;;; --- mode: subdirs-neg ----------------------------------------------
 
 ;; The negative control, in its OWN process: the elisp value slot has no
-;; "unbind" (loader.scm :1140), so one process can not go from bound back
+;; "unbind" (loader.scm :1144), so one process can not go from bound back
 ;; to unbound.  `default-directory' is NOT bound here, so the load must
 ;; raise `void-variable' and `load-path' must not change.
 (define (mode-subdirs-neg)
@@ -671,7 +671,7 @@ definition itself: a `memq' over the `features' list."
 ;; The CALL lines prove that the installed cell is a real elisp
 ;; primitive and not only a bound cell: every value is `#t' or `#nil'.
 ;; `(eq? '#nil #f)' is FALSE, so a caller must pass the value through
-;; `elisp-loader-truthy?' (loader.scm :1068).  The 2 TRUTHY lines pin
+;; `elisp-loader-truthy?' (loader.scm :1075).  The 2 TRUTHY lines pin
 ;; that rule (F6 of the imp-10 cr.org review).
 ;;
 ;; L23 is MEASURED here too: `elisp-/` with 0 arguments, and
@@ -731,7 +731,7 @@ definition itself: a `memq' over the `features' list."
   ;; F6 of the imp-10 cr.org review: a comparison cell answers `#nil',
   ;; not `#f'.  Guile 3 also treats `#nil' as FALSE in a plain `if'
   ;; (MEASURED), but `#nil' is NOT `#f', so a caller must not compare
-  ;; with `#f' and must use `elisp-loader-truthy?' (loader.scm :1068).
+  ;; with `#f' and must use `elisp-loader-truthy?' (loader.scm :1075).
   ;; The first line is the hazard, the second line is the required route.
   (show "TRUTHY #nil-is-not-#f" "~s" (eq? (arith-call '> 1 2) #f))
   (show "TRUTHY elisp-loader-truthy?" "~s"
@@ -936,7 +936,7 @@ definition itself: a `memq' over the `features' list."
 ;; cell may hold a SYMBOL.  C owner =src/data.c :706 (`Fdefalias').  The
 ;; row needs 3 changes: the cell (utils.scm :235), the UNEVALLED
 ;; `function' form that `#'x' reads to (loader.scm :1209) and the
-;; symbol indirection of `elisp-loader-apply' (loader.scm :1106).
+;; symbol indirection of `elisp-loader-apply' (loader.scm :1113).
 ;; The CALL below uses a FIXTURE function: the cell of `string-equal' is
 ;; still EMPTY in a plain `guile' process (MEASURED, `string-equal
 ;; fbound: #f'), so a call of `string=' stops 1 wall later and would NOT
@@ -1188,11 +1188,24 @@ definition itself: a `memq' over the `features' list."
 ;;   section 2.1 (`bare-symbol` at :51) was a PATTERN measure and :51 is
 ;;   not the cause of the old stop.  No form count is printed: `done`
 ;;   is the observable.
-;;   The NEXT wall of the chain is ONE cause, the limit L4 of
-;;   `elisp-loader-make-procedure` (loader.scm :1295): no `&optional` and
-;;   no `&rest` in a parameter list.  `elisp-loader-bind-params!` walks
-;;   the params and calls `(cdr as)` past the end of a short argument
-;;   list, so the raise is `wrong-type-arg ("cdr" ... ())`.
+;;   The NEXT wall of the chain WAS ONE cause, the limit L4 (no
+;;   `&optional` and no `&rest` in a parameter list).
+;;   `elisp-loader-bind-params!` walked the params and called `(cdr as)`
+;;   past the end of a short argument list, so the raise was
+;;   `wrong-type-arg ("cdr" ... ())`.
+;;
+;; M60 imp-19 -- limit L4 is CLOSED, and this mode is its record.  The
+;; 4-branch binder is `elisp-loader-bind-params!` (loader.scm :1161, the
+;; limit text is at :1319); the C peer is `funcall_lambda`
+;; (src/eval.c :2167).  The BEFORE row is the imp-18 text above.  The
+;; AFTER row, MEASURED with the same command, is
+;;   `LOAD lisp/emacs-lisp/macroexp.el: ERROR void-function (declare)`,
+;;   `LOAD lisp/custom.el: ERROR void-function (declare)`,
+;;   `LOAD lisp/startup.el: ERROR void-function (defgroup)` and
+;;   `BARESYM expand: "ERROR void-function (declare)"`.
+;; The `cdr` raise is gone: 2 of the 4 files move to a NEW wall,
+;; `declare`, and startup.el keeps the `defgroup` stop because custom.el
+;; still does not load.
 ;;   The 3 measured stops: macroexp.el form 16
 ;;   (`define-obsolete-function-alias` :178), custom.el form 1
 ;;   (`(require 'widget)` :36, so widget.el form 3
@@ -1201,7 +1214,7 @@ definition itself: a `memq' over the `features' list."
 ;;   `&rest args` `defmacro`, so custom.el must load first).
 ;;
 ;; NOTE on key 6: `defmacro` stores an EXPANDER in the macro table and
-;; does NOT touch the elisp function cell (row 23, loader.scm :1345;
+;; does NOT touch the elisp function cell (row 23, loader.scm :1387;
 ;; limit L10).  So the 2 names below answer #f to `symbol-fbound?` while
 ;; a CALL of them expands.  The macro table is the real state.
 (define (mode-baresym)
@@ -1236,10 +1249,11 @@ definition itself: a `memq' over the `features' list."
         (symbol-fbound? 'defgroup)
         (procedure? (macro-ref 'defgroup)))
   ;; The 2 names EXPAND, so the #f above is the row-23 split and not a
-  ;; missing definition.  The expansion itself stops on the L4 wall (the
-  ;; expander params are `(obsolete-name current-name when &optional
-  ;; docstring)'), and that raise IS the measured cause of the chain
-  ;; stop, not a defect of this row.
+  ;; missing definition.  At M60 imp-18 the expansion stopped on the L4
+  ;; wall (the expander params are `(obsolete-name current-name when
+  ;; &optional docstring)'), and that raise WAS the measured cause of the
+  ;; chain stop.  M60 imp-19 closed L4: the expansion now runs into the
+  ;; NEXT wall, `void-function (declare)` (MEASURED).
   (show "BARESYM expand" "~s"
         (describe-error
          (lambda () (eval-form '(define-obsolete-function-alias

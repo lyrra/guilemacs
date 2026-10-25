@@ -568,13 +568,15 @@ host limit is a skip, never a pass."
                           "mod/emacs/loader.scm"
                           "(elisp-loader-eval-seq (cdr form))"))))
 
-;; `let*' reuses the `let' undo path.  MEASURED: 4 LINES hold
+;; `let*' reuses the `let' undo path.  MEASURED: 5 LINES hold
 ;; `elisp-loader-bind-thunk' -- the definition, the `let' branch, the
-;; `let*' branch and `elisp-loader-bind-params!' -- and 3 LINES hold the
+;; `let*' branch and 2 in `elisp-loader-bind-params!' (the `&rest' branch
+;; and the positional branch) -- and 3 LINES hold the
 ;; exit form (the 2 dynamic-wind branches and the procedure maker).
+;; M60 imp-19 RE-PIN of the thunk count: 4 -> 5.  OLD value 4.
 (m60-imp9--check "s2/let*-reuses-let-undo-path"
                  (m60-imp9--all
-                  (eql 4 (m60-imp9--literal-lines
+                  (eql 5 (m60-imp9--literal-lines
                           "mod/emacs/loader.scm"
                           "(elisp-loader-bind-thunk"))
                   (eql 3 (m60-imp9--literal-lines

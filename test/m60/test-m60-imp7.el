@@ -732,7 +732,13 @@ host limit is a skip, never a pass."
                      "L9: the table is process-GLOBAL and has no reset"
                      "L2 a macro call expands when the evaluator EVALUATES"
                      "L3 the expander runs on the DYNAMIC binding model"
-                     "L4 no `&rest' / `&optional' parameter support"
+                     ;; M60 imp-19 RE-PIN of limit L4: the OLD literal was
+                     ;; "L4 no `&rest' / `&optional' parameter support".
+                     "L4 CLOSED at M60 imp-19 for 3 shapes"
+                     "L45 a missing REQUIRED argument and an EXTRA argument do not"
+                     "L46 a malformed parameter list does NOT raise"
+                     "L47 the binder binds DYNAMICALLY (L3)"
+                     "L48 `&key' is NOT a branch"
                      "L5 a DOC element is not stripped"
                      "L6 the table lookup adds 1 `assq'"))
                   (m60-imp7--holds-all

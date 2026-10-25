@@ -1145,15 +1145,39 @@ A chain longer than `%elisp-loader-indirect-limit' raises
         ;; bound name (the common case) restores exactly.
         (lambda () (set-symbol-value! name #nil)))))
 
+;; M60 imp-19 -- L4 is CLOSED for 3 parameter shapes.  The walk has 4
+;; branches.  C peer: `funcall_lambda' (src/eval.c :2167).  C tests the 2
+;; MARKER symbols on the parameter list BEFORE it binds a cell
+;; (`Qand_rest' :2200, `Qand_optional' :2207) and builds the rest
+;; argument with `Flist' (:2218).  B1 a non-pair tail ENDS the walk: that
+;; is the empty parameter list, a short argument list and a bare `args'
+;; (L45, L46).  B2 `&optional' writes NO cell; the name after it binds
+;; the elisp nil `#nil' when no argument is left (D1, D2).  B3 `&rest'
+;; binds the WHOLE remaining Scheme list and ENDS the walk (D3, D4); a
+;; bare `&rest' binds nothing.  B4 a plain name takes the next positional
+;; argument.  The walk tests `pair?' before EVERY `(cdr as)', so it can
+;; NOT call `(cdr args)' past the end of a short list: that raise was the
+;; L4 wall.
 (define (elisp-loader-bind-params! params args)
   "Bind PARAMS to ARGS.  Return the list of restore thunks."
   (let loop ((ps params) (as args) (restore '()))
-    (if (pair? ps)
-        (loop (cdr ps) (cdr as)
-              (cons (elisp-loader-bind-thunk (car ps)
-                                             (if (pair? as) (car as) #nil))
-                    restore))
-        restore)))
+    (cond
+      ;; B1: empty parameter list, or a non-list tail: nothing to bind.
+      ((not (pair? ps)) restore)
+      ;; B2: `&optional' marks the names that follow.  No cell (D2).
+      ((eq? (car ps) '&optional) (loop (cdr ps) as restore))
+      ;; B3: `&rest' marks 1 name.  It binds the remaining list and ends
+      ;; the walk (D3, D4).  A bare `&rest' binds nothing.
+      ((eq? (car ps) '&rest)
+       (if (pair? (cdr ps))
+           (cons (elisp-loader-bind-thunk (cadr ps) as) restore)
+           restore))
+      ;; B4: a required OR optional name: positional, or elisp nil (D1).
+      (else
+       (let ((value (if (pair? as) (car as) #nil)))
+         (loop (cdr ps)
+               (if (pair? as) (cdr as) '())
+               (cons (elisp-loader-bind-thunk (car ps) value) restore)))))))
 
 ;; M60 imp-9 fix (cr.org F5): elisp accepts a BARE SYMBOL binding, as in
 ;; `(let (q) ...)'.  It binds elisp nil, the same as `((q))'.  The old
@@ -1292,8 +1316,26 @@ A chain longer than `%elisp-loader-indirect-limit' raises
       ;;    not at definition time.
       ;; L3 the expander runs on the DYNAMIC binding model of this
       ;;    evaluator, not on the lexical model of a compiler.
-      ;; L4 no `&rest' / `&optional' parameter support.  This is the
-      ;;    existing limit of `elisp-loader-make-procedure'.
+      ;; L4 CLOSED at M60 imp-19 for 3 shapes: a name after `&optional'
+      ;;    binds the elisp nil `#nil' when no argument is left; the name
+      ;;    after `&rest' binds the whole remaining list; the walk never
+      ;;    calls `(cdr args)' past the end of a short list.  The binder
+      ;;    is `elisp-loader-bind-params!' and the C peer is
+      ;;    `funcall_lambda' (src/eval.c :2167).
+      ;; L45 a missing REQUIRED argument and an EXTRA argument do not
+      ;;    raise `wrong-number-of-arguments'.  C raises it at
+      ;;    src/eval.c :2224 and :2242; this loader stays lenient, so a
+      ;;    file that loads today keeps loading.
+      ;; L46 a malformed parameter list does NOT raise, and each shape
+      ;;    has 1 answer: a bare `&rest' is IGNORED (no cell, the walk
+      ;;    stops); `(a &rest &rest)' puts the remaining list in the
+      ;;    cell of `&rest'; a non-symbol name raises a Guile
+      ;;    `wrong-type-arg' from `symbol-bound?'.  C raises
+      ;;    `invalid-function' instead (src/eval.c :2198, :2240).
+      ;; L47 the binder binds DYNAMICALLY (L3), so a `&rest' value is a
+      ;;    plain Scheme list, not a lexenv alist.
+      ;; L48 `&key' is NOT a branch.  It takes the positional step of B4,
+      ;;    so a `&key' name binds 1 argument and the walk continues.
       ;; L5 a DOC element is not stripped.  A leading string in the body
       ;;    evaluates to itself and is ignored.
       ;; L6 the table lookup adds 1 `assq' to every function call on this

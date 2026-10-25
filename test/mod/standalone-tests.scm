@@ -18,7 +18,12 @@
 ;; M60 imp-18 (19 -> 22): the 3 cases of row 35 (the guarded
 ;; `bare-symbol' install): 1 for the cell, 1 for the identity, and 1 for
 ;; the elisp nil (the 3rd truth value).
-(define expected-passes 22)
+;; M60 imp-19 (22 -> 32): the 10 cases of limit L4 (`&optional' and
+;; `&rest' in a parameter list): 5 fixture cases and 5 malformed-shape
+;; cases.  cr.org FIX of the imp-19 round (32 -> 36, OLD value 32): cases
+;; 11 ... 14 gate the 2 limits that had no case, L45 (lenient arity) and
+;; L46 (a non-list parameter list), plus D1 for several `&optional' names.
+(define expected-passes 36)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -483,6 +488,236 @@
                                     (string-append anchor "/m60ntlb"))
                               (symbol-value 'load-path)))))
   (set-symbol-value! 'load-path saved))
+
+;;; M60 imp-19 -- L4: `&optional' and `&rest' in a parameter list.  The
+;;; binder `elisp-loader-bind-params!' is NOT exported, so these cases run
+;;; the REAL reader and evaluator: `standalone-optional.el' holds the 3
+;;; shapes of brief.org section 8, and the malformed shapes reach the walk
+;;; through `elisp-loader-eval' of a `defun' whose BODY is the marker
+;;; symbol, so the body returns the VALUE CELL of that name.  C peer:
+;;; `funcall_lambda' (src/eval.c :2167).
+
+(define m19-null (and (symbol-fbound? 'null) (symbol-function 'null)))
+(define m19-eval (module-ref (resolve-module '(emacs loader))
+                             'elisp-loader-eval))
+
+;; (ok VALUE) or (error KEY . ARGS): a raise must be READ, not fatal.
+(define (m19-try thunk)
+  (catch #t
+    (lambda () (list 'ok (thunk)))
+    (lambda (key . args) (cons 'error (cons key args)))))
+
+(define (m19-cell name)
+  (and (symbol-bound? name) (symbol-value name)))
+
+;; The `&rest' value is a plain Scheme list (L47), so its tail is the
+;; Scheme (), not the elisp nil.
+(define (m19-scheme-list? value elems)
+  (let loop ((v value) (l elems))
+    (cond ((null? l) (null? v))
+          ((pair? v) (and (eqv? (car v) (car l)) (loop (cdr v) (cdr l))))
+          (else #f))))
+
+;; The elisp `list' cell ends its result with the elisp nil `#nil', not
+;; with the Scheme (), so the ELEMENTS are compared 1 by 1 and the TAIL is
+;; read through the elisp `null' cell.
+(define (m19-elems? value elems)
+  (let loop ((v value) (l elems))
+    (cond ((null? l) (and m19-null (eq? #t (m19-null v))))
+          ((pair? v) (and (eqv? (car v) (car l)) (loop (cdr v) (cdr l))))
+          (else #f))))
+
+;; Cases 1 ... 5 read the fixture.  Both markers must stay UNBOUND after
+;; the load: a marker writes NO cell (D2).
+(let* ((load-result (m19-try (lambda ()
+                               (load-fixture "standalone-optional.el")
+                               'loaded)))
+       (loaded (eq? 'loaded (cadr load-result)))
+       (m2 (m19-cell 'standalone-optional-m-2))
+       (m1 (m19-cell 'standalone-optional-m-1))
+       (f2 (m19-cell 'standalone-optional-f-2))
+       (f1 (m19-cell 'standalone-optional-f-1))
+       (f0 (m19-cell 'standalone-optional-f-0))
+       (g4 (m19-cell 'standalone-optional-g-4)))
+  ;; Case 1 -- both arguments present: `b' is the 2nd argument.
+  (test-assert (format #f "L4 case 1: `(a &optional b)' with 2 arguments binds b to the 2nd argument (load: ~s, value: ~s)"
+                       load-result m2)
+               (and loaded
+                    (pair? m2)
+                    (eqv? 1 (car m2))
+                    (eqv? 2 (cadr m2))
+                    (eq? #t (m19-null (cddr m2)))))
+  ;; Case 2 -- 1 argument: `b' is the elisp nil `#nil', and NOT `#f' (D1).
+  (test-assert (format #f "L4 case 2: a missing optional argument binds the elisp nil #nil and not #f (value: ~s)"
+                       m1)
+               (and loaded
+                    (pair? m1)
+                    (eqv? 1 (car m1))
+                    (eq? #nil (cadr m1))
+                    (not (eq? #f (cadr m1)))))
+  ;; Case 3 -- `&rest' for 2, 1 and 0 extra arguments: 3 different lists
+  ;; (D3).  The 0 case is the Scheme (), so the elisp `null' cell answers
+  ;; #t for it while `(eq? #nil REST)' is #f.
+  (test-assert (format #f "L4 case 3: `&rest' binds the whole remaining list for 2, 1 and 0 extra arguments (2: ~s, 1: ~s, 0: ~s)"
+                       f2 f1 f0)
+               (and loaded
+                    (pair? f2) (eqv? 1 (car f2))
+                    (m19-scheme-list? (cadr f2) '(2 3))
+                    (pair? f1) (eqv? 1 (car f1))
+                    (m19-scheme-list? (cadr f1) '(2))
+                    (pair? f0) (eqv? 1 (car f0))
+                    (null? (cadr f0))
+                    (eq? #t (m19-null (cadr f0)))
+                    (not (eq? #nil (cadr f0)))))
+  ;; Case 4 -- the 3 shapes in 1 call: `(a &optional b &rest c)'.
+  (test-assert (format #f "L4 case 4: `(a &optional b &rest c)' binds all 3 shapes in 1 call (value: ~s)"
+                       g4)
+               (and loaded
+                    (pair? g4)
+                    (eqv? 1 (car g4))
+                    (eqv? 2 (cadr g4))
+                    (m19-scheme-list? (caddr g4) '(3 4))))
+  ;; Case 5 -- no cell for a marker (D2).
+  (test-assert (format #f "L4 case 5: `&optional' and `&rest' are UNBOUND after the load, so a marker writes no cell (optional: ~s, rest: ~s)"
+                       (symbol-bound? '&optional) (symbol-bound? '&rest))
+               (and loaded
+                    (not (symbol-bound? '&optional))
+                    (not (symbol-bound? '&rest)))))
+
+;; Case 6 runs FIRST of cases 6 ... 10: only this case must see `&rest'
+;; UNBOUND.  The restore thunk of a name that was unbound leaves elisp nil
+;; in the cell, so a later bare `&rest' call would not raise.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-bare-rest
+                                    (a &rest) &rest)))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-bare-rest 1))))))
+  (test-assert (format #f "L4 case 6: a bare `&rest' stops the walk and writes no cell, so the body raises void-variable (call: ~s, unbound: ~s)"
+                       call (not (symbol-bound? '&rest)))
+               (and (eq? 'ok (car def))
+                    (eq? 'error (car call))
+                    (eq? 'void-variable (cadr call))
+                    (eq? '&rest (caddr call))
+                    (not (symbol-bound? '&rest)))))
+
+;; Case 7 -- `(a &rest &rest)': the 2nd marker IS the rest name, so its
+;; cell holds the remaining list (L46).
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-double-rest
+                                    (a &rest &rest) &rest)))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-double-rest 1 2 3)))))
+       (cell (and (eq? 'ok (car call)) (cadr call))))
+  (test-assert (format #f "L4 case 7: `(a &rest &rest)' puts the remaining list in the cell of `&rest' (call: ~s)"
+                       call)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (m19-scheme-list? cell '(2 3)))))
+
+;; Case 8 -- `(a &rest &optional b)': the walk stops at the rest name, so
+;; the marker `&optional' itself becomes the rest name (L46).
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-rest-then-optional
+                                    (a &rest &optional b) &optional)))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-rest-then-optional 1 2 3)))))
+       (cell (and (eq? 'ok (car call)) (cadr call))))
+  (test-assert (format #f "L4 case 8: `(a &rest &optional b)' gives the marker `&optional' the remaining list (call: ~s)"
+                       call)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (m19-scheme-list? cell '(2 3)))))
+
+;; Case 9 -- a NON-SYMBOL name does not raise at the `defun', and the CALL
+;; raises a Guile `wrong-type-arg' (L46).  C raises `invalid-function'.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-bad-name (1) 42)))))
+       (call (m19-try (lambda () (m19-eval '(m19-optional-bad-name 1))))))
+  (test-assert (format #f "L4 case 9: a non-symbol parameter name raises wrong-type-arg at the CALL (def: ~s, call: ~s)"
+                       def call)
+               (and (eq? 'ok (car def))
+                    (eq? 'error (car call))
+                    (eq? 'wrong-type-arg (cadr call)))))
+
+;; Case 10 -- `(a &key b)': `&key' is NOT a branch (L48), so it takes the
+;; positional step and its cell holds the 2nd argument.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-key (a &key b) &key)))))
+       (call (m19-try (lambda () (m19-eval '(m19-optional-key 1 2 3)))))
+       (cell (and (eq? 'ok (car call)) (cadr call))))
+  (test-assert (format #f "L4 case 10: `&key' is out of scope and takes the positional argument (call: ~s)"
+                       call)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (eqv? 2 cell))))
+
+;;; M60 imp-19 CR FIX (cr.org section 5, G2 / F5 of the imp-19 round): 4
+;;; more cases gate the 2 limit texts that no case measured before.  Cases
+;;; 11 and 12 gate L45 (lenient arity: a missing REQUIRED argument and an
+;;; EXTRA argument do not raise).  Case 13 gates L46 for a NON-LIST
+;;; parameter list (a bare `args', decision D6): it binds nothing.  Case
+;;; 14 gates D1 for SEVERAL names after 1 `&optional'.
+
+;; Case 11 -- L45: 1 required name is missing.  C raises
+;; `wrong-number-of-arguments' (src/eval.c :2224); this loader binds the
+;; elisp nil, so the call answers.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-short-required
+                                    (a b) (list a b))))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-short-required 1)))))
+       (value (and (eq? 'ok (car call)) (cadr call))))
+  (test-assert (format #f "L45 case 11: a missing REQUIRED argument does not raise and binds #nil (call: ~s)"
+                       call)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (m19-elems? value '(1 #nil)))))
+
+;; Case 12 -- L45: 1 EXTRA argument.  C raises at :2242; here the extra
+;; argument is ignored and the required name keeps the 1st argument.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-extra-arg
+                                    (a) (list a))))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-extra-arg 1 2 3)))))
+       (value (and (eq? 'ok (car call)) (cadr call))))
+  (test-assert (format #f "L45 case 12: an EXTRA argument does not raise and is ignored (call: ~s)"
+                       call)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (m19-elems? value '(1)))))
+
+;; Case 13 -- L46 and D6: a NON-LIST parameter list (a bare `args').  The
+;; `defun' and the CALL both answer, and the walk binds NOTHING, so the
+;; name `args' stays UNBOUND after the call.
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-bare-params args 42)))))
+       (call (m19-try (lambda ()
+                        (m19-eval '(m19-optional-bare-params 1 2 3))))))
+  (test-assert (format #f "L46 case 13: a non-list parameter list binds nothing and does not raise (def: ~s, call: ~s, args bound: ~s)"
+                       def call (symbol-bound? 'args))
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car call))
+                    (eqv? 42 (cadr call))
+                    (not (symbol-bound? 'args)))))
+
+;; Case 14 -- D1 for 2 names after 1 `&optional': every name without an
+;; argument binds the elisp nil, and a 4th argument is ignored (L45).
+(let* ((def (m19-try (lambda ()
+                       (m19-eval '(defun m19-optional-two
+                                    (a &optional b c) (list a b c))))))
+       (short (m19-try (lambda () (m19-eval '(m19-optional-two 1)))))
+       (half (m19-try (lambda () (m19-eval '(m19-optional-two 1 2)))))
+       (long (m19-try (lambda () (m19-eval '(m19-optional-two 1 2 3 4))))))
+  (test-assert (format #f "L4 case 14: `(a &optional b c)' gives #nil to every name without an argument (1: ~s, 2: ~s, 4: ~s)"
+                       short half long)
+               (and (eq? 'ok (car def))
+                    (eq? 'ok (car short))
+                    (m19-elems? (cadr short) '(1 #nil #nil))
+                    (eq? 'ok (car half))
+                    (m19-elems? (cadr half) '(1 2 #nil))
+                    (eq? 'ok (car long))
+                    (m19-elems? (cadr long) '(1 2 3)))))
 
 (test-end "Guilemacs standalone loader and reader")
 

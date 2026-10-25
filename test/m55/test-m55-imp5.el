@@ -307,7 +307,8 @@ symbol `m55-imp5-guile-absent'."
                  ;; `FIX-*' stays 10).
                  ;; M60 imp-17 (row F3) RE-PIN: 1,813 -> 1,833 LINES (OLD value 1,813).
                  ;; M60 imp-18 (row 35) RE-PIN: 1,833 -> 1,847 LINES (OLD value 1,833).
-                 (eql 1847 (m55-imp5--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-19 (limit L4) RE-PIN: 1,847 -> 1,889 LINES (OLD value 1,847).
+                 (eql 1889 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
 (m55-imp5--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
