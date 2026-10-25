@@ -513,11 +513,14 @@ host limit is a skip, never a pass."
 ;; cover the whole boundary.
 (setq m60-imp2--group 'r3)
 
+;; M60 imp-16 (row 25): the port lands, so this stop MOVES.  OLD value:
+;; "LOAD lisp/subdirs.el: ERROR void-function
+;; (normal-top-level-add-to-load-path)".  Mode `cells' binds
+;; `default-directory' just before the load, as the elisp caller does.
 (m60-imp2--check "r3/subdirs-first-stop"
                  (m60-imp2--probe-line
                   "cells"
-                  (concat "LOAD lisp/subdirs.el: ERROR void-function"
-                          " (normal-top-level-add-to-load-path)")))
+                  "LOAD lisp/subdirs.el: done"))
 ;; RE-PINNED at M60 imp-4: `provide' landed (row 18), so lisp/cdl.el
 ;; is NO stop of mode `cells' any more: it loads to the END.  The old
 ;; pin is not deleted; it follows the measured value.

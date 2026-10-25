@@ -1559,7 +1559,28 @@ A chain longer than `%elisp-loader-indirect-limit' raises
     ;; the return value and the mark that mode `obsolete' prints.
     (unless (symbol-fbound? 'make-obsolete-variable)
       (set-symbol-function! 'make-obsolete-variable
-                            elisp-make-obsolete-variable)))
+                            elisp-make-obsolete-variable))
+    ;; M60 imp-16 -- row 25: the cell of (emacs utils), the row-18 pattern
+    ;; of `provide' (:1554) and `make-obsolete-variable' (:1560): 1
+    ;; install site, 1 guard, 0 new evaluator branches, 0 FIX markers.
+    ;; The owner is the elisp Lisp function of lisp/startup.el :479, and
+    ;; the 1 caller is lisp/subdirs.el :3.  That caller BINDS
+    ;; `default-directory' to the directory of the file (startup.el
+    ;; :631); the port reads it and never binds it (limit L42), so this
+    ;; guard does NOT bind it -- a default here would hide the missing
+    ;; caller bind.  A full Emacs already owns this cell, because
+    ;; `startup.el' loads before any `subdirs.el' load; the guard keeps
+    ;; the elisp `defun'.
+    ;; MEASURED (`guile -L mod', GUILE_AUTO_COMPILE=0, mode `subdirs' in
+    ;; test/m60/probe-imp3.scm): `lisp/subdirs.el' :3 names 24
+    ;; subdirectories, all 24 exist in this tree, and `load-path' goes
+    ;; 14 -> 38, with the new entry after the `<root>/lisp' anchor at
+    ;; index 0 being `<root>/lisp/vc'.  milestone.org section 4 says 21;
+    ;; that value does not reproduce.
+    ;; Limits: L39 ... L43, named at the definition in (emacs utils).
+    (unless (symbol-fbound? 'normal-top-level-add-to-load-path)
+      (set-symbol-function! 'normal-top-level-add-to-load-path
+                            elisp-normal-top-level-add-to-load-path)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

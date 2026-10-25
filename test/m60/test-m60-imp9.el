@@ -775,11 +775,15 @@ host limit is a skip, never a pass."
                   (m60-imp9--probe-line "cells" "features: (cdl)")
                   (m60-imp9--probe-line "cells" "FEATURES-BOUND: #t")))
 
-;; Row 25 is STILL the one wall: `subdirs.el' stops at the missing cell.
-(m60-imp9--check "s4/row-25-still-open"
+;; Row 25 is CLOSED at M60 imp-16: the port is installed, so this load
+;; reaches the END.  OLD value: "LOAD lisp/subdirs.el: ERROR
+;; void-function (normal-top-level-add-to-load-path)".  The check name
+;; says CLOSED: the old name `s4/row-25-still-open' asserted the
+;; opposite of this test (cr.org F4 of the imp-16 review).
+(m60-imp9--check "s4/row-25-closed"
                  (m60-imp9--probe-line
                   "cells"
-                  "LOAD lisp/subdirs.el: ERROR void-function (normal-top-level-add-to-load-path)"))
+                  "LOAD lisp/subdirs.el: done"))
 
 (m60-imp9--check "s4/stubs-blockers"
                  (m60-imp9--all

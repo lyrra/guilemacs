@@ -17,10 +17,16 @@
 ;;;   GUILEMACS_ROOT=$PWD GUILE_AUTO_COMPILE=0 \
 ;;;     guile -L mod test/m60/probe-imp3.scm MODE
 ;;;
-;;; MODE is one of `cells', `provide', `stubs', `negative', `noboot',
-;;; `require', `defs', `macros', `registration', `language',
-;;; `obsolete', `control', `arith', `put', `set', `alias', `hash', or
-;;; `eac'.
+;;; MODE is one of `cells', `subdirs', `subdirs-neg', `provide', `stubs',
+;;; `negative', `noboot', `require', `defs', `macros', `registration',
+;;; `language', `obsolete', `control', `arith', `put', `set', `alias',
+;;; `hash', or `eac'.
+;;; Mode `subdirs' is the M60 imp-16 record of row 25
+;;; (`normal-top-level-add-to-load-path'): the 24-name expansion of
+;;; lisp/subdirs.el :3 and the 14 -> 38 `load-path' delta.  Mode
+;;; `subdirs-neg' is its negative control: the load raises
+;;; `void-variable' when the caller bind of `default-directory' is
+;;; absent.
 ;;; Mode `hash' is the M60 imp-15 record of row 32 (the
 ;;; `make-hash-table' family, its keyword decode and its 5 raise texts);
 ;;; it also records the NEXT stop of lisp/emacs-lisp/macroexp.el.
@@ -152,6 +158,14 @@ definition itself: a `memq' over the `features' list."
                      " "))
   (show "ASYM" "require=~s provide=~s"
         (symbol-fbound? 'require) (symbol-fbound? 'provide))
+  ;; M60 imp-16 -- row 25: `lisp/subdirs.el' :3 calls
+  ;; `normal-top-level-add-to-load-path', and the CALLER owns the
+  ;; `default-directory' bind (lisp/startup.el :631).  With no bind the
+  ;; load raises `void-variable (default-directory)' (measured), so this
+  ;; fixture binds it exactly as the elisp caller does.  The trailing
+  ;; "/" is mandatory: the elisp anchor compare is `directory-file-name'
+  ;; of the variable, and the `load-path' entry has no trailing "/".
+  (set-symbol-value! 'default-directory (string-append root "/lisp/"))
   (load-line "lisp/subdirs.el")
   (load-line "lisp/cdl.el")
   ;; M60 imp-4 acceptance: mode `cells' never installs the 2 cells, so
@@ -164,6 +178,53 @@ definition itself: a `memq' over the `features' list."
   (load-line "lisp/obarray.el")
   (load-line "lisp/hex-util.el")
   (show "FEATURES-BOUND" "~s" (symbol-bound? 'features)))
+
+;;; --- mode: subdirs --------------------------------------------------
+
+;; M60 imp-16 -- row 25 record, the 6 keys of brief.org Step 3.  The bind
+;; copies the elisp caller (lisp/startup.el :631); the port READS the
+;; variable only (limit L42).
+(define (list-index-of str lst)
+  (let loop ((l lst) (i 0))
+    (cond ((null? l) #f)
+          ((equal? str (car l)) i)
+          (else (loop (cdr l) (+ i 1))))))
+
+(define (mode-subdirs)
+  (show "SUBDIRS dd-bound" "~s" (symbol-bound? 'default-directory))
+  (let ((before (length (symbol-value 'load-path))))
+    (show "SUBDIRS lp-len-before" "~s" before)
+    (set-symbol-value! 'default-directory (string-append root "/lisp/"))
+    (show "SUBDIRS load" "~a" (describe (try-load "lisp/subdirs.el")))
+    (let* ((lp (symbol-value 'load-path))
+           (after (length lp)))
+      (show "SUBDIRS lp-len-after" "~s" after)
+      (show "SUBDIRS added" "~s" (- after before))
+      ;; The anchor is the stripped `default-directory', the `<root>/lisp'
+      ;; entry at index 0.  The entry AFTER it is the proof of the SPLICE,
+      ;; not of the load.
+      (let* ((dd (symbol-value 'default-directory))
+             (anchor (substring dd 0 (- (string-length dd) 1)))
+             (at (list-index-of anchor lp)))
+        (show "SUBDIRS anchor" "~s then ~s"
+              (and at (list-ref lp at))
+              (and at (< (+ at 1) after) (list-ref lp (+ at 1))))))))
+
+;;; --- mode: subdirs-neg ----------------------------------------------
+
+;; The negative control, in its OWN process: the elisp value slot has no
+;; "unbind" (loader.scm :1140), so one process can not go from bound back
+;; to unbound.  `default-directory' is NOT bound here, so the load must
+;; raise `void-variable' and `load-path' must not change.
+(define (mode-subdirs-neg)
+  (show "SUBDIRS-NEG dd-bound" "~s" (symbol-bound? 'default-directory))
+  (show "SUBDIRS-NEG lp-len-before" "~s"
+        (length (symbol-value 'load-path)))
+  (let ((result (try-load "lisp/subdirs.el")))
+    (show "SUBDIRS-NEG load" "~a" (describe result))
+    (show "SUBDIRS-NEG raised" "~s"
+          (and (pair? result) (eq? (car result) 'error) (cddr result))))
+  (show "SUBDIRS-NEG lp-len-after" "~s" (length (symbol-value 'load-path))))
 
 ;;; --- mode: provide --------------------------------------------------
 
@@ -1104,6 +1165,8 @@ definition itself: a `memq' over the `features' list."
 
 (case (string->symbol mode)
   ((cells) (mode-cells))
+  ((subdirs) (mode-subdirs))
+  ((subdirs-neg) (mode-subdirs-neg))
   ((provide) (mode-provide))
   ((stubs) (mode-stubs))
   ((negative) (mode-negative))
@@ -1121,5 +1184,5 @@ definition itself: a `memq' over the `features' list."
   ((alias) (mode-alias))
   ((eac) (mode-eac))
   ((hash) (mode-hash))
-  (else (die (format #f "unknown mode ~a (cells|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash)"
+  (else (die (format #f "unknown mode ~a (cells|subdirs|subdirs-neg|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash)"
                      mode))))

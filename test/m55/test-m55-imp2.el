@@ -359,7 +359,8 @@ symbol `m55-imp2-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp2--check "install-cell-count"
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                 (eql 51 (m55-imp2--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51).
+                 (eql 52 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 
 ;;; --- S2. The REAL path (brief.org sections 3 and 6) -----------------
@@ -423,7 +424,9 @@ symbol `m55-imp2-guile-absent'."
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
                  ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
                  ;; count and its 4 counters.  OLD: 1,653 lines, 74, 40, 36 and 9.
-                 (eql 1792 (m55-imp2--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-16 (row 25) RE-PIN: 1,792 -> 1,813 LINES (the guarded
+                 ;; `normal-top-level-add-to-load-path' install in `init-loader').
+                 (eql 1813 (m55-imp2--lines "mod/emacs/loader.scm")))
 (m55-imp2--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp2--lines "mod/emacs/reader.scm")))
 (m55-imp2--check "prelude-load.scm-lines-229"
@@ -437,7 +440,9 @@ symbol `m55-imp2-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp2--check "loader.scm-symbol-fbound-guards"
                  ;; M60 imp-13 RE-PIN: `symbol-fbound?' 39 -> 40 LINES (OLD value 39).
-                 (eql 55 (m55-imp2--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-16 RE-PIN: 55 -> 56 LINES (OLD value 55; the row-25
+                 ;; guarded install in `init-loader').
+                 (eql 56 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
 ;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
@@ -445,7 +450,8 @@ symbol `m55-imp2-guile-absent'."
 ;; stale number, because it changed again (an earlier cr.org round F5).
 (m55-imp2--check "loader.scm-set-symbol-function"
                  ;; M60 imp-13 RE-PIN: `set-symbol-function!' 35 -> 36 LINES (OLD value 35).
-                 (eql 51 (m55-imp2--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51).
+                 (eql 52 (m55-imp2--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 (m55-imp2--check "loader.scm-fix-markers-9"
                  (eql 10 (m55-imp2--count-lines "mod/emacs/loader.scm"

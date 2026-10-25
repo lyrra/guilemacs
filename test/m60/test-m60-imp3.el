@@ -608,10 +608,13 @@ host limit is a skip, never a pass."
 ;; (eval-when-compile)'.
 ;; M60 imp-8 (row 27) RE-PIN: this line is `done' now; the old pin was
 ;; the `ERROR void-function (make-obsolete-variable)' line of row 27.
+;; M60 imp-16 (row 25): the FIRST line of this ordered list MOVES from
+;; "LOAD lisp/subdirs.el: ERROR void-function" to "done" -- the port is
+;; installed, and mode `cells' binds `default-directory' before the load.
 (m60-imp3--check "s5/four-first-stops"
                  (m60-imp3--probe-ordered
                   "cells"
-                  '("LOAD lisp/subdirs.el: ERROR void-function"
+                  '("LOAD lisp/subdirs.el: done"
                     "LOAD lisp/cdl.el: done"
                     "LOAD lisp/obarray.el: done"
                     "LOAD lisp/hex-util.el: done")))

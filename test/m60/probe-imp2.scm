@@ -124,6 +124,12 @@ definition itself: a `memq' over the `features' list."
                      " "))
   (show "ASYM" "require=~s provide=~s"
         (symbol-fbound? 'require) (symbol-fbound? 'provide))
+  ;; M60 imp-16 -- row 25: `lisp/subdirs.el' :3 calls
+  ;; `normal-top-level-add-to-load-path', and the CALLER owns the
+  ;; `default-directory' bind (lisp/startup.el :631).  This fixture keeps
+  ;; the same bind as probe-imp3.scm, so `mode cells' measures the LOAD
+  ;; and not the missing bind.
+  (set-symbol-value! 'default-directory (string-append root "/lisp/"))
   (load-line "lisp/subdirs.el")
   (load-line "lisp/cdl.el")
   (load-line "lisp/obarray.el")

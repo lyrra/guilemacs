@@ -24,6 +24,9 @@
     elisp-get elisp-put elisp-symbol-plist elisp-setplist
     elisp-intern elisp-intern-soft elisp-mapatoms elisp-unintern
     elisp-featurep elisp-provide
+    ;; M60 imp-16 -- row 25: installed by `init-loader' with the row-18
+    ;; guard.  The private trailing-"/" strip stays unexported.
+    elisp-normal-top-level-add-to-load-path
     elisp-make-obsolete-variable
     elisp-make-hash-table elisp-gethash elisp-puthash elisp-remhash
     elisp-clrhash elisp-hash-table-count elisp-hash-table-test
@@ -502,6 +505,75 @@ presence or absence of Emacs or environment extensions."
              #t
              #t)  ; Simplified: assume subfeatures are present if feature is
          #nil))))
+
+;; M60 imp-16 -- row 25.  The owner is the elisp Lisp function of
+;; lisp/startup.el :479 (`normal-top-level-add-to-load-path'), not a C
+;; DEFUN: `grep -rn normal-top-level-add-to-load-path src/' gives 0 hits.
+;; The 1 caller is lisp/subdirs.el :3.  `startup.el' can not load yet (it
+;; stops on the C cell `bare-symbol', row 35, and it needs the `defgroup'
+;; macro of lisp/custom.el), so the port lives here and `init-loader'
+;; installs it with 1 guard (the row-18 pattern, loader.scm).
+;;
+;; The port holds the DECISION, not a wrapper: the anchor search, the
+;; trailing-"/" strip and the splice are Scheme.  No C leaf is called and
+;; no libc FFI is used.  `(emacs fileio)' is C-backed and does not run on
+;; this path, so the port does NOT call `fileio-directory-file-name'.
+;;
+;; M60 imp-16 LIMITS of row 25 -- named, not claimed:
+;;   L39: `set-cdr!' needs a MUTABLE pair.  A caller that binds
+;;        `load-path' to a QUOTED literal gets an error where Emacs
+;;        mutates.  The plain path is safe: `init-loader' binds a `list'
+;;        (loader.scm :1507).
+;;   L40: the DOS_NT branch is NOT ported.  The elisp loop also compares
+;;        `downcase' of the 2 names when `system-type' is `ms-dos' or
+;;        `windows-nt'.
+;;   L41: the `expand-file-name' cell is the loader join
+;;        (loader.scm :988).  Its 1-argument form is NOT implemented: it
+;;        raises `wrong-number-of-arguments'.  The port passes the
+;;        directory as the 2nd argument.
+;;   L42: the port does not bind `default-directory'.  The caller must
+;;        bind it (lisp/startup.el :631).  A load without the bind raises
+;;        `void-variable', which is the elisp behaviour.
+;;   L43: the port is NOT idempotent.  A 2nd load of `subdirs.el'
+;;        splices 24 more entries.  The elisp function does the same.
+
+;; `directory-file-name': drop the trailing "/" and keep "/" alone.
+(define (elisp--directory-name-strip name)
+  (let loop ((i (string-length name)))
+    (if (and (> i 1) (char=? (string-ref name (- i 1)) #\/))
+        (loop (- i 1))
+        (substring name 0 i))))
+
+;; Row 25: a Scheme port of `normal-top-level-add-to-load-path'
+;; (lisp/startup.el :479).  The caller binds `default-directory' to the
+;; directory of the subdirs.el file (lisp/startup.el :631), so the port
+;; READS that variable and never binds it.
+(define (elisp-normal-top-level-add-to-load-path dirs)
+  (if (not (symbol-bound? 'default-directory))
+      ;; The evaluator rule: an unbound variable raises, it does not
+      ;; answer nil.  `symbol-value' would answer the unbound sentinel.
+      (throw 'void-variable 'default-directory)
+      (let* ((thisdir (elisp--directory-name-strip
+                       (symbol-value 'default-directory)))
+             (expand (symbol-function 'expand-file-name))
+             ;; The elisp body applies `mapcar #'expand-file-name' with
+             ;; 1 argument.  Here the directory is passed explicitly, so
+             ;; the port needs no 1-argument `expand-file-name'.
+             (new (map (lambda (dir) (expand dir thisdir)) dirs)))
+        ;; Walk to the tail cell whose car is THISDIR, as the elisp loop
+        ;; does (lisp/startup.el :486 ... :492): stop on a MATCH, on the
+        ;; TAIL cell, or on the nil terminator.  The splice runs for
+        ;; EVERY non-nil TAIL (`(when tail (setcdr ...))', :495), so a
+        ;; match AT the tail cell and an ABSENT anchor both splice after
+        ;; the tail cell.  The DOS_NT `downcase' compare of L40 joins
+        ;; this `or'.
+        (let loop ((tail (symbol-value 'load-path)))
+          (cond ((not (pair? tail)) #nil)
+                ((or (not (pair? (cdr tail)))
+                     (equal? thisdir (car tail)))
+                 (set-cdr! tail (append new (cdr tail)))
+                 (cdr tail))
+                (else (loop (cdr tail))))))))
 
 (define elisp-provide
   (case-lambda

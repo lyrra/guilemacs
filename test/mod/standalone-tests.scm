@@ -9,7 +9,11 @@
 ;; M60 imp-14: 6 -> 8, the 2 `defalias' cases of row 34.
 ;; M60 imp-15: 8 -> 12, the 4 hash cases of row 32; 12 -> 13 for the
 ;; ACCESSOR case of brief.org P1.
-(define expected-passes 13)
+;; M60 imp-16: 13 -> 15, the 2 cases of row 25
+;; (`normal-top-level-add-to-load-path'): 1 negative and 1 positive.
+;; cr.org F1 fix: 15 -> 17, the TAIL-cell anchor case and the ABSENT
+;; anchor case (the elisp loop splices at the tail cell too).
+(define expected-passes 17)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -325,6 +329,75 @@
                     (equal? "Wrong type argument: hash-table-p (1 2)"
                             (and gethash-fn
                                  (text (lambda () (gethash-fn 'k '(1 2)))))))))
+
+;; M60 imp-16 -- row 25: `normal-top-level-add-to-load-path'.  The port
+;; READS `default-directory' (the caller owns the bind, lisp/startup.el
+;; :631); it does not bind it.  The NEGATIVE case runs FIRST, because the
+;; positive case binds the variable for the rest of the process (the
+;; elisp value slot has no "unbind", loader.scm :1140).
+(let ((before (length (symbol-value 'load-path))))
+  (let ((result (catch #t
+                  (lambda () (load-fixture "standalone-ntl.el") 'loaded)
+                  (lambda (key . args) (list 'error key args)))))
+    (test-assert "row 25: no caller bind of default-directory raises void-variable and leaves load-path alone"
+                 (and (equal? '(error void-variable (default-directory)) result)
+                      (= before (length (symbol-value 'load-path)))))))
+
+;; The positive case: the 2 expanded names follow the ANCHOR entry, which
+;; is the stripped `default-directory'.  A `done' load is not expansion
+;; proof; the 2 joined values at the anchor cell are.  This bind is the
+;; caller bind of lisp/startup.el :631.
+(set-symbol-value! 'default-directory (string-append repo-root "/lisp/"))
+(let* ((before (length (symbol-value 'load-path)))
+       (dd (symbol-value 'default-directory))
+       (anchor (substring dd 0 (- (string-length dd) 1)))
+       (result (catch #t
+                 (lambda () (load-fixture "standalone-ntl.el") 'loaded)
+                 (lambda (key . args) (list 'error key args))))
+       (lp (symbol-value 'load-path))
+       (at (let loop ((l lp) (i 0))
+             (cond ((null? l) #f)
+                   ((equal? anchor (car l)) i)
+                   (else (loop (cdr l) (+ i 1)))))))
+  (test-assert "row 25: the 2 names are expanded and spliced after the anchor entry"
+               (and (eq? 'loaded result)
+                    (= (+ before 2) (length lp))
+                    at
+                    (equal? (string-append anchor "/m60ntla")
+                            (list-ref lp (+ at 1)))
+                    (equal? (string-append anchor "/m60ntlb")
+                            (list-ref lp (+ at 2))))))
+
+;; F1 of the cr.org review of imp-16: the elisp loop stops on the TAIL
+;; cell of `load-path' and STILL splices after it (`(when tail
+;; (setcdr tail ...))', lisp/startup.el :495).  The plain path keeps the
+;; anchor at index 0 of 14, so the 2 cases above never reach the tail
+;; cell.  These 2 do: 1 with the anchor AT the tail cell, 1 with no
+;; anchor at all (elisp splices after the LAST cell).  Both put the OLD
+;; `load-path' back: the value slot is process-global.
+(let* ((saved (symbol-value 'load-path))
+       (dd (symbol-value 'default-directory))
+       (anchor (substring dd 0 (- (string-length dd) 1)))
+       (ntl-run (lambda (lp)
+                  (set-symbol-value! 'load-path lp)
+                  (catch #t
+                    (lambda () (load-fixture "standalone-ntl.el") 'loaded)
+                    (lambda (key . args) (list 'error key args))))))
+  (let ((result (ntl-run (list "/tmp/m60ntl-a" anchor))))
+    (test-assert "row 25: the anchor AT the TAIL cell of load-path still takes the 2 names"
+                 (and (eq? 'loaded result)
+                      (equal? (list "/tmp/m60ntl-a" anchor
+                                    (string-append anchor "/m60ntla")
+                                    (string-append anchor "/m60ntlb"))
+                              (symbol-value 'load-path)))))
+  (let ((result (ntl-run (list "/tmp/m60ntl-a" "/tmp/m60ntl-b"))))
+    (test-assert "row 25: an ABSENT anchor appends the 2 names after the last cell"
+                 (and (eq? 'loaded result)
+                      (equal? (list "/tmp/m60ntl-a" "/tmp/m60ntl-b"
+                                    (string-append anchor "/m60ntla")
+                                    (string-append anchor "/m60ntlb"))
+                              (symbol-value 'load-path)))))
+  (set-symbol-value! 'load-path saved))
 
 (test-end "Guilemacs standalone loader and reader")
 

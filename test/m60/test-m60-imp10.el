@@ -470,9 +470,12 @@ PROCEDURE already existed before this row.")
 (m60-imp10--check "s2/no-regression-on-older-modes"
                  (m60-imp10--all
                   (m60-imp10--probe-line "cells" "EMPTY-CELLS: ()")
+                  ;; M60 imp-16 (row 25) RE-PIN: OLD value "LOAD
+                  ;; lisp/subdirs.el: ERROR void-function
+                  ;; (normal-top-level-add-to-load-path)".
                   (m60-imp10--probe-line
                    "cells"
-                   "LOAD lisp/subdirs.el: ERROR void-function (normal-top-level-add-to-load-path)")
+                   "LOAD lisp/subdirs.el: done")
                   (m60-imp10--probe-line "control" "cond empty: #nil")
                   (m60-imp10--probe-line "defs" "defconst value: 2")
                   (m60-imp10--probe-line "obsolete" "LOAD lisp/obarray.el: done")))
