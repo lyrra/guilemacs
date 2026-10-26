@@ -1218,6 +1218,137 @@ A chain longer than `%elisp-loader-indirect-limit' raises
         (remove (lambda (entry) (eq? (car entry) name))
                 elisp-loader-macro-table)))
 
+;; M60 imp-21 -- row 28b: the backquote VALUE BUILDER.
+;; The read loop interns the NAME only, so the head that a real file
+;; reaches is the 1-CHARACTER symbol: `elisp-parse-backquote-with-list-
+;; construction' (reader.scm :540) conses `(intern "`")' at :545, and the
+;; read loop calls it at :1568.  `(eq? (string->symbol "`") 'backquote)'
+;; is #f (measured).  The 2 unquote PRODUCERS agree: `,@' at
+;; reader.scm :560/:1689 and `,' at :567/:1692 use `elisp-intern', which
+;; is `string->symbol' (utils.scm :106).
+;; The C peer interns the NAME only too: `DEFSYM (Qbackquote, "`")' at
+;; src/lread.c :3500, and src/eval.c holds 0 `backquote' match.  The walk
+;; below is therefore a DECISION, not a port.
+(define elisp-loader-backquote-head (string->symbol "`"))
+(define elisp-loader-unquote-head (string->symbol ","))
+(define elisp-loader-unquote-spliced-head (string->symbol ",@"))
+
+;; LIMITS of this row.  These are NAMED limits, never claims:
+;; L53 the unquoted names resolve on the DYNAMIC binding model of this
+;;    evaluator (L3).  Emacs uses the lexical model.
+;; L54 `,@' of a value that is not a proper list raises a Guile
+;;    `misc-error'.  This loader has no elisp `signal' path (L20 / L21),
+;;    so the error text names no elisp symbol.
+;; L55 the depth rule is LOCAL to this walk: an unquote at a depth higher
+;;    than 1 keeps the structure and does NOT evaluate.  C `Fread' has no
+;;    depth, so the rule is a DECISION.
+;; L56 a `,@' at depth 1 in a VALUE context RAISES.  This port raises; a
+;;    full Emacs does NOT.  The splice branch of `backquote-process'
+;;    (lisp/emacs-lisp/backquote.el :166) answers the tag 2 with the form
+;;    `x' (:171), and the `backquote' macro DROPS the tag
+;;    (`(cdr (backquote-process structure))', :110), so `,@x' expands to
+;;    `x'.  The raise is a DECISION of this port, not a port of C.  A
+;;    deeper `,@' keeps the structure, as L55 does.
+;; L57 a DOTTED unquote tail differs: the reader turns `(1 . ,x)' into
+;;    (backquote (1 (, x))), so the walk returns (1 , x) and NOT (1 . 5).
+;;    The cause is the reader tail read, and this imp changes no reader.
+;; L58 an unquote with MORE than 1 argument does NOT raise: `(, a b)' at
+;;    depth 1 evaluates `a' and DROPS `b', because the walk reads
+;;    `(cadr form)' only.  A full Emacs raises "Multiple args to , are
+;;    not supported" (:162), and the same for `,@' (:170).  This row
+;;    needs no shape, so the limit is named and no code is changed.
+;; The SHAPE of a DELAYED unquote is a proper 2-element list
+;; `(<,> form)': `backquote-delay-process' (:121) listifies the `,' head
+;; against the processed CDR, and the cdr of a `,x' form is the LIST
+;; (x), so the `,' lands in the head of a pair whose tail is a list.  A
+;; dotted pair can not come out.  The argument stays the FORM and is not
+;; evaluated (cr.org F6 of the imp-21 round: the DOTTED claim is refuted
+;; by the source, not by a run; vanilla Emacs does not run on this host).
+;; The value is a FRESH SCHEME list or a FRESH SCHEME vector.  It is not a
+;; byte-code constant, and no `list' / `vector' cell is touched: this walk
+;; is 1 pass and there is no compile phase in this loader.
+;; The reader has 2 live backquote producers, and
+;; `elisp-parse-backquote-from-port' (reader.scm :528) is a 3rd, dead one
+;; (0 caller).  This walk accepts BOTH live heads, so the readers agree
+;; again.  The producers stay 2; their merge is the next candidate.
+
+;; Walk 1 FORM at 1 DEPTH.  An atom returns ITSELF.  Every returned level
+;; is a FRESH pair: the loader KEEPS the form that it evaluates, and a
+;; macro expander can run 2 times, so a sub-list that shares a pair with
+;; the input can be mutated by a later caller.
+(define (elisp-loader-backquote-walk form depth)
+  "Return the value of backquote FORM at DEPTH.  Every level is fresh."
+  (cond
+    ;; A VECTOR is a value context too, so a `,' or `,@' inside it must be
+    ;; walked: an untouched vector answers a WRONG value with no raise
+    ;; (cr.org F3 of the imp-21 round).
+    ((vector? form) (elisp-loader-backquote-walk-vector form depth))
+    ((not (pair? form)) form)
+    (else
+     (let ((head (car form)))
+       (cond
+         ;; L55: depth 1 evaluates; a deeper level keeps the structure.
+         ;; A DELAYED unquote answers the proper 2-element list
+         ;; `(<,> form)' and the form is NOT evaluated (see L56 ... L58
+         ;; above): `backquote-delay-process' listifies the `,' head
+         ;; against the processed CDR.
+         ((eq? head elisp-loader-unquote-head)
+          (if (= depth 1)
+              (elisp-loader-eval (cadr form))
+              (cons elisp-loader-unquote-head
+                    (cons (elisp-loader-backquote-walk (cadr form) (- depth 1))
+                          #nil))))
+         ;; L56: a splice at depth 1 is legal in a LIST context only.
+         ;; `walk-list' owns that case, so this is a VALUE context.  A
+         ;; deeper splice keeps the structure, as L55 does (cr.org F2).
+         ((eq? head elisp-loader-unquote-spliced-head)
+          (if (= depth 1)
+              (error "backquote: `,@' is legal inside a list only" form)
+              (cons elisp-loader-unquote-spliced-head
+                    (cons (elisp-loader-backquote-walk (cadr form) (- depth 1))
+                          #nil))))
+         ;; The nested case: keep the head that the producer made.
+         ((or (eq? head elisp-loader-backquote-head) (eq? head 'backquote))
+          (cons head
+                (cons (elisp-loader-backquote-walk (cadr form) (+ depth 1))
+                      #nil)))
+         (else (elisp-loader-backquote-walk-list form depth)))))))
+
+;; Walk 1 LIST at 1 DEPTH and build a FRESH list.  A splice is tested on
+;; the ELEMENT shape here, so the data carries no sentinel object.
+(define (elisp-loader-backquote-walk-list form depth)
+  "Return a fresh list for backquote list FORM at DEPTH.  A `,@' at DEPTH
+1 appends the ELEMENTS of its value; a non-pair tail is walked and kept."
+  (let loop ((rest form))
+    (cond
+      ;; The normal list end needs no test: `(null? #nil)' is #t and
+      ;; `(pair? #nil)' is #f, so a dotted tail is WALKED here.
+      ((not (pair? rest)) (elisp-loader-backquote-walk rest depth))
+      ((and (= depth 1)
+            (pair? (car rest))
+            (eq? (car (car rest)) elisp-loader-unquote-spliced-head))
+       (let ((value (elisp-loader-eval (cadr (car rest)))))
+         (if (list? value)
+             (append value (loop (cdr rest)))
+             (error "backquote: `,@' needs a proper list" value))))
+      (else
+       (cons (elisp-loader-backquote-walk (car rest) depth)
+             (loop (cdr rest)))))))
+
+;; Walk 1 VECTOR at 1 DEPTH and build a FRESH vector.  Emacs expands a
+;; vector to (vector ...) with the same element rules: the `vectorp'
+;; branch of `backquote-process' (lisp/emacs-lisp/backquote.el :138)
+;; processes `(append s ())' and rebuilds a `vector' / `vconcat' call, so
+;; `[1 ,(+ 1 1)]' gives [1 2] and `[1 ,@(list 1 2)]' gives [1 1 2] by
+;; SOURCE (vanilla Emacs does not run on this host: no dump file).  The
+;; ELEMENTS go through `walk-list' and a depth-1 `,@' spreads there.
+;; Before this, the walk returned a vector UNCHANGED, so its unquotes
+;; were a WRONG value with no raise.
+(define (elisp-loader-backquote-walk-vector vec depth)
+  "Return a fresh vector for backquote VECTOR VEC at DEPTH."
+  (list->vector
+   (elisp-loader-backquote-walk-list (vector->list vec) depth)))
+
 (define (elisp-loader-eval-form form)
   (let ((head (car form)))
     (cond
@@ -1225,6 +1356,13 @@ A chain longer than `%elisp-loader-indirect-limit' raises
        (elisp-loader-apply (elisp-loader-eval head)
                            (map elisp-loader-eval (cdr form))))
       ((eq? head 'quote) (cadr form))
+      ;; M60 imp-21 -- row 28b: the backquote builder.  It is placed
+      ;; BEFORE the `function' branch and BEFORE the macro-table test:
+      ;; the argument of a backquote is UNEVALLED, and the branch tests
+      ;; NO cell.  Both heads are tested, so the 2 live reader producers
+      ;; agree again.
+      ((or (eq? head elisp-loader-backquote-head) (eq? head 'backquote))
+       (elisp-loader-backquote-walk (cadr form) 1))
       ;; M60 imp-14 -- row 34: `function' is a SPECIAL FORM (unevalled).
       ;; It returns a SYMBOL argument as it is, so the cell of
       ;; (defalias 'string= #'string-equal) holds the SYMBOL

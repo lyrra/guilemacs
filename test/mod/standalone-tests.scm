@@ -32,7 +32,22 @@
 ;; cr.org F7 fix of the imp-20 round (42 -> 43, OLD value 42): case 7
 ;; gates limit L14 at CALL time: a declaration in the body of a `defun'
 ;; is data, so the call answers the body value and does not raise.
-(define expected-passes 43)
+;; M60 imp-21 (43 -> 48): the 5 cases of row 28b (the `backquote' value
+;; builder): the fixture loads, `,' evaluates and `,@' splices at depth 1,
+;; a nested backquote keeps both heads at depth 2, the load continues, and
+;; `,@' of a non-list raises (L54, L55).
+;; cr.org FIX of the imp-21 round (48 -> 51): 3 cases for the 2 behavior
+;; findings and 1 missing gate: a nested `,@' at depth 2 keeps its
+;; structure and does not raise (F2), a VECTOR argument is walked and a
+;; depth-1 `,@' spreads inside it (F3), and the L56 raise of a `,@' in a
+;; value context has a case (F8).
+;; M60 imp-21 cr.org FIX 2 (51 -> 53): 2 cases for the 2 findings that had
+;; no gate: the SHAPE of a delayed unquote with a COMPOUND argument (F6:
+;; the shape claim is refuted by lisp/emacs-lisp/backquote.el :121, and
+;; the case would catch a dotted pair), and L58, an unquote with 2
+;; arguments (F8).  The reader can NOT write the L58 shape: `,` takes 1
+;; form, so `(, a b)' reads as `((, a) b)'; the case BUILDS the form.
+(define expected-passes 53)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -790,6 +805,203 @@
   (test-assert (format #f "row 36 case 7: a declaration in a `defun' body is data at CALL time and the call answers 7 (value: ~s)"
                        call)
                (and loaded (eqv? 7 call))))
+
+;;; M60 imp-21 -- row 28b: `backquote' is a VALUE BUILDER.  The loader
+;;; branch of `elisp-loader-eval-form' (mod/emacs/loader.scm) calls
+;;; `elisp-loader-backquote-walk' at depth 1.  The read loop interns the
+;;; NAME only, so the head that a real file reaches is the 1-CHARACTER
+;;; symbol `(intern "`")' (reader.scm :545); the branch tests both heads.
+;;; The C peer interns the NAME only too (`DEFSYM (Qbackquote, "`")',
+;;; src/lread.c :3500), so the walk is a DECISION, not a port.
+;;
+;; The 10 cases load `standalone-backquote.el' ONE time: the top-level
+;; backquote does not raise, a `,' at depth 1 evaluates and a `,@' at
+;; depth 1 splices, a NESTED backquote keeps its 2 heads at depth 2 (L55),
+;; a nested `,@' at depth 2 keeps its structure (L56), a VECTOR argument
+;; is walked (F3), the load continues, and `,@' of a non-list raises
+;; (L54).  Cases 5 and 8 read TEXT: a Scheme quasiquote can NOT build the
+;; 1-character head, so the elisp reader must make the form.
+(define m60-backquote-head (string->symbol "`"))
+(define m60-unquote-head (string->symbol ","))
+(define m60-unquote-spliced-head (string->symbol ",@"))
+
+;; The FIXED expectations of cases 3, 6 and 7, built with `cons' and the
+;; elisp nil tail, so a case compares against its OWN value and not
+;; against the value that it measures (cr.org F6 of this round).
+;; `(a `(b ,m60-bq-c))' -> (a (<bq> (b (<,> m60-bq-c))))
+(define m60-bq-nested-want
+  (cons 'a
+        (cons (cons m60-backquote-head
+                    (cons (cons 'b
+                                (cons (cons m60-unquote-head
+                                            (cons 'm60-bq-c #nil))
+                                      #nil))
+                          #nil))
+              #nil)))
+;; `(a `(b ,@m60-bq-c))' -> (a (<bq> (b (<,@> m60-bq-c))))
+(define m60-bq-nested-splice-want
+  (cons 'a
+        (cons (cons m60-backquote-head
+                    (cons (cons 'b
+                                (cons (cons m60-unquote-spliced-head
+                                            (cons 'm60-bq-c #nil))
+                                      #nil))
+                          #nil))
+              #nil)))
+;; `(a `(b ,(list 1 2)))' -> (a (<bq> (b (<,> (list 1 2))))).  The
+;; argument is a FORM and it is NOT evaluated (L55), and the pair is
+;; PROPER: `backquote-delay-process' (:121) listifies the `,' head against
+;; the processed cdr, whose value is the LIST (x), so no dotted pair can
+;; come out (cr.org F6 of this round).
+(define m60-bq-nested-form-want
+  (cons 'a
+        (cons (cons m60-backquote-head
+                    (cons (cons 'b
+                                (cons (cons m60-unquote-head
+                                            (cons (cons 'list (cons 1 (cons 2 #nil)))
+                                                  #nil))
+                                      #nil))
+                          #nil))
+              #nil)))
+;; L58: the form `(bq (1 (, m60-bq-b 99)))' built with `cons'.  The walk
+;; reads `(cadr form)' only, so the answer is (1 2) and the 99 is DROPPED.
+(define m60-bq-multi-form
+  (cons m60-backquote-head
+        (cons (cons 1 (cons (cons m60-unquote-head
+                                  (cons 'm60-bq-b (cons 99 #nil)))
+                            #nil))
+              #nil)))
+;; `[1 ,m60-bq-b ,@m60-bq-c]' -> #[1 2 3 4].  Both unquotes are at depth
+;; 1, so the `,' evaluates to 2 and the `,@' spreads 3 and 4.  A vector
+;; compare is positional: `(vector-ref v i)'.
+(define m60-bq-vector-want #(1 2 3 4))
+
+(let* ((load-result (m19-try (lambda ()
+                               (load-fixture "standalone-backquote.el")
+                               'loaded)))
+       (loaded (eq? 'loaded (cadr load-result)))
+       (basic (and loaded (m19-cell 'm60-bq-basic)))
+       (nested (and loaded (m19-cell 'm60-bq-nested)))
+       (tail (and loaded (m19-cell 'm60-bq-tail)))
+       (b (and loaded (m19-cell 'm60-bq-b)))
+       (nested-splice (and loaded (m19-cell 'm60-bq-nested-splice)))
+       (vector-value (and loaded (m19-cell 'm60-bq-vector)))
+       (nested-form (and loaded (m19-cell 'm60-bq-nested-form)))
+       (multi-eval (and loaded (m19-try (lambda ()
+                                          (m19-eval m60-bq-multi-form)))))
+       ;; The inner form of `(a `(b ,m60-bq-c))' is the 2nd element.
+       (inner (and loaded (pair? nested) (cadr nested)))
+       (inner-arg (and inner (pair? inner) (cadr inner)))
+       (comma (and inner-arg (pair? inner-arg) (pair? (cdr inner-arg))
+                   (cadr inner-arg)))
+       ;; Case 8 reads a `,@' in a VALUE context from TEXT: the whole
+       ;; argument of the backquote is the splice.
+       (value-splice-form
+        (and loaded
+             (symbol-fbound? 'read-from-string)
+             (m19-try
+              (lambda ()
+                (car ((symbol-function 'read-from-string)
+                      "`,@m60-bq-b"))))))
+       (value-splice-eval (and value-splice-form
+                               (eq? 'ok (car value-splice-form))
+                               (m19-try (lambda ()
+                                          (m19-eval (cadr value-splice-form))))))
+       ;; Case 5 reads the form from TEXT with the elisp `read-from-string'
+       ;; cell (reader.scm :141); it returns (OBJECT . INDEX).
+       (splice-form (and loaded
+                         (symbol-fbound? 'read-from-string)
+                         (m19-try
+                          (lambda ()
+                            (car ((symbol-function 'read-from-string)
+                                  "`(1 ,@m60-bq-b)"))))))
+       (splice-eval (and splice-form
+                         (eq? 'ok (car splice-form))
+                         (m19-try (lambda ()
+                                    (m19-eval (cadr splice-form)))))))
+  ;; Case 1 -- the fixture loads: a top-level backquote does not raise.
+  (test-assert (format #f "row 28b case 1: `standalone-backquote.el' loads, so a top-level backquote does not raise (result: ~s)"
+                       load-result)
+               loaded)
+  ;; Case 2 -- `,' at depth 1 evaluates and `,@' at depth 1 splices the
+  ;; ELEMENTS of its proper list.
+  (test-assert (format #f "row 28b case 2: ``(1 ,m60-bq-b ,@m60-bq-c 5)' is (1 2 3 4 5) (value: ~s)"
+                       basic)
+               (and loaded (m19-elems? basic '(1 2 3 4 5))))
+  ;; Case 3 -- L55: at depth 2 the `,' is NOT evaluated, so BOTH heads
+  ;; survive: the inner pair keeps the 1-character backquote symbol, and
+  ;; its argument keeps the `,' symbol with the BARE name after it.  The
+  ;; expected value is FIXED, not taken from the value under test (cr.org
+  ;; F6 of this round).  A nested structure needs `equal?': `m19-elems?'
+  ;; compares the ELEMENTS with `eqv?', and 2 equal pairs are not `eqv?'.
+  (test-assert (format #f "row 28b case 3: a nested backquote keeps both heads at depth 2 (nested: ~s, want: ~s)"
+                       nested m60-bq-nested-want)
+               (and loaded
+                    (equal? nested m60-bq-nested-want)
+                    (pair? inner)
+                    (eq? m60-backquote-head (car inner))
+                    (pair? comma)
+                    (eq? m60-unquote-head (car comma))
+                    (eq? 'm60-bq-c (cadr comma))))
+  ;; Case 4 -- the load continues after the forms above.
+  (test-assert (format #f "row 28b case 4: the load continues after the backquote forms (tail: ~s)"
+                       tail)
+               (and loaded (eq? #t tail)))
+  ;; Case 5 -- L54: `,@' of the number 2 is not a proper list, so the
+  ;; eval RAISES, and `m60-bq-b' is still the number 2.
+  (test-assert (format #f "row 28b case 5: `,@' of a non-list raises and names the value (form: ~s, eval: ~s, b: ~s)"
+                       splice-form splice-eval b)
+               (and splice-form
+                    (eq? 'ok (car splice-form))
+                    (pair? splice-eval)
+                    (eq? 'error (car splice-eval))
+                    (eq? 'misc-error (cadr splice-eval))
+                    (not (list? b))
+                    (eqv? 2 b)))
+  ;; Case 6 -- L56: a `,@' at depth 2 keeps its structure and does NOT
+  ;; raise.  A full Emacs keeps the same structure by SOURCE
+  ;; (lisp/emacs-lisp/backquote.el :166 -> backquote-delay-process :121);
+  ;; vanilla Emacs does not run on this host, so this is not a run.
+  (test-assert (format #f "row 28b case 6: a nested `,@' at depth 2 keeps its structure (value: ~s, want: ~s)"
+                       nested-splice m60-bq-nested-splice-want)
+               (and loaded
+                    (equal? nested-splice m60-bq-nested-splice-want)))
+  ;; Case 7 -- a VECTOR argument is walked: the `,' evaluates and the
+  ;; depth-1 `,@' spreads inside the vector.  Before the fix the walk
+  ;; returned the vector UNCHANGED and nothing raised (cr.org F3).
+  (test-assert (format #f "row 28b case 7: a vector argument is walked, so its unquotes evaluate (vector: ~s, want: ~s)"
+                       vector-value m60-bq-vector-want)
+               (and loaded
+                    (vector? vector-value)
+                    (= 4 (vector-length vector-value))
+                    (eqv? 1 (vector-ref vector-value 0))
+                    (eqv? 2 (vector-ref vector-value 1))
+                    (eqv? 3 (vector-ref vector-value 2))
+                    (eqv? 4 (vector-ref vector-value 3))))
+  ;; Case 8 -- L56: a `,@' as the WHOLE argument of a backquote is a VALUE
+  ;; context at depth 1, so the eval RAISES (cr.org F8 of this round).
+  (test-assert (format #f "row 28b case 8: a `,@' in a value context raises (form: ~s, eval: ~s)"
+                       value-splice-form value-splice-eval)
+               (and value-splice-form
+                    (eq? 'ok (car value-splice-form))
+                    (pair? value-splice-eval)
+                    (eq? 'error (car value-splice-eval))
+                    (eq? 'misc-error (cadr value-splice-eval))))
+  ;; Case 9 -- the SHAPE of a DELAYED unquote with a COMPOUND argument:
+  ;; the argument is a FORM and it is not evaluated, and the pair is
+  ;; proper (cr.org F6 of this round).  The expected value is FIXED.
+  (test-assert (format #f "row 28b case 9: a delayed unquote keeps its argument as a FORM in a proper pair (value: ~s, want: ~s)"
+                       nested-form m60-bq-nested-form-want)
+               (and loaded
+                    (equal? nested-form m60-bq-nested-form-want)))
+  ;; Case 10 -- L58: an unquote with 2 arguments does not raise here and
+  ;; the FIRST argument wins (cr.org F8 of this round).
+  (test-assert (format #f "row 28b case 10: L58 an unquote with 2 arguments answers (1 2) and drops the 2nd (eval: ~s)"
+                       multi-eval)
+               (and loaded
+                    (pair? multi-eval)
+                    (eq? 'ok (car multi-eval))
+                    (m19-elems? (cadr multi-eval) '(1 2)))))
 
 (test-end "Guilemacs standalone loader and reader")
 

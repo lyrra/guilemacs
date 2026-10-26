@@ -290,7 +290,11 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; M60 imp-19 (limit L4) RE-PIN: 1,847 -> 1,889 LINES (OLD value 1,847).
                  ;; M60 imp-20 (row 36) RE-PIN: 1,889 -> 1,914 LINES (OLD value 1,889;
                  ;; the `declare' branch and its comment lines, no counter changes).
-                 (eql 1914 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-21 (row 28b) RE-PIN: 1,914 -> 2,029 LINES (OLD value 1,914;
+                 ;; the backquote walk, its 3 procedures and 5 limit notes).
+                 ;; M60 imp-21 cr.org fix RE-PIN: 2,029 -> 2,052 LINES (OLD value 2,029;
+                 ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
+                 (eql 2052 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
