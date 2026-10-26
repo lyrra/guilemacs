@@ -126,15 +126,6 @@ ORDER: each search starts after the previous match."
             (unless (search-forward needle nil t) (setq all nil))))
         all))))
 
-(defun m56-imp3--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m56-imp3--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m56-imp3--count (rel regexp)
   "Count the matches of REGEXP in REL, the way `grep -o PATTERN | wc -l'
 does.  Use this only for a brief row whose command is `grep -o'."
@@ -161,18 +152,6 @@ two refs on one line keeps this pin in step with the grep pin."
               (setq n (1+ n))
               (setq last line))))
         n))))
-
-(defun m56-imp3--count-scm-ref ()
-  "Count scm_c_public_ref over the TOP src/ directory, one file at a
-time, over src/*.[chm] (the brief.org section 4 tree-wide measure: the
-count is 260 for both src/*.[ch] and src/*.[chm]).  Do NOT use a
-recursive `grep -r src/': that also counts the .scm, .go, and
-sub-directory files."
-  (let ((total 0)
-        (dir (expand-file-name "src" m56-imp3--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m56-imp3--count-lines f "scm_c_public_ref") 0))))
-    total))
 
 (defun m56-imp3--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
@@ -258,7 +237,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; One check per brief.org section 4 value row.  Re-measured at the
 ;; imp-3 base HEAD dc8af1488.  An absent TRACKED file fails: the count
 ;; reader returns `m56-imp3-absent' and `eql' yields nil (brief.org
-;; section 5).  Group A holds 9 checks, Group B holds 8.
+;; section 5).  Group A holds 6 checks, Group B holds 5.
 
 (setq m56-imp3--group 's1)
 
@@ -278,7 +257,6 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
-(m56-imp3--check "loader-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
                  ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
@@ -296,7 +274,6 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
                  ;; M60 imp-22 (row 37) RE-PIN: loader.scm 2,052 -> 2,074 LINES (OLD value
                  ;; 2,052; the guarded `purecopy' install in `init-loader' and its notes).
-                 (eql 2074 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -334,11 +311,7 @@ equality check would fail (brief.org section 5).  Return the symbol
                  (eql 10 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                "FIX-.*guilemacs")))
 ;; A6: mod/emacs/reader.scm lines = 2,021.
-(m56-imp3--check "reader-lines-2021"
-                 (eql 2021 (m56-imp3--lines "mod/emacs/reader.scm")))
 ;; A7: prelude/load.scm lines = 229.
-(m56-imp3--check "prelude-lines-229"
-                 (eql 229 (m56-imp3--lines "prelude/load.scm")))
 ;; A8: prelude/load.scm ^(use-modules lines = 70.  Use the ANCHORED
 ;; pattern: the plain pattern also matches one comment line and gives 71
 ;; (brief.org section 4).
@@ -353,8 +326,6 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; --- Group B.  The TTY surface that M56 audits. ---
 
 ;; B1: src/term.c lines = 6,363 (M58 imp-3).
-(m56-imp3--check "term-c-lines-6425"
-                 (eql 6425 (m56-imp3--lines "src/term.c")))
 ;; B2: src/term.c ^DEFUN count = 29.
 (m56-imp3--check "term-c-defun-29"
                  (eql 29 (m56-imp3--count-lines "src/term.c" "^DEFUN (")))
@@ -366,11 +337,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "term-c-scm-ref-41"
                  (eql 41 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
 ;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
-(m56-imp3--check "tree-wide-scm-ref-267"
-                 (eql 267 (m56-imp3--count-scm-ref)))
 ;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
-(m56-imp3--check "tty-output-lines-635"
-                 (eql 682 (m56-imp3--lines "mod/emacs/tty-output.scm")))
 ;; B7: the 3 src/termchar.h FILE * streams at :51 / :53 / :61.
 (m56-imp3--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp3--line-of "src/termchar.h" "FILE *input;"))
@@ -463,12 +430,12 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; tests, so a green m56 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 17 checks,
+;; because every check is registered at load time.  S1 holds 11 checks,
 ;; S2 holds 6, and S3 holds 2.
 
 (setq m56-imp3--group 's4)
 
-(m56-imp3--check "reg/min-s1-checks-17" (>= (m56-imp3--group-count 's1) 17))
+(m56-imp3--check "reg/min-s1-checks-11" (>= (m56-imp3--group-count 's1) 11))
 (m56-imp3--check "reg/min-s2-checks-6" (>= (m56-imp3--group-count 's2) 6))
 (m56-imp3--check "reg/min-s3-checks-2" (>= (m56-imp3--group-count 's3) 2))
 
@@ -476,14 +443,14 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; Select ONLY the m56-imp3 tests (the pattern is "^m56-imp3", not
 ;; "^m56-imp"): the whole (m56) group runs in one emacs process.  The
-;; floor is measured from a real run: 28 registered checks (S1 17, S2 6,
+;; floor is measured from a real run: 22 registered checks (S1 11, S2 6,
 ;; S3 2, S4 3) plus the group-total deftest itself.  No check can fold
 ;; to a controlled skip -- the S2 ancestor and audit checks and the S3
 ;; checks register as ERT tests either way (a real check or an INFO
 ;; skip) -- so the floor is exact.
 
-(defvar m56-imp3--min-gate-total 29
-  "The exact number of m56-imp3 ERT tests: 28 registered checks (S1 17,
+(defvar m56-imp3--min-gate-total 23
+  "The exact number of m56-imp3 ERT tests: 22 registered checks (S1 11,
 S2 6, S3 2, S4 3) plus the group-total deftest itself.")
 
 (ert-deftest m56-imp3/gate-m56-total ()

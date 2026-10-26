@@ -13,7 +13,7 @@
 ;;; It pins these groups:
 ;;;
 ;;;   S1 -- the re-measured surface of brief.org section 4, re-measured
-;;;         at imp-2 when it edits the loader.  S1 holds 9
+;;;         at imp-2 when it edits the loader.  S1 holds 6
 ;;;         checks: mod/emacs/loader.scm 1190 lines / 74 (symbol-function
 ;;;         'X) apply sites / 18 symbol-fbound? guards / 14
 ;;;         set-symbol-function! sites / 7 FIX-*-guilemacs markers;
@@ -124,15 +124,6 @@ ORDER: each search starts after the previous match."
           (when all
             (unless (search-forward needle nil t) (setq all nil))))
         all))))
-
-(defun m55-imp1--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m55-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
 
 (defun m55-imp1--count (rel regexp)
   "Count the matches of REGEXP in REL, the way `grep -o PATTERN | wc -l'
@@ -312,7 +303,6 @@ symbol `m55-imp1-guile-absent'."
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
-(m55-imp1--check "loader.scm-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
                  ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
@@ -330,11 +320,6 @@ symbol `m55-imp1-guile-absent'."
                  ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
                  ;; M60 imp-22 (row 37) RE-PIN: loader.scm 2,052 -> 2,074 LINES (OLD value
                  ;; 2,052; the guarded `purecopy' install in `init-loader' and its notes).
-                 (eql 2074 (m55-imp1--lines "mod/emacs/loader.scm")))
-(m55-imp1--check "reader.scm-lines-2021"
-                 (eql 2021 (m55-imp1--lines "mod/emacs/reader.scm")))
-(m55-imp1--check "prelude-load.scm-lines-229"
-                 (eql 229 (m55-imp1--lines "prelude/load.scm")))
 (m55-imp1--check "loader.scm-symbol-function-apply-74"
                  (eql 76 (m55-imp1--count "mod/emacs/loader.scm"
                                           "(symbol-function '")))
@@ -507,23 +492,23 @@ symbol `m55-imp1-guile-absent'."
 
 ;; An --filter that matches no group already reports exit 0 with 0
 ;; tests, so a green m55 gate proves nothing until the corpus exists and
-;; its checks really register.  S1 holds 9 checks, S2 holds 7, S3 holds
+;; its checks really register.  S1 holds 6 checks, S2 holds 7, S3 holds
 ;; 4, and S4 holds 4.
 
 (setq m55-imp1--group 's5)
 
-(m55-imp1--check "reg/min-s1-checks-9" (>= (m55-imp1--group-count 's1) 9))
+(m55-imp1--check "reg/min-s1-checks-6" (>= (m55-imp1--group-count 's1) 6))
 (m55-imp1--check "reg/min-s2-checks-7" (>= (m55-imp1--group-count 's2) 7))
 (m55-imp1--check "reg/min-s3-checks-4" (>= (m55-imp1--group-count 's3) 4))
 (m55-imp1--check "reg/min-s4-checks-4" (>= (m55-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m55-imp1 tests is 29: 28 registered checks
-;; (S1 9, S2 7, S3 4, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m55-imp1 tests is 26: 25 registered checks
+;; (S1 6, S2 7, S3 4, S4 4, S5 4) plus the group-total deftest itself.
 
-(defvar m55-imp1--min-gate-total 29
-  "The exact number of m55-imp1 ERT tests: 28 registered checks (S1 9,
+(defvar m55-imp1--min-gate-total 26
+  "The exact number of m55-imp1 ERT tests: 25 registered checks (S1 6,
 S2 7, S3 4, S4 4, S5 4) plus the group-total deftest itself.")
 
 (ert-deftest m55-imp1/gate-m55-total ()

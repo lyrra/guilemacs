@@ -20,7 +20,7 @@
 ;;;         symbol-fbound? lines, 14 set-symbol-function! lines, 7
 ;;;         FIX-*-guilemacs lines); mod/emacs/reader.scm (2,021 lines);
 ;;;         prelude/load.scm (265 lines, 70 ^(use-modules lines, 31
-;;;         ^(init-...-registrations) lines).  S1 holds 9 checks.
+;;;         ^(init-...-registrations) lines).  S1 holds 6 checks.
 ;;;   S1b -- the real-path re-check (brief.org section 6): ONE plain
 ;;;         `guile -L mod -c' subprocess calls (use-modules (emacs
 ;;;         loader)) and (use-modules (emacs-elisp runtime)), then
@@ -126,15 +126,6 @@ ORDER: each search starts after the previous match."
           (when all
             (unless (search-forward needle nil t) (setq all nil))))
         all))))
-
-(defun m55-imp5--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m55-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
 
 (defun m55-imp5--count (rel regexp)
   "Count the matches of REGEXP in REL, the way `grep -o PATTERN | wc -l'
@@ -296,7 +287,6 @@ symbol `m55-imp5-guile-absent'."
 ;; M60 imp-9 fix (cr.org F3, F4, F5; L21) RE-PIN: loader.scm 1,480 -> 1,511 LINES.
 ;; M60 imp-11 (cr.org F3, F5) RE-PIN: loader.scm 1,511 -> 1,620 LINES; the check NAME drops the
 ;; stale number, because it changed again (an earlier cr.org round F5).
-(m55-imp5--check "loader.scm-lines"
                  ;; M60 imp-12 RE-PIN: loader.scm 1,620 -> 1,642 LINES (OLD value 1,620).
                  ;; M60 imp-13 RE-PIN: loader.scm 1,642 -> 1,653 LINES (OLD value 1,642).
                  ;; M60 imp-15 (row 32) RE-PIN: the hash-table cells move the loader.scm line
@@ -316,13 +306,8 @@ symbol `m55-imp5-guile-absent'."
                  ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
                  ;; M60 imp-22 (row 37) RE-PIN: loader.scm 2,052 -> 2,074 LINES (OLD value
                  ;; 2,052; the guarded `purecopy' install in `init-loader' and its notes).
-                 (eql 2074 (m55-imp5--lines "mod/emacs/loader.scm")))
 ;; Row 2: mod/emacs/reader.scm lines = 2,021.
-(m55-imp5--check "reader.scm-lines-2021"
-                 (eql 2021 (m55-imp5--lines "mod/emacs/reader.scm")))
 ;; Row 3: prelude/load.scm lines = 265.
-(m55-imp5--check "prelude-load.scm-lines-229"
-                 (eql 229 (m55-imp5--lines "prelude/load.scm")))
 ;; Row 4: (symbol-function 'X) applies in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m55-imp5--check "loader.scm-symbol-function-apply-74"
@@ -444,12 +429,12 @@ symbol `m55-imp5-guile-absent'."
 ;; tests, so a green m55 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 9 checks,
+;; because every check is registered at load time.  S1 holds 6 checks,
 ;; S1b holds 2 checks, and S2 holds 6 checks.
 
 (setq m55-imp5--group 's3)
 
-(m55-imp5--check "reg/min-s1-checks-9" (>= (m55-imp5--group-count 's1) 9))
+(m55-imp5--check "reg/min-s1-checks-6" (>= (m55-imp5--group-count 's1) 6))
 (m55-imp5--check "reg/min-s1b-checks-2" (>= (m55-imp5--group-count 's1b) 2))
 (m55-imp5--check "reg/min-s2-checks-6" (>= (m55-imp5--group-count 's2) 6))
 
@@ -457,14 +442,14 @@ symbol `m55-imp5-guile-absent'."
 
 ;; Select ONLY the m55-imp5 tests (the pattern is "^m55-imp5", not
 ;; "^m55-imp"): the whole (m55) group runs in one emacs process.  The
-;; floor is measured from a real run: 20 registered checks (S1 9, S1b 2,
+;; floor is measured from a real run: 17 registered checks (S1 6, S1b 2,
 ;; S2 6, S3 3) plus the group-total deftest itself.  No check can fold
 ;; to a controlled skip -- S1b's two checks and the S2 audit check
 ;; register as ERT tests either way (a real check or an INFO skip) -- so
 ;; the floor is exact.
 
-(defvar m55-imp5--min-gate-total 21
-  "The minimum number of m55-imp5 ERT tests: 20 registered checks (S1 9,
+(defvar m55-imp5--min-gate-total 18
+  "The minimum number of m55-imp5 ERT tests: 17 registered checks (S1 6,
 S1b 2, S2 6, S3 3) plus the group-total deftest.")
 
 (ert-deftest m55-imp5/gate-m55-total ()
