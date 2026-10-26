@@ -706,6 +706,9 @@ host limit is a skip, never a pass."
 ;; imp-7 value 437: the 3 `defun shadow' lines of mode `macros').  Only
 ;; the loader.scm count moves here; the 3 unchanged counts prove that no
 ;; OTHER file was touched.
+;; M60 imp-22 (row 37) RE-PIN: probe-imp3.scm 444 -> 1,373 LINES (OLD
+;; value 444; mode `purecopy' and every mode after it).  No live check
+;; pins that count.
 (setq m60-imp7--group 's5)
 
 

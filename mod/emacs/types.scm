@@ -39,6 +39,7 @@
     elisp-char-table-p
     elisp-bare-symbol-p
     elisp-bare-symbol
+    elisp-purecopy
     elisp-boundp
     elisp-condition-variable-p
     elisp-hash-table-p
@@ -434,6 +435,18 @@ of strings.  (`equal' ignores text properties.)"
   ;; wrapper case of this call is not observable, and `position-symbol'
   ;; and `remove-pos-from-symbol' stay out of this row.
   sym)
+
+(define (elisp-purecopy obj)
+  "Return OBJ."
+  ;; M60 imp-22 -- row 37: the C DEFUN of src/alloc.c :1513 is
+  ;; `return obj;' with the argument vector 1, 1, 0, so it names NO type
+  ;; predicate and raises NO error.  This host has no pure space:
+  ;; `pure_cons' is `Fcons' (:1508) and `make_pure_c_string' is
+  ;; `scm_from_utf8_stringn' (:1502), so the C body IS the identity.
+  ;; Limit L59: a `purecopy' of a MUTABLE object answers the SAME
+  ;; object, so a later `setcar' or `put' on the answer is visible to
+  ;; the caller.  A dumping build copies the object into pure space.
+  obj)
 
 (define (elisp-boundp symbol)
   "Return t if SYMBOL's value is not void."

@@ -47,7 +47,22 @@
 ;; the case would catch a dotted pair), and L58, an unquote with 2
 ;; arguments (F8).  The reader can NOT write the L58 shape: `,` takes 1
 ;; form, so `(, a b)' reads as `((, a) b)'; the case BUILDS the form.
-(define expected-passes 53)
+;; M60 imp-22 (53 -> 61): the 8 cases of row 37 (the guarded `purecopy'
+;; identity install): the cell, the identity for a symbol, an integer,
+;; the elisp nil and a string, the MUTABLE-object limit L59 (a cons
+;; comes back as the SAME cons), and the fixture load, whose macro
+;; expander body calls the cell at load time.
+;; M60 imp-22 cr.org FIX (60 -> 61, OLD value 60): 1 case for the type
+;; that cr.org section 5 left NOT measured: an AGGREGATE object (a vector
+;; and a hash table) comes back as the SAME object too.
+;; M60 imp-22 cr.org F5 FIX: the pre-fix text of this block counted "7
+;; cases"; MEASURED are 8 `test-assert' forms (`Case 1' ... `Case 8'), so
+;; the text and the pin 61 agree now.
+;; M60 imp-22 cr.org review of 18e00220f, F3 and F6: case 1 now asserts
+;; `procedure?' (a stub VALUE in the cell fails it) and case 3 drops the
+;; CONSTANT form `(not (eq? #nil #f))'.  Comments and 1 assertion only,
+;; so the pin stays 61.
+(define expected-passes 61)
 
 ;; No SRFI-64 log file: it would land in the working directory (cr.org F4).
 (set! test-log-to-file #f)
@@ -1002,6 +1017,119 @@
                     (pair? multi-eval)
                     (eq? 'ok (car multi-eval))
                     (m19-elems? (cadr multi-eval) '(1 2)))))
+
+;;; M60 imp-22 -- row 37: the `purecopy' cell of (emacs types) :439,
+;;; installed by the guarded block of `init-loader'.  The C owner is
+;;; `Fpurecopy' (src/alloc.c :1513), its body is `return obj;', and its
+;;; argument vector 1, 1, 0 names NO type predicate, so NO argument
+;;; raises.  Limit L59: a MUTABLE object comes back as the SAME object.
+
+;; Case 1 -- the CELL is present after `init-loader' and holds a
+;; PROCEDURE.  The `procedure?' arm is the observable of brief.org
+;; section 4.1: a stub VALUE in the cell must NOT pass this case
+;; (cr.org F3 of the imp-22 review).
+(let ((cell (and (symbol-fbound? 'purecopy) (symbol-function 'purecopy))))
+  (test-assert (format #f "row 37: `init-loader' installs the `purecopy' cell as a PROCEDURE (fbound: ~s, procedure: ~s)"
+                       (symbol-fbound? 'purecopy)
+                       (and cell (procedure? cell)))
+               (and (eq? #t (symbol-fbound? 'purecopy))
+                    (procedure? cell))))
+
+;; Case 2 -- the CELL is the IDENTITY for a symbol and for an integer,
+;; and no argument raises.
+(let* ((cell (and (symbol-fbound? 'purecopy) (symbol-function 'purecopy)))
+       (sym (and cell (apply cell '(m60-imp22))))
+       (num (and cell
+                 (catch #t
+                   (lambda () (list 'ok (apply cell '(42))))
+                   (lambda (key . args) (cons 'error (cons key args)))))))
+  (test-assert (format #f "row 37: the installed `purecopy' cell returns the SAME symbol and an integer unchanged, with no raise (sym: ~s, num: ~s)"
+                       sym num)
+               (and (eq? sym 'm60-imp22) (equal? num '(ok 42)))))
+
+;; Case 3 -- the elisp nil stays `#nil'.  `equal?' keeps the 3 truth
+;; values apart, so a cell that answers `#f' gives `(ok #f)' and FAILS
+;; here.  The OLD form `(not (eq? #nil #f))' is deleted: it is a
+;; CONSTANT and proves nothing at any run (cr.org F6 of the imp-22
+;; review).
+(let ((result (and (symbol-fbound? 'purecopy)
+                   (catch #t
+                     (lambda ()
+                       (list 'ok (apply (symbol-function 'purecopy)
+                                        (list #nil))))
+                     (lambda (key . args) (cons 'error (cons key args)))))))
+  (test-assert (format #f "row 37: the elisp nil passes through the installed `purecopy' cell unchanged (result: ~s)"
+                       result)
+               (equal? result (list 'ok #nil))))
+
+;; Case 4 -- a STRING comes back as the SAME object (`eq?').  This is
+;; limit L59: a dumping build answers a COPY, because `make_pure_c_string'
+;; (:1502) cannot look through the call here.
+(let* ((cell (and (symbol-fbound? 'purecopy) (symbol-function 'purecopy)))
+       (str (and cell (string-copy "m60-imp22-string")))
+       (back (and str (apply cell (list str)))))
+  (test-assert (format #f "row 37: a string comes back as the SAME object (back: ~s)"
+                       back)
+               (and (string? back) (eq? str back))))
+
+;; Case 5 -- a CONS comes back as the SAME cons, so a later `set-car!'
+;; on the answer is visible to the caller.  L59 pins this; it is not a
+;; defect of the port.
+(let* ((cell (and (symbol-fbound? 'purecopy) (symbol-function 'purecopy)))
+       (obj (and cell (list 1 2)))
+       (back (and obj (apply cell (list obj)))))
+  (when (and back (pair? back)) (set-car! back 'm60-imp22-mutated))
+  (test-assert (format #f "row 37: a cons comes back as the SAME cons and `set-car!' is visible to the caller (obj: ~s)"
+                       obj)
+               (and (pair? back)
+                    (eq? obj back)
+                    (eq? 'm60-imp22-mutated (car obj)))))
+
+;; Case 6 -- `standalone-purecopy.el' loads: its macro expander body
+;; calls the cell at LOAD time, so a missing cell fails the load.
+(let ((result (catch #t
+                (lambda () (load-fixture "standalone-purecopy.el") 'loaded)
+                (lambda (key . args) (cons 'error (cons key args))))))
+  (test-assert (format #f "row 37: `standalone-purecopy.el' loads with `purecopy' in an expander body (result: ~s)"
+                       result)
+               (eq? 'loaded result)))
+
+;; Case 7 -- the stored values of the fixture: the macro expansion is the
+;; quoted symbol, the integer is unchanged, and the load reached the END
+;; (the tail cell is set).
+(test-assert (format #f "row 37: the fixture keeps the identity answers and reaches its tail (expanded: ~s, string: ~s, integer: ~s, tail: ~s)"
+                     (and (symbol-bound? 'm60-purecopy-expanded)
+                          (symbol-value 'm60-purecopy-expanded))
+                     (and (symbol-bound? 'm60-purecopy-string)
+                          (symbol-value 'm60-purecopy-string))
+                     (and (symbol-bound? 'm60-purecopy-integer)
+                          (symbol-value 'm60-purecopy-integer))
+                     (and (symbol-bound? 'm60-purecopy-tail)
+                          (symbol-value 'm60-purecopy-tail)))
+             (and (symbol-bound? 'm60-purecopy-expanded)
+                  (eq? 'm60-purecopy-value
+                       (symbol-value 'm60-purecopy-expanded))
+                  (symbol-bound? 'm60-purecopy-string)
+                  (equal? "m60-purecopy-string"
+                          (symbol-value 'm60-purecopy-string))
+                  (symbol-bound? 'm60-purecopy-integer)
+                  (equal? 42 (symbol-value 'm60-purecopy-integer))
+                  (symbol-bound? 'm60-purecopy-tail)
+                  (eq? #t (symbol-value 'm60-purecopy-tail))))
+
+;; Case 8 -- an AGGREGATE object comes back as the SAME object.  The C
+;; body is `return obj;', so the identity holds for a vector and for a
+;; hash table too.  cr.org section 5 of the imp-22 review left this type
+;; NOT measured.
+(let* ((cell (and (symbol-fbound? 'purecopy) (symbol-function 'purecopy)))
+       (vec (and cell (vector 1 2 3)))
+       (tbl (and cell (make-hash-table))))
+  (test-assert (format #f "row 37: an aggregate object (a vector, a hash table) comes back as the SAME object (vec: ~s, tbl: ~s)"
+                       vec tbl)
+               (and (vector? vec)
+                    (eq? vec (apply cell (list vec)))
+                    (hash-table? tbl)
+                    (eq? tbl (apply cell (list tbl))))))
 
 (test-end "Guilemacs standalone loader and reader")
 

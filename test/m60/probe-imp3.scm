@@ -20,7 +20,7 @@
 ;;; MODE is one of `cells', `subdirs', `subdirs-neg', `provide', `stubs',
 ;;; `negative', `noboot', `require', `defs', `macros', `registration',
 ;;; `language', `obsolete', `control', `arith', `put', `set', `alias',
-;;; `hash', `baresym', or `eac'.
+;;; `hash', `baresym', `purecopy', or `eac'.
 ;;; Mode `subdirs' is the M60 imp-16 record of row 25
 ;;; (`normal-top-level-add-to-load-path'): the 24-name expansion of
 ;;; lisp/subdirs.el :3 and the 14 -> 38 `load-path' delta.  Mode
@@ -30,6 +30,9 @@
 ;;; Mode `hash' is the M60 imp-15 record of row 32 (the
 ;;; `make-hash-table' family, its keyword decode and its 5 raise texts);
 ;;; it also records the NEXT stop of lisp/emacs-lisp/macroexp.el.
+;;; Mode `purecopy' is the M60 imp-22 record of row 37 (the identity
+;;; cell `purecopy'): the cell, its 5 call results, limit L59, and the
+;;; first stop of byte-run.el, macroexp.el, custom.el and startup.el.
 ;;; Mode `baresym' is the M60 imp-18 record of row 35 (the identity cell
 ;;; `bare-symbol'): the cell, its 3 call results, and the first stop of
 ;;; byte-run.el, macroexp.el, custom.el and startup.el.
@@ -1261,6 +1264,86 @@ definition itself: a `memq' over the `features' list."
   ;; 7. F3 does not regress.
   (show "BARESYM featurep-fbound" "~s" (symbol-fbound? 'featurep))))
 
+;;; --- mode: purecopy -------------------------------------------------
+
+;; M60 imp-22 -- row 37 (`purecopy' is an identity cell).  OWNER:
+;; `elisp-purecopy' of (emacs types) :439, installed UNDER a guard by
+;; `init-loader' (loader.scm :1843 ... :1844).  The C owner is
+;; `DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0)' at
+;; src/alloc.c :1513; its body is `return obj;' (:1517) and the argument
+;; vector names NO type predicate, so NO argument raises.  This host has
+;; NO pure space: `make_pure_c_string' (:1502) is
+;; `scm_from_utf8_stringn' and `pure_cons' (:1508) is `Fcons', so the C
+;; body IS the identity for every object.
+;;
+;; MEASURED on the plain `guile -L mod' path (values of this mode,
+;; command: `GUILEMACS_ROOT=$PWD GUILE_AUTO_COMPILE=0 guile -L mod
+;; test/m60/probe-imp3.scm purecopy'):
+;;   `PURECOPY cell: #t proc=#t'
+;;   `PURECOPY symbol: m60-probe-sym same=#t'
+;;   `PURECOPY integer: (ok 42)'
+;;   `PURECOPY nil: (#nil) is-nil=#t not-false=#t'
+;;   `PURECOPY string: "m60-probe-string" same=#t'      (L59)
+;;   `PURECOPY cons: (m60-probe-mutated m60-probe-b) same=#t setcar-visible=#t'
+;;   `PURECOPY vector: #(1 2 3) same=#t'                (L59)
+;;
+;; The NEXT wall of each real file, measured by the same run:
+;;   byte-run.el            done
+;;   macroexp.el            void-function (defsubst)
+;;   custom.el              void-function (defsubst)
+;;   startup.el             void-function (nconc)
+;; `defsubst' and `nconc' are OTHER rows and stay OPEN.
+;;
+;; Limit L59: a `purecopy' of a MUTABLE object answers the SAME object,
+;; so a later `set-car!' or `put' on the answer shows to the caller.  A
+;; dumping vanilla build copies the object into pure space.
+(define (mode-purecopy)
+  (let ((cell (and (symbol-fbound? 'purecopy)
+                   (symbol-function 'purecopy))))
+    ;; 1. The cell is EMPTY at HEAD and BOUND to a PROCEDURE after
+    ;; `init-loader'.
+    (show "PURECOPY cell" "~s proc=~s"
+          (symbol-fbound? 'purecopy)
+          (and cell (procedure? cell)))
+    ;; 2. The identity for a symbol: the SAME symbol, `eq?'.
+    (show "PURECOPY symbol" "~s same=~s"
+          (and cell (cell 'm60-probe-sym))
+          (and cell (eq? (cell 'm60-probe-sym) 'm60-probe-sym)))
+    ;; 3. An integer comes back unchanged and NOTHING raises (the C
+    ;; argument vector names no type predicate).
+    (show "PURECOPY integer" "~a" (describe-error (lambda () (cell 42))))
+    ;; 4. The elisp nil stays `#nil' and is NOT `#f'.
+    (let ((back (catch #t
+                  (lambda () (list (cell #nil)))
+                  (lambda (key . args) (cons 'error (cons key args))))))
+      (show "PURECOPY nil" "~s is-nil=~s not-false=~s"
+            back
+            (equal? back (list #nil))
+            (and (pair? back) (not (eq? (car back) #f)))))
+    ;; 5. L59: a MUTABLE string comes back as the SAME object.
+    (let* ((str (string-copy "m60-probe-string"))
+           (back (and cell (cell str))))
+      (show "PURECOPY string" "~s same=~s" back (and back (eq? str back))))
+    ;; 6. L59: a cons comes back as the SAME cons, so a later `set-car!'
+    ;; is visible to the caller.
+    (let* ((obj (list 'm60-probe-a 'm60-probe-b))
+           (back (and cell (cell obj))))
+      (when (and (pair? back) (pair? obj)) (set-car! back 'm60-probe-mutated))
+      (show "PURECOPY cons" "~s same=~s setcar-visible=~s"
+            back
+            (and back (eq? obj back))
+            (and (pair? obj) (eq? 'm60-probe-mutated (car obj)))))
+    ;; 7. L59: an aggregate object comes back as the SAME object.
+    (let* ((vec (vector 1 2 3))
+           (back (and cell (cell vec))))
+      (show "PURECOPY vector" "~s same=~s" back (and back (eq? vec back))))
+    ;; 8. The first stop of each real file.  byte-run.el is FIRST,
+    ;; because macroexp.el :178 calls a macro that byte-run.el :543 owns.
+    (load-line "lisp/emacs-lisp/byte-run.el")
+    (load-line "lisp/emacs-lisp/macroexp.el")
+    (load-line "lisp/custom.el")
+    (load-line "lisp/startup.el")))
+
 ;;; --- dispatch -------------------------------------------------------
 
 (case (string->symbol mode)
@@ -1285,5 +1368,6 @@ definition itself: a `memq' over the `features' list."
   ((eac) (mode-eac))
   ((hash) (mode-hash))
   ((baresym) (mode-baresym))
-  (else (die (format #f "unknown mode ~a (cells|subdirs|subdirs-neg|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash|baresym)"
+  ((purecopy) (mode-purecopy))
+  (else (die (format #f "unknown mode ~a (cells|subdirs|subdirs-neg|provide|stubs|negative|noboot|require|defs|macros|registration|language|obsolete|control|arith|put|set|alias|eac|hash|baresym|purecopy)"
                      mode))))

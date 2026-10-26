@@ -321,8 +321,11 @@ PROCEDURE already existed before this row.")
                      ;; M60 imp-18 (row 35) RE-PIN: the OLD pin was
                      ;; "elisp-hash-table-p))".  Row 35 adds 1 name to the
                      ;; same select list, so the list ends on that name.
+                     ;; M60 imp-22 (row 37) RE-PIN: the OLD pin was
+                     ;; "elisp-bare-symbol))".  Row 37 adds 1 name to the
+                     ;; same select list, so the list ends on that name.
                      "elisp-hash-table-p"
-                     "elisp-bare-symbol))"
+                     "elisp-purecopy))"
                      "#:use-module ((emacs numbers)"
                      "#:use-module ((emacs sequences) #:select (elisp-append elisp-length))"))))
 

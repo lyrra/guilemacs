@@ -30,7 +30,10 @@
                            elisp-hash-table-p
                            ;; M60 imp-18 -- row 35: the identity of
                            ;; types.scm :426, guarded install below.
-                           elisp-bare-symbol))
+                           elisp-bare-symbol
+                           ;; M60 imp-22 -- row 37: the identity of
+                           ;; types.scm :439, guarded install below.
+                           elisp-purecopy))
   #:use-module ((emacs numbers)
                 #:select (elisp-+ elisp-- elisp-* elisp-/
                            elisp-= elisp-< elisp->
@@ -1262,8 +1265,9 @@ A chain longer than `%elisp-loader-indirect-limit' raises
 ;; against the processed CDR, and the cdr of a `,x' form is the LIST
 ;; (x), so the `,' lands in the head of a pair whose tail is a list.  A
 ;; dotted pair can not come out.  The argument stays the FORM and is not
-;; evaluated (cr.org F6 of the imp-21 round: the DOTTED claim is refuted
-;; by the source, not by a run; vanilla Emacs does not run on this host).
+;; evaluated (the kb entry `backquote-is-a-value-builder-not-a-cell`,
+;; its L57 note: the DOTTED claim is refuted by the source, not by a run;
+;; vanilla Emacs does not run on this host).
 ;; The value is a FRESH SCHEME list or a FRESH SCHEME vector.  It is not a
 ;; byte-code constant, and no `list' / `vector' cell is touched: this walk
 ;; is 1 pass and there is no compile phase in this loader.
@@ -1281,7 +1285,7 @@ A chain longer than `%elisp-loader-indirect-limit' raises
   (cond
     ;; A VECTOR is a value context too, so a `,' or `,@' inside it must be
     ;; walked: an untouched vector answers a WRONG value with no raise
-    ;; (cr.org F3 of the imp-21 round).
+    ;; (the kb entry `backquote-is-a-value-builder-not-a-cell`).
     ((vector? form) (elisp-loader-backquote-walk-vector form depth))
     ((not (pair? form)) form)
     (else
@@ -1819,7 +1823,25 @@ A chain longer than `%elisp-loader-indirect-limit' raises
     ;; The port (types.scm :426) copies that shape: it answers its
     ;; argument for a symbol, a number and `#nil' alike.
     (unless (symbol-fbound? 'bare-symbol)
-      (set-symbol-function! 'bare-symbol elisp-bare-symbol)))
+      (set-symbol-function! 'bare-symbol elisp-bare-symbol))
+    ;; M60 imp-22 -- row 37: the row-18 pattern of `provide' (:1745) and
+    ;; `make-obsolete-variable' (:1772): 1 install site, 1 guard, 0 new
+    ;; evaluator branches, 0 FIX markers, 0 C change.  The C owner is
+    ;; `DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0)' at
+    ;; src/alloc.c :1513; a full Emacs keeps that cell, so the install
+    ;; stays UNDER the guard.
+    ;; The callers are BODY forms of a `defmacro' or a `defun', not
+    ;; top-level forms: `byte-run.el' :540, :576, :631; `custom.el' :169
+    ;; (a plain `defun' body at :160), :210, :494, :506, :594, :647,
+    ;; :651, :655, :662; `widget.el' :57 (cr.org F7 FIX).
+    ;; Limit L59 (types.scm :439): a `purecopy' of a MUTABLE object
+    ;; answers the SAME object, so a later `setcar' is visible to the
+    ;; caller.  A dumping build copies it into pure space.
+    ;; L15: the `EMPTY-CELLS' list of test/m60/probe-imp3.scm is a FIXED
+    ;; 11-name list and does NOT hold `purecopy', so that line is not the
+    ;; proof of row 37.
+    (unless (symbol-fbound? 'purecopy)
+      (set-symbol-function! 'purecopy elisp-purecopy)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'load elisp-load)

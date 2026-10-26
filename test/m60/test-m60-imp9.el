@@ -844,6 +844,9 @@ host limit is a skip, never a pass."
 ;; header line) -> 584 (the cr.org fix observables and the real path)
 ;; -> 591 (cr.org F4 of the imp-9 review: the `let parallel-init'
 ;; observable, its comment and its `defconst').
+;; M60 imp-22 (row 37) RE-PIN: test/m60/probe-imp3.scm 591 -> 1,373 LINES
+;; (mode `purecopy', its comment block, 1 dispatch clause and 1 mode name;
+;; OLD value 591 is the imp-9 number above, and 691 the imp-10 one below).
 (setq m60-imp9--group 's5)
 
 
@@ -856,6 +859,8 @@ host limit is a skip, never a pass."
 ;; 23 / 19 -> 38 / 34 LINES (grep -c) -- and mode `arith' to
 ;; test/m60/probe-imp3.scm (591 -> 691 LINES).  OLD VALUES are the
 ;; cells that the numbers above replace.
+;; M60 imp-22 (row 37) RE-PIN: probe-imp3.scm 691 -> 1,373 LINES (OLD
+;; value 691; mode `purecopy').  No live check pins that count.
 ;; The 5 limits of brief.org section 10 are NAMED in the source.  A
 ;; reader who finds a limit here must not read it as a claim.
 (m60-imp9--check "s5/limits-named"
@@ -924,9 +929,56 @@ host limit is a skip, never a pass."
                       (eq 'fail (m60-imp9--verdict nil))
                       (eq 'fail (m60-imp9--verdict (m60-imp9--all t nil)))))
 
+;;; --- S3 extension: the plain-guile probe gate of row 37 -------------
+
+;; M60 imp-22 (row 37): mode `purecopy' of test/m60/probe-imp3.scm is
+;; the plain-path record of the guarded `purecopy' identity install
+;; (types.scm :439, loader.scm :1843 ... :1844).  Before this block the
+;; mode was only PRINTED by hand, so a regression in it raised no
+;; failure.  These 11 whole-line pins GATE the record: the cell, the
+;; identity for a symbol, an integer and the elisp nil, the L59
+;; SAME-object answers for a string, a cons and a vector, and the first
+;; stop of each of the 4 real files.  MEASURED 2026-10-26 with the
+;; child run of `m60-imp9--probe-1'.
+(setq m60-imp9--group 's3)
+
+(m60-imp9--check "s3/purecopy-cell-identity"
+                 (m60-imp9--all
+                  (m60-imp9--probe-line "purecopy" "PURECOPY cell: #t proc=#t")
+                  (m60-imp9--probe-line "purecopy"
+                                        "PURECOPY symbol: m60-probe-sym same=#t")
+                  (m60-imp9--probe-line "purecopy" "PURECOPY integer: (ok 42)")
+                  (m60-imp9--probe-line "purecopy"
+                                        "PURECOPY nil: (#nil) is-nil=#t not-false=#t")))
+
+;; L59 on the plain path: the MUTABLE objects come back as the SAME
+;; object, so the `set-car!' of the answer shows to the caller.
+(m60-imp9--check "s3/purecopy-L59-same-object"
+                 (m60-imp9--all
+                  (m60-imp9--probe-line "purecopy"
+                                        "PURECOPY string: \"m60-probe-string\" same=#t")
+                  (m60-imp9--probe-line "purecopy"
+                                        "PURECOPY cons: (m60-probe-mutated m60-probe-b) same=#t setcar-visible=#t")
+                  (m60-imp9--probe-line "purecopy"
+                                        "PURECOPY vector: #(1 2 3) same=#t")))
+
+;; The first stop of each real file.  `defsubst' and `nconc' are OTHER
+;; rows and stay OPEN; the pins only record that row 37 is passed.
+(m60-imp9--check "s3/purecopy-first-stops"
+                 (m60-imp9--all
+                  (m60-imp9--probe-line "purecopy"
+                                        "LOAD lisp/emacs-lisp/byte-run.el: done")
+                  (m60-imp9--probe-line "purecopy"
+                                        "LOAD lisp/emacs-lisp/macroexp.el: ERROR void-function (defsubst)")
+                  (m60-imp9--probe-line "purecopy"
+                                        "LOAD lisp/custom.el: ERROR void-function (defsubst)")
+                  (m60-imp9--probe-line "purecopy"
+                                        "LOAD lisp/startup.el: ERROR void-function (nconc)")))
+
 ;;; --- The group-total check ------------------------------------------
 
-(defvar m60-imp9--min-gate-total 46
+;; 46 -> 47: the 3 probe gates of row 37 above (m60 imp-22).
+(defvar m60-imp9--min-gate-total 47
   "Minimum registered ERT test count for this corpus.")
 
 (ert-deftest m60-imp9/gate-m60-total ()

@@ -329,7 +329,9 @@ symbol `m55-imp3-guile-absent'."
                  ;; the backquote walk, its 3 procedures and 5 limit notes).
                  ;; M60 imp-21 cr.org fix RE-PIN: 2,029 -> 2,052 LINES (OLD value 2,029;
                  ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
-                 (eql 2052 (m55-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-22 (row 37) RE-PIN: loader.scm 2,052 -> 2,074 LINES (OLD value
+                 ;; 2,052; the guarded `purecopy' install in `init-loader' and its notes).
+                 (eql 2074 (m55-imp3--lines "mod/emacs/loader.scm")))
 (m55-imp3--check "reader.scm-lines-2021"
                  (eql 2021 (m55-imp3--lines "mod/emacs/reader.scm")))
 (m55-imp3--check "prelude-load.scm-lines-229"
@@ -347,7 +349,8 @@ symbol `m55-imp3-guile-absent'."
                  ;; guarded install in `init-loader').
                  ;; M60 imp-17 (row F3) RE-PIN: `symbol-fbound?' 56 -> 57 LINES (OLD value 56).
                  ;; M60 imp-18 (row 35) RE-PIN: `symbol-fbound?' 57 -> 58 LINES (OLD value 57).
-                 (eql 58 (m55-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-22 (row 37) RE-PIN: `symbol-fbound?' 58 -> 59 LINES (OLD value 58).
+                 (eql 59 (m55-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
 ;; LINES (the same guarded install).  `FIX-.*guilemacs' stays 9.
@@ -358,7 +361,8 @@ symbol `m55-imp3-guile-absent'."
                  ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51).
                  ;; M60 imp-17 (row F3) RE-PIN: `set-symbol-function!' 52 -> 53 LINES (OLD value 52).
                  ;; M60 imp-18 (row 35) RE-PIN: `set-symbol-function!' 53 -> 54 LINES (OLD value 53).
-                 (eql 54 (m55-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-22 (row 37) RE-PIN: `set-symbol-function!' 54 -> 55 LINES (OLD value 54).
+                 (eql 55 (m55-imp3--count-lines "mod/emacs/loader.scm"
                                                "set-symbol-function!")))
 (m55-imp3--check "loader.scm-fix-markers-9"
                  (eql 10 (m55-imp3--count-lines "mod/emacs/loader.scm"

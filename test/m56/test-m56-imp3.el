@@ -294,7 +294,9 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; the backquote walk, its 3 procedures and 5 limit notes).
                  ;; M60 imp-21 cr.org fix RE-PIN: 2,029 -> 2,052 LINES (OLD value 2,029;
                  ;; the L56 / L58 / shape notes of cr.org F6, F7 and F8, comments only).
-                 (eql 2052 (m56-imp3--lines "mod/emacs/loader.scm")))
+                 ;; M60 imp-22 (row 37) RE-PIN: loader.scm 2,052 -> 2,074 LINES (OLD value
+                 ;; 2,052; the guarded `purecopy' install in `init-loader' and its notes).
+                 (eql 2074 (m56-imp3--lines "mod/emacs/loader.scm")))
 ;; A2: (symbol-function 'X) matches in loader.scm = 74.  The brief
 ;; command is `grep -o ... | wc -l', a MATCH count, so count matches.
 (m56-imp3--check "loader-symbol-function-74"
@@ -311,7 +313,8 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; guarded install in `init-loader').
                  ;; M60 imp-17 (row F3) RE-PIN: `symbol-fbound?' 56 -> 57 LINES (OLD value 56).
                  ;; M60 imp-18 (row 35) RE-PIN: `symbol-fbound?' 57 -> 58 LINES (OLD value 57).
-                 (eql 58 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-22 (row 37) RE-PIN: `symbol-fbound?' 58 -> 59 LINES (OLD value 58).
+                 (eql 59 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "symbol-fbound?")))
 ;; A4: set-symbol-function! lines in loader.scm = 15 (`grep -c').
 ;; M60 imp-8 (row 27) RE-PIN: loader.scm `set-symbol-function!' 18 -> 19
@@ -323,7 +326,8 @@ equality check would fail (brief.org section 5).  Return the symbol
                  ;; M60 imp-16 RE-PIN: 51 -> 52 LINES (OLD value 51).
                  ;; M60 imp-17 (row F3) RE-PIN: `set-symbol-function!' 52 -> 53 LINES (OLD value 52).
                  ;; M60 imp-18 (row 35) RE-PIN: `set-symbol-function!' 53 -> 54 LINES (OLD value 53).
-                 (eql 54 (m56-imp3--count-lines "mod/emacs/loader.scm"
+                 ;; M60 imp-22 (row 37) RE-PIN: `set-symbol-function!' 54 -> 55 LINES (OLD value 54).
+                 (eql 55 (m56-imp3--count-lines "mod/emacs/loader.scm"
                                                 "set-symbol-function!")))
 ;; A5: FIX-*-guilemacs lines in loader.scm = 8 (`grep -c').
 (m56-imp3--check "loader-fix-markers-8"
