@@ -393,8 +393,8 @@ file gives the symbol `m59-imp3-absent', which is a FAIL, not a pass."
                  (eql 2 (m59-imp3--grep-c "src/xfaces.c"
                                           "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -o scm_c_public_ref src/*.h src/*.c | wc -l').
-(m59-imp3--check "c/tree-wide-scm-ref-267"
-                 (eql 267 (m59-imp3--src-public-refs)))
+(m59-imp3--check "c/tree-wide-scm-ref-268"
+                 (eql 268 (m59-imp3--src-public-refs)))
 
 ;;; --- U4. The negative control ---------------------------------------
 

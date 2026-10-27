@@ -454,8 +454,8 @@ file gives the symbol `m59-imp4-absent', which is a FAIL, not a pass."
                  (eql 2 (m59-imp4--grep-c "src/xfaces.c"
                                           "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -o scm_c_public_ref src/*.h src/*.c | wc -l').
-(m59-imp4--check "c/tree-wide-scm-ref-267"
-                 (eql 267 (m59-imp4--src-public-refs)))
+(m59-imp4--check "c/tree-wide-scm-ref-268"
+                 (eql 268 (m59-imp4--src-public-refs)))
 ;; The re-pin moves the VALUE and the NAME together (brief.org section
 ;; 9).  A check that still says -260 pins 267, so a failure report names
 ;; the wrong count (cr.org F4).  This guard computes the current count

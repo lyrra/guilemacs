@@ -96,8 +96,11 @@
 
     ;; --- Cross-file number: the tree-wide scm_c_public_ref re-pin ----
     ;; The imp-2 and imp-3 sites move the count 172 -> 177.
-    (m41-imp2--check "tree-wide-scm-public-ref-267"
-                     (eql 263 (m41-imp2--tree-wide-scm-public-ref)))
+    (m41-imp2--check "tree-wide-scm-public-ref-268"
+                     ;; M61 imp-1 re-pin: the ONE new scm_c_public_ref site in src/term.c
+;; moves the src/*.[ch] occurrence count 267 -> 268.  Measured with an
+;; Emacs batch count over src/*.c and src/*.h (the function itself).
+                     (eql 268 (m41-imp2--tree-wide-scm-public-ref)))
 
     ;; --- End-to-end: the live DEFUN through the C boundary (cr.org F6) -
     ;; The .scm corpus checks the module return only.  These calls reach

@@ -164,24 +164,28 @@ princ'd FAIL with no ERT test would leave the exit code 0."
 (setq m54-imp5--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m54-imp5--check "term.c-lines-6425"
-                 (eql 6425 (m54-imp5--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m54-imp5--check "term.c-defun-count-29"
-                 (eql 29 (m54-imp5--count-lines "src/term.c" "^DEFUN (")))
-;; Row 3: the 4 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
+;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
+;; (--tty-handle, --tty-handle-write), the C identity table, and the
+;; routed normal write, so the surface numbers changed.  Do not copy them
+;; from this comment; re-measure.
+(m54-imp5--check "term.c-lines-6738"
+                 (eql 6738 (m54-imp5--lines "src/term.c")))
+;; Row 2: src/term.c ^DEFUN ( count = 31.
+(m54-imp5--check "term.c-defun-count-31"
+                 (eql 31 (m54-imp5--count-lines "src/term.c" "^DEFUN (")))
+;; Row 3: the 6 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
 ;; bare leaf tokens (each name also occurs in a sibling docstring).
-(m54-imp5--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m54-imp5--count-defun-leaf "src/term.c")))
+(m54-imp5--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m54-imp5--count-defun-leaf "src/term.c")))
 ;; Row 4: src/term.c scm_c_public_ref sites = 36.
-(m54-imp5--check "term.c-scm-ref-41"
-                 (eql 41 (m54-imp5--count-lines "src/term.c" "scm_c_public_ref")))
+(m54-imp5--check "term.c-scm-ref-42"
+                 (eql 42 (m54-imp5--count-lines "src/term.c" "scm_c_public_ref")))
 ;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m54-imp5--check "tty-output.scm-lines-682"
-                 (eql 682 (m54-imp5--lines "mod/emacs/tty-output.scm")))
+(m54-imp5--check "tty-output.scm-lines-860"
+                 (eql 860 (m54-imp5--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp5--check "tree-wide-scm-ref-267"
-                 (eql 267 (m54-imp5--count-scm-ref)))
+(m54-imp5--check "tree-wide-scm-ref-268"
+                 (eql 268 (m54-imp5--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 8) ---------------------
 
@@ -203,7 +207,7 @@ princ'd FAIL with no ERT test would leave the exit code 0."
 (m54-imp5--check "pty-driver-total-26"
                  (m54-imp5--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 32"))
+                  "\"total-case-count\", len(CASES), 36"))
 
 ;;; --- S3. The guards -------------------------------------------------
 

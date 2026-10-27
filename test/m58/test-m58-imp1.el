@@ -287,18 +287,25 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
       (m58-imp1--info-skip "head-fca28d3be" "no git binary on PATH")
     (m58-imp1--check "head-fca28d3be" ok)))
 
-(m58-imp1--check "term.c-lines-6425"
-                 (eql 6425 (m58-imp1--lines "src/term.c")))
-(m58-imp1--check "term.c-defun-count-29"
-                 (eql 29 (m58-imp1--count "src/term.c" "^DEFUN (")))
-(m58-imp1--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m58-imp1--count-defun-leaf "src/term.c")))
-(m58-imp1--check "term.c-scm-ref-41"
-                 (eql 41 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
-(m58-imp1--check "tree-wide-scm-ref-267"
-                 (eql 267 (m58-imp1--count-scm-ref)))
-(m58-imp1--check "tty-output.scm-lines-682"
-                 (eql 682 (m58-imp1--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
+;; src/term.c grows the handle block, 2 DEFUNs and 2 --tty-* leaves, so
+;; 6738 lines, 31 DEFUNs and 6 leaves.  Measured with `wc -l
+;; src/term.c`, `grep -c '^DEFUN (' src/term.c` and `grep -c
+;; '^DEFUN ("--tty-' src/term.c`.
+(m58-imp1--check "term.c-lines-6738"
+                 (eql 6738 (m58-imp1--lines "src/term.c")))
+(m58-imp1--check "term.c-defun-count-31"
+                 (eql 31 (m58-imp1--count "src/term.c" "^DEFUN (")))
+(m58-imp1--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m58-imp1--count-defun-leaf "src/term.c")))
+(m58-imp1--check "term.c-scm-ref-42"
+                 (eql 42 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
+(m58-imp1--check "tree-wide-scm-ref-268"
+                 (eql 268 (m58-imp1--count-scm-ref)))
+;; M61 imp-1 re-pin: the handle block adds 178 lines, 682 -> 860.
+;; Measured with `wc -l mod/emacs/tty-output.scm`.
+(m58-imp1--check "tty-output.scm-lines-860"
+                 (eql 860 (m58-imp1--lines "mod/emacs/tty-output.scm")))
 (m58-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
@@ -308,10 +315,11 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; moves from 25 to 31.  The re-pin lands in the SAME commit as the new
 ;; cases, else this check goes red.  The imp-2 corpus T5 and the imp-3
 ;; corpus U2 pin this re-pin from the other side.
-(m58-imp1--check "pty-driver-cases-32"
+;; M61 imp-1 re-pin: the m61-imp1 group adds 4 cases, 32 -> 36.
+(m58-imp1--check "pty-driver-cases-36"
                  (let ((pins (m58-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 32 (car pins))
+                        (eql 36 (car pins))
                         ;; The group pins must add up to the total, so a
                         ;; group pin that moves without the total FAILS.
                         (eql (car pins) (cdr pins)))))

@@ -245,25 +245,25 @@ host limit is a skip, never a pass (brief.org section 7)."
       (m57-imp1--info-skip "head-e2423fcb0" "no git binary on PATH")
     (m57-imp1--check "head-e2423fcb0" ok)))
 
-(m57-imp1--check "term.c-lines-6425"
-                 (eql 6425 (m57-imp1--lines "src/term.c")))
-(m57-imp1--check "term.c-defun-count-29"
-                 (eql 29 (m57-imp1--count "src/term.c" "^DEFUN (")))
-(m57-imp1--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m57-imp1--count-defun-leaf "src/term.c")))
-(m57-imp1--check "term.c-scm-ref-41"
-                 (eql 41 (m57-imp1--count "src/term.c" "scm_c_public_ref")))
-(m57-imp1--check "tree-wide-scm-ref-267"
-                 (eql 267 (m57-imp1--count-scm-ref)))
-(m57-imp1--check "tty-output.scm-lines-682"
-                 (eql 682 (m57-imp1--lines "mod/emacs/tty-output.scm")))
+(m57-imp1--check "term.c-lines-6738"
+                 (eql 6738 (m57-imp1--lines "src/term.c")))
+(m57-imp1--check "term.c-defun-count-31"
+                 (eql 31 (m57-imp1--count "src/term.c" "^DEFUN (")))
+(m57-imp1--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m57-imp1--count-defun-leaf "src/term.c")))
+(m57-imp1--check "term.c-scm-ref-42"
+                 (eql 42 (m57-imp1--count "src/term.c" "scm_c_public_ref")))
+(m57-imp1--check "tree-wide-scm-ref-268"
+                 (eql 268 (m57-imp1--count-scm-ref)))
+(m57-imp1--check "tty-output.scm-lines-860"
+                 (eql 860 (m57-imp1--lines "mod/emacs/tty-output.scm")))
 (m57-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m57-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m57-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m57-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m57-imp1--check "pty-driver-cases-32"
+(m57-imp1--check "pty-driver-cases-36"
                  (m57-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 32"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 36"))
 
 ;;; --- S2. The row map (brief.org section 5) --------------------------
 
@@ -285,7 +285,12 @@ host limit is a skip, never a pass (brief.org section 7)."
                  (m57-imp1--holds-all
                   "src/term.c"
                   '("fwrite (SDATA (string), 1, SBYTES (string), tty->output);"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->output);"
+                    ;; M61 imp-1 re-pin (bounded fallback of
+                    ;; brief.org section 4 D2 item 3): the 3 normal glyph
+                    ;; fwrite sites moved into the ONE handle call, so
+                    ;; this needle names the new site.  Measured with
+                    ;; `grep -n m61_tty_handle_write_1 src/term.c`.
+                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
                     "putc (' ', tty->output);"
                     "size_t written = fwrite (str, 1, len, tty->output);")))
 

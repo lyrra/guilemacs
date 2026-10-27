@@ -146,8 +146,8 @@ real error, not a pass."
                                          (format "DEFUN (\"--term-%s\"" leaf))))
 (m48-imp2--check "leaf-defuns-6"
                  (eql 6 (m48-imp2--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp2--check "defun-count-29"
-                 (eql 29 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
+(m48-imp2--check "defun-count-31"
+                 (eql 31 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
 (m48-imp2--check "geometry-leaves-retired"
                  (and (not (m48-imp2--contains-p
                             "src/term.c" "DEFUN (\"--term-frame-geometry\""))

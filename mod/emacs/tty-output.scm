@@ -73,6 +73,7 @@
 (define-module (emacs tty-output)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
+  #:use-module (rnrs bytevectors)     ; bytevector-length / bytevector-copy
   #:declarative? #t
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
             tty-write-verdict tty-termscript-copy-handle
@@ -92,7 +93,14 @@
             tty-set-terminal-window-steps tty-set-scroll-region-steps
             tty-delete-glyphs-steps tty-ins-del-lines-steps
             tty-face-on-steps tty-face-off-steps tty-capable-p
-            tty-color-mode-tag tty-color-mode-changed-p))
+            tty-color-mode-tag tty-color-mode-changed-p
+            make-tty-handle tty-handle? tty-handle-id tty-handle-state
+            tty-handle-states tty-handle-open? tty-handle-with-state
+            tty-handle-close tty-handle-check-open tty-handle-write
+            tty-handle-write-all tty-handle-write-all-with
+            tty-handle-write-all-borrowed
+            tty-handle-write-verdict
+            tty-handle-from-device))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -680,3 +688,173 @@
 ;; are a change, even though both give the same ("none") scheme.
 (define (tty-color-mode-changed-p mode previous)
   (if (= mode previous) 0 1))
+
+;; --- M61 imp-1: the opaque per-TTY handle -----------------------------
+;;
+;; milestone.org section 4, docs/m61-plan.org.  ONE opaque value per TTY:
+;; a tagged vector #(tty-handle IDENTITY STATE).
+;;
+;;   IDENTITY  a plain fixnum.  It names one entry of the static table
+;;             in src/term.c (identity -> struct tty_display_info *).
+;;             It is not a pointer, not a byte offset, and not a file
+;;             descriptor.  C reads the number only.
+;;   STATE     one plain symbol of the 5 handle states: borrowed,
+;;             owned, transferred, duplicated, closed.
+;;
+;; The shape is a tagged vector, the same shape as tty-out-handle
+;; above, because a srfi-9 record did not cross the module interface in
+;; the guilemacs load path (docs/kb.org).  A tagged vector is a plain
+;; value box: no C structure, no Lisp_Object, no FILE *, and no port can
+;; hide in it.
+;;
+;; imp-1 moves NO ownership.  Every handle it creates is BORROWED: C
+;; owns the FILE * output stream and runs every byte write.  A state
+;; change builds a NEW value; the module holds no module-level mutable
+;; state.
+
+;; The ONE typed C leaf of imp-1: (%--tty-handle-write IDENTITY BYTES)
+;; -> the plain fwrite count, or a negative fixnum holding the negated
+;; errno (-EBADF for a closed or unknown identity, -EINVAL when the tty
+;; holds no output stream).
+(defelisp %--tty-handle-write --tty-handle-write)
+
+;; The ONE bootstrap leaf: resolve a DEVICE to its identity.  DEVICE
+;; follows the M52 convention (a terminal object, a frame, or nil for the
+;; selected frame), because a Scheme caller must be able to name a TTY
+;; before it holds a number.  Every other M61 operation takes the plain
+;; fixnum identity only.
+(defelisp %--tty-handle --tty-handle)
+
+(define tty-handle-tag 'tty-handle)
+
+;; The 5 handle states of docs/m61-plan.org section 2.2, in the order of
+;; the legal life of one stream.
+(define tty-handle-states '(borrowed owned transferred duplicated closed))
+
+(define (make-tty-handle identity state)
+  (vector tty-handle-tag identity state))
+
+(define (tty-handle? x)
+  (and (vector? x)
+       (= 3 (vector-length x))
+       (eq? tty-handle-tag (vector-ref x 0))))
+
+(define (tty-handle-id h) (vector-ref h 1))
+(define (tty-handle-state h) (vector-ref h 2))
+
+;; A handle is open for use in every state but closed.
+(define (tty-handle-open? h)
+  (and (tty-handle? h) (not (eq? 'closed (tty-handle-state h)))))
+
+;; Build a NEW handle value with STATE.  This is the only state change
+;; allowed; the old value keeps its own state.
+(define (tty-handle-with-state h state)
+  (make-tty-handle (tty-handle-id h) state))
+
+;; Drop the handle.  C keeps the streams: it closes them at delete_tty,
+;; so a Scheme close is a Scheme-side fact only (docs/m61-plan.org
+;; section 6).
+(define (tty-handle-close h)
+  (tty-handle-with-state h 'closed))
+
+;; The ONE raise site of the closed-use error.  (error ...) is enough: no
+;; elisp condition machinery is needed, and the identity travels as a
+;; plain fixnum.  It is defined BEFORE tty-handle-check-open uses it.
+(define (tty-handle-close-error identity)
+  (error "tty-handle: the identity is closed" identity))
+
+;; Return H when it is open; else raise a plain error.  The error is a
+;; Scheme error with plain values, NOT a C longjmp, and it reaches the
+;; caller before any C call.
+(define (tty-handle-check-open h)
+  (cond ((not (tty-handle? h))
+         (error "tty-handle: not a tty handle" h))
+        ((eq? 'closed (tty-handle-state h))
+         (tty-handle-close-error (tty-handle-id h)))
+        (else h)))
+
+;; The ONE operation of imp-1: write the plain bytevector BYTES to the
+;; output stream that IDENTITY names.  Return the leaf's plain fixnum:
+;; the fwrite count, or the negated errno.  C keeps the FILE *, the
+;; fwrite, the clearerr, the order, and the termscript copy.
+(define (tty-handle-write h bytes)
+  (tty-handle-check-open h)
+  ((force %--tty-handle-write) (tty-handle-id h) bytes))
+
+;; The after-write DECISION of one handle write, through the ONE shared
+;; verdict procedure tty-write-verdict (M54 imp-2).  RC is the plain
+;; leaf answer and LEN the plain requested count.  Return the plain
+;; string "done" / "retry" / "give-up":
+;;
+;;   RC >= 0        the leaf moved RC bytes, so the verdict decides from
+;;                  RC and LEN with no error (err = 0)
+;;   RC < 0         a hard failure: the negated errno is a give-up
+;;
+;; The procedure is pure: it calls no leaf and emits nothing
+;; (docs/kb.org =leaf-must-call-the-mechanism=).
+(define (tty-handle-write-verdict rc len)
+  (if (< rc 0)
+      "give-up"
+      (tty-write-verdict rc len 0)))
+
+;; The bootstrap of the handle layer: build the handle value of DEVICE.
+;; DEVICE follows the M52 convention (a terminal object, a frame, or nil
+;; for the selected frame).  Return the plain handle value in the
+;; state borrowed, or #nil when DEVICE does not resolve to a tty.  The
+;; created handle is BORROWED: C owns the stream.
+(define (tty-handle-from-device device)
+  (let ((identity ((force %--tty-handle) device)))
+    (if (< identity 0)
+        #nil
+        (make-tty-handle identity 'borrowed))))
+
+;; Write BYTES in full, and RETRY a short write instead of losing the
+;; tail.  Return the total plain count, or the negated errno of a hard
+;; failure.  The retry decision is the ONE verdict procedure
+;; tty-write-verdict, through tty-handle-write-verdict; the loop is the
+;; only place that consumes it.  C stays the single writer.
+;;
+;; WRITE-PROC is the one write operation.  The general form takes it as a
+;; plain procedure, so the loop is PURE and a test can hand it a plain
+;; lambda with no leaf, no stub, and no module state.
+(define (tty-handle-write-all-with write-proc h bytes)
+  (let ((len (bytevector-length bytes)))
+    (let loop ((offset 0) (total 0))
+      (if (>= offset len)
+          total
+          (let* ((slice (if (zero? offset)
+                            bytes
+                            ;; MEASURED on this host: (bytevector-copy bv
+                            ;; start end) answers "Wrong number of
+                            ;; arguments to #<procedure bytevector-copy
+                            ;; (_)>", so the range form is NOT usable
+                            ;; here (cr.org F8).  Copy through
+                            ;; bytevector-copy! instead.
+                            (let ((rest (make-bytevector (- len offset) 0)))
+                              (bytevector-copy! bytes offset rest 0
+                                                (- len offset))
+                              rest)))
+                 (rc (write-proc h slice)))
+            (cond ((< rc 0) rc)
+                  ;; No progress: report what went out.  A host that can
+                  ;; not accept the bytes answers 0, never a spin.
+                  ((zero? rc) total)
+                  ((string=? "give-up" (tty-handle-write-verdict rc
+                                                                (- len offset)))
+                   total)
+                  (else (loop (+ offset rc) (+ total rc)))))))))
+
+;; The thin entry point of the retry loop: the ONE write operation of the
+;; handle, with the retry of a short write.
+(define (tty-handle-write-all h bytes)
+  (tty-handle-write-all-with tty-handle-write h bytes))
+
+;; The C-facing form of the SAME retry loop (cr.org F1, F2).  The routed
+;; normal glyph write in src/term.c passes the plain identity fixnum and
+;; the plain bytevector, so C holds no handle value and no state.  This
+;; procedure builds a BORROWED handle: C owns the FILE * output stream.
+;; The state check and the retry then run per write, in Scheme.
+(define (tty-handle-write-all-borrowed identity bytes)
+  (if (or (not (integer? identity)) (< identity 0))
+      -9                                    ; -EBADF
+      (tty-handle-write-all (make-tty-handle identity 'borrowed) bytes)))

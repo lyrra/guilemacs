@@ -327,15 +327,15 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; B1: src/term.c lines = 6,363 (M58 imp-3).
 ;; B2: src/term.c ^DEFUN count = 29.
-(m56-imp3--check "term-c-defun-29"
-                 (eql 29 (m56-imp3--count-lines "src/term.c" "^DEFUN (")))
+(m56-imp3--check "term-c-defun-31"
+                 (eql 31 (m56-imp3--count-lines "src/term.c" "^DEFUN (")))
 ;; B3: the 4 --tty-* leaf DEFUNs.  Count the DEFUN forms, NOT the bare
 ;; leaf token: each leaf name also occurs in a sibling docstring.
-(m56-imp3--check "term-c-tty-leaf-4"
-                 (eql 4 (m56-imp3--count-lines "src/term.c" "^DEFUN (\"--tty-")))
+(m56-imp3--check "term-c-tty-leaf-6"
+                 (eql 6 (m56-imp3--count-lines "src/term.c" "^DEFUN (\"--tty-")))
 ;; B4: src/term.c scm_c_public_ref sites = 39 (M58 imp-3 added 3).
-(m56-imp3--check "term-c-scm-ref-41"
-                 (eql 41 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
+(m56-imp3--check "term-c-scm-ref-42"
+                 (eql 42 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
 ;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
 ;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
 ;; B7: the 3 src/termchar.h FILE * streams at :51 / :53 / :61.
@@ -349,7 +349,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 (m56-imp3--check "pty-driver-cases-32"
                  (and (m56-imp3--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 32")
+                       "\"total-case-count\", len(CASES), 36")
                       (= 0 (m56-imp3--count "test/pty-driver.py"
                                             "len(CASES), 24"))))
 

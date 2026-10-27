@@ -98,6 +98,18 @@ init_elisp_functions (void)
   elisp_functions_ptr.f_cdr = scm_c_module_lookup (emacs_list, "elisp-cdr");
 }
 
+/* M61 imp-1 (cr.org F3): true after init_guile has run.  A C hub that
+   wants to ask Scheme must fall back to the plain C mechanism while the
+   Guile runtime does not exist yet, because a Scheme call allocates and
+   can start a collection.  See m61_tty_handle_write_1 in src/term.c.  */
+static bool guile_runtime_started;
+
+bool
+guile_runtime_up (void)
+{
+  return guile_runtime_started;
+}
+
 void
 init_guile (void)
 {
@@ -117,6 +129,10 @@ init_guile (void)
      input_event * in SMOB_DATA.  Ownership stays with kbd_buffer.
      Mark/free/print hooks and wrap/unwrap live in keyboard.c.  */
   ie_tag = scm_make_smob_type ("input-event", 0);
+
+  /* M61 imp-1: from here on a C hub may ask Scheme.  The flag is set
+     LAST, so no dispatcher can run before its module is reachable.  */
+  guile_runtime_started = true;
 }
 
 /*

@@ -1,6 +1,11 @@
 SCM make_c_closure (SCM (*) (), void *, int, int);
 void init_guile (void);
 
+/* M61 imp-1 (cr.org F3): true after init_guile has run.  A C hub that
+   asks Scheme must test this flag first and then use its plain C
+   mechanism, because a Scheme call allocates.  */
+bool guile_runtime_up (void);
+
 /* M2: smob type tag for KBOARD foreign-object wrapping.
    Defined in guile.c, initialized in init_guile. */
 extern scm_t_bits kboard_tag;

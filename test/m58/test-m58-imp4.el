@@ -337,19 +337,21 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
                        "+ M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES")
                       (m58-imp4--contains-p
                        "test/pty-driver.py"
-                       "         + M58_IMP4_CASES)")))
+                       ;; M61 imp-1 re-pin: the aggregate now names the
+                       ;; m61-imp1 group after M58_IMP4_CASES.
+                       "+ M58_IMP4_CASES + M61_IMP1_CASES)")))
 
-(m58-imp4--check "pty/case-counts-32"
+(m58-imp4--check "pty/case-counts-36"
                  (let ((pins (m58-imp4--pty-case-pins)))
                    (and (consp pins)
-                        (eql 32 (car pins))
+                        (eql 36 (car pins))
                         (eql (car pins) (cdr pins)))))
 
 (m58-imp4--check "pty/case-pins-value-not-bytes"
                  (let ((case-region (m58-imp4--region
                                      "test/pty-driver.py"
                                      "M58_IMP4_CASES = ("
-                                     "CASES = (M42_IMP3_CASES")))
+                                     "# M61 imp-1: the opaque per-TTY handle")))
                    (and (stringp case-region)
                         (not (string-match-p "output_span" case-region))
                         (not (string-match-p "span_requires" case-region))
@@ -460,31 +462,31 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (setq m58-imp4--group 't5)
 
-(m58-imp4--check "repin/imp1-cases-32"
+(m58-imp4--check "repin/imp1-cases-36"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-32\"")
+                                        "\"pty-driver-cases-36\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 32 (car pins))")))
+                                        "(eql 36 (car pins))")))
 
-(m58-imp4--check "repin/imp2-cases-32"
+(m58-imp4--check "repin/imp2-cases-36"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "\"pty-case-counts-32\"")
+                                        "\"pty-case-counts-36\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "(eql 32 (car pins))")
+                                        "(eql 36 (car pins))")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "\"imp1-repinned-32\"")
+                                        "\"imp1-repinned-36\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "pty-driver-cases-32")))
+                                        "pty-driver-cases-36")))
 
-(m58-imp4--check "repin/imp3-cases-32"
+(m58-imp4--check "repin/imp3-cases-36"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "\"pty/case-counts-32\"")
+                                        "\"pty/case-counts-36\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "(eql 32 (car pins))")
+                                        "(eql 36 (car pins))")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-driver-cases-32")
+                                        "pty-driver-cases-36")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-case-counts-32")))
+                                        "pty-case-counts-36")))
 
 (defun m58-imp4--stale-pinners (needles)
   "Return the base names of the test/*/m*/*.el files that hold a NEEDLE."
@@ -538,13 +540,16 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
                        "mod/emacs/tty-output.scm"
                        '("(define (tty-color-mode-tag mode)"
                          "(define (tty-color-mode-changed-p mode previous)"
-                         "tty-color-mode-tag tty-color-mode-changed-p))"))))
+                         ;; M61 imp-1 re-pin: the export list no longer
+                         ;; ends at these two names, so the needle drops
+                         ;; the closing parens of #:export.
+                         "tty-color-mode-tag tty-color-mode-changed-p"))))
 
 ;; Purity: the 2 procedures hold no leaf call, no emit, and no set!.
 (m58-imp4--check "scheme/purity"
                  (let ((body (m58-imp4--region "mod/emacs/tty-output.scm"
                                                "(define (tty-color-mode-tag mode)"
-                                               nil)))
+                                               ";; --- M61 imp-1: the opaque per-TTY handle")))
                    (and (stringp body)
                         (not (string-match-p "%--tty" body))
                         (not (string-match-p "emit" body))
@@ -672,7 +677,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 (setq m58-imp4--group 't9)
 
 (m58-imp4--check "surface/term-c-lines"
-                 (eql 6425 (m58-imp4--count "src/term.c" "\n")))
+                 (eql 6738 (m58-imp4--count "src/term.c" "\n")))
 
 (defun m58-imp4--src-public-refs ()
   "Count the scm_c_public_ref sites in every src/*.c and src/*.h file."
@@ -687,11 +692,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
     n))
 
 (m58-imp4--check "surface/public-refs"
-                 (and (eql 41 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
-                      (eql 267 (m58-imp4--src-public-refs))))
+                 (and (eql 42 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
+                      (eql 268 (m58-imp4--src-public-refs))))
 
 (m58-imp4--check "surface/module-lines"
-                 (eql 682 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))
+                 (eql 860 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))
 
 ;; The negative control (brief.org section 7): with
 ;; tty-color-mode-changed-p forced to 0, the case reports "8 8 8", not

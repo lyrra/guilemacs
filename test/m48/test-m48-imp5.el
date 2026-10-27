@@ -150,13 +150,18 @@ FAIL with no ERT test would leave the exit code 0."
 
 (setq m48-imp5--group 's1)
 
+;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
+;; src/term.c grew 2 DEFUNs (--tty-handle, --tty-handle-write) and the
+;; identity table, so lines 6425 -> 6738 and DEFUNs 29 -> 31.  Measured
+;; with `wc -l src/term.c` and `grep -c '^DEFUN ("' src/term.c`.  The
+;; refs count did not move (42).
 (m48-imp5--check "term.c-lines-DEFUNs-refs"
                  (let ((lines (m48-imp5--lines "src/term.c"))
                        (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
                        (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 6425 lines)
-                        (integerp defuns) (eql 29 defuns)
-                        (integerp refs) (eql 41 refs))))
+                   (and (integerp lines) (eql 6738 lines)
+                        (integerp defuns) (eql 31 defuns)
+                        (integerp refs) (eql 42 refs))))
 (m48-imp5--check "term.c-guile.h-at-48"
                  (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))
 (m48-imp5--check "term.c-leaves-6"
@@ -166,8 +171,8 @@ FAIL with no ERT test would leave the exit code 0."
                                           "FIX-20261005-guilemacs")))
 (m48-imp5--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
-(m48-imp5--check "tree-wide-scm-public-ref-267"
-                 (eql 267 (m48-imp5--count-scm-ref)))
+(m48-imp5--check "tree-wide-scm-public-ref-268"
+                 (eql 268 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
                  (let ((lines (m48-imp5--lines "src/keyboard.c"))
                        (defuns (m48-imp5--count "src/keyboard.c" "^DEFUN (\"")))

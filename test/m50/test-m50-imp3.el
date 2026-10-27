@@ -206,8 +206,8 @@ to the closing `\\n}' at column 0, or nil."
                  (eql 5 (m50-imp3--count "src/emacs.c" "^DEFUN (\"")))
 (m50-imp3--check "emacs.c-scm-ref-6"
                  (eql 6 (m50-imp3--count "src/emacs.c" "scm_c_public_ref")))
-(m50-imp3--check "scm-c-public-ref-267"
-                 (eql 267 (m50-imp3--count-scm-ref)))
+(m50-imp3--check "scm-c-public-ref-268"
+                 (eql 268 (m50-imp3--count-scm-ref)))
 
 ;;; --- F2. The C bridge (brief.org section 3) -------------------------
 

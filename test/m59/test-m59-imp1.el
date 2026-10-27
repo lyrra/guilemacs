@@ -377,8 +377,8 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 (m59-imp1--check "xfaces.c-scm-ref-2"
                  (eql 2 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -h ... | wc -l').
-(m59-imp1--check "tree-wide-scm-ref-267"
-                 (eql 267 (m59-imp1--count-scm-ref)))
+(m59-imp1--check "tree-wide-scm-ref-268"
+                 (eql 268 (m59-imp1--count-scm-ref)))
 ;; Unit: LINES (`grep -c guile' = 8).  The lines of Guile coupling: the
 ;; 2 includes (:229, :230), the 2 real seams (:1047
 ;; guile_parse_color_spec, :3995 guile_parse_face_bool_attribute), and 4
@@ -404,7 +404,7 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 (m59-imp1--check "pty-driver-cases-32"
                  (let ((pins (m59-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 32 (car pins))
+                        (eql 36 (car pins))
                         (eql (car pins) (cdr pins)))))
 (m59-imp1--check "corpus-dir-present"
                  (and (m59-imp1--exists-p "test/m59")
@@ -521,8 +521,11 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; The boundary rule do-not-give-scheme-a-C-descriptor, by name in the
 ;; TRACKED C source.  Measured line: src/term.c :5682.  The M58 plan
 ;; cited :5484; that cite is STALE at this HEAD.
-(m59-imp1--check "boundary-rule-line-5682"
-                 (and (eql 5682 (m59-imp1--line-of
+;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
+;; the M61 block inserted above moved this comment, 5682 -> 5978.
+;; Measured with `grep -n 'no Guile port owns a FILE' src/term.c`.
+(m59-imp1--check "boundary-rule-line-5978"
+                 (and (eql 5978 (m59-imp1--line-of
                                  "src/term.c" "no Guile port owns a FILE"))
                       (m59-imp1--contains-p "src/term.c"
                                             "no Guile port owns a FILE *")))

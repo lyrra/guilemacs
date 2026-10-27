@@ -188,23 +188,27 @@ pass."
 (setq m54-imp1--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m54-imp1--check "term.c-lines-6425"
-                 (eql 6425 (m54-imp1--lines "src/term.c")))
+;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
+;; (--tty-handle, --tty-handle-write), the C identity table, and the
+;; routed normal write, so the surface numbers changed.  Measured at
+;; HEAD + M61 imp-1; do not copy them from this comment.
+(m54-imp1--check "term.c-lines-6738"
+                 (eql 6738 (m54-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m54-imp1--check "term.c-defun-count-29"
-                 (eql 29 (m54-imp1--count "src/term.c" "^DEFUN (")))
+(m54-imp1--check "term.c-defun-count-31"
+                 (eql 31 (m54-imp1--count "src/term.c" "^DEFUN (")))
 ;; Row 3: the 4 --tty-* leaf DEFUNs.
-(m54-imp1--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m54-imp1--count-defun-leaf "src/term.c")))
+(m54-imp1--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m54-imp1--count-defun-leaf "src/term.c")))
 ;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m54-imp1--check "term.c-scm-ref-41"
-                 (eql 41 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
+(m54-imp1--check "term.c-scm-ref-42"
+                 (eql 42 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
 ;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m54-imp1--check "tty-output.scm-lines-682"
-                 (eql 682 (m54-imp1--lines "mod/emacs/tty-output.scm")))
+(m54-imp1--check "tty-output.scm-lines-860"
+                 (eql 860 (m54-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp1--check "tree-wide-scm-ref-267"
-                 (eql 267 (m54-imp1--count-scm-ref)))
+(m54-imp1--check "tree-wide-scm-ref-268"
+                 (eql 268 (m54-imp1--count-scm-ref)))
 
 ;;; --- S2. The 3 stream fields and the boundary rule ------------------
 
@@ -263,11 +267,14 @@ pass."
                     "fflush (tty->output);"
                     "putc (' ', tty->termscript);"
                     "putc (' ', tty->output);"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->output);"
+                    ;; M61 imp-1: the normal glyph write of the 3 hubs
+                    ;; goes through the per-TTY handle; the termscript
+                    ;; copy stays at its call site.
+                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
                     "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->output);"
+                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
                     "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->output);"
+                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
                     "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
                     "f = t->display_info.tty->input;"
                     "emacs_fclose (t->display_info.tty->output);"

@@ -992,6 +992,281 @@ encode_terminal_code (struct glyph *src, int src_len,
 
 #endif /* HAVE_ANDROID */
 
+/* --- M61 imp-1: the opaque per-TTY handle -------------------------- */
+
+/* FIX-20261027-guilemacs: M61 imp-1 -- ONE opaque Scheme value per TTY
+   (docs/m61-plan.org, milestone.org section 4).  Scheme holds a plain
+   fixnum identity, and this static table maps that identity to the
+   struct tty_display_info *.  The pointer never crosses the seam: no
+   Lisp_Object, char *, FILE *, or struct is passed to Scheme, and the
+   Scheme layer passes a number only.  The identity registers when the
+   tty is created (init_tty) and drops at the terminal-death path
+   (delete_tty), so the table never holds a dangling pointer.
+
+   An identity is NEVER reused: m61_tty_handle_next only increases, so a
+   handle that named a dead tty answers -EBADF and can not alias a new
+   tty.
+
+   FIX-20261027-guilemacs: the table has a FIXED capacity
+   (M61_HANDLE_MAX).  A session with more text terminals than that runs
+   the same write mechanism directly (m61_tty_output_write_1), so the
+   limit costs no byte and no ordering (see m61_tty_handle_write_1).  A
+   growable table is a later act; the handle contract does not
+   change.  */
+
+#define M61_HANDLE_MAX 16
+
+static struct
+{
+  int identity;
+  struct tty_display_info *tty;
+} m61_tty_handles[M61_HANDLE_MAX];
+
+static int m61_tty_handle_next = 1;
+
+/* Resolve the M52 DEVICE convention (a terminal object, a frame, or nil
+   for the selected frame) to its tty.  The definition is below, next to
+   the M52 leaves; the resolver leaf --tty-handle is the ONE bootstrap
+   step that still accepts a Lisp DEVICE, because a Scheme caller must
+   have a way to name a TTY before it holds an identity.  */
+static struct tty_display_info *m52_tty_of_device_1 (Lisp_Object);
+
+/* The after-write verdict of one output write (M54 imp-2).  Both output
+   writers -- the M61 handle path above and the M52 byte path below --
+   ask through this ONE helper, so C keeps ONE decision site for the
+   output stream (the M54 imp-2 rule).  The definition is in the M54
+   block of this file.  */
+static Lisp_Object m54_tty_write_verdict_1 (size_t, size_t, int);
+static bool m54_tty_write_gives_up_p (Lisp_Object);
+
+/* The Scheme POLICY dispatcher of the routed normal write: ask
+   (emacs tty-output) tty-handle-write-all-borrowed for the write of
+   IDENTITY with BYTES.  Scheme checks the handle state and retries a
+   short write (cr.org F1, F2); C keeps the mechanism.  The definition is
+   below, next to the leaf.  */
+static Lisp_Object m61_tty_handle_write_scheme (Lisp_Object, Lisp_Object);
+
+/* Register TTY and return its plain identity, or -ENOSPC when the table
+   is full, or -EBADF when TTY is NULL.  A second call for the same TTY
+   answers the same identity.  */
+static int
+m61_tty_handle_register_1 (struct tty_display_info *tty)
+{
+  int free_slot = -1;
+
+  if (!tty)
+    return -EBADF;
+
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    {
+      if (m61_tty_handles[i].tty == tty && m61_tty_handles[i].identity)
+	return m61_tty_handles[i].identity;
+      if (free_slot < 0 && !m61_tty_handles[i].tty)
+	free_slot = i;
+    }
+
+  if (free_slot < 0)
+    return -ENOSPC;
+
+  m61_tty_handles[free_slot].identity = m61_tty_handle_next++;
+  m61_tty_handles[free_slot].tty = tty;
+  return m61_tty_handles[free_slot].identity;
+}
+
+/* Drop the identity of TTY.  Runs at the terminal-death path, before the
+   struct is freed.  */
+static void
+m61_tty_handle_drop_1 (struct tty_display_info *tty)
+{
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    if (tty && m61_tty_handles[i].tty == tty)
+      {
+	m61_tty_handles[i].tty = NULL;
+	m61_tty_handles[i].identity = 0;
+      }
+}
+
+/* Resolve the plain IDENTITY to its tty, or NULL when the table holds no
+   entry for it (a closed or unknown handle).  */
+static struct tty_display_info *
+m61_tty_handle_of_identity_1 (int identity)
+{
+  if (identity <= 0)
+    return NULL;
+
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    if (m61_tty_handles[i].identity == identity)
+      return m61_tty_handles[i].tty;
+
+  return NULL;
+}
+
+/* Write LEN bytes at BYTES to the output stream of the tty TTY and
+   return the =fwrite= count, or the negated errno of a hard failure that
+   Scheme gives up on.  This is the mechanism of the handle path.
+
+   C keeps the FILE *, the fwrite, the clearerr, and the order.  The
+   after-write DECISION (retry / give-up) is the M54 imp-2 Scheme
+   verdict, so a short write is reported as its count and only a give-up
+   returns the negated errno.  The termscript copy and every fflush point
+   stay at their call sites (M61 imp-2).  */
+static ptrdiff_t
+m61_tty_output_write_1 (struct tty_display_info *tty,
+			const unsigned char *bytes, size_t len)
+{
+  if (!tty)
+    return -EBADF;
+  if (!tty->output)
+    return -EINVAL;
+
+  size_t written = fwrite (bytes, 1, len, tty->output);
+  int out_err = errno;
+  bool failed = ferror (tty->output) != 0;
+  clearerr (tty->output);
+
+  if (written < len && failed)
+    {
+      int e = out_err ? out_err : EIO;
+      Lisp_Object verdict = m54_tty_write_verdict_1 (written, len, e);
+      /* m54_tty_write_gives_up_p answers true for a nil verdict too (no
+	 Scheme runtime), so this writer and the M52 writer below report
+	 the SAME -e on a hard error (cr.org F4).  */
+      if (m54_tty_write_gives_up_p (verdict))
+	return -e;
+    }
+
+  return (ptrdiff_t) written;
+}
+
+/* Resolve the plain IDENTITY, then run the write mechanism.  Return
+   -EBADF for a closed or unknown identity.  This is the body of the leaf
+   --tty-handle-write.  */
+static ptrdiff_t
+m61_tty_handle_write_bytes_1 (int identity, const unsigned char *bytes,
+			      size_t len)
+{
+  struct tty_display_info *tty = m61_tty_handle_of_identity_1 (identity);
+
+  if (!tty)
+    return -EBADF;
+
+  return m61_tty_output_write_1 (tty, bytes, len);
+}
+
+/* The hub entry point: write the encoded bytes of the normal glyph path
+   through the handle of TTY.  C registers the identity, copies the bytes
+   into ONE plain Guile bytevector, and calls the Scheme policy
+   procedure with plain values only.  Scheme checks the handle state and
+   RETRIES a short write through tty-handle-write-all, so no byte of the
+   glyph run is lost (cr.org F1, F2).  C keeps the FILE *, the fwrite,
+   the clearerr and the order.
+
+   FIX-20261027-guilemacs: the bytevector copy is ONE allocation per
+   glyph run inside block_input (cr.org F3).  A moving barrier (a shared
+   bytevector) is a later act; the copy is the price of the plain-value
+   seam.
+
+   FIX-20261027-guilemacs: before the Guile runtime exists, and when the
+   identity table is full, run the SAME write mechanism directly
+   (m61_tty_output_write_1), so no byte is lost and the order holds.  */
+static ptrdiff_t
+m61_tty_handle_write_1 (struct tty_display_info *tty,
+			const unsigned char *bytes, size_t len)
+{
+  int identity;
+
+  if (!guile_runtime_up ())
+    return m61_tty_output_write_1 (tty, bytes, len);
+
+  identity = m61_tty_handle_register_1 (tty);
+  if (identity < 0)
+    return m61_tty_output_write_1 (tty, bytes, len);
+
+  Lisp_Object bv = scm_c_make_bytevector (len);
+  memcpy (SCM_BYTEVECTOR_CONTENTS (bv), bytes, len);
+
+  Lisp_Object rc = m61_tty_handle_write_scheme (make_fixnum (identity), bv);
+
+  /* A non-numeric answer means Scheme wrote nothing usable.  Report it as
+     a hard failure and do NOT write again: the bytes may already be on
+     the stream, and a second write would duplicate them.  */
+  if (!FIXNUMP (rc))
+    return -EIO;
+
+  return (ptrdiff_t) XFIXNUM (rc);
+}
+
+/* The ONE Scheme dispatcher of the routed normal write (cr.org F1).  It
+   resolves the module procedure one time (the M52 imp-4 idiom), then
+   passes plain values only: a fixnum identity and a Guile bytevector.
+   Scheme owns the state check and the retry, and it calls back into the
+   leaf --tty-handle-write for the mechanism.  */
+static Lisp_Object
+m61_tty_handle_write_scheme (Lisp_Object identity, Lisp_Object bytes)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tty-output",
+                             "tty-handle-write-all-borrowed");
+  return SCM_CALL_2 (proc, identity, bytes);
+}
+
+DEFUN ("--tty-handle-write", Fc_tty_handle_write, Sc_tty_handle_write,
+       2, 2, 0,
+       doc: /* FIX-20261027-guilemacs: Internal: M61 imp-1 -- write the
+plain bytevector BYTES to the output stream of the per-TTY handle
+IDENTITY (docs/m61-plan.org section 3.1).
+
+IDENTITY is a plain fixnum that names an entry of the static C identity
+table; it is not a pointer, not a byte offset, and not a descriptor.
+C owns the struct tty_display_info and its FILE *output stream, so no
+Lisp_Object, char *, FILE *, or struct crosses the layer
+(docs/kb.org =passthrough-leaf-is-not-a-port=).
+
+Return a plain fixnum: the =fwrite= count, or a negative fixnum holding
+the negated errno (-EBADF when the identity is closed or unknown,
+-EINVAL when BYTES is not a bytevector or the tty holds no output
+stream).  A short write is reported as its count, so Scheme decides
+retry / give-up through tty-write-verdict.  This leaf writes the output
+stream only: the termscript copy and the fflush points stay at their
+call sites (M61 imp-2).  */)
+  (Lisp_Object identity, Lisp_Object bytes)
+{
+  if (!FIXNUMP (identity))
+    return make_fixnum (-EINVAL);
+  if (!scm_is_bytevector (bytes))
+    return make_fixnum (-EINVAL);
+
+  return make_fixnum
+    (m61_tty_handle_write_bytes_1
+     ((int) XFIXNUM (identity),
+      (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytes),
+      scm_c_bytevector_length (bytes)));
+}
+
+DEFUN ("--tty-handle", Fc_tty_handle, Sc_tty_handle, 1, 1, 0,
+       doc: /* FIX-20261027-guilemacs: Internal: M61 imp-1 -- return the
+plain identity of the per-TTY handle of DEVICE.
+
+DEVICE is the M52 convention: a terminal object, a frame, or nil for the
+selected frame.  This is the ONE bootstrap step of the handle layer: a
+Scheme caller must be able to name a TTY before it holds a number, so
+this leaf resolves DEVICE to its tty and registers the identity.  Every
+other M61 operation takes the plain fixnum identity only.
+
+Return a plain fixnum: the identity, or a negative fixnum holding the
+negated errno (-EBADF when DEVICE does not resolve to a tty, -ENOSPC
+when the identity table is full).  docs/m61-plan.org section 3.1.  */)
+  (Lisp_Object device)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+
+  if (!tty)
+    return make_fixnum (-EBADF);
+
+  return make_fixnum (m61_tty_handle_register_1 (tty));
+}
+
 #ifndef HAVE_ANDROID
 
 /* An implementation of write_glyphs for termcap frames. */
@@ -1048,8 +1323,12 @@ tty_write_glyphs (struct frame *f, struct glyph *string, int len)
       if (coding->produced > 0)
 	{
 	  block_input ();
-	  fwrite (conversion_buffer, 1, coding->produced, tty->output);
-	  clearerr (tty->output);
+	  /* M61 imp-1: the ONE ordered output write of the normal
+	     glyph path runs through the per-TTY handle.  C keeps the
+	     clearerr.  The termscript copy and the fflush points stay
+	     here (imp-2).  */
+	  m61_tty_handle_write_1 (tty, conversion_buffer,
+	                          coding->produced);
 	  if (tty->termscript)
 	    fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
 	  unblock_input ();
@@ -1107,8 +1386,12 @@ tty_write_glyphs_with_face (struct frame *f, struct glyph *string,
   if (coding->produced > 0)
     {
       block_input ();
-      fwrite (conversion_buffer, 1, coding->produced, tty->output);
-      clearerr (tty->output);
+      /* M61 imp-1: the ONE ordered output write of the normal
+         glyph path runs through the per-TTY handle.  C keeps the
+         clearerr.  The termscript copy and the fflush points stay
+         here (imp-2).  */
+      m61_tty_handle_write_1 (tty, conversion_buffer,
+                              coding->produced);
       if (tty->termscript)
 	fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
       unblock_input ();
@@ -1197,8 +1480,12 @@ tty_insert_glyphs (struct frame *f, struct glyph *start, int len)
       if (coding->produced > 0)
 	{
 	  block_input ();
-	  fwrite (conversion_buffer, 1, coding->produced, tty->output);
-	  clearerr (tty->output);
+	  /* M61 imp-1: the ONE ordered output write of the normal
+	     glyph path runs through the per-TTY handle.  C keeps the
+	     clearerr.  The termscript copy and the fflush points stay
+	     here (imp-2).  */
+	  m61_tty_handle_write_1 (tty, conversion_buffer,
+	                          coding->produced);
 	  if (tty->termscript)
 	    fwrite (conversion_buffer, 1, coding->produced, tty->termscript);
 	  unblock_input ();
@@ -4795,6 +5082,10 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
   terminal->display_info.tty = tty;
   tty->terminal = terminal;
 
+  /* M61 imp-1: register the plain handle identity of this tty in the
+     static identity table (docs/m61-plan.org section 4).  */
+  m61_tty_handle_register_1 (tty);
+
   tty->Wcm = xmalloc (sizeof *tty->Wcm);
   Wcm_clear (tty);
 
@@ -5374,6 +5665,11 @@ delete_tty (struct terminal *terminal)
   if (tty->termscript)
     emacs_fclose (tty->termscript);
 
+  /* M61 imp-1: drop the handle identity BEFORE the struct is freed, so
+     the table never holds a dangling pointer and a use of the dead
+     identity answers -EBADF (docs/m61-plan.org section 6).  */
+  m61_tty_handle_drop_1 (tty);
+
   xfree (tty->old_tty);
   xfree (tty->Wcm);
   xfree (tty);
@@ -5798,15 +6094,32 @@ m54_tty_write_verdict_scheme (Lisp_Object written, Lisp_Object len,
   return SCM_CALL_3 (proc, written, len, err);
 }
 
-/* True when the plain verdict string is "give-up".  A nil verdict (the
-   dispatcher returned elisp nil) is handled by the caller, which keeps
-   the present C behavior.  */
+/* True when the plain verdict string is "give-up", and true for a nil
+   verdict too.  A nil verdict means there is no Scheme runtime, and then
+   the present C behavior of BOTH output writers is the give-up behavior:
+   report the negated errno (cr.org F4).  Keeping the test here means the
+   two writers share ONE decision site.  */
 static bool
 m54_tty_write_gives_up_p (Lisp_Object verdict)
 {
+  if (NILP (verdict))
+    return true;
   return (STRINGP (verdict)
 	  && SBYTES (verdict) == sizeof "give-up" - 1
 	  && memcmp (SSDATA (verdict), "give-up", sizeof "give-up" - 1) == 0);
+}
+
+/* The ONE site that asks Scheme for the after-write verdict of an output
+   write.  WRITTEN is the =fwrite= count, LEN the requested count, and ERR
+   the plain errno.  Return the plain verdict value, which the caller
+   tests with m54_tty_write_gives_up_p; a nil value means there is no
+   Scheme runtime and the present C behavior holds (M61 imp-1 added the
+   second caller, the normal glyph write, so the site stays ONE).  */
+static Lisp_Object
+m54_tty_write_verdict_1 (size_t written, size_t len, int err)
+{
+  return m54_tty_write_verdict_scheme (make_fixnum (written),
+				       make_fixnum (len), make_fixnum (err));
 }
 
 /* --- M54 imp-3: the termscript copy decision ------------------------- */
@@ -5906,11 +6219,11 @@ m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
   if (written < len && ferror (tty->output))
     {
       int e = out_err ? out_err : EIO;
-      Lisp_Object verdict
-	= m54_tty_write_verdict_scheme (make_fixnum (written),
-					make_fixnum (len), make_fixnum (e));
+      Lisp_Object verdict = m54_tty_write_verdict_1 (written, len, e);
       clearerr (tty->output);
-      if (NILP (verdict) || m54_tty_write_gives_up_p (verdict))
+      /* The nil (no Scheme runtime) case is inside the helper, so both
+	 output writers decide alike (cr.org F4).  */
+      if (m54_tty_write_gives_up_p (verdict))
 	return -e;
       return (ptrdiff_t) written;
     }

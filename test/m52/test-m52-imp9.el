@@ -228,24 +228,29 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (setq m52-imp9--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m52-imp9--check "term.c-lines-6425"
-                 (eql 6425 (m52-imp9--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m52-imp9--check "term.c-defun-count-29"
-                 (eql 29 (m52-imp9--count "src/term.c" "^DEFUN (")))
-;; Row 3: the 4 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
+;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
+;; (--tty-handle, --tty-handle-write), the C identity table, and moved
+;; the 3 normal glyph output writes into the ONE handle leaf, so the
+;; surface numbers changed.  Do not copy them from this comment.
+(m52-imp9--check "term.c-lines-6738"
+                 (eql 6738 (m52-imp9--lines "src/term.c")))
+;; Row 2: src/term.c ^DEFUN ( count = 31.
+(m52-imp9--check "term.c-defun-count-31"
+                 (eql 31 (m52-imp9--count "src/term.c" "^DEFUN (")))
+;; Row 3: the 6 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
 ;; leaf tokens (each name also occurs in a sibling docstring).
-(m52-imp9--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m52-imp9--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c fwrite ( count = 10.
-(m52-imp9--check "term.c-fwrite-count-10"
-                 (eql 10 (m52-imp9--count "src/term.c" "fwrite (")))
+(m52-imp9--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m52-imp9--count-defun-leaf "src/term.c")))
+;; Row 4: src/term.c fwrite ( count = 8: the 3 normal glyph output
+;; writes moved into the ONE handle leaf, and the leaf holds 1 fwrite.
+(m52-imp9--check "term.c-fwrite-count-8"
+                 (eql 8 (m52-imp9--count "src/term.c" "fwrite (")))
 ;; Row 5: src/term.c scm_c_public_ref sites = 36.
-(m52-imp9--check "term.c-scm-ref-41"
-                 (eql 41 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
+(m52-imp9--check "term.c-scm-ref-42"
+                 (eql 42 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
 ;; Row 6: mod/emacs/tty-output.scm lines = 454.
-(m52-imp9--check "tty-output.scm-lines-682"
-                 (eql 682 (m52-imp9--lines "mod/emacs/tty-output.scm")))
+(m52-imp9--check "tty-output.scm-lines-860"
+                 (eql 860 (m52-imp9--lines "mod/emacs/tty-output.scm")))
 ;; Row 7: the 34 #:export names of the module, one check per name.
 ;; The 8 M54 names (tty-write-verdict, tty-termscript-copy-handle,
 ;; tty-tab-verdict, and the tty-out-handle accessors) come first, then the
@@ -281,8 +286,8 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "m52-caps-rows-37"
                  (eql 37 (m52-imp9--caps-row-count)))
 ;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m52-imp9--check "tree-wide-scm-ref-267"
-                 (eql 267 (m52-imp9--count-scm-ref)))
+(m52-imp9--check "tree-wide-scm-ref-268"
+                 (eql 268 (m52-imp9--count-scm-ref)))
 
 ;;; --- S2. The registration (brief.org section 3.3) -------------------
 
@@ -308,7 +313,7 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 (m52-imp9--check "pty-driver-total-26"
                  (m52-imp9--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 32"))
+                  "\"total-case-count\", len(CASES), 36"))
 
 ;;; --- S3. The guards (brief.org section 3.4) -------------------------
 

@@ -206,10 +206,10 @@ anchored match finds the definition only."
                     "src/term.c"
                     (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                             wrapper))))
-(m48-imp4--check "term.c-scm-ref-41"
-                 (eql 41 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
-(m48-imp4--check "scm-c-public-ref-267"
-                 (eql 267 (m48-imp4--count-scm-ref)))
+(m48-imp4--check "term.c-scm-ref-42"
+                 (eql 42 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
+(m48-imp4--check "scm-c-public-ref-268"
+                 (eql 268 (m48-imp4--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 4.4) --------
 
@@ -244,8 +244,8 @@ anchored match finds the definition only."
 
 (m48-imp4--check "leaf-defuns-6"
                  (eql 6 (m48-imp4--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp4--check "defun-count-29"
-                 (eql 29 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
+(m48-imp4--check "defun-count-31"
+                 (eql 31 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
 (m48-imp4--check "term.c-has-guile.h"
                  (m48-imp4--contains-p "src/term.c" "#include \"guile.h\""))
 

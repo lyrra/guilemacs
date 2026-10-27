@@ -225,23 +225,23 @@ probe: the loader must read and evaluate a real Elisp file."
 (setq m53-imp1--group 's1)
 
 ;; Row 1: src/term.c lines = 6,214.
-(m53-imp1--check "term.c-lines-6425"
-                 (eql 6425 (m53-imp1--lines "src/term.c")))
+(m53-imp1--check "term.c-lines-6738"
+                 (eql 6738 (m53-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m53-imp1--check "term.c-defun-count-29"
-                 (eql 29 (m53-imp1--count "src/term.c" "^DEFUN (")))
+(m53-imp1--check "term.c-defun-count-31"
+                 (eql 31 (m53-imp1--count "src/term.c" "^DEFUN (")))
 ;; Row 3: the 4 --tty-* leaf DEFUNs.
-(m53-imp1--check "term.c-leaf-defun-count-4"
-                 (eql 4 (m53-imp1--count-defun-leaf "src/term.c")))
+(m53-imp1--check "term.c-leaf-defun-count-6"
+                 (eql 6 (m53-imp1--count-defun-leaf "src/term.c")))
 ;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m53-imp1--check "term.c-scm-ref-41"
-                 (eql 41 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
+(m53-imp1--check "term.c-scm-ref-42"
+                 (eql 42 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
 ;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m53-imp1--check "tty-output.scm-lines-682"
-                 (eql 682 (m53-imp1--lines "mod/emacs/tty-output.scm")))
+(m53-imp1--check "tty-output.scm-lines-860"
+                 (eql 860 (m53-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m53-imp1--check "tree-wide-scm-ref-267"
-                 (eql 267 (m53-imp1--count-scm-ref)))
+(m53-imp1--check "tree-wide-scm-ref-268"
+                 (eql 268 (m53-imp1--count-scm-ref)))
 
 ;;; --- S2. CHECK 1, the standalone loader -----------------------------
 
@@ -309,7 +309,7 @@ probe: the loader must read and evaluate a real Elisp file."
 (m53-imp1--check "pty-driver-total-26"
                  (m53-imp1--contains-p
                   "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 32"))
+                  "\"total-case-count\", len(CASES), 36"))
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 

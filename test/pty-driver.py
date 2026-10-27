@@ -1761,12 +1761,197 @@ M58_IMP4_CASES = (
     },
 )
 
+# M61 imp-1: the opaque per-TTY handle.  The child runs on a real PTY and
+# writes through the ONE ordered output path in three ways: the elisp
+# send-string-to-terminal path, the new typed handle leaf, and the normal
+# glyph write of a redisplay.  The case pins the byte ORDER inside its own
+# BEGIN .. END span, so a byte that arrives in the wrong place FAILS.  No
+# source text is read: the bytes at the pty master are the evidence.
+M61_IMP1_BEGIN = b"M61-IMP1-BEGIN!"
+M61_IMP1_END = b"M61-IMP1-END!"
+M61_IMP1_A = b"M61-IMP1-A|"
+M61_IMP1_HANDLE = b"M61-IMP1-B|"
+M61_IMP1_GLYPH = b"M61-IMP1-GLYPH"
+M61_IMP1_C = b"M61-IMP1-C|"
+
+# Take the handle of the newest terminal, then write in one known order.
+# The report is "ok" only when the handle path counted every byte it was
+# asked to write.
+M61_IMP1_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the newest terminal is the
+       ;; last element (see READ_PATH_PROBE).
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (handle (and term ((module-ref output 'tty-handle-from-device) term)))
+       (write! (module-ref output 'tty-handle-write-all)))
+  (if (not handle)
+      "no-tty-handle"
+    (let* ((send (lambda (s) ((c 'send-string-to-terminal) s)))
+           (_b (send "@@BEGIN@@"))
+           (_a (send "@@A@@"))
+           ;; Path 1: the typed handle leaf, through the Scheme retry loop.
+           (n (write! handle #vu8(@@HANDLEBYTES@@)))
+           ;; Path 2: the NORMAL glyph write (tty_write_glyphs), through a
+           ;; real redisplay of a real buffer.
+           (_g (begin ((c 'goto-char) ((c 'point-max)))
+                      ((c 'insert) "@@GLYPH@@")
+                      ((c 'redisplay) #t)))
+           ;; Path 3: the elisp path again, to prove the order holds AFTER
+           ;; a glyph write.
+           (_c (send "@@CBYTES@@"))
+           (_e (send "@@END@@")))
+      (if (= n @@HANDLEN@@)
+          "ok"
+          "handle-count"))))
+"""
+
+M61_IMP1_LARGE_N = 65536
+M61_IMP1_LARGE = bytes(65 + (i % 26) for i in range(M61_IMP1_LARGE_N))
+
+# The same handle path with a payload larger than one pty buffer, so the
+# write can be short.  tty-handle-write-all retries through the ONE
+# verdict procedure until every byte is out.  The span bytes pin the
+# ORDER of the payload, so a lost or reordered byte FAILS.
+M61_IMP1_LARGE_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (bvmod (resolve-module '(rnrs bytevectors)))
+       (mkbv (module-ref bvmod 'make-bytevector))
+       (u8set (module-ref bvmod 'bytevector-u8-set!))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (handle (and term ((module-ref output 'tty-handle-from-device) term)))
+       (write! (module-ref output 'tty-handle-write-all))
+       (n @@N@@)
+       (payload (let ((bv (mkbv n 0)))
+                  (let loop ((i 0))
+                    (if (< i n)
+                        (begin (u8set bv i (+ 65 (modulo i 26)))
+                               (loop (+ i 1)))
+                        bv)))))
+  (if (not handle)
+      "no-tty-handle"
+    (let* ((send (lambda (s) ((c 'send-string-to-terminal) s)))
+           (_b (send "@@BEGIN@@"))
+           (total (write! handle payload))
+           (_e (send "@@END@@")))
+      ;; A probe value is a STRING (the report format), so the total count
+      ;; leaves as a decimal string.
+      (if (number? total) (number->string total) total))))
+"""
+
+# The bounded BOOTSTRAP case (cr.org F5).  The ONE leaf of the handle layer
+# that still accepts a Lisp DEVICE is --tty-handle.  This probe proves:
+#   1. DEVICE -> identity: a terminal object gives a plain positive fixnum.
+#   2. the identity is STABLE: a second bootstrap names the same number.
+#   3. the state is borrowed: imp-1 moves no ownership.
+#   4. the leaf + the Scheme retry loop accept the identity alone: an empty
+#      write of the real stream answers 0.
+#   5. an identity that the C table does not hold answers -EBADF (-9), as a
+#      PLAIN value: no longjmp, no error escape.
+M61_IMP1_BOOT_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (from-device (module-ref output 'tty-handle-from-device))
+       (write-all (module-ref output 'tty-handle-write-all-borrowed))
+       (id-of (module-ref output 'tty-handle-id))
+       (state-of (module-ref output 'tty-handle-state))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (h (and term (from-device term)))
+       (h2 (and term (from-device term))))
+  (cond ((not h) "no-tty-handle")
+        ((not (and (integer? (id-of h)) (> (id-of h) 0))) "bad-identity")
+        ((not (eq? 'borrowed (state-of h))) "bad-state")
+        ((not (equal? (id-of h) (id-of h2))) "identity-not-stable")
+        ((not (= 0 (write-all (id-of h) #vu8()))) "empty-write")
+        ((not (= -9 (write-all 1000000 #vu8(65)))) "closed-not-ebadf")
+        (else "ok")))
+"""
+
+M61_IMP1_CASES = (
+    {
+        "name": "m61-imp1/byte-order-e2e",
+        "group": "m61-imp1",
+        "probe": M61_IMP1_PROBE,
+        "subst": {"BEGIN": M61_IMP1_BEGIN.decode(),
+                  "A": M61_IMP1_A.decode(),
+                  "HANDLEBYTES": " ".join(str(b) for b in M61_IMP1_HANDLE),
+                  "HANDLEN": str(len(M61_IMP1_HANDLE)),
+                  "GLYPH": M61_IMP1_GLYPH.decode(),
+                  "CBYTES": M61_IMP1_C.decode(),
+                  "END": M61_IMP1_END.decode()},
+        "expect": "ok",
+        # A non-numeric report cannot use output_span (the driver parses
+        # that report as a byte count), so the END marker proves the probe
+        # ran to completion and span_requires pins the order.
+        "pty_contains": M61_IMP1_END,
+        # The three writes must arrive in THIS order inside the span.
+        "span_requires": {
+            "span": (M61_IMP1_BEGIN, M61_IMP1_END),
+            "needles": (M61_IMP1_HANDLE, M61_IMP1_GLYPH),
+            "needles_in_order": (M61_IMP1_A, M61_IMP1_HANDLE,
+                                 M61_IMP1_GLYPH, M61_IMP1_C),
+        },
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp1/clean-exit-e2e",
+        "group": "m61-imp1",
+        "probe": M61_IMP1_PROBE,
+        "subst": {"BEGIN": M61_IMP1_BEGIN.decode(),
+                  "A": M61_IMP1_A.decode(),
+                  "HANDLEBYTES": " ".join(str(b) for b in M61_IMP1_HANDLE),
+                  "HANDLEN": str(len(M61_IMP1_HANDLE)),
+                  "GLYPH": M61_IMP1_GLYPH.decode(),
+                  "CBYTES": M61_IMP1_C.decode(),
+                  "END": M61_IMP1_END.decode()},
+        "expect": "ok",
+        "pty_contains": M61_IMP1_END,
+        # Exit 0 and the terminal mode restored.  The write path changed,
+        # so the restore path is re-proved here, not assumed.
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp1/large-write-e2e",
+        "group": "m61-imp1",
+        "probe": M61_IMP1_LARGE_PROBE,
+        "subst": {"BEGIN": M61_IMP1_BEGIN.decode(),
+                  "END": M61_IMP1_END.decode(),
+                  "N": str(M61_IMP1_LARGE_N)},
+        # The bare decimal report is the total count of the handle path.
+        "expect_decimal": True,
+        "output_span": (M61_IMP1_BEGIN, M61_IMP1_END),
+        # Every payload byte must arrive in order: a short write that were
+        # dropped or reordered fails this compare.
+        "output_span_bytes": M61_IMP1_LARGE,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp1/bootstrap-e2e",
+        "group": "m61-imp1",
+        "probe": M61_IMP1_BOOT_PROBE,
+        # No byte order to compare: this case checks the plain identity
+        # contract, so the report is the whole result.
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
-         + M58_IMP4_CASES)
+         + M58_IMP4_CASES + M61_IMP1_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -1774,7 +1959,8 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m52-imp8",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
-          "m58-imp2", "m58-imp3", "m58-imp4")
+          "m58-imp2", "m58-imp3", "m58-imp4",
+          "m61-imp1")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -2710,7 +2896,8 @@ def selftest():
     check("m58-imp2-case-count", len(group_cases("m58-imp2")), 1)
     check("m58-imp3-case-count", len(group_cases("m58-imp3")), 5)
     check("m58-imp4-case-count", len(group_cases("m58-imp4")), 1)
-    check("total-case-count", len(CASES), 32)
+    check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
+    check("total-case-count", len(CASES), 36)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
