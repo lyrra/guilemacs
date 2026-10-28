@@ -279,6 +279,8 @@ real error, not a pass."
 (m46-imp3--check "mech-unlock-handler"
                  (m46-imp3--contains-p "src/filelock.c"
                                        "unlock_file_handle_error (Lisp_Object err)"))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m46-imp3--check "leaf-defuns-8"
                  (eql 8 (m46-imp3--count "src/filelock.c" "^DEFUN (\"--filelock-")))
 (m46-imp3--check "defun-count-13"
@@ -298,8 +300,8 @@ real error, not a pass."
                  (eql 1216 (m46-imp3--lines "src/filelock.c")))
 (m46-imp3--check "filelock.c-defuns-13"
                  (eql 13 (m46-imp3--count "src/filelock.c" "^DEFUN (\"")))
-(m46-imp3--check "tree-wide-scm-public-ref-268"
-                 (eql 268 (m46-imp3--count-scm-ref)))
+(m46-imp3--check "tree-wide-scm-public-ref-270"
+                 (eql 270 (m46-imp3--count-scm-ref)))
 (m46-imp3--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp3--lines "src/callproc.c")))
 (m46-imp3--check "sysdep.c-lines-4950"

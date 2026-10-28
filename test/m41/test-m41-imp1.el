@@ -112,11 +112,11 @@
                      (eql 11233 (m41-imp1--lines "src/keyboard.c")))
     (m41-imp1--check "keyboard-globals.c-lines-490"
                      (eql 490 (m41-imp1--lines "src/keyboard-globals.c")))
-    (m41-imp1--check "tree-wide-scm-public-ref-268"
+    (m41-imp1--check "tree-wide-scm-public-ref-270"
                      ;; M61 imp-1 re-pin: the ONE new scm_c_public_ref site in src/term.c
 ;; moves the src/*.[ch] occurrence count 267 -> 268.  Measured with an
 ;; Emacs batch count over src/*.c and src/*.h (the function itself).
-                     (eql 268 (m41-imp1--tree-wide-scm-public-ref)))
+                     (eql 270 (m41-imp1--tree-wide-scm-public-ref)))
 
     ;; --- The gitignored plan (guarded: skip when absent) ------------
     (if (not (file-exists-p (expand-file-name "docs/m41-plan.org"

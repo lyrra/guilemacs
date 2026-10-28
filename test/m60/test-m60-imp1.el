@@ -311,8 +311,10 @@ host limit is a skip, never a pass (docs/m60-plan.org section 12)."
                       (eql 32 (m60-imp1--lines "mod/emacs-elisp/spec.scm"))))
 
 ;; Unit: OCCURRENCES over src/*.[ch].
-(m60-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m60-imp1--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m60-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m60-imp1--count-scm-ref)))
 
 ;; Unit: ENTRIES of mod/emacs-elisp.  9, because `runtime/' is one entry.
 (m60-imp1--check "emacs-elisp-entries-9"

@@ -1,4 +1,5 @@
-;;; SRFI-64 tests for the M61 imp-1 per-TTY handle of (emacs tty-output).
+;;; SRFI-64 tests for the M61 per-TTY handle of (emacs tty-output):
+;;; imp-1 (the value, the write) and imp-2 (the flush, the termscript copy).
 
 ;; COVER: the handle value, its 5 states, the closed-use error, the
 ;; after-write verdict, and the retry loop, all of mod/emacs/tty-output.scm.
@@ -9,7 +10,10 @@
 ;;   2. It starts no Emacs and runs no C build, so it proves NO C seam.
 ;;      The C identity table, the leaf --tty-handle-write, the bootstrap
 ;;      --tty-handle, and the routed normal write are proved by the
-;;      m61-imp1 PTY group of test/pty-driver.py, not here.
+;;      m61-imp1 PTY group of test/pty-driver.py, not here.  The 2
+;;      imp-2 leaves (--tty-handle-flush, --tty-handle-termscript) and
+;;      the 0 answer of a tty with no termscript stream are proved by the
+;;      m61-imp2 PTY group, not here: a plain Guile session has no tty.
 ;;   3. It mutates NO module binding.  A `module-set!' of a leaf inside a
 ;;      declarative module is inlined by the compiler, so a stub test
 ;;      silently stops testing anything once a compiled .go cache exists.
@@ -25,7 +29,11 @@
 
 ;; Pinned case count.  A suite that loses a case must fail: each suite
 ;; pins its own count (docs/kb.org test-mod-standalone-suite).
-(define expected-passes 31)
+;; The pin counts EVERY pass, the Z1 check below included.  That is the
+;; shape of the 4 sibling suites of this directory: their exit block is
+;; (= passes expected-passes) (cr.org F2).  imp-1 carried 31; imp-2 adds
+;; the 12 G checks, the 4 H checks and Z1, so 48.
+(define expected-passes 48)
 
 ;; No SRFI-64 log file: it would land in the working directory.  See the
 ;; same note, docs/kb.org test-mod-standalone-suite.
@@ -162,19 +170,88 @@
 (test-equal "F2 a non-integer identity is -EBADF"
             -9 (tty-handle-write-all-borrowed 'seven #vu8(65)))
 
+;; --- G. the 2 operations of imp-2 -----------------------------------
+;;
+;; The 4 new exports: the 2 operations and their C-facing forms.  Each
+;; name below is the imported binding, so a name that the module does not
+;; export stops this file.
+
+(test-equal "G1 the flush operation is exported"
+            #t (procedure? tty-handle-flush))
+(test-equal "G2 the termscript copy is exported"
+            #t (procedure? tty-handle-termscript))
+(test-equal "G3 the C-facing flush is exported"
+            #t (procedure? tty-handle-flush-borrowed))
+(test-equal "G4 the C-facing termscript copy is exported"
+            #t (procedure? tty-handle-termscript-borrowed))
+
+;; The 2 new leaves are DELAYED references of the module, so a name that
+;; the C side does not define fails in the PTY group and not here
+;; (LIMIT 2).  The state check runs BEFORE the leaf in both operations,
+;; so a closed handle raises with no C call and no Emacs binary.
+(test-equal "G5 a closed handle flush raises" #t
+            (catch #t
+                   (lambda () (tty-handle-flush closed) #f)
+                   (lambda (key . args) #t)))
+(test-equal "G6 a closed handle termscript copy raises" #t
+            (catch #t
+                   (lambda () (tty-handle-termscript closed #vu8(65)) #f)
+                   (lambda (key . args) #t)))
+
+;; A value that is not a handle raises the same way.
+(test-equal "G7 a non-handle flush raises" #t
+            (catch #t
+                   (lambda () (tty-handle-flush 7) #f)
+                   (lambda (key . args) #t)))
+(test-equal "G8 a non-handle termscript copy raises" #t
+            (catch #t
+                   (lambda () (tty-handle-termscript 'h #vu8(65)) #f)
+                   (lambda (key . args) #t)))
+
+;; The C-facing forms answer -EBADF, with no C call, for an identity that
+;; no table entry can hold.  These are the same 2 guards as F1 and F2.
+(test-equal "G9 a negative identity is -EBADF for the flush"
+            -9 (tty-handle-flush-borrowed -1))
+(test-equal "G10 a non-integer identity is -EBADF for the flush"
+            -9 (tty-handle-flush-borrowed 'seven))
+(test-equal "G11 a negative identity is -EBADF for the termscript copy"
+            -9 (tty-handle-termscript-borrowed -1 #vu8(65)))
+(test-equal "G12 a non-integer identity is -EBADF for the termscript copy"
+            -9 (tty-handle-termscript-borrowed 'seven #vu8(65)))
+
+;; --- H. the plain triple that the M54 verdict site feeds --------------
+;;
+;; m54_tty_termscript_verdict passes (copied, len, err) as 3 PLAIN values
+;; and reads no global errno (cr.org F3).  The C sites that build the
+;; triple are proved by the m61-imp2 and the m54-imp3 PTY groups; this
+;; section proves the Scheme decision that consumes it.  The literal 13
+;; is EACCES on Linux, a real error and neither EINTR nor EAGAIN.
+(test-equal "H1 a full copy is done"
+            "done" (tty-write-verdict 10 10 0))
+(test-equal "H2 a short copy with no errno retries"
+            "retry" (tty-write-verdict 5 10 0))
+(test-equal "H3 a short copy with a real errno gives up"
+            "give-up" (tty-write-verdict 5 10 13))
+(test-equal "H4 a copy of 0 bytes of 0 is done"
+            "done" (tty-write-verdict 0 0 0))
+
 ;; --- the pinned count ----------------------------------------------
 
+;; 1 pass is still to come when this line runs: the pass of this check.
+;; So the count here is the pin minus 1, and the exit block below compares
+;; the full pin (cr.org F2).
 (test-assert "Z1 every case ran"
-             (= expected-passes (test-runner-pass-count test-runner)))
+             (= expected-passes (1+ (test-runner-pass-count test-runner))))
 
 ;; The summary line and the explicit exit.  The SRFI-64 default exit status
 ;; is 0 even with an unexpected failure, so a runner that reads the status
-;; only would report a green gate for a red suite.  Same shape as the
-;; sibling suites of this directory.
+;; only would report a green gate for a red suite.  Same shape as the 4
+;; sibling suites of this directory: the pin counts every pass, so the
+;; compare is (= passes expected-passes) (cr.org F2).
 (let ((passes (test-runner-pass-count test-runner))
       (fails  (test-runner-fail-count test-runner)))
   (format #t "~a: ~a passed, ~a failed (expected ~a passed)~%"
           "Guilemacs tty-handle module" passes fails expected-passes)
-  (exit (if (and (zero? fails) (= passes (1+ expected-passes))) 0 1)))
+  (exit (if (and (zero? fails) (= passes expected-passes)) 0 1)))
 
 (test-end "Guilemacs tty-handle module")

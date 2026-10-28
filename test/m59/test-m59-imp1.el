@@ -370,6 +370,8 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 (m59-imp1--check "xfaces.c-lines-7741"
                  (eql 7741 (m59-imp1--lines "src/xfaces.c")))
 ;; Unit: LINES (`grep -c "^DEFUN ("').
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m59-imp1--check "xfaces.c-defun-count-33"
                  (eql 33 (m59-imp1--grep-c "src/xfaces.c" "^DEFUN (")))
 ;; Unit: LINES (`grep -c scm_c_public_ref').  2 after the M59 imp-4 MOVE:
@@ -377,8 +379,8 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 (m59-imp1--check "xfaces.c-scm-ref-2"
                  (eql 2 (m59-imp1--grep-c "src/xfaces.c" "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -h ... | wc -l').
-(m59-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m59-imp1--count-scm-ref)))
+(m59-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m59-imp1--count-scm-ref)))
 ;; Unit: LINES (`grep -c guile' = 8).  The lines of Guile coupling: the
 ;; 2 includes (:229, :230), the 2 real seams (:1047
 ;; guile_parse_color_spec, :3995 guile_parse_face_bool_attribute), and 4
@@ -401,10 +403,10 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; M59 imp-1 adds NO PTY case.  The counted surface stays 32.  The group
 ;; pins must add up to the total, so a group pin that moves without the
 ;; total FAILS.
-(m59-imp1--check "pty-driver-cases-32"
+(m59-imp1--check "pty-driver-cases-42"
                  (let ((pins (m59-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 36 (car pins))
+                        (eql 42 (car pins))
                         (eql (car pins) (cdr pins)))))
 (m59-imp1--check "corpus-dir-present"
                  (and (m59-imp1--exists-p "test/m59")
@@ -524,8 +526,12 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
 ;; the M61 block inserted above moved this comment, 5682 -> 5978.
 ;; Measured with `grep -n 'no Guile port owns a FILE' src/term.c`.
-(m59-imp1--check "boundary-rule-line-5978"
-                 (and (eql 5978 (m59-imp1--line-of
+(m59-imp1--check "boundary-rule-line-6334"
+                 ;; M61 imp-2 re-pin: the M61 handle block and the routed
+                 ;; flush sites moved this comment 5978 -> 6334.
+                 ;; Measured with
+                 ;; `grep -n 'no Guile port owns a FILE' src/term.c`.
+                 (and (eql 6334 (m59-imp1--line-of
                                  "src/term.c" "no Guile port owns a FILE"))
                       (m59-imp1--contains-p "src/term.c"
                                             "no Guile port owns a FILE *")))

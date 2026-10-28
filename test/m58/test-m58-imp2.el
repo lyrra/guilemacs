@@ -29,7 +29,7 @@
 ;;;         and the imp-1 line stays present.  T4 holds 4 checks.
 ;;;   T5 -- the cross-corpus re-pin: the new case moves the
 ;;;         test/pty-driver.py total from 25 to 26, so
-;;;         test/m58/test-m58-imp1.el must hold pty-driver-cases-32 and
+;;;         test/m58/test-m58-imp1.el must hold pty-driver-cases-42 and
 ;;;         must hold no live pty-driver-cases-26.  T5 holds 2 checks.
 ;;;   T6 -- the guards: 5 checks -- one per-group min-count guard for each
 ;;;         of T1 .. T5.  The in-process group-total `ert-deftest' is a
@@ -246,43 +246,48 @@ host limit is a skip, never a pass."
 ;; (struct frame' src/term.c` and its two neighbours.
 (m58-imp2--check "term.c-face-hub-signatures"
                  (and (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 2666))
+                               (m58-imp2--line-text "src/term.c" 3018))
                       (string= "turn_on_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 2667))
+                               (m58-imp2--line-text "src/term.c" 3019))
                       (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 2742))
+                               (m58-imp2--line-text "src/term.c" 3094))
                       (string= "turn_off_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 2743))
+                               (m58-imp2--line-text "src/term.c" 3095))
                       (string= "bool"
-                               (m58-imp2--line-text "src/term.c" 2789))
+                               (m58-imp2--line-text "src/term.c" 3141))
                       (string= "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                               (m58-imp2--line-text "src/term.c" 2790))))
+                               (m58-imp2--line-text "src/term.c" 3142))))
 
 ;; M61 imp-1 re-pin: same +281 shift, so 1041 -> 1316, 1059 -> 1338,
 ;; 1103 -> 1382, 1118 -> 1401, 1179 -> 1462 and 1210 -> 1497.  Measured
 ;; with `grep -n 'turn_.\{1,3\}_face (f, face);' src/term.c`.
+;;
+;; M61 imp-2 re-pin: the repaired imp-2 act adds 59 lines above this
+;; region, so 1316 -> 1672, 1338 -> 1693, 1382 -> 1737, 1401 -> 1754,
+;; 1462 -> 1815 and 1497 -> 1849.  The face hubs move in step:
+;; 2959 -> 3018, 3035 -> 3094 and 3082 -> 3141.  Same command.
 (m58-imp2--check "term.c-six-glyph-writer-callers"
                  (and (eql 6 (m58-imp2--count
                               "src/term.c"
                               "turn_\\(on\\|off\\)_face (f, face);"))
                       (string-match-p
                        "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1316) ""))
+                       (or (m58-imp2--line-text "src/term.c" 1672) ""))
                       (string-match-p
                        "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1338) ""))
+                       (or (m58-imp2--line-text "src/term.c" 1693) ""))
                       (string-match-p
                        "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1382) ""))
+                       (or (m58-imp2--line-text "src/term.c" 1737) ""))
                       (string-match-p
                        "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1401) ""))
+                       (or (m58-imp2--line-text "src/term.c" 1754) ""))
                       (string-match-p
                        "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1462) ""))
+                       (or (m58-imp2--line-text "src/term.c" 1815) ""))
                       (string-match-p
                        "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1497) ""))))
+                       (or (m58-imp2--line-text "src/term.c" 1849) ""))))
 
 ;; M58 imp-3 SUPERSEDED this check.  imp-2 pinned the INLINE C
 ;; decision (the TTY_CAPABLE_P_TRY macro and the bold gate).  The MOVE
@@ -335,11 +340,11 @@ host limit is a skip, never a pass."
                        "test/pty-driver.py"
                        '("GROUPS = (" "\"m58-imp2\")"))))
 
-(m58-imp2--check "pty-case-counts-36"
+(m58-imp2--check "pty-case-counts-42"
                  (let ((pins (m58-imp2--pty-case-pins)))
                    (and (consp pins)
-                        (eql 36 (car pins))
-                        ;; The 19 group pins must add up to the total, so
+                        (eql 42 (car pins))
+                        ;; The 20 group pins must add up to the total, so
                         ;; a group pin that moves alone FAILS.
                         (eql (car pins) (cdr pins)))))
 
@@ -444,9 +449,9 @@ host limit is a skip, never a pass."
 ;; the M61 act moves these counts.  Measured on this host.
 (m58-imp2--check "imp1-repinned-36"
                  (and (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-36\"")
+                                        "\"pty-driver-cases-42\"")
                       (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 36 (car pins))")))
+                                        "(eql 42 (car pins))")))
 
 (m58-imp2--check "imp1-no-stale-pin-26"
                  (not (m58-imp2--live-p "test/m58/test-m58-imp1.el"

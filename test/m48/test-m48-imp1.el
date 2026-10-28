@@ -175,18 +175,20 @@ passes the raw symbol to reach it."
 ;;; two geometry leaves and their C arithmetic were removed; the Scheme
 ;;; module now owns the geometry arithmetic.  The current source has 29
 ;;; DEFUNs and 36 term.c refs.  The keyboard surface does not move.
-(m48-imp1--check "term.c-lines-6738"
-                 (eql 6738 (m48-imp1--lines "src/term.c")))
-(m48-imp1--check "term.c-defuns-31"
-                 (eql 31 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
-(m48-imp1--check "term.c-scm-ref-42"
-                 (eql 42 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m48-imp1--check "term.c-lines-7094"
+                 (eql 7094 (m48-imp1--lines "src/term.c")))
+(m48-imp1--check "term.c-defuns-33"
+                 (eql 33 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
+(m48-imp1--check "term.c-scm-ref-44"
+                 (eql 44 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
 (m48-imp1--check "term.c-has-guile.h"
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
-(m48-imp1--check "scm-c-public-ref-268"
-                 (eql 268 (m48-imp1--count-scm-ref)))
+(m48-imp1--check "scm-c-public-ref-270"
+                 (eql 270 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"

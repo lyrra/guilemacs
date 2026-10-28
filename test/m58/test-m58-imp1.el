@@ -292,20 +292,22 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; 6738 lines, 31 DEFUNs and 6 leaves.  Measured with `wc -l
 ;; src/term.c`, `grep -c '^DEFUN (' src/term.c` and `grep -c
 ;; '^DEFUN ("--tty-' src/term.c`.
-(m58-imp1--check "term.c-lines-6738"
-                 (eql 6738 (m58-imp1--lines "src/term.c")))
-(m58-imp1--check "term.c-defun-count-31"
-                 (eql 31 (m58-imp1--count "src/term.c" "^DEFUN (")))
-(m58-imp1--check "term.c-leaf-defun-count-6"
-                 (eql 6 (m58-imp1--count-defun-leaf "src/term.c")))
-(m58-imp1--check "term.c-scm-ref-42"
-                 (eql 42 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
-(m58-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m58-imp1--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m58-imp1--check "term.c-lines-7094"
+                 (eql 7094 (m58-imp1--lines "src/term.c")))
+(m58-imp1--check "term.c-defun-count-33"
+                 (eql 33 (m58-imp1--count "src/term.c" "^DEFUN (")))
+(m58-imp1--check "term.c-leaf-defun-count-8"
+                 (eql 8 (m58-imp1--count-defun-leaf "src/term.c")))
+(m58-imp1--check "term.c-scm-ref-44"
+                 (eql 44 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
+(m58-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m58-imp1--count-scm-ref)))
 ;; M61 imp-1 re-pin: the handle block adds 178 lines, 682 -> 860.
 ;; Measured with `wc -l mod/emacs/tty-output.scm`.
-(m58-imp1--check "tty-output.scm-lines-860"
-                 (eql 860 (m58-imp1--lines "mod/emacs/tty-output.scm")))
+(m58-imp1--check "tty-output.scm-lines-906"
+                 (eql 906 (m58-imp1--lines "mod/emacs/tty-output.scm")))
 (m58-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
@@ -316,10 +318,10 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; cases, else this check goes red.  The imp-2 corpus T5 and the imp-3
 ;; corpus U2 pin this re-pin from the other side.
 ;; M61 imp-1 re-pin: the m61-imp1 group adds 4 cases, 32 -> 36.
-(m58-imp1--check "pty-driver-cases-36"
+(m58-imp1--check "pty-driver-cases-42"
                  (let ((pins (m58-imp1--pty-case-pins)))
                    (and (consp pins)
-                        (eql 36 (car pins))
+                        (eql 42 (car pins))
                         ;; The group pins must add up to the total, so a
                         ;; group pin that moves without the total FAILS.
                         (eql (car pins) (cdr pins)))))

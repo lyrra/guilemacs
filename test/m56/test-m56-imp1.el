@@ -260,25 +260,27 @@ host limit is a skip, never a pass (brief.org section 11)."
 ;; --tty-handle-write) and the routed normal write changed the surface
 ;; numbers, and the PTY driver gained the m61-imp1 group.  Re-measure;
 ;; do not copy these numbers.
-(m56-imp1--check "term.c-lines-6738"
-                 (eql 6738 (m56-imp1--lines "src/term.c")))
-(m56-imp1--check "term.c-defun-count-31"
-                 (eql 31 (m56-imp1--count "src/term.c" "^DEFUN (")))
-(m56-imp1--check "term.c-leaf-defun-count-6"
-                 (eql 6 (m56-imp1--count-defun-leaf "src/term.c")))
-(m56-imp1--check "term.c-scm-ref-42"
-                 (eql 42 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
-(m56-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m56-imp1--count-scm-ref)))
-(m56-imp1--check "tty-output.scm-lines-860"
-                 (eql 860 (m56-imp1--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m56-imp1--check "term.c-lines-7094"
+                 (eql 7094 (m56-imp1--lines "src/term.c")))
+(m56-imp1--check "term.c-defun-count-33"
+                 (eql 33 (m56-imp1--count "src/term.c" "^DEFUN (")))
+(m56-imp1--check "term.c-leaf-defun-count-8"
+                 (eql 8 (m56-imp1--count-defun-leaf "src/term.c")))
+(m56-imp1--check "term.c-scm-ref-44"
+                 (eql 44 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
+(m56-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m56-imp1--count-scm-ref)))
+(m56-imp1--check "tty-output.scm-lines-906"
+                 (eql 906 (m56-imp1--lines "mod/emacs/tty-output.scm")))
 (m56-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m56-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m56-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m56-imp1--check "pty-driver-cases-32"
+(m56-imp1--check "pty-driver-cases-42"
                  (m56-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 36"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 42"))
 
 ;;; --- S2. The row map (brief.org section 4) --------------------------
 

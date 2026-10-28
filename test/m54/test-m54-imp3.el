@@ -215,10 +215,14 @@ error, not a pass."
                  (m54-imp3--contains-p
                   "src/term.c"
                   "m54_tty_write_verdict_scheme (Lisp_Object written, Lisp_Object len,"))
+;; M61 imp-2 re-pin: the ONE verdict site takes the plain errno as a 4th
+;; argument, so no caller reads the global errno (the review of imp-2,
+;; finding F3).  MEASURED with `grep -n 'm54_tty_termscript_verdict (size_t'
+;; src/term.c`.
 (m54-imp3--check "seam-termscript-helper"
                  (m54-imp3--contains-p
                   "src/term.c"
-                  "m54_tty_termscript_verdict (size_t copied, size_t len, bool failed)"))
+                  "m54_tty_termscript_verdict (size_t copied, size_t len, int err, bool failed)"))
 (m54-imp3--check "seam-single-copy-call-site"
                  (eql 1 (m54-imp3--count
                          "src/term.c"
@@ -236,16 +240,23 @@ error, not a pass."
                        "tty-termscript-copy-handle")))
 (m54-imp3--check "stay-c-copy-sites"
                  (and
-                  ;; The 5 src/term.c copy sites stay C.  :235, :750,
-                  ;; :1044 / :1103 / :1193 (the 3 conversion_buffer
-                  ;; writes), plus the moved copy guard.
+                  ;; M61 imp-2 moved the 3 conversion_buffer copies of the
+                  ;; normal glyph path into the per-TTY handle, so 2 of the
+                  ;; 5 src/term.c copy sites stay C: the
+                  ;; tty_send_additional_strings copy (it can run during a
+                  ;; GC emergency escape) and the hard-clear putc loop.
                   (m54-imp3--contains-p
                    "src/term.c"
                    "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript)")
                   (m54-imp3--contains-p "src/term.c" "putc (' ', tty->termscript)")
-                  (eql 3 (m54-imp3--count
+                  (eql 0 (m54-imp3--count
                           "src/term.c"
                           "fwrite (conversion_buffer, 1, coding->produced, tty->termscript)"))
+                  ;; The moved copies run through the ONE mechanism of the
+                  ;; M61 ordered path.
+                  (eql 1 (m54-imp3--count
+                          "src/term.c"
+                          "fwrite (bytes, 1, len, tty->termscript)"))
                   ;; The src/cm.c putc sites stay C.
                   (m54-imp3--contains-p "src/cm.c" "putc (c & 0177, current_tty->termscript)")
                   (m54-imp3--contains-p "src/cm.c" "putc ('\\r', tty->termscript)")

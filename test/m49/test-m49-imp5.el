@@ -222,8 +222,10 @@ FAIL with no ERT test would leave the exit code 0."
                  (m49-imp5--export-p "mod/emacs/dired.scm"
                                      "dired-file-attributes-lessp"))
 ;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m49-imp5--check "tree-wide-scm-public-ref-268"
-                 (eql 268 (m49-imp5--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m49-imp5--check "tree-wide-scm-public-ref-270"
+                 (eql 270 (m49-imp5--count-scm-ref)))
 
 ;;; --- S2. The corpus is registered (brief.org section 6) -------------
 

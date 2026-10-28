@@ -242,8 +242,10 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
                  (m50-imp5--contains-p "prelude/load.scm"
                                        "(use-modules (emacs emacs))"))
 ;; Row 11: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m50-imp5--check "tree-wide-scm-public-ref-268"
-                 (eql 268 (m50-imp5--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m50-imp5--check "tree-wide-scm-public-ref-270"
+                 (eql 270 (m50-imp5--count-scm-ref)))
 ;; The ordered 5-block name list equals the src/emacs.c DEFUN names.
 (m50-imp5--check "block-list-exact-5"
                  (equal '("invocation-name"

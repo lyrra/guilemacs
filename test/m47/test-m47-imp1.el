@@ -192,8 +192,10 @@ that a stale string is GONE, not that a current string is present."
                  (m47-imp1--tracked-p "src/fileio.c" "#include \"guile.h\""))
 (m47-imp1--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp1--lines "mod/emacs/fileio.scm")))
-(m47-imp1--check "scm-c-public-ref-268"
-                 (eql 268 (m47-imp1--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m47-imp1--check "scm-c-public-ref-270"
+                 (eql 270 (m47-imp1--count-scm-ref)))
 (m47-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp1--lines "src/keyboard.c")))
 (m47-imp1--check "keyboard.c-defuns-447"

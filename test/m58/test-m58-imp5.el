@@ -303,7 +303,7 @@ the TRACKED file is absent and prints FAIL."
                          "tty->RPov = string_cost (tty->TS_repeat);"
                          "tty->RPov = FRAME_COLS (frame) * 2;"))
                       ;; The site line, measured now (imp-5 moves no C).
-                      (eql 1789 (m58-imp5--line-of "src/term.c"
+                      (eql 2141 (m58-imp5--line-of "src/term.c"
                                                   "Don't use TS_repeat"))
                       ;; 3 sites: 2 writes here, 1 declaration.
                       (eql 3 (m58-imp5--grep-src "RPov"))
@@ -324,7 +324,7 @@ the TRACKED file is absent and prints FAIL."
                          "if (t->type == output_termcap)"
                          "t->display_info.tty->TS_enter_underline_mode = 0;"
                          "M52_CAP (\"underline\", TS_enter_underline_mode),"))
-                      (eql 3169 (m58-imp5--line-of
+                      (eql 3521 (m58-imp5--line-of
                                  "src/term.c" "DEFUN (\"tty-no-underline\""))
                       (m58-imp5--contains-p "tool/run-tests.scm"
                                             "STAYS C (one C field write behind a C type test")
@@ -337,7 +337,7 @@ the TRACKED file is absent and prints FAIL."
                        "src/term.c"
                        '("DEFUN (\"tty-top-frame\", Ftty_top_frame, Stty_top_frame, 0, 1, 0,"
                          "return t->display_info.tty->top_frame;"))
-                      (eql 3187 (m58-imp5--line-of
+                      (eql 3539 (m58-imp5--line-of
                                  "src/term.c" "DEFUN (\"tty-top-frame\""))
                       ;; The body computes nothing: one field read, then
                       ;; nil for a non-tty terminal.
@@ -407,26 +407,28 @@ the TRACKED file is absent and prints FAIL."
 ;;   test/m58                     5 corpus .el files
 (setq m58-imp5--group 'v3)
 
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m58-imp5--check "v3/term-c-surface"
-                 (and (eql 6738 (m58-imp5--count "src/term.c" "\n"))
-                      (eql 31 (m58-imp5--count "src/term.c" "^DEFUN ("))))
+                 (and (eql 7094 (m58-imp5--count "src/term.c" "\n"))
+                      (eql 33 (m58-imp5--count "src/term.c" "^DEFUN ("))))
 
-(m58-imp5--check "v3/leaf-defuns-6"
-                 (eql 6 (m58-imp5--leaf-defuns)))
+(m58-imp5--check "v3/leaf-defuns-8"
+                 (eql 8 (m58-imp5--leaf-defuns)))
 
 (m58-imp5--check "v3/public-refs"
-                 (and (eql 42 (m58-imp5--count "src/term.c" "scm_c_public_ref"))
-                      (eql 268 (m58-imp5--src-public-refs))))
+                 (and (eql 44 (m58-imp5--count "src/term.c" "scm_c_public_ref"))
+                      (eql 270 (m58-imp5--src-public-refs))))
 
 (m58-imp5--check "v3/module-lines"
-                 (eql 860 (m58-imp5--count "mod/emacs/tty-output.scm" "\n")))
+                 (eql 906 (m58-imp5--count "mod/emacs/tty-output.scm" "\n")))
 
-(m58-imp5--check "v3/pty-36-cases-20-groups"
+(m58-imp5--check "v3/pty-42-cases-21-groups"
                  (let ((pins (m58-imp5--pty-case-pins)))
                    (and (consp pins)
-                        (eql 36 (nth 0 pins))
-                        (eql 36 (nth 1 pins))
-                        (eql 20 (nth 2 pins)))))
+                        (eql 42 (nth 0 pins))
+                        (eql 42 (nth 1 pins))
+                        (eql 21 (nth 2 pins)))))
 
 ;; imp-5 adds ONE corpus, so test/m58 holds 5 .el files.
 (m58-imp5--check "v3/corpus-files-5"

@@ -245,25 +245,27 @@ host limit is a skip, never a pass (brief.org section 7)."
       (m57-imp1--info-skip "head-e2423fcb0" "no git binary on PATH")
     (m57-imp1--check "head-e2423fcb0" ok)))
 
-(m57-imp1--check "term.c-lines-6738"
-                 (eql 6738 (m57-imp1--lines "src/term.c")))
-(m57-imp1--check "term.c-defun-count-31"
-                 (eql 31 (m57-imp1--count "src/term.c" "^DEFUN (")))
-(m57-imp1--check "term.c-leaf-defun-count-6"
-                 (eql 6 (m57-imp1--count-defun-leaf "src/term.c")))
-(m57-imp1--check "term.c-scm-ref-42"
-                 (eql 42 (m57-imp1--count "src/term.c" "scm_c_public_ref")))
-(m57-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m57-imp1--count-scm-ref)))
-(m57-imp1--check "tty-output.scm-lines-860"
-                 (eql 860 (m57-imp1--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m57-imp1--check "term.c-lines-7094"
+                 (eql 7094 (m57-imp1--lines "src/term.c")))
+(m57-imp1--check "term.c-defun-count-33"
+                 (eql 33 (m57-imp1--count "src/term.c" "^DEFUN (")))
+(m57-imp1--check "term.c-leaf-defun-count-8"
+                 (eql 8 (m57-imp1--count-defun-leaf "src/term.c")))
+(m57-imp1--check "term.c-scm-ref-44"
+                 (eql 44 (m57-imp1--count "src/term.c" "scm_c_public_ref")))
+(m57-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m57-imp1--count-scm-ref)))
+(m57-imp1--check "tty-output.scm-lines-906"
+                 (eql 906 (m57-imp1--lines "mod/emacs/tty-output.scm")))
 (m57-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m57-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m57-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m57-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m57-imp1--check "pty-driver-cases-36"
+(m57-imp1--check "pty-driver-cases-42"
                  (m57-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 36"))
+                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 42"))
 
 ;;; --- S2. The row map (brief.org section 5) --------------------------
 
@@ -290,7 +292,11 @@ host limit is a skip, never a pass (brief.org section 7)."
                     ;; fwrite sites moved into the ONE handle call, so
                     ;; this needle names the new site.  Measured with
                     ;; `grep -n m61_tty_handle_write_1 src/term.c`.
-                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
+                    ;; M61 imp-2 re-pin: the write and the termscript
+                    ;; copy of a glyph run share ONE bytevector, so the
+                    ;; needle names the glyph-run hub.  Measured with
+                    ;; `grep -n 'm61_tty_handle_glyph_run_1 (tty' src/term.c`.
+                    "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
                     "putc (' ', tty->output);"
                     "size_t written = fwrite (str, 1, len, tty->output);")))
 
@@ -299,7 +305,13 @@ host limit is a skip, never a pass (brief.org section 7)."
 (m57-imp1--check "output-flush-sites"
                  (m57-imp1--holds-all
                   "src/term.c"
-                  '("fflush (tty->output);"
+                  '(
+                    ;; M61 imp-2 re-pin (bounded fallback of
+                    ;; milestone.org section 5): the 6 flush sites moved
+                    ;; into the ONE handle call, so this needle names the
+                    ;; new site.  Measured with
+                    ;; `grep -n 'm61_tty_handle_flush_1 (tty);' src/term.c`.
+                    "(void) m61_tty_handle_flush_1 (tty);"
                     "if (fflush (tty->output) != 0)")))
 (m57-imp1--check "output-clearerr-sites"
                  (m57-imp1--contains-p "src/term.c" "clearerr (tty->output);"))
@@ -311,7 +323,10 @@ host limit is a skip, never a pass (brief.org section 7)."
                  (m57-imp1--holds-all
                   "src/term.c"
                   '("fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
+                    ;; M61 imp-2 re-pin: the 3 glyph termscript
+                    ;; copies moved into the ONE mechanism.  Measured with
+                    ;; `grep -n 'fwrite (bytes, 1, len, tty->termscript)' src/term.c`.
+                    "n = fwrite (bytes, 1, len, tty->termscript);"
                     "putc (' ', tty->termscript);"
                     "size_t copied = fwrite (str, 1, len, tty->termscript);")))
 (m57-imp1--check "termscript-guard-and-close"

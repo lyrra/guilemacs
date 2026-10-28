@@ -152,8 +152,10 @@ of the presence of docs/."
                  (m46-imp4--contains-p "src/filelock.c" "#include \"guile.h\""))
 (m46-imp4--check "filelock.scm-lines-104"
                  (eql 104 (m46-imp4--lines "mod/emacs/filelock.scm")))
-(m46-imp4--check "scm-c-public-ref-268"
-                 (eql 268 (m46-imp4--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m46-imp4--check "scm-c-public-ref-270"
+                 (eql 270 (m46-imp4--count-scm-ref)))
 (m46-imp4--check "callproc.c-lines-2387"
                  (eql 2387 (m46-imp4--lines "src/callproc.c")))
 (m46-imp4--check "callproc.c-defuns-7"

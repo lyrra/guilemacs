@@ -219,10 +219,12 @@ mechanism helpers, whose TN_max_colors reads are not the hub policy."
                       "src/term.c"
                       (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                               wrapper)))))
-(m48-imp3--check "term.c-scm-ref-42"
-                 (eql 42 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
-(m48-imp3--check "scm-c-public-ref-268"
-                 (eql 268 (m48-imp3--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m48-imp3--check "term.c-scm-ref-44"
+                 (eql 44 (m48-imp3--count "src/term.c" "scm_c_public_ref")))
+(m48-imp3--check "scm-c-public-ref-270"
+                 (eql 270 (m48-imp3--count-scm-ref)))
 
 ;;; --- F3. The inline decision is gone (brief.org section 3.2) --------
 
@@ -269,8 +271,8 @@ that also holds make_fixnum."
 
 (m48-imp3--check "leaf-defuns-6"
                  (eql 6 (m48-imp3--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp3--check "defun-count-31"
-                 (eql 31 (m48-imp3--count "src/term.c" "^DEFUN (\"")))
+(m48-imp3--check "defun-count-33"
+                 (eql 33 (m48-imp3--count "src/term.c" "^DEFUN (\"")))
 (m48-imp3--check "term.c-has-guile.h"
                  (m48-imp3--contains-p "src/term.c" "#include \"guile.h\""))
 

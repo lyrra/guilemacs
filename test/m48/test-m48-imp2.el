@@ -146,8 +146,10 @@ real error, not a pass."
                                          (format "DEFUN (\"--term-%s\"" leaf))))
 (m48-imp2--check "leaf-defuns-6"
                  (eql 6 (m48-imp2--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp2--check "defun-count-31"
-                 (eql 31 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m48-imp2--check "defun-count-33"
+                 (eql 33 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
 (m48-imp2--check "geometry-leaves-retired"
                  (and (not (m48-imp2--contains-p
                             "src/term.c" "DEFUN (\"--term-frame-geometry\""))

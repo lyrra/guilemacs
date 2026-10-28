@@ -384,6 +384,8 @@ file gives the symbol `m59-imp3-absent', which is a FAIL, not a pass."
     return Qt;")))
 
 ;; Unit: LINES (`grep -c "^DEFUN ("').
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m59-imp3--check "c/defun-count-33"
                  (eql 33 (m59-imp3--grep-c "src/xfaces.c" "^DEFUN (")))
 ;; Unit: LINES (`grep -c scm_c_public_ref src/xfaces.c' = 2).  1 after
@@ -393,8 +395,8 @@ file gives the symbol `m59-imp3-absent', which is a FAIL, not a pass."
                  (eql 2 (m59-imp3--grep-c "src/xfaces.c"
                                           "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -o scm_c_public_ref src/*.h src/*.c | wc -l').
-(m59-imp3--check "c/tree-wide-scm-ref-268"
-                 (eql 268 (m59-imp3--src-public-refs)))
+(m59-imp3--check "c/tree-wide-scm-ref-270"
+                 (eql 270 (m59-imp3--src-public-refs)))
 
 ;;; --- U4. The negative control ---------------------------------------
 

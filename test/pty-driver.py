@@ -1946,12 +1946,269 @@ M61_IMP1_CASES = (
     },
 )
 
+# M61 imp-2: 1 private termscript file per case.  The probe opens it with
+# open-termscript, reads it back, and the driver never touches it, so a
+# stale file can not make a case pass.
+def _m61_imp2_tsfile(name):
+    directory = tempfile.mkdtemp(prefix="m61-imp2-")
+    atexit.register(shutil.rmtree, directory, True)
+    return os.path.join(directory, name + ".termscript")
+
+
+# M61 imp-2: the flush and the termscript copy on the per-TTY handle.
+# The child runs on a real PTY and uses the 2 new operations of
+# (emacs tty-output).  The proof is real behavior: the probe reads the
+# termscript FILE it opened, and the driver reads the pty master.  No
+# source text is read.
+#
+# LIMIT: a termscript file records the COPIED bytes only, so it can not
+# observe the order of 2 writes on 2 different streams.  The order check
+# below is therefore: the copies reach the termscript stream in the order
+# of the operations.  The C order itself (output write first, copy second)
+# is a 1-line reading of m61_tty_handle_glyph_run_1 in src/term.c.
+M61_IMP2_BEGIN = b"M61-IMP2-BEGIN!"
+M61_IMP2_END = b"M61-IMP2-END!"
+M61_IMP2_FLUSH = b"M61-IMP2-FLUSH"
+M61_IMP2_TS_LEAF = b"M61-IMP2-TSLEAF"
+M61_IMP2_TS_GLYPH = b"M61-IMP2-TSGLYPH"
+M61_IMP2_TS_A = b"M61-IMP2-TS-A|"
+M61_IMP2_TS_B = b"M61-IMP2-TS-B|"
+M61_IMP2_ORD_A = b"M61-IMP2-ORD-A|"
+M61_IMP2_ORD_B = b"M61-IMP2-ORD-B|"
+M61_IMP2_SKIP = "m61-imp2-skip:"
+
+# The shared Scheme helpers: read a whole file as a string, and find the
+# first index of NEEDLE in TEXT at or after FROM (-1 when absent).  The
+# probe text lands inside ONE (begin ...), so these are internal defines.
+M61_IMP2_HELPERS = r"""
+(define (m61-imp2-slurp path)
+  (call-with-input-file path
+    (lambda (port)
+      (let loop ((acc '()))
+        (let ((ch (read-char port)))
+          (if (eof-object? ch)
+              (list->string (reverse acc))
+              (loop (cons ch acc))))))))
+(define (m61-imp2-index text needle from)
+  (let ((n (string-length needle)) (m (string-length text)))
+    (let loop ((i from))
+      (cond ((> (+ i n) m) -1)
+            ((string=? (substring text i (+ i n)) needle) i)
+            (else (loop (+ i 1)))))))
+"""
+
+M61_IMP2_HANDLE_PRELUDE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (handle (and term ((module-ref output 'tty-handle-from-device) term)))
+       (flush! (and handle (module-ref output 'tty-handle-flush)))
+       (copy! (and handle (module-ref output 'tty-handle-termscript)))
+       (open! (c 'open-termscript))
+       (ti (c 'insert))
+       (goto (c 'goto-char))
+       (pmax (c 'point-max))
+       (redisplay! (c 'redisplay))
+       (send (c 'send-string-to-terminal)))
+  (if (not handle)
+      "no-tty-handle"
+"""
+
+# A glyph run with NO trailing newline.  The bytes can reach the pty master
+# only when a flush of the ordered path runs, so their arrival in the pty
+# span IS the proof that the flush happened after the display.
+M61_IMP2_FLUSH_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
+    (begin
+      (send "@@BEGIN@@")
+      (goto (pmax))
+      (ti "@@NEEDLE@@")
+      (redisplay! #t)
+      (let ((rc (flush! handle))
+            ;; No termscript file is open in this case, so the copy leaf
+            ;; must answer 0: a plain count and NOT an error.  A session
+            ;; without a termscript stream is legal.
+            (none (copy! handle #vu8(65))))
+        (send "@@END@@")
+        (cond ((not (= rc 0)) "flush-answer")
+              ((not (= none 0)) "no-termscript-answer")
+              (else "ok"))))))
+"""
+
+# The 2 streams must hold the SAME bytes: the leaf copies a known payload
+# and must answer its exact count, and the normal glyph write of a real
+# redisplay must reach the termscript stream too.  The probe reads the
+# termscript FILE back, so a copy that is dropped FAILS.
+M61_IMP2_TS_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
+    (begin
+      (open! "@@TSFILE@@")
+      (let ((n (copy! handle #vu8(@@LEAFBYTES@@))))
+        (goto (pmax))
+        (ti "@@GLYPH@@")
+        (redisplay! #t)
+        (open! #nil)
+        (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
+               (i1 (m61-imp2-index text "@@LEAFSTR@@" 0))
+               (i2 (m61-imp2-index text "@@GLYPH@@" 0)))
+          (cond ((not (= n @@LEAFN@@)) "leaf-count")
+                ((< i1 0) "leaf-bytes-missing")
+                ((< i2 0) "glyph-bytes-missing")
+                (else "ok")))))))
+"""
+
+# The order contract: the termscript copy of one operation sits after the
+# copy of the operations that ran before it.  The probe writes A, then a
+# glyph run, then B, and reads the indices back from the termscript FILE.
+M61_IMP2_TS_ORDER_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
+    (begin
+      (open! "@@TSFILE@@")
+      (let ((na (copy! handle #vu8(@@ABYTES@@))))
+        (goto (pmax))
+        (ti "@@GLYPH@@")
+        (redisplay! #t)
+        (let ((nb (copy! handle #vu8(@@BBYTES@@))))
+          (open! #nil)
+          (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
+                 (ia (m61-imp2-index text "@@ASTR@@" 0))
+                 (ig (m61-imp2-index text "@@GLYPH@@" 0))
+                 (ib (m61-imp2-index text "@@BSTR@@" 0)))
+            (cond ((not (and (= na @@AN@@) (= nb @@BN@@))) "copy-count")
+                  ((< ia 0) "a-missing")
+                  ((< ig 0) "glyph-missing")
+                  ((< ib 0) "b-missing")
+                  ((not (< ia ig)) "glyph-before-a")
+                  ((not (< ig ib)) "b-before-glyph")
+                  (else "ok"))))))))
+"""
+
+# The byte-order contract of section 3 on BOTH streams: 2 glyph runs of 2
+# different strings must reach the output stream and the termscript stream
+# in the order of the runs.  The driver checks the pty master, the probe
+# checks the termscript FILE.
+M61_IMP2_BYTE_ORDER_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
+    (begin
+      (open! "@@TSFILE@@")
+      (goto (pmax))
+      (ti "@@A@@")
+      (redisplay! #t)
+      (goto (pmax))
+      (ti "@@B@@")
+      (redisplay! #t)
+      (send "@@END@@")
+      (open! #nil)
+      (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
+             (ia (m61-imp2-index text "@@A@@" 0))
+             (ib (m61-imp2-index text "@@B@@" 0)))
+        (cond ((not (= (copy! handle #vu8()) 0)) "empty-copy-count")
+              ((< ia 0) "a-missing")
+              ((< ib 0) "b-missing")
+              ((not (< ia ib)) "b-before-a")
+              (else "ok"))))))
+"""
+
+# The only case of this group that reports SKIP.  A short write of the
+# termscript stream needs a WRITE error on a regular file, and this host
+# offers no bounded way to force it (a full file system is not a test
+# fixture).  The output-stream retry of a short write is already proved by
+# m61-imp1/large-write-e2e.
+M61_IMP2_SHORT_PROBE = r"""
+(string-append "m61-imp2-skip: a short write of the termscript stream"
+               " can not be forced on this host")
+"""
+
+M61_IMP2_CASES = (
+    {
+        "name": "m61-imp2/byte-order-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_BYTE_ORDER_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("byteorder"),
+                  "A": M61_IMP2_ORD_A.decode(),
+                  "B": M61_IMP2_ORD_B.decode(),
+                  "END": M61_IMP2_END.decode()},
+        "expect": "ok",
+        # The ORDER of the 2 runs on the output stream: A, then B, then the
+        # end marker.  A driver that only looked for both needles would
+        # accept the wrong order.
+        "pty_in_order": (M61_IMP2_ORD_A, M61_IMP2_ORD_B, M61_IMP2_END),
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2/flush-order-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_FLUSH_PROBE,
+        "subst": {"BEGIN": M61_IMP2_BEGIN.decode(),
+                  "NEEDLE": M61_IMP2_FLUSH.decode(),
+                  "END": M61_IMP2_END.decode()},
+        "expect": "ok",
+        # A glyph run with no trailing newline reaches the pty only after a
+        # flush.  The needle is our own text, so pinning it is allowed.
+        "pty_contains": M61_IMP2_FLUSH,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2/termscript-agreement-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_TS_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("agreement"),
+                  "LEAFBYTES": " ".join(str(b) for b in M61_IMP2_TS_LEAF),
+                  "LEAFSTR": M61_IMP2_TS_LEAF.decode(),
+                  "LEAFN": str(len(M61_IMP2_TS_LEAF)),
+                  "GLYPH": M61_IMP2_TS_GLYPH.decode()},
+        "expect": "ok",
+        "pty_contains": M61_IMP2_TS_GLYPH,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2/termscript-order-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_TS_ORDER_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("order"),
+                  "ABYTES": " ".join(str(b) for b in M61_IMP2_TS_A),
+                  "ASTR": M61_IMP2_TS_A.decode(),
+                  "AN": str(len(M61_IMP2_TS_A)),
+                  "BBYTES": " ".join(str(b) for b in M61_IMP2_TS_B),
+                  "BSTR": M61_IMP2_TS_B.decode(),
+                  "BN": str(len(M61_IMP2_TS_B)),
+                  "GLYPH": M61_IMP2_TS_GLYPH.decode()},
+        "expect": "ok",
+        "pty_contains": M61_IMP2_TS_GLYPH,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2/short-write-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_SHORT_PROBE,
+        # NO placeholder and no pty byte: the case reports the SKIP itself.
+        "expect": "ok",
+        # The NARROW skip: only the probe's own prefix is an INFO skip.
+        "info_report_prefix": M61_IMP2_SKIP,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2/clean-exit-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_FLUSH_PROBE,
+        "subst": {"BEGIN": M61_IMP2_BEGIN.decode(),
+                  "NEEDLE": M61_IMP2_FLUSH.decode(),
+                  "END": M61_IMP2_END.decode()},
+        "expect": "ok",
+        "pty_contains": M61_IMP2_FLUSH,
+        # Exit 0 and the terminal mode restored.  The flush path changed,
+        # so the restore path is re-proved here, not assumed.
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
-         + M58_IMP4_CASES + M61_IMP1_CASES)
+         + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -1960,7 +2217,7 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
-          "m61-imp1")
+          "m61-imp1", "m61-imp2")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -2235,6 +2492,9 @@ def output_complete(case, output):
     needle = case.get("pty_contains")
     if needle is not None and needle not in output:
         return False
+    order = case.get("pty_in_order")
+    if order is not None and pty_order_index(output, order) is None:
+        return False
     span = case.get("output_span")
     if span is not None:
         start, end = span
@@ -2243,11 +2503,27 @@ def output_complete(case, output):
     return True
 
 
+def pty_order_index(output, needles):
+    """The position of the last needle when OUTPUT holds every needle of
+    NEEDLES in this order, else None.  M61 imp-2: the ORDER of the bytes
+    is a contract of section 3 of milestone.org, so a case that pins an
+    order must not accept the reverse order."""
+    pos = -1
+    for needle in needles:
+        pos = output.find(needle, pos + 1)
+        if pos < 0:
+            return None
+    return pos
+
+
 def check_output(case, got, output):
     """Check exact byte output or the reported size of a marked span."""
     needle = case.get("pty_contains")
     if needle is not None and needle not in output:
         return "pty output did not contain %r" % needle
+    order = case.get("pty_in_order")
+    if order is not None and pty_order_index(output, order) is None:
+        return "pty output did not hold %r in this order" % (order,)
     span = case.get("output_span")
     if span is not None:
         start, end = span
@@ -2897,7 +3173,8 @@ def selftest():
     check("m58-imp3-case-count", len(group_cases("m58-imp3")), 5)
     check("m58-imp4-case-count", len(group_cases("m58-imp4")), 1)
     check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
-    check("total-case-count", len(CASES), 36)
+    check("m61-imp2-case-count", len(group_cases("m61-imp2")), 6)
+    check("total-case-count", len(CASES), 42)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),

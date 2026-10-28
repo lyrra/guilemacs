@@ -199,8 +199,10 @@ regression, and must not turn the gate red."
                        (kg (m45-imp1--lines "src/keyboard-globals.c")))
                    (and (integerp kb) (integerp kg)
                         (eql 237 (- 11960 (+ kb kg))))))
-(m45-imp1--check "scm-c-public-ref-268"
-                 (eql 268 (m45-imp1--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m45-imp1--check "scm-c-public-ref-270"
+                 (eql 270 (m45-imp1--count-scm-ref)))
 (m45-imp1--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp1--lines "mod/emacs/tty-modes.scm")))
 (m45-imp1--check "callproc.c-lines-2387"

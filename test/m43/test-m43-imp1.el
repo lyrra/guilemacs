@@ -155,8 +155,10 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 38990 (m43-imp1--lines "src/xdisp.c")))
 (m43-imp1--check "xdisp.c-defuns-24"
                  (eql 24 (m43-imp1--count "src/xdisp.c" "^DEFUN (\"")))
-(m43-imp1--check "scm-c-public-ref-268"
-                 (eql 268 (m43-imp1--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m43-imp1--check "scm-c-public-ref-270"
+                 (eql 270 (m43-imp1--count-scm-ref)))
 (m43-imp1--check "gobble.scm-lines-303"
                  (eql 303 (m43-imp1--lines "mod/emacs/gobble.scm")))
 

@@ -339,12 +339,12 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
                        "test/pty-driver.py"
                        ;; M61 imp-1 re-pin: the aggregate now names the
                        ;; m61-imp1 group after M58_IMP4_CASES.
-                       "+ M58_IMP4_CASES + M61_IMP1_CASES)")))
+                       "+ M61_IMP1_CASES + M61_IMP2_CASES)")))
 
-(m58-imp4--check "pty/case-counts-36"
+(m58-imp4--check "pty/case-counts-42"
                  (let ((pins (m58-imp4--pty-case-pins)))
                    (and (consp pins)
-                        (eql 36 (car pins))
+                        (eql 42 (car pins))
                         (eql (car pins) (cdr pins)))))
 
 (m58-imp4--check "pty/case-pins-value-not-bytes"
@@ -462,31 +462,31 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (setq m58-imp4--group 't5)
 
-(m58-imp4--check "repin/imp1-cases-36"
+(m58-imp4--check "repin/imp1-cases-42"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-36\"")
+                                        "\"pty-driver-cases-42\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 36 (car pins))")))
+                                        "(eql 42 (car pins))")))
 
-(m58-imp4--check "repin/imp2-cases-36"
+(m58-imp4--check "repin/imp2-cases-42"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "\"pty-case-counts-36\"")
+                                        "\"pty-case-counts-42\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "(eql 36 (car pins))")
+                                        "(eql 42 (car pins))")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
                                         "\"imp1-repinned-36\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "pty-driver-cases-36")))
+                                        "pty-driver-cases-42")))
 
-(m58-imp4--check "repin/imp3-cases-36"
+(m58-imp4--check "repin/imp3-cases-42"
                  (and (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "\"pty/case-counts-36\"")
+                                        "\"pty/case-counts-42\"")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "(eql 36 (car pins))")
+                                        "(eql 42 (car pins))")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-driver-cases-36")
+                                        "pty-driver-cases-42")
                       (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-case-counts-36")))
+                                        "pty-case-counts-42")))
 
 (defun m58-imp4--stale-pinners (needles)
   "Return the base names of the test/*/m*/*.el files that hold a NEEDLE."
@@ -676,8 +676,10 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;;   mod/emacs/tty-output.scm      682 lines (HEAD: 637)
 (setq m58-imp4--group 't9)
 
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m58-imp4--check "surface/term-c-lines"
-                 (eql 6738 (m58-imp4--count "src/term.c" "\n")))
+                 (eql 7094 (m58-imp4--count "src/term.c" "\n")))
 
 (defun m58-imp4--src-public-refs ()
   "Count the scm_c_public_ref sites in every src/*.c and src/*.h file."
@@ -692,11 +694,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
     n))
 
 (m58-imp4--check "surface/public-refs"
-                 (and (eql 42 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
-                      (eql 268 (m58-imp4--src-public-refs))))
+                 (and (eql 44 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
+                      (eql 270 (m58-imp4--src-public-refs))))
 
 (m58-imp4--check "surface/module-lines"
-                 (eql 860 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))
+                 (eql 906 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))
 
 ;; The negative control (brief.org section 7): with
 ;; tty-color-mode-changed-p forced to 0, the case reports "8 8 8", not

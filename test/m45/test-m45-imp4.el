@@ -144,8 +144,10 @@ of the presence of docs/."
                  (eql 7 (m45-imp4--count "src/callproc.c" "^DEFUN (\"")))
 (m45-imp4--check "callproc.c-scm-ref-4"
                  (eql 4 (m45-imp4--count "src/callproc.c" "scm_c_public_ref")))
-(m45-imp4--check "scm-c-public-ref-268"
-                 (eql 268 (m45-imp4--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m45-imp4--check "scm-c-public-ref-270"
+                 (eql 270 (m45-imp4--count-scm-ref)))
 (m45-imp4--check "sysdep.c-lines-4950"
                  (eql 4950 (m45-imp4--lines "src/sysdep.c")))
 (m45-imp4--check "sysdep.c-defuns-7"

@@ -200,7 +200,7 @@ host limit is a skip, never a pass (brief.org section 2)."
                        "\"m56-imp2-case-count\", len(group_cases(\"m56-imp2\")), 1")
                       (m56-imp2--contains-p
                        "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 36")))
+                       "\"total-case-count\", len(CASES), 42")))
 (m56-imp2--check "output-span"
                  (m56-imp2--contains-p
                   "test/pty-driver.py"

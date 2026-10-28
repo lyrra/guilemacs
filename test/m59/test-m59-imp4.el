@@ -447,6 +447,8 @@ file gives the symbol `m59-imp4-absent', which is a FAIL, not a pass."
 (m59-imp4--check "c/callers-5"
                  (eql 6 (m59-imp4--count "src/xfaces.c" "Fbitmap_spec_p")))
 ;; Unit: LINES (`grep -c "^DEFUN ("' = 33: this imp adds NO DEFUN.
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m59-imp4--check "c/defun-count-33"
                  (eql 33 (m59-imp4--grep-c "src/xfaces.c" "^DEFUN (")))
 ;; Unit: LINES (`grep -c scm_c_public_ref src/xfaces.c' = 2).
@@ -454,8 +456,8 @@ file gives the symbol `m59-imp4-absent', which is a FAIL, not a pass."
                  (eql 2 (m59-imp4--grep-c "src/xfaces.c"
                                           "scm_c_public_ref")))
 ;; Unit: OCCURRENCES (`grep -o scm_c_public_ref src/*.h src/*.c | wc -l').
-(m59-imp4--check "c/tree-wide-scm-ref-268"
-                 (eql 268 (m59-imp4--src-public-refs)))
+(m59-imp4--check "c/tree-wide-scm-ref-270"
+                 (eql 270 (m59-imp4--src-public-refs)))
 ;; The re-pin moves the VALUE and the NAME together (brief.org section
 ;; 9).  A check that still says -260 pins 267, so a failure report names
 ;; the wrong count (cr.org F4).  This guard computes the current count

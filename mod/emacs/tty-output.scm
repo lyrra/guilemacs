@@ -100,7 +100,9 @@
             tty-handle-write-all tty-handle-write-all-with
             tty-handle-write-all-borrowed
             tty-handle-write-verdict
-            tty-handle-from-device))
+            tty-handle-from-device
+            tty-handle-flush tty-handle-flush-borrowed
+            tty-handle-termscript tty-handle-termscript-borrowed))
 
 ;; The typed C leaves of src/term.c.
 (defelisp %--tty-emit-cap   --tty-emit-cap)
@@ -725,6 +727,11 @@
 ;; fixnum identity only.
 (defelisp %--tty-handle --tty-handle)
 
+;; The 2 typed C leaves of imp-2: the flush of the output stream and the
+;; copy to the termscript stream.  Both take the plain identity fixnum.
+(defelisp %--tty-handle-flush --tty-handle-flush)
+(defelisp %--tty-handle-termscript --tty-handle-termscript)
+
 (define tty-handle-tag 'tty-handle)
 
 ;; The 5 handle states of docs/m61-plan.org section 2.2, in the order of
@@ -858,3 +865,42 @@
   (if (or (not (integer? identity)) (< identity 0))
       -9                                    ; -EBADF
       (tty-handle-write-all (make-tty-handle identity 'borrowed) bytes)))
+
+;; --- M61 imp-2: the flush and the termscript copy ---------------------
+;;
+;; 2 more operations of the ordered output path.  Scheme checks that the
+;; handle is open; C keeps the FILE *, the fflush, the position of the
+;; flush and the fwrite of the copy.  A state change still builds a NEW
+;; handle value, and the module holds no module-level mutable state.
+
+;; Flush the output stream that H names.  Return the leaf's plain fixnum:
+;; 0 on success, or the negated errno (-EBADF for a closed or unknown
+;; identity, -EINVAL when the tty holds no output stream).
+(define (tty-handle-flush h)
+  (tty-handle-check-open h)
+  ((force %--tty-handle-flush) (tty-handle-id h)))
+
+;; Copy the plain bytevector BYTES to the termscript stream that H names.
+;; Return the leaf's plain fixnum: the fwrite count, or the negated errno.
+;; A tty with no termscript stream answers 0, a plain count and NOT an
+;; error: a session without tty->termscript is legal.
+(define (tty-handle-termscript h bytes)
+  (tty-handle-check-open h)
+  ((force %--tty-handle-termscript) (tty-handle-id h) bytes))
+
+;; The C-facing form of the flush.  The routed flush in src/term.c passes
+;; the plain identity fixnum, so C holds no handle value and no state.  The
+;; literal -9 is -EBADF on Linux only; src/term.c holds the same value, and
+;; a host with a different EBADF must change both sites.
+(define (tty-handle-flush-borrowed identity)
+  (if (or (not (integer? identity)) (< identity 0))
+      -9                                    ; -EBADF
+      (tty-handle-flush (make-tty-handle identity 'borrowed))))
+
+;; The C-facing form of the termscript copy, the same shape.  C passes the
+;; SAME bytevector that it gave to the output write of the glyph run, so
+;; the run holds ONE copy of the bytes.
+(define (tty-handle-termscript-borrowed identity bytes)
+  (if (or (not (integer? identity)) (< identity 0))
+      -9                                    ; -EBADF
+      (tty-handle-termscript (make-tty-handle identity 'borrowed) bytes)))

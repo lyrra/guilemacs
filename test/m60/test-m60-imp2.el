@@ -441,8 +441,10 @@ host limit is a skip, never a pass."
 
 
 ;; Unit: OCCURRENCES over src/*.[ch].  MEASURED: 267.
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m60-imp2--check "r1/tree-wide-scm-ref"
-                 (eql 268 (m60-imp2--count-scm-ref)))
+                 (eql 270 (m60-imp2--count-scm-ref)))
 
 
 ;; The 2 fixtures of this imp.  An absent fixture must FAIL here, not be

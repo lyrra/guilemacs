@@ -157,8 +157,10 @@ FAIL with no ERT test would leave the exit code 0 (cr.org finding
                  (eql 0 (m47-imp6--count "src/fileio.c" "OPEN (cr\\.org")))
 (m47-imp6--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp6--lines "mod/emacs/fileio.scm")))
-(m47-imp6--check "tree-wide-scm-public-ref-268"
-                 (eql 268 (m47-imp6--count-scm-ref)))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m47-imp6--check "tree-wide-scm-public-ref-270"
+                 (eql 270 (m47-imp6--count-scm-ref)))
 (m47-imp6--check "keyboard.c-lines-11233"
                  (eql 11233 (m47-imp6--lines "src/keyboard.c")))
 (m47-imp6--check "keyboard.c-defuns-447"

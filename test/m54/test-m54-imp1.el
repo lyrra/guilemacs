@@ -192,23 +192,25 @@ pass."
 ;; (--tty-handle, --tty-handle-write), the C identity table, and the
 ;; routed normal write, so the surface numbers changed.  Measured at
 ;; HEAD + M61 imp-1; do not copy them from this comment.
-(m54-imp1--check "term.c-lines-6738"
-                 (eql 6738 (m54-imp1--lines "src/term.c")))
+;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
+;; flush/termscript sites moved the surface.  MEASURED on this tree.
+(m54-imp1--check "term.c-lines-7094"
+                 (eql 7094 (m54-imp1--lines "src/term.c")))
 ;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m54-imp1--check "term.c-defun-count-31"
-                 (eql 31 (m54-imp1--count "src/term.c" "^DEFUN (")))
+(m54-imp1--check "term.c-defun-count-33"
+                 (eql 33 (m54-imp1--count "src/term.c" "^DEFUN (")))
 ;; Row 3: the 4 --tty-* leaf DEFUNs.
-(m54-imp1--check "term.c-leaf-defun-count-6"
-                 (eql 6 (m54-imp1--count-defun-leaf "src/term.c")))
+(m54-imp1--check "term.c-leaf-defun-count-8"
+                 (eql 8 (m54-imp1--count-defun-leaf "src/term.c")))
 ;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m54-imp1--check "term.c-scm-ref-42"
-                 (eql 42 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
+(m54-imp1--check "term.c-scm-ref-44"
+                 (eql 44 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
 ;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m54-imp1--check "tty-output.scm-lines-860"
-                 (eql 860 (m54-imp1--lines "mod/emacs/tty-output.scm")))
+(m54-imp1--check "tty-output.scm-lines-906"
+                 (eql 906 (m54-imp1--lines "mod/emacs/tty-output.scm")))
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp1--check "tree-wide-scm-ref-268"
-                 (eql 268 (m54-imp1--count-scm-ref)))
+(m54-imp1--check "tree-wide-scm-ref-270"
+                 (eql 270 (m54-imp1--count-scm-ref)))
 
 ;;; --- S2. The 3 stream fields and the boundary rule ------------------
 
@@ -249,57 +251,62 @@ pass."
 ;; string per stream operation, in file order: every output / termscript
 ;; write, every flush, the read handle, the open / close, the init, and
 ;; the size / baud queries.  A re-ordered or removed path breaks the
-;; run.  A repeated identical form (for example the 6 live
-;; `fflush (tty->output);' sites, or the 3 conversion_buffer output
-;; writes) appears once per occurrence, so the removal of one site is
-;; caught too.
+;; run.  A repeated identical form (for example the 6 routed
+;; `m61_tty_handle_flush_1 (tty);' sites, or the 3 glyph-run calls)
+;; appears once per occurrence, so the removal of one site is caught
+;; too.
 
 (setq m54-imp1--group 's3)
 
 (m54-imp1--check "site-map-ordered-operations"
                  (m54-imp1--ordered-p
                   "src/term.c"
-                  '("fflush (tty->output);"
-                    "fwrite (SDATA (string), 1, SBYTES (string), tty->output);"
-                    "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);"
-                    "fflush (tty->output);"
-                    "fflush (tty->output);"
-                    "fflush (tty->output);"
-                    "putc (' ', tty->termscript);"
-                    "putc (' ', tty->output);"
-                    ;; M61 imp-1: the normal glyph write of the 3 hubs
-                    ;; goes through the per-TTY handle; the termscript
-                    ;; copy stays at its call site.
-                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
-                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
-                    "m61_tty_handle_write_1 (tty, conversion_buffer,"
-                    "fwrite (conversion_buffer, 1, coding->produced, tty->termscript);"
-                    "f = t->display_info.tty->input;"
-                    "emacs_fclose (t->display_info.tty->output);"
-                    "fflush (tty->output);"
-                    "fflush (tty->output);"
-                    "tty->input = tty->output"
-                    "add_keyboard_wait_descriptor (fileno (tty->input));"
-                    "get_tty_size (fileno (tty->input), &width, &height);"
-                    "init_baud_rate (fileno (tty->input));"
-                    "tty->output = stdout;"
-                    "tty->input = stdin;"
-                    "get_tty_size (fileno (tty->input), &width, &height);"
-                    ;; M54 imp-4 moved the tab policy to Scheme: the site
-                    ;; is now the seam call, not the old C one-liner.
-                    "m54_tty_tabs_verdict_scheme (tabs_safe ? Qt : Qnil,"
-                    "init_baud_rate (fileno (tty->input));"
-                    "delete_keyboard_wait_descriptor (fileno (tty->input));"
-                    "emacs_fclose (tty->input);"
-                    "emacs_fclose (tty->output);"
-                    "emacs_fclose (tty->termscript);"
-                    "m52_tty_write_1 (struct tty_display_info *tty"
-                    "fwrite (str, 1, len, tty->output);"
-                    "fwrite (str, 1, len, tty->termscript);"
-                    "m52_tty_emit_cap_1 (struct tty_display_info *tty"
-                    "fflush (tty->output)")))
+                  '(
+                   ;; M61 imp-2: the 6 routed flush sites ask Scheme for
+                   ;; the order decision, and the fflush itself stays C
+                   ;; in the ONE mechanism m61_tty_output_flush_1.
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "fwrite (SDATA (string), 1, SBYTES (string), tty->output);"
+                   "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);"
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "putc (' ', tty->termscript);"
+                   "putc (' ', tty->output);"
+                   ;; M61 imp-2: the 2 mechanisms of the ordered path (the
+                   ;; termscript copy and the flush) and the ONE glyph-run
+                   ;; entry point of the 3 hubs.  The hub call replaces the
+                   ;; old write call plus its bare termscript fwrite.
+                   "m61_tty_output_write_1 (struct tty_display_info *tty,"
+                   "m61_tty_output_termscript_1 (struct tty_display_info *tty,"
+                   "m61_tty_output_flush_1 (struct tty_display_info *tty)"
+                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
+                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
+                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
+                   "f = t->display_info.tty->input;"
+                   "emacs_fclose (t->display_info.tty->output);"
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "(void) m61_tty_handle_flush_1 (tty);"
+                   "tty->input = tty->output"
+                   "add_keyboard_wait_descriptor (fileno (tty->input));"
+                   "get_tty_size (fileno (tty->input), &width, &height);"
+                   "init_baud_rate (fileno (tty->input));"
+                   "tty->output = stdout;"
+                   "tty->input = stdin;"
+                   "get_tty_size (fileno (tty->input), &width, &height);"
+                   ;; M54 imp-4 moved the tab policy to Scheme: the site
+                   ;; is now the seam call, not the old C one-liner.
+                   "m54_tty_tabs_verdict_scheme (tabs_safe ? Qt : Qnil,"
+                   "init_baud_rate (fileno (tty->input));"
+                   "delete_keyboard_wait_descriptor (fileno (tty->input));"
+                   "emacs_fclose (tty->input);"
+                   "emacs_fclose (tty->output);"
+                   "emacs_fclose (tty->termscript);"
+                   "m52_tty_write_1 (struct tty_display_info *tty"
+                   "fwrite (str, 1, len, tty->output);"
+                   "fwrite (str, 1, len, tty->termscript);"
+                   "m52_tty_emit_cap_1 (struct tty_display_info *tty"
+                   "fflush (tty->output)")))
 ;; The 4 --tty-* leaf DEFUNs (brief.org section 4.3).
 (m54-imp1--check "leaf-defuns"
                  (m54-imp1--holds-all
