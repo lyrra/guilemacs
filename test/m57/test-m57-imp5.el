@@ -134,15 +134,6 @@ ORDER: each search starts after the previous match."
   "Non-nil when the TRACKED file REL (repo-root-relative) exists."
   (file-exists-p (expand-file-name rel m57-imp5--root)))
 
-(defun m57-imp5--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m57-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m57-imp5--count (rel regexp)
   "Count the matches of REGEXP in REL."
   (m57-imp5--with rel
@@ -165,12 +156,6 @@ to nil and the check FAILS."
           (goto-char (point-min))
           (while (search-forward "\n" end t) (setq n (1+ n)))
           n)))))
-
-(defun m57-imp5--count-defun-leaf (rel)
-  "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 3)."
-  (m57-imp5--count rel "^DEFUN (\"--tty-"))
 
 (defun m57-imp5--count-scm-ref ()
   "Count scm_c_public_ref over src/*.[ch] (the brief.org section 3
@@ -251,25 +236,19 @@ host limit is a skip, never a pass (brief.org section 7)."
 
 (setq m57-imp5--group 's1)
 
+;; M61 imp-2b (milestone.org findings F2): the src/term.c and
+;; mod/emacs/tty-output.scm source-text pins (the line counts, the
+;; ^DEFUN ( count, the --tty-* leaf count and the scm_c_public_ref
+;; count) are REMOVED, not re-pinned.  A test proves behavior; it must
+;; not read source text.
+
 (let ((ok (m57-imp5--ancestor-p "e2423fcb0" "HEAD")))
   (if (eq ok 'm57-imp5-prog-absent)
       (m57-imp5--info-skip "head-e2423fcb0" "no git binary on PATH")
     (m57-imp5--check "head-e2423fcb0" ok)))
 
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m57-imp5--check "term.c-lines-7094"
-                 (eql 7094 (m57-imp5--lines "src/term.c")))
-(m57-imp5--check "term.c-defun-count-33"
-                 (eql 33 (m57-imp5--count "src/term.c" "^DEFUN (")))
-(m57-imp5--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m57-imp5--count-defun-leaf "src/term.c")))
-(m57-imp5--check "term.c-scm-ref-44"
-                 (eql 44 (m57-imp5--count "src/term.c" "scm_c_public_ref")))
 (m57-imp5--check "tree-wide-scm-ref-270"
                  (eql 270 (m57-imp5--count-scm-ref)))
-(m57-imp5--check "tty-output.scm-lines-906"
-                 (eql 906 (m57-imp5--lines "mod/emacs/tty-output.scm")))
 (m57-imp5--check "termchar-file-streams-3"
                  (and (eql 51 (m57-imp5--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m57-imp5--line-of "src/termchar.h" "FILE \\*output;"))
@@ -277,15 +256,6 @@ host limit is a skip, never a pass (brief.org section 7)."
 (m57-imp5--check "pty-driver-cases-42"
                  (m57-imp5--contains-p
                   "test/pty-driver.py" "\"total-case-count\", len(CASES), 42"))
-;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
-;; the M61 notes of test-m57-imp1.el added 5 lines, so 483 -> 488.
-;; Measured with `wc -l test/m57/test-m57-imp1.el`.
-(m57-imp5--check "imp1-corpus-lines-503"
-                 ;; M61 imp-2 re-pin: the imp-1 corpus re-pinned 3 moved
-                 ;; source-text needles, so it grew 488 -> 503 lines.
-                 ;; Measured with `wc -l test/m57/test-m57-imp1.el`.
-                 (eql 503 (m57-imp5--lines "test/m57/test-m57-imp1.el")))
-
 ;;; --- S2. The C2 result (brief.org section 3) ------------------------
 
 ;; The C2 result, pinned against the TRACKED C source (NOT docs/).  The
@@ -493,12 +463,12 @@ host limit is a skip, never a pass (brief.org section 7)."
 ;; tests, so a green m57 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 10 checks,
+;; because every check is registered at load time.  S1 holds 4 checks,
 ;; S2 holds 13, S3 holds 2, and S4 holds 4.
 
 (setq m57-imp5--group 's5)
 
-(m57-imp5--check "reg/min-s1-checks-10" (>= (m57-imp5--group-count 's1) 10))
+(m57-imp5--check "reg/min-s1-checks-4" (>= (m57-imp5--group-count 's1) 4))
 (m57-imp5--check "reg/min-s2-checks-13" (>= (m57-imp5--group-count 's2) 13))
 (m57-imp5--check "reg/min-s3-checks-2" (>= (m57-imp5--group-count 's3) 2))
 (m57-imp5--check "reg/min-s4-checks-4" (>= (m57-imp5--group-count 's4) 4))
@@ -506,13 +476,13 @@ host limit is a skip, never a pass (brief.org section 7)."
 ;;; --- The group-total check ------------------------------------------
 
 ;; The measured count of m57-imp5 tests is 34: 33 registered checks
-;; (S1 10, S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; (S1 4, S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.
 
-(defvar m57-imp5--min-gate-total 34
-  "The exact number of m57-imp5 ERT tests: 33 registered checks (S1 10,
+(defvar m57-imp5--min-gate-total 28
+  "The exact number of m57-imp5 ERT tests: 33 registered checks (S1 4,
 S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
 
 (ert-deftest m57-imp5/gate-m57-total ()

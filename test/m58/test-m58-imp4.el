@@ -53,7 +53,7 @@
 ;;;         4 checks.
 ;;;   T9 -- the surface re-pins (measured, not copied), the record
 ;;;         of the negative control, and the 3 limits L3 / L4 / L5.
-;;;         T9 holds 5 checks.
+;;;         T9 holds 3 checks.
 ;;;
 ;;; This corpus reads TRACKED files only (src/, mod/, test/, and
 ;;; tool/run-tests.scm).  It does NOT read docs/ (docs/kb.org
@@ -678,9 +678,6 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 ;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m58-imp4--check "surface/term-c-lines"
-                 (eql 7094 (m58-imp4--count "src/term.c" "\n")))
-
 (defun m58-imp4--src-public-refs ()
   "Count the scm_c_public_ref sites in every src/*.c and src/*.h file."
   (let ((dir (expand-file-name "src" m58-imp4--root))
@@ -693,12 +690,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
           (setq n (1+ n)))))
     n))
 
+;; M61 imp-2b (milestone.org findings F2): the src/term.c
+;; scm_c_public_ref pin is REMOVED.  The tree-wide count stays: this act
+;; adds no public reference.
 (m58-imp4--check "surface/public-refs"
-                 (and (eql 44 (m58-imp4--count "src/term.c" "scm_c_public_ref"))
-                      (eql 270 (m58-imp4--src-public-refs))))
-
-(m58-imp4--check "surface/module-lines"
-                 (eql 906 (m58-imp4--count "mod/emacs/tty-output.scm" "\n")))
+                 (eql 270 (m58-imp4--src-public-refs)))
 
 ;; The negative control (brief.org section 7): with
 ;; tty-color-mode-changed-p forced to 0, the case reports "8 8 8", not
@@ -738,7 +734,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 (m58-imp4--check "reg/min-t5-checks-5" (>= (m58-imp4--group-count 't5) 5))
 (m58-imp4--check "reg/min-t7-checks-4" (>= (m58-imp4--group-count 't7) 4))
 (m58-imp4--check "reg/min-t8-checks-4" (>= (m58-imp4--group-count 't8) 4))
-(m58-imp4--check "reg/min-t9-checks-5" (>= (m58-imp4--group-count 't9) 5))
+(m58-imp4--check "reg/min-t9-checks-3" (>= (m58-imp4--group-count 't9) 3))
 (m58-imp4--check "reg/min-t6-prior-checks-8"
                  ;; This guard counts 8 prior guards; it becomes the 9th.
                  (>= (m58-imp4--group-count 't6) 8))
@@ -746,14 +742,14 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;;; --- The group-total check ------------------------------------------
 
 ;; The measured count of m58-imp4 tests: 41 registered checks (T1 5,
-;; T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 5) plus the
+;; T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 3) plus the
 ;; group-total deftest itself.  The T3 and T7 checks may fold to a
 ;; controlled INFO skip on a host with no built src/emacs, no PTY, or
 ;; no guile, and a controlled skip is still a registered test.
 
-(defvar m58-imp4--gate-total 42
+(defvar m58-imp4--gate-total 40
   "The EXACT number of m58-imp4 ERT tests: 41 registered checks (T1 5,
-T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 5) plus the group-total
+T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 3) plus the group-total
 deftest itself.  The guard uses `equal', not `>=', so a DUPLICATE
 registration fails too.")
 

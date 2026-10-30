@@ -15,8 +15,8 @@
 ;;;         base HEAD fa11385b3: src/term.c (6,214 lines, 29 ^DEFUN (,
 ;;;         4 --tty-* leaf DEFUNs, 36 scm_c_public_ref sites); the 454
 ;;;         lines of mod/emacs/tty-output.scm; and the tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] (260).  S1 holds 6
-;;;         checks.
+;;;         scm_c_public_ref count over src/*.[chm] (260).  S1 holds 1
+;;;         check.
 ;;;   S2 -- CHECK 1, the standalone loader.  A plain `guile' process
 ;;;         (no Emacs C core) loads (emacs loader) and (emacs reader);
 ;;;         a real Elisp file loads through the Scheme loader; and the
@@ -106,15 +106,6 @@ once, so a multi-needle check does not re-read the file per needle."
   "Non-nil when the TRACKED file REL (repo-root-relative) exists."
   (file-exists-p (expand-file-name rel m53-imp1--root)))
 
-(defun m53-imp1--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m53-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m53-imp1--count (rel regexp)
   "Count the matches of REGEXP in REL."
   (m53-imp1--with rel
@@ -123,12 +114,6 @@ once, so a multi-needle check does not re-read the file per needle."
       (let ((n 0))
         (while (re-search-forward regexp nil t) (setq n (1+ n)))
         n))))
-
-(defun m53-imp1--count-defun-leaf (rel)
-  "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 5)."
-  (m53-imp1--count rel "^DEFUN (\"--tty-"))
 
 (defun m53-imp1--count-scm-ref ()
   "Count scm_c_public_ref over src/*.[chm] (the brief.org section 5
@@ -224,23 +209,12 @@ probe: the loader must read and evaluate a real Elisp file."
 
 (setq m53-imp1--group 's1)
 
-;; Row 1: src/term.c lines = 6,214.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m53-imp1--check "term.c-lines-7094"
-                 (eql 7094 (m53-imp1--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m53-imp1--check "term.c-defun-count-33"
-                 (eql 33 (m53-imp1--count "src/term.c" "^DEFUN (")))
-;; Row 3: the 4 --tty-* leaf DEFUNs.
-(m53-imp1--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m53-imp1--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m53-imp1--check "term.c-scm-ref-44"
-                 (eql 44 (m53-imp1--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m53-imp1--check "tty-output.scm-lines-906"
-                 (eql 906 (m53-imp1--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2b (milestone.org findings F2): the src/term.c and
+;; mod/emacs/tty-output.scm source-text pins (the line counts, the
+;; ^DEFUN ( count, the --tty-* leaf count and the scm_c_public_ref
+;; count) are REMOVED, not re-pinned.  A test proves behavior; it must
+;; not read source text.
+
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
 (m53-imp1--check "tree-wide-scm-ref-270"
                  (eql 270 (m53-imp1--count-scm-ref)))
@@ -321,12 +295,12 @@ probe: the loader must read and evaluate a real Elisp file."
 ;; tests, so a green m53 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 6 checks,
+;; because every check is registered at load time.  S1 holds 1 check,
 ;; S2 holds 6, S3 holds 3, and S4 holds 4.
 
 (setq m53-imp1--group 's5)
 
-(m53-imp1--check "reg/min-s1-checks-6" (>= (m53-imp1--group-count 's1) 6))
+(m53-imp1--check "reg/min-s1-checks-1" (>= (m53-imp1--group-count 's1) 1))
 (m53-imp1--check "reg/min-s2-checks-6" (>= (m53-imp1--group-count 's2) 6))
 (m53-imp1--check "reg/min-s3-checks-3" (>= (m53-imp1--group-count 's3) 3))
 (m53-imp1--check "reg/min-s4-checks-4" (>= (m53-imp1--group-count 's4) 4))
@@ -334,14 +308,14 @@ probe: the loader must read and evaluate a real Elisp file."
 ;;; --- The group-total check ------------------------------------------
 
 ;; The floor is the measured count of m53-imp1 tests: 23 registered
-;; checks (S1 6, S2 6, S3 3, S4 4, S5 4) plus the group-total deftest
+;; checks (S1 1, S2 6, S3 3, S4 4, S5 4) plus the group-total deftest
 ;; itself.  The two S2 guile checks may fold to a controlled INFO skip
 ;; on a host with no guile binary, and a controlled skip is still a
 ;; registered test, so the floor holds either way.  This is a coarse
 ;; net, not a tight bound; the per-group reg/min-* guards are the tight
 ;; check.
 
-(defvar m53-imp1--min-gate-total 23
+(defvar m53-imp1--min-gate-total 18
   "The minimum number of m53-imp1 ERT tests: 23 registered checks plus
 the group-total deftest, allowing one slack for a folded skip.")
 

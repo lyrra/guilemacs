@@ -227,32 +227,15 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 
 (setq m52-imp9--group 's1)
 
-;; Row 1: src/term.c lines = 6,214.
-;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
-;; (--tty-handle, --tty-handle-write), the C identity table, and moved
-;; the 3 normal glyph output writes into the ONE handle leaf, so the
-;; surface numbers changed.  Do not copy them from this comment.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m52-imp9--check "term.c-lines-7094"
-                 (eql 7094 (m52-imp9--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 31.
-(m52-imp9--check "term.c-defun-count-33"
-                 (eql 33 (m52-imp9--count "src/term.c" "^DEFUN (")))
-;; Row 3: the 6 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
-;; leaf tokens (each name also occurs in a sibling docstring).
-(m52-imp9--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m52-imp9--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c fwrite ( count = 8: the 3 normal glyph output
-;; writes moved into the ONE handle leaf, and the leaf holds 1 fwrite.
-(m52-imp9--check "term.c-fwrite-count-6"
-                 (eql 6 (m52-imp9--count "src/term.c" "fwrite (")))
-;; Row 5: src/term.c scm_c_public_ref sites = 36.
-(m52-imp9--check "term.c-scm-ref-44"
-                 (eql 44 (m52-imp9--count "src/term.c" "scm_c_public_ref")))
-;; Row 6: mod/emacs/tty-output.scm lines = 454.
-(m52-imp9--check "tty-output.scm-lines-906"
-                 (eql 906 (m52-imp9--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2b (milestone.org findings F2): rows 1 to 6 held the
+;; source-text pins of src/term.c (lines, ^DEFUN ( count, --tty-* leaf
+;; count, fwrite count, scm_c_public_ref sites) and of
+;; mod/emacs/tty-output.scm (lines).  They are REMOVED, not re-pinned.  A
+;; source-inspection test proves no behavior and rejects a valid refactor
+;; (docs/milestone-overview.org =Test rules for ports=, docs/arch.org
+;; =Testing=).  The measured numbers live in the commit message of M61
+;; imp-2b.  Row 7, the export names, stays: it proves that a name the
+;; module publishes still resolves.
 ;; Row 7: the 34 #:export names of the module, one check per name.
 ;; The 8 M54 names (tty-write-verdict, tty-termscript-copy-handle,
 ;; tty-tab-verdict, and the tty-out-handle accessors) come first, then the
@@ -323,13 +306,15 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; tests, so a green m52 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 43 checks;
-;; S2 holds 4 checks.
+;; because every check is registered at load time.  S1 holds 37 checks;
+;; S2 holds 4 checks.  S1 held 43 until M61 imp-2b removed the 6
+;; source-text pins (milestone.org findings F2); the guard name and its
+;; bound moved with the count.
 
 (setq m52-imp9--group nil)
 
-(m52-imp9--check "reg/min-s1-checks-43"
-                 (>= (m52-imp9--group-count 's1) 43))
+(m52-imp9--check "reg/min-s1-checks-37"
+                 (>= (m52-imp9--group-count 's1) 37))
 (m52-imp9--check "reg/min-s2-checks-4"
                  (>= (m52-imp9--group-count 's2) 4))
 
@@ -355,10 +340,15 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; whole-corpus or load-order loss.  The corpus reads no docs/, so the
 ;; total does not depend on docs/.
 
-(defvar m52-imp9--min-gate-total 72
+;;
+;; M61 imp-2b lowered the floor from 72 to 66 when findings F2 removed the
+;; 6 source-text pins of this corpus.
+
+(defvar m52-imp9--min-gate-total 66
   "The minimum number of ERT tests the m52 group registers: the measured
 total (80) minus the 8 gated m52 pty cases (imp-3 holds 3; imp-4 ..
-imp-8 hold 1 each).")
+imp-8 hold 1 each), minus the 6 source-text pins that M61 imp-2b
+removed.")
 
 (ert-deftest m52-imp9/gate-m52-total ()
   "The m52 group registers at least its docs-independent floor."

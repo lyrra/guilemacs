@@ -39,7 +39,7 @@
 ;;;   - EOF: not applicable to output.
 ;;;   - CLOSE: C closes the streams.  Scheme never closes them.
 ;;;
-;;; The padding note (cr1.org F3, for imp-4): the real termcap output
+;;; The padding note (for imp-4): the real termcap output
 ;;; path is the C OUTPUT macro, which calls emacs_tputs and applies
 ;;; padding.  The leaf m52_tty_emit_cap_1 calls tparam and a raw
 ;;; fwrite, so it does NOT apply padding.  imp-3 rewires nothing, so
@@ -101,6 +101,8 @@
             tty-handle-write-all-borrowed
             tty-handle-write-verdict
             tty-handle-from-device
+            tty-handle-outcome tty-handle-outcome-count
+            tty-handle-outcome-errno tty-handle-ebadf
             tty-handle-flush tty-handle-flush-borrowed
             tty-handle-termscript tty-handle-termscript-borrowed))
 
@@ -804,6 +806,29 @@
       "give-up"
       (tty-write-verdict rc len 0)))
 
+;; --- M61 imp-2b: the ONE plain carrier of a count and an error --------
+;;
+;; A routed write and a routed copy answer ONE 2-element vector of 2 plain
+;; fixnums, #(count errno).  COUNT is the number of bytes that MOVED, and
+;; it is correct ALSO on a hard failure.  ERRT is the positive errno of a
+;; hard failure, or 0.  No Lisp_Object, no char *, no FILE * and no struct
+;; crosses the layer (milestone.org =findings= F1 and F3).
+;;
+;; The C side builds the same shape (m61_tty_outcome_make in src/term.c)
+;; and reads it with vector-ref only, so ONE shape serves both
+;; directions.  A plain count alone is NOT enough: a copy of 5 bytes that
+;; then fails must report 5 and not 0 (milestone.org =findings= F3).
+(define (tty-handle-outcome count errno)
+  (vector count errno))
+
+(define (tty-handle-outcome-count outcome) (vector-ref outcome 0))
+(define (tty-handle-outcome-errno outcome) (vector-ref outcome 1))
+
+;; The positive EBADF of the carrier.  It is 9 on this host; src/term.c
+;; holds the same value in its EBADF, and a host with a different EBADF
+;; must change both sites.
+(define tty-handle-ebadf 9)
+
 ;; The bootstrap of the handle layer: build the handle value of DEVICE.
 ;; DEVICE follows the M52 convention (a terminal object, a frame, or nil
 ;; for the selected frame).  Return the plain handle value in the
@@ -816,55 +841,73 @@
         (make-tty-handle identity 'borrowed))))
 
 ;; Write BYTES in full, and RETRY a short write instead of losing the
-;; tail.  Return the total plain count, or the negated errno of a hard
-;; failure.  The retry decision is the ONE verdict procedure
-;; tty-write-verdict, through tty-handle-write-verdict; the loop is the
-;; only place that consumes it.  C stays the single writer.
+;; tail.  Return the plain carrier #(count errno): COUNT is the number of
+;; bytes that moved on EVERY path, and ERRT is the positive errno of a
+;; hard failure, or 0.  A caller never infers zero progress from an error
+;; (milestone.org =findings= F3).  The retry decision is the ONE verdict
+;; procedure tty-write-verdict, through tty-handle-write-verdict; the loop
+;; is the only place that consumes it.  C stays the single writer.
 ;;
 ;; WRITE-PROC is the one write operation.  The general form takes it as a
 ;; plain procedure, so the loop is PURE and a test can hand it a plain
-;; lambda with no leaf, no stub, and no module state.
+;; lambda with no leaf, no stub, and no module state.  The loop catches
+;; NOTHING: a raise of WRITE-PROC leaves this procedure, so the caller
+;; must treat that as "progress unknown" and must not write again
+;; (milestone.org =findings= F1).
 (define (tty-handle-write-all-with write-proc h bytes)
   (let ((len (bytevector-length bytes)))
     (let loop ((offset 0) (total 0))
       (if (>= offset len)
-          total
+          (tty-handle-outcome total 0)
           (let* ((slice (if (zero? offset)
                             bytes
                             ;; MEASURED on this host: (bytevector-copy bv
                             ;; start end) answers "Wrong number of
                             ;; arguments to #<procedure bytevector-copy
                             ;; (_)>", so the range form is NOT usable
-                            ;; here (cr.org F8).  Copy through
-                            ;; bytevector-copy! instead.
+                            ;; here.  Copy through bytevector-copy!
+                            ;; instead.
                             (let ((rest (make-bytevector (- len offset) 0)))
                               (bytevector-copy! bytes offset rest 0
                                                 (- len offset))
                               rest)))
                  (rc (write-proc h slice)))
-            (cond ((< rc 0) rc)
+            (cond ;; A hard failure: report the errno AND the count that
+                  ;; already moved.
+                  ((< rc 0) (tty-handle-outcome total (- rc)))
                   ;; No progress: report what went out.  A host that can
                   ;; not accept the bytes answers 0, never a spin.
-                  ((zero? rc) total)
+                  ((zero? rc) (tty-handle-outcome total 0))
                   ((string=? "give-up" (tty-handle-write-verdict rc
                                                                 (- len offset)))
-                   total)
+                   (tty-handle-outcome total 0))
                   (else (loop (+ offset rc) (+ total rc)))))))))
 
 ;; The thin entry point of the retry loop: the ONE write operation of the
-;; handle, with the retry of a short write.
+;; handle, with the retry of a short write.  It answers the same carrier.
 (define (tty-handle-write-all h bytes)
   (tty-handle-write-all-with tty-handle-write h bytes))
 
-;; The C-facing form of the SAME retry loop (cr.org F1, F2).  The routed
-;; normal glyph write in src/term.c passes the plain identity fixnum and
-;; the plain bytevector, so C holds no handle value and no state.  This
-;; procedure builds a BORROWED handle: C owns the FILE * output stream.
-;; The state check and the retry then run per write, in Scheme.
+;; The C-facing form of the SAME retry loop (milestone.org =findings= F1).
+;; The routed normal glyph write in src/term.c passes the plain identity
+;; fixnum and the plain bytevector, so C holds no handle value and no
+;; state.  This procedure builds a BORROWED handle: C owns the FILE *
+;; output stream.  The state check and the retry then run per write, in
+;; Scheme.
+;;
+;; The answer is the carrier #(count errno), or #f.  The catch is HERE and
+;; not in the loop, so #f keeps ONE meaning: the progress is UNKNOWN.  A
+;; raise can stop the loop between 2 writes, so the count that already
+;; moved is not known.  C must not write on #f (milestone.org =findings=
+;; F1).  A known count and a known error always answer the carrier, so #f
+;; is rare.
 (define (tty-handle-write-all-borrowed identity bytes)
   (if (or (not (integer? identity)) (< identity 0))
-      -9                                    ; -EBADF
-      (tty-handle-write-all (make-tty-handle identity 'borrowed) bytes)))
+      (tty-handle-outcome 0 tty-handle-ebadf)
+      (catch #t
+        (lambda ()
+          (tty-handle-write-all (make-tty-handle identity 'borrowed) bytes))
+        (lambda (key . args) #f))))
 
 ;; --- M61 imp-2: the flush and the termscript copy ---------------------
 ;;
@@ -875,23 +918,27 @@
 
 ;; Flush the output stream that H names.  Return the leaf's plain fixnum:
 ;; 0 on success, or the negated errno (-EBADF for a closed or unknown
-;; identity, -EINVAL when the tty holds no output stream).
+;; identity, -EINVAL when the tty holds no output stream).  The flush is
+;; IDEMPOTENT, so it needs no carrier: a repeated flush costs no byte.
 (define (tty-handle-flush h)
   (tty-handle-check-open h)
   ((force %--tty-handle-flush) (tty-handle-id h)))
 
 ;; Copy the plain bytevector BYTES to the termscript stream that H names.
-;; Return the leaf's plain fixnum: the fwrite count, or the negated errno.
-;; A tty with no termscript stream answers 0, a plain count and NOT an
-;; error: a session without tty->termscript is legal.
+;; Return the leaf's carrier #(count errno): the copy count, and the
+;; positive errno of a hard failure or 0.  The count is correct also on a
+;; hard failure, because this path has NO retry loop: a copy of 5 bytes
+;; that then fails reports 5 (milestone.org =findings= F3).  A tty with no
+;; termscript stream answers #(0 0), a plain count and NOT an error: a
+;; session without tty->termscript is legal.
 (define (tty-handle-termscript h bytes)
   (tty-handle-check-open h)
   ((force %--tty-handle-termscript) (tty-handle-id h) bytes))
 
 ;; The C-facing form of the flush.  The routed flush in src/term.c passes
-;; the plain identity fixnum, so C holds no handle value and no state.  The
-;; literal -9 is -EBADF on Linux only; src/term.c holds the same value, and
-;; a host with a different EBADF must change both sites.
+;; the plain identity fixnum, so C holds no handle value and no state.
+;; The literal -9 is -EBADF on Linux only; src/term.c holds the same
+;; value, and a host with a different EBADF must change both sites.
 (define (tty-handle-flush-borrowed identity)
   (if (or (not (integer? identity)) (< identity 0))
       -9                                    ; -EBADF
@@ -899,8 +946,14 @@
 
 ;; The C-facing form of the termscript copy, the same shape.  C passes the
 ;; SAME bytevector that it gave to the output write of the glyph run, so
-;; the run holds ONE copy of the bytes.
+;; the run holds ONE copy of the bytes.  The answer is the carrier
+;; #(count errno), or #f when the progress is UNKNOWN, with the same
+;; single meaning as the write form above (milestone.org =findings= F1 and
+;; F3).
 (define (tty-handle-termscript-borrowed identity bytes)
   (if (or (not (integer? identity)) (< identity 0))
-      -9                                    ; -EBADF
-      (tty-handle-termscript (make-tty-handle identity 'borrowed) bytes)))
+      (tty-handle-outcome 0 tty-handle-ebadf)
+      (catch #t
+        (lambda ()
+          (tty-handle-termscript (make-tty-handle identity 'borrowed) bytes))
+        (lambda (key . args) #f))))

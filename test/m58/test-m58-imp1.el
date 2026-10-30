@@ -17,7 +17,7 @@
 ;;;   S1 -- the re-measured surface of docs/m58-plan.org (the base
 ;;;         fca28d3be as an ANCESTOR of HEAD, and the src/term.c /
 ;;;         src/termchar.h / mod/emacs/tty-output.scm / pty-driver.py
-;;;         numbers).  S1 holds 9 checks.
+;;;         numbers).  S1 holds 4 checks.
 ;;;   S2 -- the row map of docs/m58-plan.org: group A (the
 ;;;         face-appearance policy), group B (the color-mode policy),
 ;;;         group C (the cost policy), group D (the init policy),
@@ -165,15 +165,6 @@ ORDER: each search starts after the previous match."
   "Non-nil when the TRACKED file REL (repo-root-relative) exists."
   (file-exists-p (expand-file-name rel m58-imp1--root)))
 
-(defun m58-imp1--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m58-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m58-imp1--count (rel regexp)
   "Count the matches of REGEXP in REL."
   (m58-imp1--with rel
@@ -196,12 +187,6 @@ to nil and the check FAILS."
           (goto-char (point-min))
           (while (search-forward "\n" end t) (setq n (1+ n)))
           n)))))
-
-(defun m58-imp1--count-defun-leaf (rel)
-  "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (docs/m58-plan.org)."
-  (m58-imp1--count rel "^DEFUN (\"--tty-"))
 
 (defun m58-imp1--count-scm-ref ()
   "Count scm_c_public_ref over src/*.[ch] (the docs/m58-plan.org
@@ -282,32 +267,19 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 
 (setq m58-imp1--group 's1)
 
+;; M61 imp-2b (milestone.org findings F2): the src/term.c and
+;; mod/emacs/tty-output.scm source-text pins (the line counts, the
+;; ^DEFUN ( count, the --tty-* leaf count and the scm_c_public_ref
+;; count) are REMOVED, not re-pinned.  A test proves behavior; it must
+;; not read source text.
+
 (let ((ok (m58-imp1--ancestor-p "fca28d3be" "HEAD")))
   (if (eq ok 'm58-imp1-prog-absent)
       (m58-imp1--info-skip "head-fca28d3be" "no git binary on PATH")
     (m58-imp1--check "head-fca28d3be" ok)))
 
-;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
-;; src/term.c grows the handle block, 2 DEFUNs and 2 --tty-* leaves, so
-;; 6738 lines, 31 DEFUNs and 6 leaves.  Measured with `wc -l
-;; src/term.c`, `grep -c '^DEFUN (' src/term.c` and `grep -c
-;; '^DEFUN ("--tty-' src/term.c`.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m58-imp1--check "term.c-lines-7094"
-                 (eql 7094 (m58-imp1--lines "src/term.c")))
-(m58-imp1--check "term.c-defun-count-33"
-                 (eql 33 (m58-imp1--count "src/term.c" "^DEFUN (")))
-(m58-imp1--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m58-imp1--count-defun-leaf "src/term.c")))
-(m58-imp1--check "term.c-scm-ref-44"
-                 (eql 44 (m58-imp1--count "src/term.c" "scm_c_public_ref")))
 (m58-imp1--check "tree-wide-scm-ref-270"
                  (eql 270 (m58-imp1--count-scm-ref)))
-;; M61 imp-1 re-pin: the handle block adds 178 lines, 682 -> 860.
-;; Measured with `wc -l mod/emacs/tty-output.scm`.
-(m58-imp1--check "tty-output.scm-lines-906"
-                 (eql 906 (m58-imp1--lines "mod/emacs/tty-output.scm")))
 (m58-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m58-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m58-imp1--line-of "src/termchar.h" "FILE \\*output;"))
@@ -510,12 +482,12 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;; tests, so a green m58 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 9 checks,
+;; because every check is registered at load time.  S1 holds 4 checks,
 ;; S2 holds 8, S3 holds 2, and S4 holds 4.
 
 (setq m58-imp1--group 's5)
 
-(m58-imp1--check "reg/min-s1-checks-9" (>= (m58-imp1--group-count 's1) 9))
+(m58-imp1--check "reg/min-s1-checks-4" (>= (m58-imp1--group-count 's1) 4))
 (m58-imp1--check "reg/min-s2-checks-8" (>= (m58-imp1--group-count 's2) 8))
 (m58-imp1--check "reg/min-s3-checks-2" (>= (m58-imp1--group-count 's3) 2))
 (m58-imp1--check "reg/min-s4-checks-4" (>= (m58-imp1--group-count 's4) 4))
@@ -523,12 +495,12 @@ host limit is a skip, never a pass (docs/m58-plan.org)."
 ;;; --- The group-total check ------------------------------------------
 
 ;; The measured count of m58-imp1 tests is 28: 27 registered checks
-;; (S1 9, S2 8, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; (S1 4, S2 8, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.
 
-(defvar m58-imp1--min-gate-total 28
+(defvar m58-imp1--min-gate-total 23
   "The exact number of m58-imp1 ERT tests: 27 registered checks (S1 9,
 S2 8, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
 

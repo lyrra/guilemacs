@@ -11,12 +11,15 @@
 ;;;
 ;;; It pins these groups:
 ;;;
-;;;   S1 -- the re-measured surface of brief.org section 4.3, re-measured
-;;;         at base HEAD c5245cc6e: src/term.c (6,214 lines, 29 ^DEFUN (,
-;;;         4 --tty-* leaf DEFUNs, 36 scm_c_public_ref sites); the 454
-;;;         lines of mod/emacs/tty-output.scm; and the tree-wide
-;;;         scm_c_public_ref count over src/*.[chm] (260).  S1 holds 6
-;;;         checks.
+;;;   S1 -- REMOVED by M61 imp-2b (milestone.org findings F2).  S1 held
+;;;         the source-text pins of src/term.c (lines, ^DEFUN ( count,
+;;;         --tty-* leaf count, scm_c_public_ref sites), the
+;;;         mod/emacs/tty-output.scm line count, and the tree-wide
+;;;         scm_c_public_ref count.  A source-inspection test proves no
+;;;         behavior, so the assertions are removed and NOT re-pinned
+;;;         (docs/milestone-overview.org =Test rules for ports=,
+;;;         docs/arch.org =Testing=).  The measured numbers live in the
+;;;         commit message of M61 imp-2b.
 ;;;   S2 -- the 3 stream fields of src/termchar.h: input :51, output
 ;;;         :53, termscript :61 (name, FILE * type, and line), plus the
 ;;;         boundary rule ("one owner, one writer": no Guile port owns a
@@ -119,24 +122,6 @@ ordered name list of brief.org section 6, preferred over a line pin."
   "Non-nil when the TRACKED file REL (repo-root-relative) exists."
   (file-exists-p (expand-file-name rel m54-imp1--root)))
 
-(defun m54-imp1--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m54-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
-(defun m54-imp1--count (rel regexp)
-  "Count the matches of REGEXP in REL."
-  (m54-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (re-search-forward regexp nil t) (setq n (1+ n)))
-        n))))
-
 (defun m54-imp1--line-of (rel regexp)
   "Return the 1-based line number of the first REGEXP match in REL, or
 nil when REGEXP does not match.  The reader returns the symbol
@@ -150,21 +135,6 @@ to nil and the check FAILS."
           (goto-char (point-min))
           (while (search-forward "\n" end t) (setq n (1+ n)))
           n)))))
-
-(defun m54-imp1--count-defun-leaf (rel)
-  "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 4.3)."
-  (m54-imp1--count rel "^DEFUN (\"--tty-"))
-
-(defun m54-imp1--count-scm-ref ()
-  "Count scm_c_public_ref over src/*.[chm] (the brief.org section 4.3
-tree-wide measure)."
-  (let ((total 0)
-        (dir (expand-file-name "src" m54-imp1--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m54-imp1--count f "scm_c_public_ref") 0))))
-    total))
 
 (defun m54-imp1--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
@@ -182,35 +152,6 @@ pass."
     (setq m54-imp1--registered (1+ m54-imp1--registered))
     (m54-imp1--bump-group)
     (imp-register-bool-as-ert-test (format "m54-imp1/%s" name) pass)))
-
-;;; --- S1. The measured surface (brief.org section 4.3) ---------------
-
-(setq m54-imp1--group 's1)
-
-;; Row 1: src/term.c lines = 6,214.
-;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
-;; (--tty-handle, --tty-handle-write), the C identity table, and the
-;; routed normal write, so the surface numbers changed.  Measured at
-;; HEAD + M61 imp-1; do not copy them from this comment.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m54-imp1--check "term.c-lines-7094"
-                 (eql 7094 (m54-imp1--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m54-imp1--check "term.c-defun-count-33"
-                 (eql 33 (m54-imp1--count "src/term.c" "^DEFUN (")))
-;; Row 3: the 4 --tty-* leaf DEFUNs.
-(m54-imp1--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m54-imp1--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m54-imp1--check "term.c-scm-ref-44"
-                 (eql 44 (m54-imp1--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m54-imp1--check "tty-output.scm-lines-906"
-                 (eql 906 (m54-imp1--lines "mod/emacs/tty-output.scm")))
-;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp1--check "tree-wide-scm-ref-270"
-                 (eql 270 (m54-imp1--count-scm-ref)))
 
 ;;; --- S2. The 3 stream fields and the boundary rule ------------------
 
@@ -354,25 +295,26 @@ pass."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 6 checks,
-;; S2 holds 4, S3 holds 4, and S4 holds 4.
+;; because every check is registered at load time.  S2 holds 4 checks,
+;; S3 holds 4, and S4 holds 4.  S1 is gone (M61 imp-2b, findings F2), so
+;; it has no guard: a group that holds no check needs none.
 
 (setq m54-imp1--group 's5)
 
-(m54-imp1--check "reg/min-s1-checks-6" (>= (m54-imp1--group-count 's1) 6))
 (m54-imp1--check "reg/min-s2-checks-4" (>= (m54-imp1--group-count 's2) 4))
 (m54-imp1--check "reg/min-s3-checks-4" (>= (m54-imp1--group-count 's3) 4))
 (m54-imp1--check "reg/min-s4-checks-4" (>= (m54-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The floor is the measured count of m54-imp1 tests: 22 registered
-;; checks (S1 6, S2 4, S3 4, S4 4, S5 4) plus the group-total deftest
-;; itself.  This is a coarse net, not a tight bound; the per-group
-;; reg/min-* guards are the tight check.
+;; The floor is the MEASURED count of m54-imp1 tests: 15 registered
+;; checks (S2 4, S3 4, S4 4, S5 3) plus the group-total deftest itself.
+;; This is a coarse net, not a tight bound; the per-group reg/min-*
+;; guards are the tight check.  M61 imp-2b lowered this floor from 22
+;; when findings F2 removed the 6 S1 source-text pins and the S1 guard.
 
-(defvar m54-imp1--min-gate-total 22
-  "The minimum number of m54-imp1 ERT tests: 22 registered checks plus
+(defvar m54-imp1--min-gate-total 16
+  "The minimum number of m54-imp1 ERT tests: 15 registered checks plus
 the group-total deftest, allowing one slack.")
 
 (ert-deftest m54-imp1/gate-m54-total ()

@@ -105,14 +105,6 @@ the symbol `m48-imp5-absent' when REL does not exist."
       (when (search-forward needle nil t)
         (line-number-at-pos (match-beginning 0))))))
 
-(defun m48-imp5--count-scm-ref ()
-  "Count scm_c_public_ref over src/*.[chm] (the brief.org section 4 measure)."
-  (let ((total 0)
-        (dir (expand-file-name "src" m48-imp5--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m48-imp5--count f "scm_c_public_ref") 0))))
-    total))
-
 (defun m48-imp5--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
 An absent src/ file makes the reader return the symbol
@@ -150,31 +142,16 @@ FAIL with no ERT test would leave the exit code 0."
 
 (setq m48-imp5--group 's1)
 
-;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
-;; src/term.c grew 2 DEFUNs (--tty-handle, --tty-handle-write) and the
-;; identity table, so lines 6425 -> 6738 and DEFUNs 29 -> 31.  Measured
-;; with `wc -l src/term.c` and `grep -c '^DEFUN ("' src/term.c`.  The
-;; refs count did not move (42).
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m48-imp5--check "term.c-lines-DEFUNs-refs"
-                 (let ((lines (m48-imp5--lines "src/term.c"))
-                       (defuns (m48-imp5--count "src/term.c" "^DEFUN (\""))
-                       (refs (m48-imp5--count "src/term.c" "scm_c_public_ref")))
-                   (and (integerp lines) (eql 7094 lines)
-                        (integerp defuns) (eql 33 defuns)
-                        (integerp refs) (eql 44 refs))))
-(m48-imp5--check "term.c-guile.h-at-48"
-                 (eql 48 (m48-imp5--line-of "src/term.c" "#include \"guile.h\"")))
-(m48-imp5--check "term.c-leaves-6"
-                 (eql 6 (m48-imp5--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp5--check "term.c-fix-marks-10"
-                 (eql 10 (m48-imp5--count "src/term.c"
-                                          "FIX-20261005-guilemacs")))
+;; M61 imp-2b (milestone.org findings F2): the src/term.c source-text
+;; pins (lines, ^DEFUN ( count, scm_c_public_ref sites, the guile.h line,
+;; the term-* leaf count, the FIX-mark count) and the tree-wide
+;; scm_c_public_ref count are REMOVED, not re-pinned.  A
+;; source-inspection test proves no behavior and rejects a valid
+;; refactor (docs/milestone-overview.org =Test rules for ports=,
+;; docs/arch.org =Testing=).  The measured numbers live in the commit
+;; message of M61 imp-2b.
 (m48-imp5--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp5--lines "mod/emacs/terminal.scm")))
-(m48-imp5--check "tree-wide-scm-public-ref-270"
-                 (eql 270 (m48-imp5--count-scm-ref)))
 (m48-imp5--check "keyboard.c-lines-DEFUNs"
                  (let ((lines (m48-imp5--lines "src/keyboard.c"))
                        (defuns (m48-imp5--count "src/keyboard.c" "^DEFUN (\"")))
@@ -215,13 +192,15 @@ FAIL with no ERT test would leave the exit code 0."
 ;; tests, so a green m48 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body is
 ;; truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 11 checks;
-;; S2 holds 2 checks.
+;; because every check is registered at load time.  S1 holds 5 checks;
+;; S2 holds 2 checks.  S1 held 11 until M61 imp-2b removed the 6
+;; src/term.c source-text pins (milestone.org findings F2); the guard
+;; name and its bound moved with the count.
 
 (setq m48-imp5--group nil)
 
-(m48-imp5--check "reg/min-s1-checks-11"
-                 (>= (m48-imp5--group-count 's1) 11))
+(m48-imp5--check "reg/min-s1-checks-5"
+                 (>= (m48-imp5--group-count 's1) 5))
 (m48-imp5--check "reg/min-s2-checks-2"
                  (>= (m48-imp5--group-count 's2) 2))
 
@@ -246,8 +225,15 @@ FAIL with no ERT test would leave the exit code 0."
 ;; tight per-corpus check; this deftest only catches a whole-corpus or
 ;; load-order loss.  The corpus reads no docs/, so the total does not
 ;; depend on docs/.
+;;
+;; M61 imp-2b lowered the floor from 181 to 175 when findings F2 removed
+;; the 6 src/term.c source-text pins of this corpus (m48 imp-1 removed 4
+;; more and imp-5 these 6; the other corpora removed their own).  The
+;; second sweep of imp-2b removed 10 more pins from m48 imp-2, imp-3 and
+;; imp-4, so the floor is 165: MEASURED `./tool/run-tests.sh
+;; --filter=m48` answers 166 passed and 167 selected tests.
 
-(defvar m48-imp5--min-gate-total 181
+(defvar m48-imp5--min-gate-total 165
   "The minimum number of ERT tests the m48 group registers.")
 
 (ert-deftest m48-imp5/gate-m48-total ()

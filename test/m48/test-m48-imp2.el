@@ -144,12 +144,6 @@ real error, not a pass."
   (m48-imp2--check (format "leaf-%s" leaf)
                    (m48-imp2--contains-p "src/term.c"
                                          (format "DEFUN (\"--term-%s\"" leaf))))
-(m48-imp2--check "leaf-defuns-6"
-                 (eql 6 (m48-imp2--count "src/term.c" "^DEFUN (\"--term-")))
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m48-imp2--check "defun-count-33"
-                 (eql 33 (m48-imp2--count "src/term.c" "^DEFUN (\"")))
 (m48-imp2--check "geometry-leaves-retired"
                  (and (not (m48-imp2--contains-p
                             "src/term.c" "DEFUN (\"--term-frame-geometry\""))
@@ -184,12 +178,6 @@ real error, not a pass."
 
 ;; Six typed leaves remain after imp-6 retired the two geometry leaves.
 ;; The source currently has ten FIX markers and six M48 imp-2 leaf docs.
-(m48-imp2--check "doc-marker-count-10"
-                 (eql 10 (m48-imp2--count "src/term.c"
-                                           "FIX-20261005-guilemacs")))
-(m48-imp2--check "leaf-doc-count-6"
-                 (eql 6 (m48-imp2--count "src/term.c" "M48 imp-2,")))
-
 ;;; --- E3. The wrapper module (brief.org section 5) -------------------
 
 (setq m48-imp2--group 'e3)
@@ -261,12 +249,12 @@ real error, not a pass."
 (m48-imp2--check "reg/run-tests-m48-imp2"
                  (m48-imp2--contains-p "tool/run-tests.scm"
                                        "test/m48/test-m48-imp2.el"))
-(m48-imp2--check "reg/min-e1-checks-11"
-                 (>= (m48-imp2--group-count 'e1) 11))
-(m48-imp2--check "reg/min-e2-checks-20"
-                 (>= (m48-imp2--group-count 'e2) 20))
-(m48-imp2--check "reg/min-total-40"
-                 (>= m48-imp2--registered 40))
+(m48-imp2--check "reg/min-e1-checks-9"
+                 (>= (m48-imp2--group-count 'e1) 9))
+(m48-imp2--check "reg/min-e2-checks-18"
+                 (>= (m48-imp2--group-count 'e2) 18))
+(m48-imp2--check "reg/min-total-36"
+                 (>= m48-imp2--registered 36))
 
 ;;; --- E6. The gated runtime probe (brief.org section 6.1) ------------
 

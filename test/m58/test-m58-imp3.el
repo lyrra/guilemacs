@@ -533,21 +533,14 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 
 (setq m58-imp3--group 'u5)
 
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
+;; M61 imp-2b (milestone.org findings F2): the src/term.c and
+;; mod/emacs/tty-output.scm source-text pins of the imp-1 corpus are
+;; REMOVED, not re-pinned, so this probe keeps only the tree-wide
+;; scm_c_public_ref pin, which reads no changed file.
 (m58-imp3--check "repin/imp1-surface"
-                 (and (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el"
-                       "(eql 7094 (m58-imp1--lines \"src/term.c\"))")
-                      (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el"
-                       "(eql 44 (m58-imp1--count \"src/term.c\" \"scm_c_public_ref\"))")
-                      (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el"
-                       "(eql 270 (m58-imp1--count-scm-ref))")
-                      (m58-imp3--contains-p
-                       "test/m58/test-m58-imp1.el"
-                       "(eql 906 (m58-imp1--lines \"mod/emacs/tty-output.scm\"))")))
+                 (m58-imp3--contains-p
+                  "test/m58/test-m58-imp1.el"
+                  "(eql 270 (m58-imp1--count-scm-ref))"))
 
 (m58-imp3--check "repin/imp1-cases-and-group-a"
                  (and (m58-imp3--contains-p
@@ -559,15 +552,10 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp1.el" "tty-face-on-steps")))
 
+;; M61 imp-2b (F2): the src/term.c line-text probes are REMOVED.  Only
+;; the PTY case total and the registration probes stay.
 (m58-imp3--check "repin/imp2-signatures-and-total"
-                 (and (string= "turn_on_face (struct frame *f, struct face *face)"
-                               (or (m58-imp3--line-text "src/term.c" 3019) ""))
-                      (string= "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                               (or (m58-imp3--line-text "src/term.c" 3142) ""))
-                      (m58-imp3--contains-p
-                       "test/m58/test-m58-imp2.el"
-                       "(m58-imp2--line-text \"src/term.c\" 3018)")
-                      (m58-imp3--contains-p
+                 (and (m58-imp3--contains-p
                        "test/m58/test-m58-imp2.el" "\"pty-case-counts-42\"")
                       (m58-imp3--contains-p
                        "test/m58/test-m58-imp2.el" "(eql 42 (car pins))")

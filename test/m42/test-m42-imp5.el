@@ -130,21 +130,9 @@ corpus pins is tracked, so an absent one means a broken checkout."
                  (eql 38990 (m42-imp5--lines "src/xdisp.c")))
 (m42-imp5--check "surface/xdisp.c-defuns-24"
                  (eql 24 (m42-imp5--count "src/xdisp.c" "^DEFUN (\"")))
-;; The tree-wide scm_c_public_ref count over src/*.c, src/*.h and
-;; src/*.m, like the measurement in brief.org section 7.1.
-(m42-imp5--check "surface/tree-ref-sites-267"
-                 (let ((files (directory-files (expand-file-name "src" m42-imp5--root)
-                                               t "\\.\\(c\\|h\\|m\\)\\'")))
-                   (and (consp files)
-                        (eql 267
-                             (let ((n 0))
-                               (dolist (f files)
-                                 (with-temp-buffer
-                                   (insert-file-contents f)
-                                   (goto-char (point-min))
-                                   (while (re-search-forward "scm_c_public_ref" nil t)
-                                     (setq n (1+ n)))))
-                               n)))))
+;; M61 imp-2b (milestone.org findings F2): the tree-wide
+;; scm_c_public_ref count over src/*.[chm] is REMOVED, not re-pinned.  A
+;; source-inspection count proves no behavior (docs/arch.org =Testing=).
 (m42-imp5--check "surface/gobble.scm-lines-303"
                  (eql 303 (m42-imp5--lines "mod/emacs/gobble.scm")))
 

@@ -139,14 +139,6 @@ block names after imp-2 and still catches a deletion or a re-order."
               (push name names))))
         (nreverse names)))))
 
-(defun m48-imp1--count-scm-ref ()
-  "Count scm_c_public_ref over src/*.[chm] (the brief.org section 3 measure)."
-  (let ((total 0)
-        (dir (expand-file-name "src" m48-imp1--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m48-imp1--count f "scm_c_public_ref") 0))))
-    total))
-
 (defun m48-imp1--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
 The D1/D2 callers pass `(eql N value)': when the source file is absent
@@ -173,22 +165,18 @@ passes the raw symbol to reach it."
 
 ;;; D1 was re-pinned after each M48 implementation step.  At imp-6 the
 ;;; two geometry leaves and their C arithmetic were removed; the Scheme
-;;; module now owns the geometry arithmetic.  The current source has 29
-;;; DEFUNs and 36 term.c refs.  The keyboard surface does not move.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m48-imp1--check "term.c-lines-7094"
-                 (eql 7094 (m48-imp1--lines "src/term.c")))
-(m48-imp1--check "term.c-defuns-33"
-                 (eql 33 (m48-imp1--count "src/term.c" "^DEFUN (\"")))
-(m48-imp1--check "term.c-scm-ref-44"
-                 (eql 44 (m48-imp1--count "src/term.c" "scm_c_public_ref")))
+;;; module now owns the geometry arithmetic.
+;; M61 imp-2b (milestone.org findings F2): the src/term.c source-text
+;; pins (lines, ^DEFUN ( count, scm_c_public_ref sites) and the
+;; tree-wide scm_c_public_ref count are REMOVED, not re-pinned.  A
+;; source-inspection test proves no behavior and rejects a valid
+;; refactor (docs/milestone-overview.org =Test rules for ports=,
+;; docs/arch.org =Testing=).  The measured numbers live in the commit
+;; message of M61 imp-2b.
 (m48-imp1--check "term.c-has-guile.h"
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
-(m48-imp1--check "scm-c-public-ref-270"
-                 (eql 270 (m48-imp1--count-scm-ref)))
 (m48-imp1--check "keyboard.c-lines-11233"
                  (eql 11233 (m48-imp1--lines "src/keyboard.c")))
 (m48-imp1--check "keyboard.c-defuns-447"
@@ -293,10 +281,12 @@ passes the raw symbol to reach it."
 ;; checks really register.  These guards fail when the corpus body is
 ;; truncated or its core checks do not run.  The bound is per group, and
 ;; the counts are stable because every check is registered at load time.
-;; D1 holds 11 checks; D2 holds 23 (19 block positions, the exact-list
-;; check, and the 3 ref sites).
-(m48-imp1--check "reg/min-d1-checks-11"
-                 (>= m48-imp1--registered-d1 11))
+;; D1 holds 7 checks; D2 holds 23 (19 block positions, the exact-list
+;; check, and the 3 ref sites).  D1 held 11 until M61 imp-2b removed the
+;; 4 src/term.c source-text pins (milestone.org findings F2); the guard
+;; name and its bound moved with the count.
+(m48-imp1--check "reg/min-d1-checks-7"
+                 (>= m48-imp1--registered-d1 7))
 (m48-imp1--check "reg/min-d2-checks-23"
                  (>= m48-imp1--registered-d2 23))
 

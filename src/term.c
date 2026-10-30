@@ -1022,6 +1022,13 @@ encode_terminal_code (struct glyph *src, int src_len,
    handle that named a dead tty answers -EBADF and can not alias a new
    tty.
 
+   FIX-20261030-guilemacs: EBADF is 9 on this host.  The Scheme side
+   holds the same positive value in ONE place, the definition
+   tty-handle-ebadf (mod/emacs/tty-output.scm), and the comment there
+   names these C sites.  A host with a different EBADF must change the 2
+   pair sites together.  Do not write a bare 9 or -9 here without this
+   marker.
+
    FIX-20261027-guilemacs: the table has a FIXED capacity
    (M61_HANDLE_MAX).  A session with more text terminals than that runs
    the same write mechanism directly (m61_tty_output_write_1), so the
@@ -1092,8 +1099,7 @@ static Lisp_Object m61_tty_handle_termscript_scheme (Lisp_Object,
 
    The argument count is the plain field NARGS, not a sentinel value: the
    flush dispatcher takes 1 argument, the write and the termscript
-   dispatchers take 2.  SCM_UNDEFINED is Guile's undefined value only
-   (cr1.org CR13).
+   dispatchers take 2.  SCM_UNDEFINED is Guile's undefined value only.
 
    FIX-20261028-guilemacs: the write dispatcher had no guard before this
    act (brief.org section 6.4).  */
@@ -1128,7 +1134,7 @@ m61_tty_scheme_raise_handler (void *data, SCM key, SCM args)
 
 /* The 1-argument form (the flush dispatcher).  A second form of the SAME
    shape, so the arity stays readable and 1 sentinel value carries 1
-   meaning (cr1.org CR13).  */
+   meaning.  */
 static Lisp_Object
 m61_tty_scheme_guard_1 (SCM proc, Lisp_Object a)
 {
@@ -1146,6 +1152,59 @@ m61_tty_scheme_guard_2 (SCM proc, Lisp_Object a, Lisp_Object b)
 
   return scm_c_catch (SCM_BOOL_T, m61_tty_scheme_body, &call,
 		      m61_tty_scheme_raise_handler, NULL, NULL, NULL);
+}
+
+/* The ONE plain carrier of a count and an error, shared by the routed
+   write and the routed termscript copy: a 2-element vector #(count errno)
+   of 2 plain fixnums.  COUNT is the number of bytes that moved, ALSO on
+   a hard failure.  ERRT is the positive errno of a hard failure, or 0.
+   No Lisp_Object, no char *, no FILE * and no struct crosses the seam.
+
+   The 3 states of ONE routed call are distinct and the caller MUST tell
+   them apart (milestone.org =findings= F1 and F3):
+
+   NO dispatch started     the identity is closed or unknown, the table
+			   is full, or the Guile runtime is not up.  No
+			   Scheme code ran, so no byte moved, and the C
+			   mechanism is the only writer.
+   a plain outcome         the call ran and Scheme answered this carrier.
+			   Use it; never run the C mechanism again.
+   the #f answer           the guard stopped a Scheme raise.  Dispatch
+			   STARTED, but the number of bytes that moved is
+			   NOT known: a raise can stop the retry loop
+			   between 2 writes.  A caller MUST NOT write or
+			   copy again on this answer, because a prefix of
+			   the first call may already be on the stream.  It
+			   reports -EIO with the count 0.  */
+static Lisp_Object
+m61_tty_outcome_make (ptrdiff_t count, int err)
+{
+  Lisp_Object outcome = scm_c_make_vector (2, SCM_INUM0);
+
+  scm_c_vector_set_x (outcome, 0, scm_from_ptrdiff_t (count));
+  scm_c_vector_set_x (outcome, 1, scm_from_int (err));
+  return outcome;
+}
+
+static bool
+m61_tty_outcome_p (Lisp_Object rc)
+{
+  return scm_is_vector (rc)
+    && scm_c_vector_length (rc) == 2
+    && scm_is_integer (scm_c_vector_ref (rc, 0))
+    && scm_is_integer (scm_c_vector_ref (rc, 1));
+}
+
+static ptrdiff_t
+m61_tty_outcome_count (Lisp_Object outcome)
+{
+  return (ptrdiff_t) scm_to_ptrdiff_t (scm_c_vector_ref (outcome, 0));
+}
+
+static int
+m61_tty_outcome_errno (Lisp_Object outcome)
+{
+  return scm_to_int (scm_c_vector_ref (outcome, 1));
 }
 
 /* Register TTY and return its plain identity, or -ENOSPC when the table
@@ -1259,52 +1318,67 @@ m61_tty_handle_write_bytes_1 (int identity, const unsigned char *bytes,
    through the handle IDENTITY of TTY, with the plain Guile bytevector BV
    that the caller built ONCE for the whole glyph run (imp-2 shares it
    with the termscript copy).  The CALLER registers the identity, so a
-   full identity table builds NO bytevector for nothing (cr1.org CR14).
+   full identity table builds NO bytevector for nothing.
    C calls the Scheme policy procedure with plain values only.  Scheme
    checks that the handle is open and RETRIES a short write through
    tty-handle-write-all, so no byte of the glyph run is lost; C keeps the
    FILE *, the fwrite, the clearerr and the order (brief.org section 3).
 
    FIX-20261027-guilemacs: the bytevector is ONE allocation per glyph
-   run inside block_input (cr1.org CR14).  A moving barrier (a shared
-   bytevector) is a later act; the copy is the price of the plain-value
-   seam.
+   run inside block_input.  A moving barrier (a shared bytevector) is a
+   later act; the copy is the price of the plain-value seam.
+
+   The 3 states of a routed call are those of m61_tty_outcome_make.  Only
+   the NO-dispatch branch writes here:
 
    FIX-20261028-guilemacs: before the Guile runtime exists, and when the
    identity table is full, run the SAME write mechanism directly
-   (m61_tty_output_write_1), so no byte is lost and the order holds.
+   (m61_tty_output_write_1), so no byte is lost and the order holds.  No
+   Scheme code ran in this branch, so no byte of the range is on the
+   stream.
 
-   FIX-20261028-guilemacs: a #f answer is the guard's "no answer", so the
-   SAME mechanism runs here and no byte is lost on a Scheme raise
-   (brief.org section 5.2).  The doubling risk of this fallback is
-   declared in milestone.org section 5.  */
+   FIX-20261030-guilemacs: the #f answer of the guard does NOT write
+   (milestone.org =findings= F1).  A #f answer proves only that the guard
+   stopped a raise; it does NOT prove that Scheme wrote 0 bytes, because
+   tty-handle-write-all-with can write a prefix and then raise.  A second
+   write of that prefix repeats terminal escape bytes, so this answer
+   reports -EIO with the count 0 instead.  */
 static ptrdiff_t
 m61_tty_handle_write_1 (struct tty_display_info *tty, int identity,
 			Lisp_Object bv, const unsigned char *bytes, size_t len)
 {
+  /* State 1: NO dispatch started.  No Scheme code ran, so no byte moved
+     and this C mechanism is the only writer.  */
   if (identity < 0 || !guile_runtime_up ())
     return m61_tty_output_write_1 (tty, bytes, len);
 
   Lisp_Object rc = m61_tty_handle_write_scheme (make_fixnum (identity), bv);
 
-  /* The guard answers SCM_BOOL_F when a Scheme raise is stopped, so a #f
-     answer means "no answer" and the mechanism runs.  Any OTHER
-     non-fixnum answer is a hard failure: do NOT write again, because the
-     bytes may already be on the stream (brief.org section 5.2).  */
-  if (scm_is_false (rc))
-    return m61_tty_output_write_1 (tty, bytes, len);
+  /* State 2: dispatch started and Scheme answered #(count errno).  Use
+     the answer and never run the C mechanism again.  A hard failure
+     answers its positive errno; the count that moved stays in the
+     carrier, and this C consumer does not report it (milestone.org
+     section 5 declares the write answer as an open limit).  */
+  if (m61_tty_outcome_p (rc))
+    {
+      int err = m61_tty_outcome_errno (rc);
 
-  if (!FIXNUMP (rc))
-    return -EIO;
+      if (err)
+	return -(ptrdiff_t) err;
+      return m61_tty_outcome_count (rc);
+    }
 
-  return (ptrdiff_t) XFIXNUM (rc);
+  /* State 3: dispatch started and the progress is UNKNOWN (the guard
+     stopped a Scheme raise).  Do NOT write: a prefix may already be on
+     the stream (milestone.org =findings= F1).  */
+  return -EIO;
 }
 
 /* Copy LEN bytes at BYTES to the termscript stream of TTY and return the
    =fwrite= count, or the negated errno of a hard failure.  The TRUE copy
    count always leaves through COPIED, also on a hard failure, so the M54
-   verdict gets the measured count and not a literal 0 (cr1.org CR4).
-   The errno leaves as a plain value in the ANSWER (cr.org F3).
+   verdict gets the measured count and not a literal 0 (milestone.org
+   =findings= F3).
    A session with no termscript stream is legal: COPIED is 0 and the
    answer is 0, a plain count and NOT an error.  C keeps the FILE *, the
    fwrite, the error flag, the errno and the clearerr.  */
@@ -1336,12 +1410,18 @@ m61_tty_output_termscript_1 (struct tty_display_info *tty,
 /* The termscript copy of one glyph run through the handle IDENTITY of
    TTY, with the SAME plain Guile bytevector BV that the output write
    used.  Scheme owns the closed-use check; C keeps the FILE * and the
-   fwrite.  COPIED carries the true count to the caller (cr1.org CR4).
+   fwrite.  COPIED carries the true count to the caller.
 
    FIX-20261028-guilemacs: the `!tty->termscript' pre-test is a STATE
    check in C.  It stays because a session without a termscript stream
-   would otherwise cross into Scheme for nothing inside block_input.  The
-   limit is declared in milestone.org section 5 (cr1.org CR10).  */
+   would otherwise cross into Scheme for nothing inside block_input.  It
+   is a DECLARED deviation (milestone.org section 5).
+
+   FIX-20261030-guilemacs: the count and the errno travel together in the
+   carrier m61_tty_outcome_make (milestone.org =findings= F3), on success
+   AND on a hard failure, so a copy of 5 bytes that then fails reports 5
+   and not 0.  The #f answer of the guard does NOT copy again: the bytes
+   may already be on the stream (milestone.org =findings= F1).  */
 static ptrdiff_t
 m61_tty_handle_termscript_1 (struct tty_display_info *tty, int identity,
 			     Lisp_Object bv, const unsigned char *bytes,
@@ -1349,37 +1429,46 @@ m61_tty_handle_termscript_1 (struct tty_display_info *tty, int identity,
 {
   *copied = 0;
 
+  /* State 1: NO dispatch started.  No Scheme code ran, so no byte moved
+     and this C mechanism is the only copier.  */
   if (!tty || !tty->termscript || identity < 0 || !guile_runtime_up ())
     return m61_tty_output_termscript_1 (tty, bytes, len, copied);
 
   Lisp_Object rc = m61_tty_handle_termscript_scheme (make_fixnum (identity),
 						     bv);
 
-  if (!FIXNUMP (rc))
+  /* State 2: dispatch started and Scheme answered #(count errno).  The
+     count leaves ALSO on a hard failure, so the M54 verdict never gets a
+     literal 0 for a copy that moved bytes.  */
+  if (m61_tty_outcome_p (rc))
     {
-      /* A #f answer is the guard's "no answer": run the mechanism, so no
-	 byte is lost on a Scheme raise.  */
-      if (scm_is_false (rc))
-	return m61_tty_output_termscript_1 (tty, bytes, len, copied);
-      return -EIO;
+      ptrdiff_t count = m61_tty_outcome_count (rc);
+      int err = m61_tty_outcome_errno (rc);
+
+      if (count > 0)
+	*copied = (size_t) count;
+      if (err)
+	return -(ptrdiff_t) err;
+      return count;
     }
 
-  ptrdiff_t n = (ptrdiff_t) XFIXNUM (rc);
-  if (n > 0)
-    *copied = (size_t) n;
-
-  return n;
+  /* State 3: dispatch started and the progress is UNKNOWN (the guard
+     stopped a Scheme raise).  Do NOT copy again (milestone.org
+     =findings= F1); COPIED stays 0, so the verdict never claims progress
+     that nobody measured.  */
+  return -EIO;
 }
 
 /* ONE glyph run of the ordered output path: build ONE plain bytevector,
    then run the output write, then the termscript copy of the same bytes.
    The order is the contract (milestone.org section 3).
 
-   cr1.org CR11: this hub READS both answers, but the write answer keeps
-   its imp-1 behavior and is still not reported in this act.  A hard
-   failure of the termscript copy can not restore the bytes, so it is
-   recorded through the ONE M54 termscript verdict site instead of being
-   dropped.  */
+   FIX-20261030-guilemacs: this hub READS the write answer, but the write
+   answer keeps its imp-1 behavior and is still not reported: a hard
+   output write failure stays silent.  That is a DECLARED limit of
+   milestone.org section 5, not a fix of this act.  A hard failure of the
+   termscript copy can not restore the bytes, so it is recorded through
+   the ONE M54 termscript verdict site instead of being dropped.  */
 static void
 m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
 			    const unsigned char *bytes, size_t len)
@@ -1403,10 +1492,10 @@ m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
 					&copied_bytes);
 
   (void) written;
-  /* The verdict gets the MEASURED copy count (cr1.org CR4) and the errno
-     as a plain value (cr.org F3).  A short copy with a clear error flag is
-     reported too: the bytes of the 2 streams must agree (cr1.org CR12).
-     No termscript stream is not a short copy.  */
+  /* The verdict gets the MEASURED copy count (milestone.org =findings=
+     F3) and the errno as a plain value.  A short copy with a clear error
+     flag is reported too: the bytes of the 2 streams must agree.  No
+     termscript stream is not a short copy.  */
   if (copied < 0)
     m54_tty_termscript_verdict (copied_bytes, len, (int) -copied, true);
   else if (tty && tty->termscript && copied_bytes < len)
@@ -1451,8 +1540,7 @@ m61_tty_handle_flush_1 (struct tty_display_info *tty)
 
   /* A flush is idempotent, so a non-fixnum answer costs NO byte: run the
      mechanism.  Without this fallback 1 Scheme raise would stop every
-     later flush of the session, with no report (cr1.org CR3, brief.org
-     section 5.2).  */
+     later flush of the session, with no report.  */
   if (!FIXNUMP (rc))
     return m61_tty_output_flush_1 (tty);
 
@@ -1477,8 +1565,7 @@ m61_tty_handle_write_scheme (Lisp_Object identity, Lisp_Object bytes)
 
 /* The ONE Scheme dispatcher of the routed flush (M61 imp-2).  IDENTITY is
    the plain fixnum identity, and the procedure takes it ALONE: the arity
-   is the guard form m61_tty_scheme_guard_1, not a sentinel argument
-   (cr1.org CR13).  */
+   is the guard form m61_tty_scheme_guard_1, not a sentinel argument.  */
 static Lisp_Object
 m61_tty_handle_flush_scheme (Lisp_Object identity)
 {
@@ -1490,7 +1577,9 @@ m61_tty_handle_flush_scheme (Lisp_Object identity)
 }
 
 /* The ONE Scheme dispatcher of the routed termscript copy (brief.org
-   section 3).  It passes the plain fixnum identity and the bytevector.  */
+   section 3).  It passes the plain fixnum identity and the bytevector.
+   The answer is the carrier #(count errno) of tty-handle-termscript-
+   borrowed (milestone.org =findings= F3).  */
 static Lisp_Object
 m61_tty_handle_termscript_scheme (Lisp_Object identity, Lisp_Object bytes)
 {
@@ -1573,23 +1662,28 @@ IDENTITY is a plain fixnum that names an entry of the static C identity
 table.  C owns the struct tty_display_info and its FILE *termscript
 stream.  BYTES must be a bytevector (scm_is_bytevector), not a string.
 
-Return a plain fixnum: the =fwrite= count, or a negative fixnum holding
-the negated errno (-EBADF when the identity is closed or unknown,
--EINVAL when BYTES is not a bytevector).  A session with no termscript
-stream answers 0: that is a plain count of 0 and NOT an error, because a
-tty without tty->termscript is legal.  */)
+Return the ONE plain carrier #(count errno) of this leaf layer
+(milestone.org =findings= F3): COUNT is the =fwrite= count that moved,
+also on a hard failure, and ERRT is the positive errno of a hard failure
+or 0.  ERRT is EBADF when the identity is closed or unknown, and EINVAL
+when IDENTITY is not a fixnum or BYTES is not a bytevector.  A
+session with no termscript stream answers #(0 0): a plain count of 0 and
+NOT an error, because a tty without tty->termscript is legal.  A count
+and an error travel together, so a caller never infers zero progress
+from an error.  */)
   (Lisp_Object identity, Lisp_Object bytes)
 {
   struct tty_display_info *tty;
 
   if (!FIXNUMP (identity))
-    return make_fixnum (-EINVAL);
+    return m61_tty_outcome_make (0, EINVAL);
+
   if (!scm_is_bytevector (bytes))
-    return make_fixnum (-EINVAL);
+    return m61_tty_outcome_make (0, EINVAL);
 
   tty = m61_tty_handle_of_identity_1 ((int) XFIXNUM (identity));
   if (!tty)
-    return make_fixnum (-EBADF);
+    return m61_tty_outcome_make (0, EBADF);
 
   size_t copied = 0;
   ptrdiff_t answer
@@ -1597,7 +1691,7 @@ tty without tty->termscript is legal.  */)
     (tty, (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytes),
      scm_c_bytevector_length (bytes), &copied);
 
-  return make_fixnum (answer);
+  return m61_tty_outcome_make (copied, answer < 0 ? (int) -answer : 0);
 }
 
 DEFUN ("--tty-handle", Fc_tty_handle, Sc_tty_handle, 1, 1, 0,
@@ -6335,7 +6429,7 @@ docs/m48-plan.org section 3.3.  */)
    (docs/kb.org =passthrough-leaf-is-not-a-port=).  imp-3 moves no
    policy: the selection and the arithmetic stay in C until imp-4.
 
-   F3 (cr1.org, for imp-4): the real termcap output path is the OUTPUT
+   F3 (for imp-4): the real termcap output path is the OUTPUT
    macro (src/term.c), which calls emacs_tputs and applies padding.
    m52_tty_emit_cap_1 calls tparam and a raw fwrite, so it does NOT
    apply padding.  imp-3 rewires nothing, so there is no regression
@@ -6453,7 +6547,7 @@ m54_tty_write_verdict_scheme (Lisp_Object written, Lisp_Object len,
 /* True when the plain verdict string is "give-up", and true for a nil
    verdict too.  A nil verdict means there is no Scheme runtime, and then
    the present C behavior of BOTH output writers is the give-up behavior:
-   report the negated errno (cr.org F4).  Keeping the test here means the
+   report the negated errno.  Keeping the test here means the
    two writers share ONE decision site.  */
 static bool
 m54_tty_write_gives_up_p (Lisp_Object verdict)
@@ -6505,7 +6599,7 @@ m54_tty_termscript_handle_scheme (Lisp_Object copied, Lisp_Object len,
 
 /* The after-write DECISION of ONE termscript copy write, borrowed from
    Scheme.  COPIED is the plain =fwrite= count; LEN is the requested
-   count; ERR is the errno that the CALLER saved (cr.org F3); FAILED is
+   count; ERR is the errno that the CALLER saved; FAILED is
    the plain C ferror result.  done / retry / give-up comes from the
    shared tty-write-verdict procedure.  C keeps the OUTPUT count as the
    return value, so the copy verdict never changes the return shape; a
@@ -6562,7 +6656,7 @@ m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
   if (!tty || !tty->output)
     return -EINVAL;
   size_t written = fwrite (str, 1, len, tty->output);
-  /* FIX-20261012-guilemacs: M54 imp-3 cr.org F3 -- save the output errno
+  /* FIX-20261012-guilemacs: M54 imp-3 -- save the output errno
      before the copy seam, whose Scheme calls can change errno.  */
   int out_err = errno;
   if (tty->termscript)
@@ -6578,7 +6672,7 @@ m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
       Lisp_Object verdict = m54_tty_write_verdict_1 (written, len, e);
       clearerr (tty->output);
       /* The nil (no Scheme runtime) case is inside the helper, so both
-	 output writers decide alike (cr.org F4).  */
+	 output writers decide alike.  */
       if (m54_tty_write_gives_up_p (verdict))
 	return -e;
       return (ptrdiff_t) written;

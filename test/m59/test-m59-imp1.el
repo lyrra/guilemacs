@@ -192,15 +192,6 @@ ORDER: each search starts after the previous match."
   "Non-nil when the TRACKED file REL (repo-root-relative) exists."
   (file-exists-p (expand-file-name rel m59-imp1--root)))
 
-(defun m59-imp1--lines (rel)
-  "Count the NEWLINES of REL, the unit of `wc -l'."
-  (m59-imp1--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m59-imp1--grep-c (rel regexp)
   "Count the LINES of REL that match REGEXP, the unit of `grep -c'.
 A line with 3 matches counts 1, not 3.  MEASURED on src/xfaces.c:
@@ -224,6 +215,15 @@ whose brief command is `grep -c'."
       (goto-char (point-min))
       (let ((n 0))
         (while (re-search-forward regexp nil t) (setq n (1+ n)))
+        n))))
+
+(defun m59-imp1--lines (rel)
+  "Count the NEWLINES of REL, the unit of `wc -l'."
+  (m59-imp1--with rel
+    (lambda ()
+      (goto-char (point-min))
+      (let ((n 0))
+        (while (search-forward "\n" nil t) (setq n (1+ n)))
         n))))
 
 (defun m59-imp1--line-of (rel regexp)
@@ -521,20 +521,12 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
                             "src/xfaces.c" "guile_parse_color_spec (spec)")))
 
 ;; The boundary rule do-not-give-scheme-a-C-descriptor, by name in the
-;; TRACKED C source.  Measured line: src/term.c :5682.  The M58 plan
-;; cited :5484; that cite is STALE at this HEAD.
-;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
-;; the M61 block inserted above moved this comment, 5682 -> 5978.
-;; Measured with `grep -n 'no Guile port owns a FILE' src/term.c`.
-(m59-imp1--check "boundary-rule-line-6334"
-                 ;; M61 imp-2 re-pin: the M61 handle block and the routed
-                 ;; flush sites moved this comment 5978 -> 6334.
-                 ;; Measured with
-                 ;; `grep -n 'no Guile port owns a FILE' src/term.c`.
-                 (and (eql 6334 (m59-imp1--line-of
-                                 "src/term.c" "no Guile port owns a FILE"))
-                      (m59-imp1--contains-p "src/term.c"
-                                            "no Guile port owns a FILE *")))
+;; TRACKED C source.  M61 imp-2b (milestone.org findings F2): the
+;; measured LINE NUMBER is REMOVED, not re-pinned.  The token presence
+;; check stays: it is a real runtime token, not a source-text line pin.
+(m59-imp1--check "boundary-rule-token"
+                 (m59-imp1--contains-p "src/term.c"
+                                       "no Guile port owns a FILE *"))
 
 ;;; --- S3. The real path (docs/m59-plan.org section 7) --------------
 

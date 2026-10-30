@@ -13,7 +13,7 @@
 ;;;         ^DEFUN (, 4 --tty-* leaf DEFUNs, 36 scm_c_public_ref
 ;;;         sites); mod/emacs/tty-output.scm (454 lines); and the
 ;;;         tree-wide scm_c_public_ref count over src/*.[chm] (260).
-;;;         S1 holds 6 checks.
+;;;         S1 holds 1 check.
 ;;;   S2 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm after test-m53-imp3.el, and
 ;;;         test/pty-driver.py still holds the 26-case total pin.  Read
@@ -93,15 +93,6 @@ An absent file folds to nil."
       (when (search-forward needle nil t)
         (line-number-at-pos (match-beginning 0))))))
 
-(defun m53-imp4--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m53-imp4--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
 (defun m53-imp4--count (rel regexp)
   "Count the matches of REGEXP in REL."
   (m53-imp4--with rel
@@ -110,12 +101,6 @@ An absent file folds to nil."
       (let ((n 0))
         (while (re-search-forward regexp nil t) (setq n (1+ n)))
         n))))
-
-(defun m53-imp4--count-defun-leaf (rel)
-  "Count the matches of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 3 / section 5)."
-  (m53-imp4--count rel "^DEFUN (\"--tty-"))
 
 (defun m53-imp4--count-scm-ref ()
   "Count scm_c_public_ref over the TOP src/ directory, one file at a
@@ -162,24 +147,12 @@ host limit is a skip, never a pass (brief.org section 8)."
 
 (setq m53-imp4--group 's1)
 
-;; Row 1: src/term.c lines = 6,214.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m53-imp4--check "term.c-lines-7094"
-                 (eql 7094 (m53-imp4--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 29.
-(m53-imp4--check "term.c-defun-count-33"
-                 (eql 33 (m53-imp4--count "src/term.c" "^DEFUN (")))
-;; Row 3: the 4 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
-;; bare leaf tokens (each name also occurs in a sibling docstring).
-(m53-imp4--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m53-imp4--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 34.
-(m53-imp4--check "term.c-scm-ref-44"
-                 (eql 44 (m53-imp4--count "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m53-imp4--check "tty-output.scm-lines-906"
-                 (eql 906 (m53-imp4--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2b (milestone.org findings F2): the src/term.c and
+;; mod/emacs/tty-output.scm source-text pins (the line counts, the
+;; ^DEFUN ( count, the --tty-* leaf count and the scm_c_public_ref
+;; count) are REMOVED, not re-pinned.  A test proves behavior; it must
+;; not read source text.
+
 ;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
 (m53-imp4--check "tree-wide-scm-ref-270"
                  (eql 270 (m53-imp4--count-scm-ref)))
@@ -212,24 +185,24 @@ host limit is a skip, never a pass (brief.org section 8)."
 ;; tests, so a green m53 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 6 checks;
+;; because every check is registered at load time.  S1 holds 1 check;
 ;; S2 holds 4 checks.
 
 (setq m53-imp4--group 's3)
 
-(m53-imp4--check "reg/min-s1-checks-6" (>= (m53-imp4--group-count 's1) 6))
+(m53-imp4--check "reg/min-s1-checks-1" (>= (m53-imp4--group-count 's1) 1))
 (m53-imp4--check "reg/min-s2-checks-4" (>= (m53-imp4--group-count 's2) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
 ;; Select ONLY the m53-imp4 tests (the pattern is "^m53-imp4", not
 ;; "^m53-imp"): the whole (m53) group runs in one emacs process.  The
-;; floor is measured from a real run: 12 registered checks (S1 6, S2 4,
+;; floor is measured from a real run: 12 registered checks (S1 1, S2 4,
 ;; S3 2) plus the group-total deftest itself.  No check can fold to a
 ;; controlled skip -- this corpus needs no guile and no pty -- so the
 ;; floor is exact.
 
-(defvar m53-imp4--min-gate-total 13
+(defvar m53-imp4--min-gate-total 8
   "The minimum number of m53-imp4 ERT tests: 12 registered checks (S1 6,
 S2 4, S3 2) plus the group-total deftest.")
 

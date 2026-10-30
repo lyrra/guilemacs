@@ -256,24 +256,14 @@ host limit is a skip, never a pass (brief.org section 11)."
       (m56-imp1--info-skip "head-30213d139" "no git binary on PATH")
     (m56-imp1--check "head-30213d139" ok)))
 
-;; M61 imp-1 MEASURED update: 2 new DEFUNs (--tty-handle,
-;; --tty-handle-write) and the routed normal write changed the surface
-;; numbers, and the PTY driver gained the m61-imp1 group.  Re-measure;
-;; do not copy these numbers.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m56-imp1--check "term.c-lines-7094"
-                 (eql 7094 (m56-imp1--lines "src/term.c")))
-(m56-imp1--check "term.c-defun-count-33"
-                 (eql 33 (m56-imp1--count "src/term.c" "^DEFUN (")))
-(m56-imp1--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m56-imp1--count-defun-leaf "src/term.c")))
-(m56-imp1--check "term.c-scm-ref-44"
-                 (eql 44 (m56-imp1--count "src/term.c" "scm_c_public_ref")))
-(m56-imp1--check "tree-wide-scm-ref-270"
-                 (eql 270 (m56-imp1--count-scm-ref)))
-(m56-imp1--check "tty-output.scm-lines-906"
-                 (eql 906 (m56-imp1--lines "mod/emacs/tty-output.scm")))
+;; M61 imp-2b (milestone.org findings F2): the src/term.c source-text
+;; pins (lines, ^DEFUN ( count, --tty-* leaf count, scm_c_public_ref
+;; sites), the tree-wide scm_c_public_ref count and the
+;; mod/emacs/tty-output.scm line count are REMOVED, not re-pinned.  A
+;; source-inspection test proves no behavior and rejects a valid
+;; refactor (docs/milestone-overview.org =Test rules for ports=,
+;; docs/arch.org =Testing=).  The measured numbers live in the commit
+;; message of M61 imp-2b.
 (m56-imp1--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m56-imp1--line-of "src/termchar.h" "FILE \\*output;"))
@@ -399,26 +389,29 @@ host limit is a skip, never a pass (brief.org section 11)."
 ;; tests, so a green m56 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 9 checks,
-;; S2 holds 7, S3 holds 2, and S4 holds 4.
+;; because every check is registered at load time.  S1 holds 3 checks,
+;; S2 holds 7, S3 holds 2, and S4 holds 4.  S1 held 9 until M61 imp-2b
+;; removed the 6 source-text pins (milestone.org findings F2); the guard
+;; name and its bound moved with the count.
 
 (setq m56-imp1--group 's5)
 
-(m56-imp1--check "reg/min-s1-checks-9" (>= (m56-imp1--group-count 's1) 9))
+(m56-imp1--check "reg/min-s1-checks-3" (>= (m56-imp1--group-count 's1) 3))
 (m56-imp1--check "reg/min-s2-checks-7" (>= (m56-imp1--group-count 's2) 7))
 (m56-imp1--check "reg/min-s3-checks-2" (>= (m56-imp1--group-count 's3) 2))
 (m56-imp1--check "reg/min-s4-checks-4" (>= (m56-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m56-imp1 tests is 27: 26 registered checks
-;; (S1 9, S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m56-imp1 tests is 21: 20 registered checks
+;; (S1 3, S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
-;; a registered test, so the floor holds either way.
+;; a registered test, so the floor holds either way.  M61 imp-2b lowered
+;; it from 27 when findings F2 removed the 6 source-text pins.
 
-(defvar m56-imp1--min-gate-total 27
-  "The exact number of m56-imp1 ERT tests: 26 registered checks (S1 9,
+(defvar m56-imp1--min-gate-total 21
+  "The exact number of m56-imp1 ERT tests: 20 registered checks (S1 3,
 S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
 
 (ert-deftest m56-imp1/gate-m56-total ()

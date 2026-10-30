@@ -1787,7 +1787,12 @@ M61_IMP1_PROBE = r"""
        ;; last element (see READ_PATH_PROBE).
        (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
        (handle (and term ((module-ref output 'tty-handle-from-device) term)))
-       (write! (module-ref output 'tty-handle-write-all)))
+       (write! (module-ref output 'tty-handle-write-all))
+       ;; M61 imp-2b: the routed answers are the plain carrier
+       ;; #(count errno), so the probe reads the count and the errno with
+       ;; the exported accessors (milestone.org findings F1 and F3).
+       (ocount (module-ref output 'tty-handle-outcome-count))
+       (oerrno (module-ref output 'tty-handle-outcome-errno)))
   (if (not handle)
       "no-tty-handle"
     (let* ((send (lambda (s) ((c 'send-string-to-terminal) s)))
@@ -1804,7 +1809,7 @@ M61_IMP1_PROBE = r"""
            ;; a glyph write.
            (_c (send "@@CBYTES@@"))
            (_e (send "@@END@@")))
-      (if (= n @@HANDLEN@@)
+      (if (and (= (ocount n) @@HANDLEN@@) (= (oerrno n) 0))
           "ok"
           "handle-count"))))
 """
@@ -1828,6 +1833,8 @@ M61_IMP1_LARGE_PROBE = r"""
        (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
        (handle (and term ((module-ref output 'tty-handle-from-device) term)))
        (write! (module-ref output 'tty-handle-write-all))
+       (ocount (module-ref output 'tty-handle-outcome-count))
+       (oerrno (module-ref output 'tty-handle-outcome-errno))
        (n @@N@@)
        (payload (let ((bv (mkbv n 0)))
                   (let loop ((i 0))
@@ -1839,11 +1846,13 @@ M61_IMP1_LARGE_PROBE = r"""
       "no-tty-handle"
     (let* ((send (lambda (s) ((c 'send-string-to-terminal) s)))
            (_b (send "@@BEGIN@@"))
-           (total (write! handle payload))
+           (answer (write! handle payload))
            (_e (send "@@END@@")))
       ;; A probe value is a STRING (the report format), so the total count
       ;; leaves as a decimal string.
-      (if (number? total) (number->string total) total))))
+      (if (and (= 0 (oerrno answer)) (number? (ocount answer)))
+          (number->string (ocount answer))
+          (if (vector? answer) "write-errno" answer)))))
 """
 
 # The bounded BOOTSTRAP case (cr.org F5).  The ONE leaf of the handle layer
@@ -1860,6 +1869,8 @@ M61_IMP1_BOOT_PROBE = r"""
        (output (resolve-module '(emacs tty-output)))
        (from-device (module-ref output 'tty-handle-from-device))
        (write-all (module-ref output 'tty-handle-write-all-borrowed))
+       (ocount (module-ref output 'tty-handle-outcome-count))
+       (oerrno (module-ref output 'tty-handle-outcome-errno))
        (id-of (module-ref output 'tty-handle-id))
        (state-of (module-ref output 'tty-handle-state))
        (terms ((force (module-ref gobble '%terminal-list))))
@@ -1870,8 +1881,12 @@ M61_IMP1_BOOT_PROBE = r"""
         ((not (and (integer? (id-of h)) (> (id-of h) 0))) "bad-identity")
         ((not (eq? 'borrowed (state-of h))) "bad-state")
         ((not (equal? (id-of h) (id-of h2))) "identity-not-stable")
-        ((not (= 0 (write-all (id-of h) #vu8()))) "empty-write")
-        ((not (= -9 (write-all 1000000 #vu8(65)))) "closed-not-ebadf")
+        ((not (= 0 (ocount (write-all (id-of h) #vu8())))) "empty-write")
+        ((not (= 0 (oerrno (write-all (id-of h) #vu8())))) "empty-write-errno")
+        ;; -EBADF is 9 on this host, as a POSITIVE errno in the carrier.
+        ((not (and (= 0 (ocount (write-all 1000000 #vu8(65))))
+                   (= 9 (oerrno (write-all 1000000 #vu8(65))))))
+         "closed-not-ebadf")
         (else "ok")))
 """
 
@@ -2007,6 +2022,9 @@ M61_IMP2_HANDLE_PRELUDE = r"""
        (handle (and term ((module-ref output 'tty-handle-from-device) term)))
        (flush! (and handle (module-ref output 'tty-handle-flush)))
        (copy! (and handle (module-ref output 'tty-handle-termscript)))
+       ;; M61 imp-2b: the copy answers the plain carrier #(count errno).
+       (ocount (module-ref output 'tty-handle-outcome-count))
+       (oerrno (module-ref output 'tty-handle-outcome-errno))
        (open! (c 'open-termscript))
        (ti (c 'insert))
        (goto (c 'goto-char))
@@ -2028,12 +2046,13 @@ M61_IMP2_FLUSH_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
       (redisplay! #t)
       (let ((rc (flush! handle))
             ;; No termscript file is open in this case, so the copy leaf
-            ;; must answer 0: a plain count and NOT an error.  A session
-            ;; without a termscript stream is legal.
+            ;; must answer the carrier #(0 0): a plain count of 0 and NOT
+            ;; an error.  A session without a termscript stream is legal.
             (none (copy! handle #vu8(65))))
         (send "@@END@@")
         (cond ((not (= rc 0)) "flush-answer")
-              ((not (= none 0)) "no-termscript-answer")
+              ((not (= 0 (ocount none))) "no-termscript-count")
+              ((not (= 0 (oerrno none))) "no-termscript-answer")
               (else "ok"))))))
 """
 
@@ -2052,7 +2071,8 @@ M61_IMP2_TS_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
         (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
                (i1 (m61-imp2-index text "@@LEAFSTR@@" 0))
                (i2 (m61-imp2-index text "@@GLYPH@@" 0)))
-          (cond ((not (= n @@LEAFN@@)) "leaf-count")
+          (cond ((not (= (ocount n) @@LEAFN@@)) "leaf-count")
+                ((not (= 0 (oerrno n))) "leaf-errno")
                 ((< i1 0) "leaf-bytes-missing")
                 ((< i2 0) "glyph-bytes-missing")
                 (else "ok")))))))
@@ -2074,7 +2094,9 @@ M61_IMP2_TS_ORDER_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
                  (ia (m61-imp2-index text "@@ASTR@@" 0))
                  (ig (m61-imp2-index text "@@GLYPH@@" 0))
                  (ib (m61-imp2-index text "@@BSTR@@" 0)))
-            (cond ((not (and (= na @@AN@@) (= nb @@BN@@))) "copy-count")
+            (cond ((not (and (= (ocount na) @@AN@@) (= (ocount nb) @@BN@@)))
+                   "copy-count")
+                  ((not (and (= 0 (oerrno na)) (= 0 (oerrno nb)))) "copy-errno")
                   ((< ia 0) "a-missing")
                   ((< ig 0) "glyph-missing")
                   ((< ib 0) "b-missing")
@@ -2101,21 +2123,44 @@ M61_IMP2_BYTE_ORDER_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
       (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
              (ia (m61-imp2-index text "@@A@@" 0))
              (ib (m61-imp2-index text "@@B@@" 0)))
-        (cond ((not (= (copy! handle #vu8()) 0)) "empty-copy-count")
+        (cond ((not (= 0 (ocount (copy! handle #vu8())))) "empty-copy-count")
+              ((not (= 0 (oerrno (copy! handle #vu8())))) "empty-copy-errno")
               ((< ia 0) "a-missing")
               ((< ib 0) "b-missing")
               ((not (< ia ib)) "b-before-a")
               (else "ok"))))))
 """
 
-# The only case of this group that reports SKIP.  A short write of the
-# termscript stream needs a WRITE error on a regular file, and this host
-# offers no bounded way to force it (a full file system is not a test
-# fixture).  The output-stream retry of a short write is already proved by
-# m61-imp1/large-write-e2e.
-M61_IMP2_SHORT_PROBE = r"""
-(string-append "m61-imp2-skip: a short write of the termscript stream"
-               " can not be forced on this host")
+# The ZERO-PROGRESS copy case (milestone.org findings F3, the review of
+# 2026-10-30 CR7).  A SHORT copy of a regular file can not be forced on
+# this host, but a copy that moves NO byte CAN: /dev/full answers ENOSPC on
+# every write, so =fwrite= answers 0 with the error flag set and
+# m61_tty_output_termscript_1 takes its hard-failure branch.  The probe
+# pins BOTH values of the carrier, so a lost count and a lost errno each
+# FAIL: count 0, and the positive ENOSPC (28 on Linux).
+#
+# The PARTIAL copy (some bytes, then a hard failure) stays a GAP: no
+# bounded file makes the first =fwrite= short and the second one fail.
+#
+# A host without /dev/full reports the narrow SKIP of this case.
+# The payload is LARGER than one stdio buffer, so =fwrite= must flush in
+# the middle of the call: /dev/full then answers a SHORT count with ENOSPC.
+M61_IMP2_FULL_PAYLOAD = bytes([65]) * 8192
+
+M61_IMP2_SHORT_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
+    (if (not (file-exists? "/dev/full"))
+        (string-append "m61-imp2-skip: this host has no /dev/full")
+        (begin
+          (open! "/dev/full")
+          (let ((answer (copy! handle #vu8(@@LEAFBYTES@@))))
+            (open! #nil)
+            ;; MEASURED on this host: a copy of 8192 bytes to /dev/full
+            ;; answers the carrier #(0 28) -- ENOSPC (28) and zero
+            ;; progress.  Both values are pinned, so a lost errno and a
+            ;; lost count each FAIL.
+            (cond ((not (= 0 (ocount answer))) "full-copy-count")
+                  ((not (= 28 (oerrno answer))) "full-copy-errno")
+                  (else "ok")))))))
 """
 
 M61_IMP2_CASES = (
@@ -2180,9 +2225,10 @@ M61_IMP2_CASES = (
         "name": "m61-imp2/short-write-e2e",
         "group": "m61-imp2",
         "probe": M61_IMP2_SHORT_PROBE,
-        # NO placeholder and no pty byte: the case reports the SKIP itself.
+        "subst": {"LEAFBYTES": " ".join(str(b) for b in M61_IMP2_FULL_PAYLOAD)},
+        # The case runs a real copy that fails on /dev/full.
         "expect": "ok",
-        # The NARROW skip: only the probe's own prefix is an INFO skip.
+        # The NARROW skip: only a host WITHOUT /dev/full reports it.
         "info_report_prefix": M61_IMP2_SKIP,
         "env": {"TERM": "xterm"},
     },

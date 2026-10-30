@@ -93,50 +93,6 @@ An absent file folds to nil."
       (when (search-forward needle nil t)
         (line-number-at-pos (match-beginning 0))))))
 
-(defun m54-imp5--lines (rel)
-  "Count the newlines of REL the way `wc -l' does."
-  (m54-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (search-forward "\n" nil t) (setq n (1+ n)))
-        n))))
-
-(defun m54-imp5--count-lines (rel regexp)
-  "Count the LINES of REL that match REGEXP, the way `grep -c' does.
-REGEXP may match anywhere in a line, and a line with two matches counts
-once.  The brief.org section 5 pins come from `grep -c', which counts
-LINES, not matches, so this corpus counts lines too: a later imp that
-puts two refs on one line keeps this pin in step with the grep pin."
-  (m54-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0)
-            (last 0))
-        (while (re-search-forward regexp nil t)
-          (let ((line (line-number-at-pos (match-beginning 0))))
-            (unless (= line last)
-              (setq n (1+ n))
-              (setq last line))))
-        n))))
-
-(defun m54-imp5--count-defun-leaf (rel)
-  "Count the lines of `^DEFUN (\"--tty-' in REL.  Do NOT pin the leaves
-with `grep -c -- '--tty-'': that count is higher, because each leaf name
-also occurs in a sibling docstring (brief.org section 7)."
-  (m54-imp5--count-lines rel "^DEFUN (\"--tty-"))
-
-(defun m54-imp5--count-scm-ref ()
-  "Count scm_c_public_ref over the TOP src/ directory, one file at a
-time, over src/*.[chm] (the brief.org section 5 tree-wide measure).  Do
-NOT use a recursive `grep -r src/': that also counts the .scm, .go, and
-sub-directory files (brief.org section 7)."
-  (let ((total 0)
-        (dir (expand-file-name "src" m54-imp5--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m54-imp5--count-lines f "scm_c_public_ref") 0))))
-    total))
-
 (defun m54-imp5--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
 The count callers pass `(eql N value)': when the source file is absent
@@ -155,39 +111,16 @@ princ'd FAIL with no ERT test would leave the exit code 0."
     (m54-imp5--bump-group)
     (imp-register-bool-as-ert-test (format "m54-imp5/%s" name) pass)))
 
-;;; --- S1. The re-measured surface (brief.org section 5) --------------
+;;; --- S1. REMOVED by M61 imp-2b (milestone.org findings F2) -----------
 
-;; One check per brief.org section 5 value row, re-measured at the imp-5
-;; base HEAD 2cc354f87.  An absent src/ file fails: the count reader
-;; returns `m54-imp5-absent' and `eql' yields nil (brief.org section 7).
-
-(setq m54-imp5--group 's1)
-
-;; Row 1: src/term.c lines = 6,214.
-;; M61 imp-1 MEASURED update: the opaque per-TTY handle added 2 DEFUNs
-;; (--tty-handle, --tty-handle-write), the C identity table, and the
-;; routed normal write, so the surface numbers changed.  Do not copy them
-;; from this comment; re-measure.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m54-imp5--check "term.c-lines-7094"
-                 (eql 7094 (m54-imp5--lines "src/term.c")))
-;; Row 2: src/term.c ^DEFUN ( count = 31.
-(m54-imp5--check "term.c-defun-count-33"
-                 (eql 33 (m54-imp5--count-lines "src/term.c" "^DEFUN (")))
-;; Row 3: the 6 --tty-* leaf DEFUNs.  Count the DEFUN forms, not the
-;; bare leaf tokens (each name also occurs in a sibling docstring).
-(m54-imp5--check "term.c-leaf-defun-count-8"
-                 (eql 8 (m54-imp5--count-defun-leaf "src/term.c")))
-;; Row 4: src/term.c scm_c_public_ref sites = 36.
-(m54-imp5--check "term.c-scm-ref-44"
-                 (eql 44 (m54-imp5--count-lines "src/term.c" "scm_c_public_ref")))
-;; Row 5: mod/emacs/tty-output.scm lines = 454.
-(m54-imp5--check "tty-output.scm-lines-906"
-                 (eql 906 (m54-imp5--lines "mod/emacs/tty-output.scm")))
-;; Row 6: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m54-imp5--check "tree-wide-scm-ref-270"
-                 (eql 270 (m54-imp5--count-scm-ref)))
+;; S1 held the source-text pins of src/term.c (lines, ^DEFUN ( count,
+;; --tty-* leaf count, scm_c_public_ref sites), the
+;; mod/emacs/tty-output.scm line count, and the tree-wide
+;; scm_c_public_ref count.  A source-inspection test proves no behavior,
+;; so the assertions are removed and NOT re-pinned
+;; (docs/milestone-overview.org =Test rules for ports=, docs/arch.org
+;; =Testing=).  The measured numbers live in the commit message of M61
+;; imp-2b.
 
 ;;; --- S2. The registration (brief.org section 8) ---------------------
 
@@ -217,26 +150,27 @@ princ'd FAIL with no ERT test would leave the exit code 0."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 6 checks;
-;; S2 holds 4 checks.
+;; because every check is registered at load time.  S2 holds 4 checks.
+;; S1 is gone (M61 imp-2b, findings F2), so it has no guard: a group that
+;; holds no check needs none.
 
 (setq m54-imp5--group 's3)
 
-(m54-imp5--check "reg/min-s1-checks-6" (>= (m54-imp5--group-count 's1) 6))
 (m54-imp5--check "reg/min-s2-checks-4" (>= (m54-imp5--group-count 's2) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
 ;; Select ONLY the m54-imp5 tests (the pattern is "^m54-imp5", not
 ;; "^m54-imp"): the whole (m54) group runs in one emacs process.  The
-;; floor is measured from a real run: 12 registered checks (S1 6, S2 4,
-;; S3 2) plus the group-total deftest itself.  No check can fold to a
+;; floor is measured from a real run: 5 registered checks (S2 4, S3 1)
+;; plus the group-total deftest itself.  No check can fold to a
 ;; controlled skip -- this corpus needs no guile and no pty -- so the
-;; floor is exact.
+;; floor is exact.  M61 imp-2b lowered it from 13 when findings F2
+;; removed the 6 S1 source-text pins and the S1 guard.
 
-(defvar m54-imp5--min-gate-total 13
-  "The minimum number of m54-imp5 ERT tests: 12 registered checks (S1 6,
-S2 4, S3 2) plus the group-total deftest.")
+(defvar m54-imp5--min-gate-total 6
+  "The minimum number of m54-imp5 ERT tests: 5 registered checks (S2 4,
+S3 1) plus the group-total deftest.")
 
 (ert-deftest m54-imp5/gate-m54-total ()
   "The m54-imp5 corpus registers at least its docs-independent floor."

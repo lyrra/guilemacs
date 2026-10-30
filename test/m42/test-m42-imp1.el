@@ -151,19 +151,13 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 (m42-imp1--check "tty-input-is-FILE-star"
                  (m42-imp1--contains-p "src/termchar.h" "FILE *input;"))
-;; M54 imp-4 added the TAB policy seam to src/term.c: 6 lines at the
-;; forward-declaration block, 15 lines at the init_tty call site, and 25
-;; lines for the dispatcher.  The three DESCRIPTOR anchors below sit
-;; AFTER those insertions, so they move (+6, +6, +21).  The M52 imp-8
-;; pattern: re-pin the older corpus in the SAME commit.
-(m42-imp1--check "tty-input-opened-by-fdopen-at-3025"
-                 (eql 3025 (m42-imp1--line-of "src/term.c" "emacs_fdopen")))
-(m42-imp1--check "initial-tty-input-is-stdin-at-5086"
-                 (eql 5086 (m42-imp1--line-of "src/term.c"
-                                              "tty->input = stdin;")))
-(m42-imp1--check "delete-tty-fcloses-input-at-5370"
-                 (eql 5370 (m42-imp1--line-of "src/term.c"
-                                              "emacs_fclose (tty->input);")))
+;; M61 imp-2b (milestone.org findings F2): the 3 src/term.c LINE anchors
+;; of the descriptor facts (emacs_fdopen, `tty->input = stdin;',
+;; `emacs_fclose (tty->input);') are REMOVED, not re-pinned.  A line pin
+;; proves no behavior: it rejects every valid insertion above it, and the
+;; M52 / M54 / M61 acts had to re-pin it each time (docs/arch.org
+;; =Testing=).  The contains check above still proves that the module
+;; names the 2 leaf tokens.
 (m42-imp1--check "read-bypasses-stdio-via-emacs-read"
                  (m42-imp1--contains-p "src/keyboard.c"
                                        "nread = emacs_read (fileno (tty->input)"))

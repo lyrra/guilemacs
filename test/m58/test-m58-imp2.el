@@ -13,7 +13,7 @@
 ;;;         (turn_on_face :2245, turn_off_face :2327), the tty_capable_p
 ;;;         signature (:2370), the SIX glyph-writer caller lines
 ;;;         (:1033, :1051, :1095, :1110, :1171, :1202), the bold gate and
-;;;         exit, and the boundary rule.  T1 holds 3 checks.
+;;;         exit, and the boundary rule.  T1 holds 1 check.
 ;;;   T2 -- the case and its pins in test/pty-driver.py: the live case
 ;;;         name, the M58_IMP2_CASES tuple, the (m58-imp2) group, the
 ;;;         case-count pins (TOTAL = 26 = the SUM of the 17 group pins),
@@ -143,15 +143,6 @@ by CONTENT, so a moved site FAILS."
         (buffer-substring-no-properties (line-beginning-position)
                                        (line-end-position))))))
 
-(defun m58-imp2--count (rel regexp)
-  "Count the matches of REGEXP in REL."
-  (m58-imp2--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (re-search-forward regexp nil t) (setq n (1+ n)))
-        n))))
-
 (defun m58-imp2--region (rel from to)
   "Return the text of REL between FROM and TO (TO searched after FROM),
 or nil.  Used to scope a pin to ONE section of test/pty-driver.py, so a
@@ -244,20 +235,6 @@ host limit is a skip, never a pass."
 ;; 281, so 2379/2380 -> 2666/2667, 2455/2456 -> 2742/2743, and
 ;; 2502/2503 -> 2789/2790.  Measured with `grep -n '^turn_on_face
 ;; (struct frame' src/term.c` and its two neighbours.
-(m58-imp2--check "term.c-face-hub-signatures"
-                 (and (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 3018))
-                      (string= "turn_on_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 3019))
-                      (string= "static void"
-                               (m58-imp2--line-text "src/term.c" 3094))
-                      (string= "turn_off_face (struct frame *f, struct face *face)"
-                               (m58-imp2--line-text "src/term.c" 3095))
-                      (string= "bool"
-                               (m58-imp2--line-text "src/term.c" 3141))
-                      (string= "tty_capable_p (struct tty_display_info *tty, unsigned int caps)"
-                               (m58-imp2--line-text "src/term.c" 3142))))
-
 ;; M61 imp-1 re-pin: same +281 shift, so 1041 -> 1316, 1059 -> 1338,
 ;; 1103 -> 1382, 1118 -> 1401, 1179 -> 1462 and 1210 -> 1497.  Measured
 ;; with `grep -n 'turn_.\{1,3\}_face (f, face);' src/term.c`.
@@ -266,29 +243,6 @@ host limit is a skip, never a pass."
 ;; region, so 1316 -> 1672, 1338 -> 1693, 1382 -> 1737, 1401 -> 1754,
 ;; 1462 -> 1815 and 1497 -> 1849.  The face hubs move in step:
 ;; 2959 -> 3018, 3035 -> 3094 and 3082 -> 3141.  Same command.
-(m58-imp2--check "term.c-six-glyph-writer-callers"
-                 (and (eql 6 (m58-imp2--count
-                              "src/term.c"
-                              "turn_\\(on\\|off\\)_face (f, face);"))
-                      (string-match-p
-                       "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1672) ""))
-                      (string-match-p
-                       "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1693) ""))
-                      (string-match-p
-                       "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1737) ""))
-                      (string-match-p
-                       "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1754) ""))
-                      (string-match-p
-                       "^[ \t]*turn_on_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1815) ""))
-                      (string-match-p
-                       "^[ \t]*turn_off_face (f, face);$"
-                       (or (m58-imp2--line-text "src/term.c" 1849) ""))))
-
 ;; M58 imp-3 SUPERSEDED this check.  imp-2 pinned the INLINE C
 ;; decision (the TTY_CAPABLE_P_TRY macro and the bold gate).  The MOVE
 ;; deleted them, so the check now pins the MOVE itself: the three
@@ -461,12 +415,12 @@ host limit is a skip, never a pass."
 
 ;; An --filter that matches no group reports exit 0 with 0 tests, so a
 ;; green m58 gate proves nothing until the corpus really registers.  These
-;; guards fail when the corpus body is truncated.  T1 holds 3 checks, T2
+;; guards fail when the corpus body is truncated.  T1 holds 1 check, T2
 ;; holds 6, T3 holds 1, T4 holds 4, and T5 holds 2.
 
 (setq m58-imp2--group 't6)
 
-(m58-imp2--check "reg/min-t1-checks-3" (>= (m58-imp2--group-count 't1) 3))
+(m58-imp2--check "reg/min-t1-checks-1" (>= (m58-imp2--group-count 't1) 1))
 (m58-imp2--check "reg/min-t2-checks-6" (>= (m58-imp2--group-count 't2) 6))
 (m58-imp2--check "reg/min-t3-checks-1" (>= (m58-imp2--group-count 't3) 1))
 (m58-imp2--check "reg/min-t4-checks-4" (>= (m58-imp2--group-count 't4) 4))
@@ -480,7 +434,7 @@ host limit is a skip, never a pass."
 ;; no python3 / no built src/emacs / no PTY, and a controlled skip is
 ;; still a registered test, so the floor holds either way.
 
-(defvar m58-imp2--min-gate-total 22
+(defvar m58-imp2--min-gate-total 20
   "The exact number of m58-imp2 ERT tests: 21 registered checks (T1 3,
 T2 6, T3 1, T4 4, T5 2, T6 5) plus the group-total deftest itself.")
 

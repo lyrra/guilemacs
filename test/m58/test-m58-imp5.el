@@ -45,7 +45,7 @@
 ;;;         --tty-* leaf DEFUNs / scm_c_public_ref sites, tree-wide
 ;;;         scm_c_public_ref, mod/emacs/tty-output.scm lines,
 ;;;         test/pty-driver.py 32 cases in 19 groups, and the 5 corpus
-;;;         files of test/m58.  V3 holds 6 checks.
+;;;         files of test/m58.  V3 holds 3 checks.
 ;;;   V4 -- the registration: the (m58) group holds this file after
 ;;;         test-m58-imp4.el, and the 4 older lines stay.  V4 holds 2
 ;;;         checks.
@@ -166,33 +166,12 @@ folds to nil, so the check prints FAIL."
                           (- (point) (length to)))))
               (and b (< a b) (buffer-substring-no-properties a b)))))))))
 
-(defun m58-imp5--count (rel regexp)
-  "Count the matches of REGEXP in REL."
-  (m58-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (let ((n 0))
-        (while (re-search-forward regexp nil t) (setq n (1+ n)))
-        n))))
-
 (defun m58-imp5--count-in (text needle)
   "Count the non-overlapping occurrences of the literal NEEDLE in TEXT."
   (let ((n 0) (start 0) (re (regexp-quote needle)))
     (while (string-match re text start)
       (setq n (1+ n) start (match-end 0)))
     n))
-
-(defun m58-imp5--line-of (rel needle)
-  "The 1-based line number of the FIRST NEEDLE in REL, or nil."
-  (m58-imp5--with rel
-    (lambda ()
-      (goto-char (point-min))
-      (when (search-forward needle nil t)
-        (let ((pos (match-beginning 0)) (n 1))
-          (save-excursion
-            (goto-char (point-min))
-            (while (search-forward "\n" pos t) (setq n (1+ n))))
-          n)))))
 
 (defun m58-imp5--lines-matching (rel regexp)
   "Count the lines of REL that hold a match of REGEXP."
@@ -223,10 +202,6 @@ folds to nil, so the check prints FAIL."
 (defun m58-imp5--src-public-refs ()
   "Count the scm_c_public_ref sites in every src/*.c and src/*.h."
   (m58-imp5--grep-src "scm_c_public_ref"))
-
-(defun m58-imp5--leaf-defuns ()
-  "Count the DEFUN forms whose name starts with --tty- in src/term.c."
-  (m58-imp5--count "src/term.c" "DEFUN (\"--tty-"))
 
 (defun m58-imp5--corpus-files ()
   "The number of .el corpus files in test/m58."
@@ -302,12 +277,10 @@ the TRACKED file is absent and prints FAIL."
                          "per_line_cost (tty->TS_repeat) < 9000 / baud_rate"
                          "tty->RPov = string_cost (tty->TS_repeat);"
                          "tty->RPov = FRAME_COLS (frame) * 2;"))
-                      ;; The site line, measured now (imp-5 moves no C).
-                      (eql 2141 (m58-imp5--line-of "src/term.c"
-                                                  "Don't use TS_repeat"))
+                      ;; M61 imp-2b (F2): the src/term.c site line and
+                      ;; the tty->RPov write count are REMOVED.
                       ;; 3 sites: 2 writes here, 1 declaration.
                       (eql 3 (m58-imp5--grep-src "RPov"))
-                      (eql 2 (m58-imp5--count "src/term.c" "tty->RPov ="))
                       (m58-imp5--contains-p "src/termchar.h" "int RPov;")
                       (m58-imp5--absent-p "mod/emacs/tty-output.scm" "RPov")
                       (m58-imp5--contains-p "tool/run-tests.scm"
@@ -324,8 +297,7 @@ the TRACKED file is absent and prints FAIL."
                          "if (t->type == output_termcap)"
                          "t->display_info.tty->TS_enter_underline_mode = 0;"
                          "M52_CAP (\"underline\", TS_enter_underline_mode),"))
-                      (eql 3521 (m58-imp5--line-of
-                                 "src/term.c" "DEFUN (\"tty-no-underline\""))
+                      ;; M61 imp-2b (F2): the site line is REMOVED.
                       (m58-imp5--contains-p "tool/run-tests.scm"
                                             "STAYS C (one C field write behind a C type test")
                       (m58-imp5--contains-p "tool/run-tests.scm"
@@ -337,8 +309,7 @@ the TRACKED file is absent and prints FAIL."
                        "src/term.c"
                        '("DEFUN (\"tty-top-frame\", Ftty_top_frame, Stty_top_frame, 0, 1, 0,"
                          "return t->display_info.tty->top_frame;"))
-                      (eql 3539 (m58-imp5--line-of
-                                 "src/term.c" "DEFUN (\"tty-top-frame\""))
+                      ;; M61 imp-2b (F2): the site line is REMOVED.
                       ;; The body computes nothing: one field read, then
                       ;; nil for a non-tty terminal.
                       (let ((body (m58-imp5--region
@@ -409,19 +380,10 @@ the TRACKED file is absent and prints FAIL."
 
 ;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m58-imp5--check "v3/term-c-surface"
-                 (and (eql 7094 (m58-imp5--count "src/term.c" "\n"))
-                      (eql 33 (m58-imp5--count "src/term.c" "^DEFUN ("))))
-
-(m58-imp5--check "v3/leaf-defuns-8"
-                 (eql 8 (m58-imp5--leaf-defuns)))
-
+;; M61 imp-2b (milestone.org findings F2): the src/term.c
+;; scm_c_public_ref pin is REMOVED.  The tree-wide count stays.
 (m58-imp5--check "v3/public-refs"
-                 (and (eql 44 (m58-imp5--count "src/term.c" "scm_c_public_ref"))
-                      (eql 270 (m58-imp5--src-public-refs))))
-
-(m58-imp5--check "v3/module-lines"
-                 (eql 906 (m58-imp5--count "mod/emacs/tty-output.scm" "\n")))
+                 (eql 270 (m58-imp5--src-public-refs)))
 
 (m58-imp5--check "v3/pty-42-cases-21-groups"
                  (let ((pins (m58-imp5--pty-case-pins)))
@@ -525,7 +487,7 @@ lines that a healthy run prints."
 
 (m58-imp5--check "reg/min-v1-checks-3" (>= (m58-imp5--group-count 'v1) 3))
 (m58-imp5--check "reg/min-v2-checks-3" (>= (m58-imp5--group-count 'v2) 3))
-(m58-imp5--check "reg/min-v3-checks-5" (>= (m58-imp5--group-count 'v3) 5))
+(m58-imp5--check "reg/min-v3-checks-3" (>= (m58-imp5--group-count 'v3) 3))
 (m58-imp5--check "reg/min-v4-checks-2" (>= (m58-imp5--group-count 'v4) 2))
 (m58-imp5--check "reg/min-v5-checks-3" (>= (m58-imp5--group-count 'v5) 3))
 (m58-imp5--check "reg/min-v6-prior-checks-5"
@@ -534,14 +496,14 @@ lines that a healthy run prints."
 
 ;;; --- The group-total check ------------------------------------------
 
-;; 23 registered checks (V1 3, V2 3, V3 6, V4 2, V5 3, V6 6) plus the
+;; 20 registered checks (V1 3, V2 3, V3 3, V4 2, V5 3, V6 6) plus the
 ;; group-total deftest itself.  A V5 check may fold to a controlled INFO
 ;; skip on a host with no built src/emacs, no python3, or no PTY, and a
 ;; controlled skip is still a registered test.
 
-(defvar m58-imp5--gate-total 24
-  "The EXACT number of m58-imp5 ERT tests: 23 registered checks (V1 3,
-V2 3, V3 6, V4 2, V5 3, V6 6) plus the group-total deftest itself.
+(defvar m58-imp5--gate-total 21
+  "The EXACT number of m58-imp5 ERT tests: 20 registered checks (V1 3,
+V2 3, V3 3, V4 2, V5 3, V6 6) plus the group-total deftest itself.
 The guard uses `equal', not `>=', so a DUPLICATE registration fails too.")
 
 (ert-deftest m58-imp5/gate-m58-total ()

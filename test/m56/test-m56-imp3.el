@@ -325,22 +325,11 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; --- Group B.  The TTY surface that M56 audits. ---
 
-;; B1: src/term.c lines = 6,363 (M58 imp-3).
-;; B2: src/term.c ^DEFUN count = 29.
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m56-imp3--check "term-c-defun-31"
-                 (eql 33 (m56-imp3--count-lines "src/term.c" "^DEFUN (")))
-;; B3: the 8 --tty-* leaf DEFUNs (M61 imp-2 added --tty-handle-flush and
-;; --tty-handle-termscript).  Count the DEFUN forms, NOT the bare leaf
-;; token: each leaf name also occurs in a sibling docstring.
-(m56-imp3--check "term-c-tty-leaf-8"
-                 (eql 8 (m56-imp3--count-lines "src/term.c" "^DEFUN (\"--tty-")))
-;; B4: src/term.c scm_c_public_ref sites = 39 (M58 imp-3 added 3).
-(m56-imp3--check "term-c-scm-ref-44"
-                 (eql 44 (m56-imp3--count-lines "src/term.c" "scm_c_public_ref")))
+;; B2, B3 and B4 are REMOVED by M61 imp-2b (milestone.org findings F2):
+;; the src/term.c ^DEFUN ( count, the --tty-* leaf count and the
+;; scm_c_public_ref count are source-text pins.  A test proves behavior;
+;; it must not read source text.
 ;; B5: the tree-wide scm_c_public_ref count over src/*.[chm] = 263.
-;; B6: mod/emacs/tty-output.scm lines = 635 (M58 imp-3 added the face section).
 ;; B7: the 3 src/termchar.h FILE * streams at :51 / :53 / :61.
 (m56-imp3--check "termchar-file-streams-3"
                  (and (eql 51 (m56-imp3--line-of "src/termchar.h" "FILE *input;"))
@@ -438,7 +427,7 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 (setq m56-imp3--group 's4)
 
-(m56-imp3--check "reg/min-s1-checks-11" (>= (m56-imp3--group-count 's1) 11))
+(m56-imp3--check "reg/min-s1-checks-8" (>= (m56-imp3--group-count 's1) 8))
 (m56-imp3--check "reg/min-s2-checks-6" (>= (m56-imp3--group-count 's2) 6))
 (m56-imp3--check "reg/min-s3-checks-2" (>= (m56-imp3--group-count 's3) 2))
 
@@ -446,14 +435,14 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; Select ONLY the m56-imp3 tests (the pattern is "^m56-imp3", not
 ;; "^m56-imp"): the whole (m56) group runs in one emacs process.  The
-;; floor is measured from a real run: 22 registered checks (S1 11, S2 6,
+;; floor is measured from a real run: 19 registered checks (S1 8, S2 6,
 ;; S3 2, S4 3) plus the group-total deftest itself.  No check can fold
 ;; to a controlled skip -- the S2 ancestor and audit checks and the S3
 ;; checks register as ERT tests either way (a real check or an INFO
 ;; skip) -- so the floor is exact.
 
-(defvar m56-imp3--min-gate-total 23
-  "The exact number of m56-imp3 ERT tests: 22 registered checks (S1 11,
+(defvar m56-imp3--min-gate-total 20
+  "The exact number of m56-imp3 ERT tests: 19 registered checks (S1 8,
 S2 6, S3 2, S4 3) plus the group-total deftest itself.")
 
 (ert-deftest m56-imp3/gate-m56-total ()

@@ -206,10 +206,6 @@ anchored match finds the definition only."
                     "src/term.c"
                     (format "scm_c_public_ref (\"emacs terminal\", \"%s\")"
                             wrapper))))
-;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
-;; flush/termscript sites moved the surface.  MEASURED on this tree.
-(m48-imp4--check "term.c-scm-ref-44"
-                 (eql 44 (m48-imp4--count "src/term.c" "scm_c_public_ref")))
 (m48-imp4--check "scm-c-public-ref-270"
                  (eql 270 (m48-imp4--count-scm-ref)))
 
@@ -244,10 +240,6 @@ anchored match finds the definition only."
 
 (setq m48-imp4--group 'f4)
 
-(m48-imp4--check "leaf-defuns-6"
-                 (eql 6 (m48-imp4--count "src/term.c" "^DEFUN (\"--term-")))
-(m48-imp4--check "defun-count-33"
-                 (eql 33 (m48-imp4--count "src/term.c" "^DEFUN (\"")))
 (m48-imp4--check "term.c-has-guile.h"
                  (m48-imp4--contains-p "src/term.c" "#include \"guile.h\""))
 
@@ -280,16 +272,16 @@ anchored match finds the definition only."
                                        "test/m48/test-m48-imp4.el"))
 (m48-imp4--check "reg/min-f1-checks-8"
                  (>= (m48-imp4--group-count 'f1) 8))
-(m48-imp4--check "reg/min-f2-checks-6"
-                 (>= (m48-imp4--group-count 'f2) 6))
+(m48-imp4--check "reg/min-f2-checks-5"
+                 (>= (m48-imp4--group-count 'f2) 5))
 (m48-imp4--check "reg/min-f3-checks-4"
                  (>= (m48-imp4--group-count 'f3) 4))
-(m48-imp4--check "reg/min-f4-checks-3"
-                 (>= (m48-imp4--group-count 'f4) 3))
+(m48-imp4--check "reg/min-f4-checks-1"
+                 (>= (m48-imp4--group-count 'f4) 1))
 (m48-imp4--check "reg/min-f5-checks-4"
                  (>= (m48-imp4--group-count 'f5) 4))
-(m48-imp4--check "reg/min-total-31"
-                 (>= m48-imp4--registered 31))
+(m48-imp4--check "reg/min-total-28"
+                 (>= m48-imp4--registered 28))
 
 ;;; --- F7. The gated runtime probe (brief.org section 9 F7) -----------
 
