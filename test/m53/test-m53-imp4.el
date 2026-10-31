@@ -174,10 +174,9 @@ host limit is a skip, never a pass (brief.org section 8)."
                    (and (integerp imp3) (integerp imp4) (< imp3 imp4))))
 (m53-imp4--check "run-tests-m53-group"
                  (m53-imp4--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp4--check "pty-driver-total-42"
-                 (m53-imp4--contains-p
-                  "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.
+;; The driver's own --selftest holds the count checks at :3470 ... :3472.
 
 ;;; --- S3. The guards -------------------------------------------------
 
@@ -186,25 +185,26 @@ host limit is a skip, never a pass (brief.org section 8)."
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
 ;; because every check is registered at load time.  S1 holds 1 check;
-;; S2 holds 4 checks.
+;; S2 holds 3 checks.
 
 (setq m53-imp4--group 's3)
 
 (m53-imp4--check "reg/min-s1-checks-1" (>= (m53-imp4--group-count 's1) 1))
-(m53-imp4--check "reg/min-s2-checks-4" (>= (m53-imp4--group-count 's2) 4))
+(m53-imp4--check "reg/min-s2-checks-3" (>= (m53-imp4--group-count 's2) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
 ;; Select ONLY the m53-imp4 tests (the pattern is "^m53-imp4", not
 ;; "^m53-imp"): the whole (m53) group runs in one emacs process.  The
-;; floor is measured from a real run: 12 registered checks (S1 1, S2 4,
+;; floor is measured from a real run: 11 registered checks (S1 6, S2 3,
 ;; S3 2) plus the group-total deftest itself.  No check can fold to a
 ;; controlled skip -- this corpus needs no guile and no pty -- so the
 ;; floor is exact.
 
-(defvar m53-imp4--min-gate-total 8
-  "The minimum number of m53-imp4 ERT tests: 12 registered checks (S1 6,
-S2 4, S3 2) plus the group-total deftest.")
+(defvar m53-imp4--min-gate-total 7
+  "The minimum number of m53-imp4 ERT tests: 11 registered checks (S1 6,
+S2 3, S3 2) plus the group-total deftest.  M61 imp-2g removed the
+pty-driver case-count pin.")
 
 (ert-deftest m53-imp4/gate-m53-total ()
   "The m53-imp4 corpus registers at least its docs-independent floor."

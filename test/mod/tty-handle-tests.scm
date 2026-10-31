@@ -17,10 +17,13 @@
 ;;      the 0 answer of a tty with no termscript stream are proved by the
 ;;      m61-imp2 PTY group, not here: a plain Guile session has no tty.
 ;;   3. The raise cases of section I run the SCHEME retry loop only, with
-;;      an injected write procedure.  A raise can NOT be forced through
-;;      the real C dispatchers on this host, so the rule "a #f answer
-;;      writes no byte" of src/term.c is proved by the code there and by
-;;      the carrier tests here, not by a C seam.
+;;      an injected write procedure.  The rule "a #f answer writes no
+;;      byte" of src/term.c is proved end to end by the m61-imp2g PTY
+;;      case `raise-e2e`, which injects a raise into the real C dispatch
+;;      (a `module-set!' of the binding that the C hub reads), not here.
+;;      The 6 K checks of section K prove the POLICY procedure of that
+;;      seam; the C side of it is proved by `clean-run-e2e` and
+;;      `raise-e2e`.
 ;;   4. It mutates NO module binding.  A `module-set!' of a leaf inside a
 ;;      declarative module is inlined by the compiler, so a stub test
 ;;      silently stops testing anything once a compiled .go cache exists.
@@ -41,8 +44,12 @@
 ;; shape of the 4 sibling suites of this directory: their exit block is
 ;; (= passes expected-passes).  imp-1 carried 31; imp-2 added the 12 G
 ;; checks, the 4 H checks and Z1, so 48; imp-2b adds the C5 to C7 checks,
-;; the H5 to H7 checks, the F3 EBADF pin, the 5 I checks and Z1, so 65.
-(define expected-passes 65)
+;; the H5 to H7 checks, the F3 EBADF pin, the 5 I checks and Z1, so 65;
+;; imp-2g adds D4, J1 and J2, so 68 (MEASURED 2026-10-31 with
+;; ./test/mod/run-mod-tests.sh); imp-2g adds the 6 K checks, so 74; the
+;; repair of review cr.org C3 adds K7, so 75; the repair of review cr.org
+;; CR2 adds G13 to G15, so 78.
+(define expected-passes 78)
 
 ;; No SRFI-64 log file: it would land in the working directory.  See the
 ;; same note, docs/kb.org test-mod-standalone-suite.
@@ -181,13 +188,21 @@
               (and (pair? answer) (eq? 'wrong-type-arg (car answer)))))
 
 ;; --- D. the after-write verdict -------------------------------------
+;;
+;; Since imp-2g the verdict takes the carrier #(count errno) of ONE call,
+;; not a plain fixnum (milestone.org =findings= F6).
 
 (test-equal "D1 a full write is done" "done"
-            (tty-handle-write-verdict 3 3))
+            (tty-handle-write-verdict (vector 3 0) 3))
 (test-equal "D2 a short write with no error is retried" "retry"
-            (tty-handle-write-verdict 1 3))
-(test-equal "D3 a negative leaf answer is a give-up" "give-up"
-            (tty-handle-write-verdict -9 3))
+            (tty-handle-write-verdict (vector 1 0) 3))
+(test-equal "D3 a carrier with an errno is a give-up" "give-up"
+            (tty-handle-write-verdict (vector 0 9) 3))
+
+;; The verdict reads the errno and not the count: a carrier that moved
+;; EVERY byte and still holds an errno is a give-up too.
+(test-equal "D4 a full count with an errno is still a give-up" "give-up"
+            (tty-handle-write-verdict (vector 3 28) 3))
 
 ;; --- E. the retry loop and its carrier ------------------------------
 ;;
@@ -195,10 +210,15 @@
 ;; through the exported accessors.  A count and an error travel together,
 ;; so a caller never infers zero progress from an error (milestone.org
 ;; =findings= F3).
+;;
+;; Since imp-2g each write procedure answers the carrier of ONE call, so a
+;; test lambda that answers a plain fixnum would stop the loop.
 
 ;; A full write is one call of the write procedure.
 (define calls 0)
-(define (full h bytes) (set! calls (+ calls 1)) (bytevector-length bytes))
+(define (full h bytes)
+  (set! calls (+ calls 1))
+  (tty-handle-outcome (bytevector-length bytes) 0))
 (define (carrier-count answer) (tty-handle-outcome-count answer))
 (define (carrier-errno answer) (tty-handle-outcome-errno answer))
 
@@ -213,7 +233,7 @@
 (set! calls 0)
 (define (short h bytes)
   (set! calls (+ calls 1))
-  (min 2 (bytevector-length bytes)))
+  (tty-handle-outcome (min 2 (bytevector-length bytes)) 0))
 (test-equal "E3 a short write is retried to completion"
             6 (carrier-count (tty-handle-write-all-with short h
                                                         #vu8(1 2 3 4 5 6))))
@@ -221,13 +241,13 @@
 
 ;; No progress does not spin: the loop reports what went out.
 (set! calls 0)
-(define (stuck h bytes) (set! calls (+ calls 1)) 0)
+(define (stuck h bytes) (set! calls (+ calls 1)) (tty-handle-outcome 0 0))
 (test-equal "E5 no progress reports 0 and stops"
             0 (carrier-count (tty-handle-write-all-with stuck h #vu8(1 2 3))))
 (test-equal "E6 no progress made one call" 1 calls)
 
 ;; A hard failure carries its positive errno with the count.
-(define (hard h bytes) -32)
+(define (hard h bytes) (tty-handle-outcome 0 32))
 (test-equal "E7 a hard failure reports the errno"
             32 (carrier-errno (tty-handle-write-all-with hard h #vu8(1 2 3))))
 
@@ -302,15 +322,32 @@
              "tty-handle: not a tty handle" '(h)))
 
 ;; The C-facing forms answer the carrier EBADF, with no C call, for an
-;; identity that no table entry can hold.
+;; identity that no table entry can hold.  The value is read from the ONE
+;; Scheme definition tty-handle-ebadf, never from a literal.
 (test-equal "G9 a negative identity is -EBADF for the flush"
-            -9 (tty-handle-flush-borrowed -1))
+            (- tty-handle-ebadf) (tty-handle-flush-borrowed -1))
 (test-equal "G10 a non-integer identity is -EBADF for the flush"
-            -9 (tty-handle-flush-borrowed 'seven))
+            (- tty-handle-ebadf) (tty-handle-flush-borrowed 'seven))
 (test-equal "G11 a negative identity is EBADF with count 0 for the copy"
-            (vector 0 9) (tty-handle-termscript-borrowed -1 #vu8(65)))
+            (vector 0 tty-handle-ebadf)
+            (tty-handle-termscript-borrowed -1 #vu8(65)))
 (test-equal "G12 a non-integer identity is EBADF with count 0 for the copy"
-            (vector 0 9) (tty-handle-termscript-borrowed 'seven #vu8(65)))
+            (vector 0 tty-handle-ebadf)
+            (tty-handle-termscript-borrowed 'seven #vu8(65)))
+
+;; The identity test of the 3 C-facing forms is POSITIVE, because
+;; src/term.c never gives an identity below 1 (m61_tty_handle_next starts
+;; at 1).  An identity of 0 is therefore NOT a handle: it must answer
+;; EBADF and it must not reach a leaf, where the raise of an unknown
+;; handle would be reported as UNKNOWN progress (review cr.org CR2).
+(test-equal "G13 identity 0 is EBADF with count 0 for the copy"
+            (vector 0 tty-handle-ebadf)
+            (tty-handle-termscript-borrowed 0 #vu8(65)))
+(test-equal "G14 identity 0 is -EBADF for the flush"
+            (- tty-handle-ebadf) (tty-handle-flush-borrowed 0))
+(test-equal "G15 identity 0 is EBADF with count 0 for the write"
+            (vector 0 tty-handle-ebadf)
+            (tty-handle-write-all-borrowed 0 #vu8(65)))
 
 ;; --- H. the count and the errno of the copy -------------------------
 ;;
@@ -400,7 +437,7 @@
   (if (= calls 1)
       (let ((n (min 2 (bytevector-length bytes))))
         (sink-write! (first-bytes bytes n))
-        n)
+        (tty-handle-outcome n 0))
       (raise 'boom)))
 (test-equal "I3 a raise after a partial write leaves the loop" 'no-answer
             (let ((answer (raised-answer
@@ -437,11 +474,15 @@
 ;; 5. A hard failure AFTER a partial write carries BOTH values: this is
 ;; the F3 defect that a plain count can not express.
 (define (partial-then-hard h bytes)
-  (if (= 0 (bytevector-length bytes)) 0 -32))
+  (if (= 0 (bytevector-length bytes))
+      (tty-handle-outcome 0 0)
+      (tty-handle-outcome 0 32)))
 (set! calls 0)
 (define (two-then-hard h bytes)
   (set! calls (+ calls 1))
-  (if (= calls 1) (min 2 (bytevector-length bytes)) -32))
+  (if (= calls 1)
+      (tty-handle-outcome (min 2 (bytevector-length bytes)) 0)
+      (tty-handle-outcome 0 32)))
 (test-equal "I9 a hard failure after a partial write keeps both values"
             (vector 2 32)
             (tty-handle-write-all-with two-then-hard h #vu8(1 2 3 4 5 6)))
@@ -451,6 +492,90 @@
             (let ((answer (tty-handle-write-all-with two-then-hard h
                                                      #vu8(1 2 3 4 5 6))))
               (list (carrier-count answer) (carrier-errno answer))))
+
+;; --- J. the count of the FAILING call (imp-2g, F6) ------------------
+;;
+;; The 2 cases below are the defect of milestone.org =findings= F6 in its
+;; smallest form: 1 call moves a nonzero prefix AND then fails, so the loop
+;; must add the count of THAT call to its total.  A loop that keeps only
+;; the total of the earlier calls answers fewer bytes than reached the
+;; stream.
+
+;; J1: ONE call answers #(5 ENOSPC) for a 12-byte payload.
+(define (five-then-fail h bytes) (tty-handle-outcome 5 28))
+(test-equal "J1 one failing call keeps its own 5 bytes"
+            (vector 5 28)
+            (tty-handle-write-all-with five-then-fail h
+                                       #vu8(1 2 3 4 5 6 7 8 9 10 11 12)))
+
+;; J2: the first call answers #(2 0) and the second #(3 ENOSPC).  A loop
+;; that keeps only TOTAL answers 2 and loses the 3 of the failing call.
+(set! calls 0)
+(define (two-then-three-then-fail h bytes)
+  (set! calls (+ calls 1))
+  (if (= calls 1)
+      (tty-handle-outcome 2 0)
+      (tty-handle-outcome 3 28)))
+(test-equal "J2 the failing second call adds its 3 bytes to the 2 written"
+            (vector 5 28)
+            (tty-handle-write-all-with two-then-three-then-fail h
+                                       #vu8(1 2 3 4 5 6 7 8 9 10 11 12)))
+
+;; --- K. the policy of a failed OUTPUT run (imp-2g, F5) -------------
+;;
+;; tty-glyph-run-policy is the Scheme side of the ONE report seam of
+;; src/term.c (m61_tty_output_failed_report).  It takes the plain values
+;; of ONE glyph run and answers the plain carrier #(copy-len word): how
+;; many bytes of the run the termscript may hold, and what the session
+;; tells the user.  The C side reads COPY-LEN, so these checks pin the
+;; rule that the 2 streams agree.
+
+;; K1: a complete run.  The whole count moves and the termscript may hold
+;; the whole run.
+(test-equal "K1 a full run is complete and copies the whole count"
+            (vector 12 "complete")
+            (tty-glyph-run-policy 12 12 0 #f))
+
+;; K2: a prefix and then a hard failure.  The measured 5 must reach the
+;; termscript, NOT the requested 12: a copy of the whole run would make
+;; the 2 streams disagree, which is the defect of F5.
+(test-equal "K2 a failed run copies its measured prefix, not the length"
+            (vector 5 "fatal")
+            (tty-glyph-run-policy 5 12 28 #f))
+
+;; K3: an unknown progress.  No byte may be copied, and 0 here is NOT a
+;; measurement (F1 and F3 rules).
+(test-equal "K3 an unknown progress copies no byte"
+            (vector 0 "unknown")
+            (tty-glyph-run-policy 0 12 5 #t))
+
+;; K4: a short run with no error.  The measured prefix is known, so it is
+;; a "short" run and the prefix may be copied.  A plain 0 progress is NOT
+;; inferred from a short count.
+(test-equal "K4 a short run with no error is short, not fatal"
+            (vector 3 "short")
+            (tty-glyph-run-policy 3 12 0 #f))
+
+;; K5: a FULL count AND a hard errno.  The error wins (the imp-2g D4
+;; rule), so the run is fatal even when every byte moved.
+(test-equal "K5 a hard errno wins over a full count"
+            (vector 12 "fatal")
+            (tty-glyph-run-policy 12 12 28 #f))
+
+;; K6: a count that is larger than the run can not grant more bytes to the
+;; termscript than the run holds.
+(test-equal "K6 a count larger than the run is clipped to the length"
+            (vector 12 "complete")
+            (tty-glyph-run-policy 20 12 0 #f))
+
+;; K7: a REAL EIO with NO byte moved is a hard failure and NOT an unknown
+;; progress.  src/term.c keeps the 2 apart with the state flag of the
+;; write hub, and not with a heuristic over the count (review cr.org C3):
+;; state 3 says "unknown", a real EIO arrives with unknown = #f.  So the
+;; fatal-errno policy runs and the copy is the measured 0, not a guess.
+(test-equal "K7 a real EIO with no byte moved is fatal, not unknown"
+            (vector 0 "fatal")
+            (tty-glyph-run-policy 0 12 5 #f))
 
 ;; --- the pinned count ----------------------------------------------
 

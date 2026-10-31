@@ -1066,6 +1066,19 @@ static bool m54_tty_write_gives_up_p (Lisp_Object);
    definition sits below this point.  */
 static void m54_tty_termscript_verdict (size_t, size_t, int, bool);
 
+/* The ONE report site of a failed OUTPUT run (M61 imp-2g, milestone.org
+   =findings= F5).  It takes PLAIN values only: 1 measured count, 1
+   length, 1 errno, and 1 "progress unknown" flag.  It answers the plain
+   number of bytes of the run that the termscript may hold, which is the
+   Scheme POLICY of this act.  The definition sits next to the termscript
+   verdict site of the M54 block below this point.  */
+static size_t m61_tty_output_failed_report (size_t, size_t, int, bool);
+
+/* The LOCAL copy rule of ONE glyph run, used when Scheme holds no answer
+   (no Guile runtime, or the guard stopped a raise).  It is the same rule
+   as the Scheme policy tty-glyph-run-policy.  */
+static size_t m61_glyph_copy_len_1 (size_t, size_t, bool);
+
 /* The Scheme POLICY dispatcher of the routed normal write: ask
    (emacs tty-output) tty-handle-write-all-borrowed for the write of
    IDENTITY with BYTES.  Scheme checks that the handle is open and it
@@ -1099,14 +1112,19 @@ static Lisp_Object m61_tty_handle_termscript_scheme (Lisp_Object,
 
    The argument count is the plain field NARGS, not a sentinel value: the
    flush dispatcher takes 1 argument, the write and the termscript
-   dispatchers take 2.  SCM_UNDEFINED is Guile's undefined value only.
+   dispatchers take 2, and the failed-run report of M61 imp-2g takes 4.
+   SCM_UNDEFINED is Guile's undefined value only.
 
    FIX-20261028-guilemacs: the write dispatcher had no guard before this
-   act (brief.org section 6.4).  */
+   act (brief.org section 6.4).
+
+   FIX-20261031-guilemacs: M61 imp-2g adds the 4-argument arm, so the
+   failed-run report reuses this ONE shape and no second shape is added.
+   There is no 3-argument arm: no guard_3 exists (review cr.org C7).  */
 struct m61_tty_scheme_call
 {
   SCM proc;
-  Lisp_Object a, b;
+  Lisp_Object a, b, c, d;
   int nargs;
 };
 
@@ -1115,10 +1133,15 @@ m61_tty_scheme_body (void *data)
 {
   struct m61_tty_scheme_call *call = data;
 
-  if (call->nargs == 1)
-    return SCM_CALL_1 (call->proc, call->a);
-
-  return SCM_CALL_2 (call->proc, call->a, call->b);
+  switch (call->nargs)
+    {
+    case 1:
+      return SCM_CALL_1 (call->proc, call->a);
+    case 4:
+      return SCM_CALL_4 (call->proc, call->a, call->b, call->c, call->d);
+    default:
+      return SCM_CALL_2 (call->proc, call->a, call->b);
+    }
 }
 
 /* The raise handler makes NO Lisp call: a Lisp call from here can raise a
@@ -1138,7 +1161,8 @@ m61_tty_scheme_raise_handler (void *data, SCM key, SCM args)
 static Lisp_Object
 m61_tty_scheme_guard_1 (SCM proc, Lisp_Object a)
 {
-  struct m61_tty_scheme_call call = { proc, a, SCM_UNDEFINED, 1 };
+  struct m61_tty_scheme_call call
+    = { proc, a, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, 1 };
 
   return scm_c_catch (SCM_BOOL_T, m61_tty_scheme_body, &call,
 		      m61_tty_scheme_raise_handler, NULL, NULL, NULL);
@@ -1148,7 +1172,21 @@ m61_tty_scheme_guard_1 (SCM proc, Lisp_Object a)
 static Lisp_Object
 m61_tty_scheme_guard_2 (SCM proc, Lisp_Object a, Lisp_Object b)
 {
-  struct m61_tty_scheme_call call = { proc, a, b, 2 };
+  struct m61_tty_scheme_call call
+    = { proc, a, b, SCM_UNDEFINED, SCM_UNDEFINED, 2 };
+
+  return scm_c_catch (SCM_BOOL_T, m61_tty_scheme_body, &call,
+		      m61_tty_scheme_raise_handler, NULL, NULL, NULL);
+}
+
+/* The 4-argument form: the ONE report of a failed output run (M61
+   imp-2g).  The same guard shape, so a Scheme raise in the report can not
+   leave through the C frame of a glyph hub, which holds block_input.  */
+static Lisp_Object
+m61_tty_scheme_guard_4 (SCM proc, Lisp_Object a, Lisp_Object b,
+			Lisp_Object c, Lisp_Object d)
+{
+  struct m61_tty_scheme_call call = { proc, a, b, c, d, 4 };
 
   return scm_c_catch (SCM_BOOL_T, m61_tty_scheme_body, &call,
 		      m61_tty_scheme_raise_handler, NULL, NULL, NULL);
@@ -1189,10 +1227,18 @@ m61_tty_outcome_make (ptrdiff_t count, int err)
 static bool
 m61_tty_outcome_p (Lisp_Object rc)
 {
+  /* BOTH slots must be a NON-NEGATIVE integer.  A carrier with a negative
+     count or a negative errno is NOT a carrier: state 2 would compute
+     -(ptrdiff_t) err and report -(-28) = +28 bytes that did not move, and
+     the retry loop would add them to its total (review cr.org CR5).  The
+     caller then answers -EIO with the count 0, the "progress unknown"
+     shape, and never replays.  */
   return scm_is_vector (rc)
     && scm_c_vector_length (rc) == 2
     && scm_is_integer (scm_c_vector_ref (rc, 0))
-    && scm_is_integer (scm_c_vector_ref (rc, 1));
+    && scm_is_integer (scm_c_vector_ref (rc, 1))
+    && scm_is_false (scm_negative_p (scm_c_vector_ref (rc, 0)))
+    && scm_is_false (scm_negative_p (scm_c_vector_ref (rc, 1)));
 }
 
 static ptrdiff_t
@@ -1262,9 +1308,16 @@ m61_tty_handle_of_identity_1 (int identity)
   return NULL;
 }
 
-/* Write LEN bytes at BYTES to the output stream of the tty TTY and
-   return the =fwrite= count, or the negated errno of a hard failure that
-   Scheme gives up on.  This is the mechanism of the handle path.
+/* Write LEN bytes at BYTES to the output stream of the tty TTY.  Answer
+   0 on success and on a short write that Scheme does not give up on, or
+   the negated errno of a hard failure that Scheme gives up on.  This is
+   the mechanism of the handle path.
+
+   WRITTEN is the plain count out-argument: the =fwrite= count of THIS
+   call.  It is set ALSO on a hard failure, so a write of 5 bytes that
+   then fails reports 5 and not 0 (milestone.org =findings= F6).  The
+   shape is that of m61_tty_output_termscript_1: ONE =size_t * and no
+   carrier.
 
    C keeps the FILE *, the fwrite, the clearerr, and the order.  The
    after-write DECISION (retry / give-up) is the M54 imp-2 Scheme
@@ -1273,22 +1326,27 @@ m61_tty_handle_of_identity_1 (int identity)
    stay at their call sites (M61 imp-2).  */
 static ptrdiff_t
 m61_tty_output_write_1 (struct tty_display_info *tty,
-			const unsigned char *bytes, size_t len)
+			const unsigned char *bytes, size_t len,
+			size_t *written)
 {
+  *written = 0;
   if (!tty)
     return -EBADF;
   if (!tty->output)
     return -EINVAL;
 
-  size_t written = fwrite (bytes, 1, len, tty->output);
+  size_t n = fwrite (bytes, 1, len, tty->output);
+  *written = n;
   int out_err = errno;
   bool failed = ferror (tty->output) != 0;
   clearerr (tty->output);
 
-  if (written < len && failed)
+  /* Do NOT reset *written in this branch: the count of the failing call
+     is the whole point of imp-2g.  */
+  if (n < len && failed)
     {
       int e = out_err ? out_err : EIO;
-      Lisp_Object verdict = m54_tty_write_verdict_1 (written, len, e);
+      Lisp_Object verdict = m54_tty_write_verdict_1 (n, len, e);
       /* m54_tty_write_gives_up_p answers true for a nil verdict too (no
 	 Scheme runtime), so this writer and the M52 writer below report
 	 the SAME -e on a hard error (brief.org section 3).  */
@@ -1296,22 +1354,25 @@ m61_tty_output_write_1 (struct tty_display_info *tty,
 	return -e;
     }
 
-  return (ptrdiff_t) written;
+  return 0;
 }
 
 /* Resolve the plain IDENTITY, then run the write mechanism.  Return
-   -EBADF for a closed or unknown identity.  This is the body of the leaf
-   --tty-handle-write.  */
+   -EBADF for a closed or unknown identity, with *WRITTEN 0.  This is the
+   body of the leaf --tty-handle-write.  */
 static ptrdiff_t
 m61_tty_handle_write_bytes_1 (int identity, const unsigned char *bytes,
-			      size_t len)
+			      size_t len, size_t *written)
 {
   struct tty_display_info *tty = m61_tty_handle_of_identity_1 (identity);
 
   if (!tty)
-    return -EBADF;
+    {
+      *written = 0;
+      return -EBADF;
+    }
 
-  return m61_tty_output_write_1 (tty, bytes, len);
+  return m61_tty_output_write_1 (tty, bytes, len, written);
 }
 
 /* The hub entry point: write the encoded bytes of the normal glyph path
@@ -1342,35 +1403,52 @@ m61_tty_handle_write_bytes_1 (int identity, const unsigned char *bytes,
    stopped a raise; it does NOT prove that Scheme wrote 0 bytes, because
    tty-handle-write-all-with can write a prefix and then raise.  A second
    write of that prefix repeats terminal escape bytes, so this answer
-   reports -EIO with the count 0 instead.  */
+   reports -EIO with the count 0 instead.
+
+   WRITTEN leaves the count of THIS call, also on a hard failure
+   (milestone.org =findings= F6).  UNKNOWN states that the progress is
+   NOT MEASURED, so the caller reads a STATE and not a heuristic over the
+   count (review cr.org C3).  */
 static ptrdiff_t
 m61_tty_handle_write_1 (struct tty_display_info *tty, int identity,
-			Lisp_Object bv, const unsigned char *bytes, size_t len)
+			Lisp_Object bv, const unsigned char *bytes, size_t len,
+			size_t *written, bool *unknown)
 {
+  *written = 0;
+  *unknown = false;
+
   /* State 1: NO dispatch started.  No Scheme code ran, so no byte moved
-     and this C mechanism is the only writer.  */
+     and this C mechanism is the only writer.  The answer is a MEASURED
+     result, also when a real EIO arrives with 0 bytes moved: that is a
+     hard failure and NOT an unknown progress.  */
   if (identity < 0 || !guile_runtime_up ())
-    return m61_tty_output_write_1 (tty, bytes, len);
+    return m61_tty_output_write_1 (tty, bytes, len, written);
 
   Lisp_Object rc = m61_tty_handle_write_scheme (make_fixnum (identity), bv);
 
   /* State 2: dispatch started and Scheme answered #(count errno).  Use
-     the answer and never run the C mechanism again.  A hard failure
-     answers its positive errno; the count that moved stays in the
-     carrier, and this C consumer does not report it (milestone.org
-     section 5 declares the write answer as an open limit).  */
+     the answer and never run the C mechanism again.  The count that
+     moved leaves ALSO on a hard failure (milestone.org =findings= F6),
+     so no caller infers 0 progress from an error.  */
   if (m61_tty_outcome_p (rc))
     {
+      ptrdiff_t count = m61_tty_outcome_count (rc);
       int err = m61_tty_outcome_errno (rc);
 
+      if (count > 0)
+	*written = (size_t) count;
       if (err)
 	return -(ptrdiff_t) err;
-      return m61_tty_outcome_count (rc);
+      return 0;
     }
 
   /* State 3: dispatch started and the progress is UNKNOWN (the guard
      stopped a Scheme raise).  Do NOT write: a prefix may already be on
-     the stream (milestone.org =findings= F1).  */
+     the stream (milestone.org =findings= F1).  The count is 0, and it is
+     NOT a measured 0: it is the "progress unknown" answer, and UNKNOWN
+     says so.  */
+  *written = 0;
+  *unknown = true;
   return -EIO;
 }
 
@@ -1463,20 +1541,50 @@ m61_tty_handle_termscript_1 (struct tty_display_info *tty, int identity,
    then run the output write, then the termscript copy of the same bytes.
    The order is the contract (milestone.org section 3).
 
-   FIX-20261030-guilemacs: this hub READS the write answer, but the write
-   answer keeps its imp-1 behavior and is still not reported: a hard
-   output write failure stays silent.  That is a DECLARED limit of
-   milestone.org section 5, not a fix of this act.  A hard failure of the
-   termscript copy can not restore the bytes, so it is recorded through
-   the ONE M54 termscript verdict site instead of being dropped.  */
-static void
+   FIX-20261030-guilemacs: a hard failure of the termscript copy can not
+   restore the bytes, so it is recorded through the ONE M54 termscript
+   verdict site instead of being dropped.
+
+   FIX-20261031-guilemacs: M61 imp-2g -- a failed OUTPUT dispatch is now
+   observable (milestone.org =findings= F5).  This hub ANSWERS the output
+   result and it hands the measured count to the caller through WRITTEN:
+
+   status 0, *WRITTEN == LEN     the whole run moved: complete.
+   status 0, *WRITTEN < LEN      a short run with no error.  The
+				 terminal holds a prefix and the count is
+				 a MEASUREMENT, not an error.
+   status -errno, *WRITTEN >= 0  the run failed after that many bytes.
+				 The count is a MEASUREMENT (F6).
+   status -EIO                   the progress is UNKNOWN (the guard
+				 stopped a Scheme raise).  *WRITTEN is 0
+				 and it is NOT a measurement.
+
+   The termscript copy of 1 run takes the SAME length as the measured
+   output: P bytes for a measured prefix, and NOTHING when the progress
+   is unknown (F1 rule: do not replay an unknown range, and do not claim
+   progress that nobody measured).  The copy stays AFTER the write.
+
+   A run that is not complete goes through the ONE report seam
+   m61_tty_output_failed_report, which carries plain values only.  The
+   CALL SITE owns the RECOVERY (brief.org section 5.2), and it reads the
+   UNKNOWN out-argument, so it can tell a MEASURED incomplete run from a
+   run of unknown progress.  Both out-arguments stay inside C: the
+   carrier of the Scheme seam does not change.  */
+static ptrdiff_t
 m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
-			    const unsigned char *bytes, size_t len)
+			    const unsigned char *bytes, size_t len,
+			    size_t *written, bool *unknown)
 {
   Lisp_Object bv = SCM_BOOL_F;
+  Lisp_Object copy_bv;
   int identity = -1;
   size_t copied_bytes = 0;
-  ptrdiff_t written, copied;
+  size_t written_bytes = 0;
+  size_t copy_len;
+  ptrdiff_t status, copied;
+
+  *written = 0;
+  *unknown = false;
 
   if (guile_runtime_up ())
     identity = m61_tty_handle_register_1 (tty);
@@ -1487,19 +1595,95 @@ m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
       memcpy (SCM_BYTEVECTOR_CONTENTS (bv), bytes, len);
     }
 
-  written = m61_tty_handle_write_1 (tty, identity, bv, bytes, len);
-  copied = m61_tty_handle_termscript_1 (tty, identity, bv, bytes, len,
-					&copied_bytes);
+  status = m61_tty_handle_write_1 (tty, identity, bv, bytes, len,
+				   &written_bytes, unknown);
+  /* UNKNOWN is a STATE of the write hub (state 3: the guard stopped a
+     Scheme raise), not a heuristic over the count (review cr.org C3).  A
+     REAL EIO from the C mechanism answers UNKNOWN = false, so the report
+     and the Scheme policy treat it as a hard failure with the measured
+     count, and the fatal-errno policy runs for it.  The count must not
+     leave this hub as if it were measured when the progress is unknown
+     (F3).  The test is a GUARD and not a measured difference:
+     m61_tty_handle_write_1 answers WRITTEN_BYTES = 0 with UNKNOWN = true,
+     so today both arms leave the 0 of the entry.  The guard keeps the F3
+     rule true in C even if that state ever answers a count.  */
+  if (!*unknown)
+    *written = written_bytes;
 
-  (void) written;
-  /* The verdict gets the MEASURED copy count (milestone.org =findings=
-     F3) and the errno as a plain value.  A short copy with a clear error
-     flag is reported too: the bytes of the 2 streams must agree.  No
-     termscript stream is not a short copy.  */
-  if (copied < 0)
-    m54_tty_termscript_verdict (copied_bytes, len, (int) -copied, true);
-  else if (tty && tty->termscript && copied_bytes < len)
-    m54_tty_termscript_verdict (copied_bytes, len, 0, false);
+  /* The copy length of this run: the whole run for a complete write, the
+     measured prefix for an incomplete one, and 0 for an unknown
+     progress.  Scheme owns this policy on the failure path.  */
+  if (*unknown || status != 0 || written_bytes < len)
+    copy_len = m61_tty_output_failed_report (written_bytes, len,
+					     status < 0 && !*unknown
+					     ? (int) -status : 0,
+					     *unknown);
+  else
+    copy_len = len;
+
+  /* A Scheme policy can not grant more bytes than this run holds.  */
+  if (copy_len > len)
+    copy_len = len;
+
+  /* Copy the SAME bytes that reached the terminal, and no byte at all
+     when the progress is unknown (F1).  A partial copy needs its own
+     bytevector of COPY_LEN bytes: BV holds the WHOLE run.
+
+     FIX-20261031-guilemacs: M61 imp-2g / review cr.org CR2 -- the LENGTH
+     CONTRACT of this seam.  The Scheme form
+     tty-handle-termscript-borrowed reads the LENGTH OF THE BYTEVECTOR and
+     takes no other count, so the vector that crosses MUST hold exactly
+     COPY_LEN bytes on EVERY partial path.  The C mechanism below reads
+     the plain LEN argument, so the 2 paths agree.  The split is therefore
+     tested against the VECTOR (SCM_BYTEVECTOR_P) and not against the
+     identity states that happen to build it: identity > 0 is the only
+     state that owns a vector, and a state with no vector needs no split
+     because the fallback obeys COPY_LEN directly.  A whole run in a
+     partial copy is the F5 defect itself.
+
+     FIX-20261031-guilemacs: review cr.org CR3 -- COPY_BV needs no
+     scm_gc_protect_object and no scm_remember_upto_here_1.  The root rule
+     of this tree is CONSERVATIVE collection (BDW-GC): a SCM held in a C
+     automatic variable is a root while the frame lives.  The older BV of
+     this function and src/gnutls.c use the same idiom.  The rule is
+     recorded in milestone.org section 5.  */
+  if (copy_len > 0)
+    {
+      copy_bv = bv;
+      if (copy_len < len && SCM_BYTEVECTOR_P (bv))
+	{
+	  copy_bv = scm_c_make_bytevector (copy_len);
+	  memcpy (SCM_BYTEVECTOR_CONTENTS (copy_bv), bytes, copy_len);
+	}
+
+      copied = m61_tty_handle_termscript_1 (tty, identity, copy_bv, bytes,
+					    copy_len, &copied_bytes);
+      /* The verdict gets the MEASURED copy count (milestone.org
+	 =findings= F3) and the errno as a plain value.  A short copy with
+	 a clear error flag is reported too: the bytes of the 2 streams
+	 must agree.  No termscript stream is not a short copy.  */
+      if (copied < 0)
+	m54_tty_termscript_verdict (copied_bytes, copy_len, (int) -copied,
+				    true);
+      else if (tty && tty->termscript && copied_bytes < copy_len)
+	m54_tty_termscript_verdict (copied_bytes, copy_len, 0, false);
+    }
+
+  return status;
+}
+
+/* The LOCAL copy rule of ONE glyph run: the termscript may hold only the
+   bytes that the output stream measured, and NOTHING when the progress is
+   unknown.  It is the fallback of m61_tty_output_failed_report when
+   Scheme holds no answer, and it states the same rule as the Scheme
+   policy tty-glyph-run-policy.  */
+static size_t
+m61_glyph_copy_len_1 (size_t written, size_t len, bool unknown)
+{
+  if (unknown)
+    return 0;
+
+  return written > len ? len : written;
 }
 
 /* Flush the output stream of TTY and return 0, or the negated errno of a
@@ -1548,19 +1732,32 @@ m61_tty_handle_flush_1 (struct tty_display_info *tty)
 }
 
 /* The ONE Scheme dispatcher of the routed normal write (brief.org
-   section 3).  It resolves the module procedure one time (the M52 imp-4
-   idiom), then passes plain values only: a fixnum identity and a Guile
-   bytevector.  Scheme owns the state check and the retry, and it calls
-   back into the leaf --tty-handle-write for the mechanism.  The call
-   runs inside the ONE guard shape m61_tty_scheme_guard_2.  */
+   section 3).  It holds the module VARIABLE of the policy procedure and
+   reads the binding at each call, then passes plain values only: a fixnum
+   identity and a Guile bytevector.  Scheme owns the state check and the
+   retry, and it calls back into the leaf --tty-handle-write for the
+   mechanism.  The call runs inside the ONE guard shape
+   m61_tty_scheme_guard_2.  */
 static Lisp_Object
 m61_tty_handle_write_scheme (Lisp_Object identity, Lisp_Object bytes)
 {
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs tty-output",
-                             "tty-handle-write-all-borrowed");
-  return m61_tty_scheme_guard_2 (proc, identity, bytes);
+  /* FIX-20261031-guilemacs: M61 imp-2g -- the binding is read at EACH
+     call, and it is not cached as a value (the M52 imp-4 idiom).  A
+     cached value freezes the procedure at the first glyph run of the
+     session, so no later (module-set!) could reach the C hub.  The
+     binding is then the ONE injection point of the real C dispatch path,
+     which the PTY case m61-imp2g/raise-e2e uses to force the -EIO arm of
+     the hub.  The cost is ONE variable read per glyph run, against the
+     bytevector allocation that this hub already makes.  An unbound or
+     missing binding answers #f, so the hub reports "progress unknown" and
+     never replays.  */
+  static SCM var = SCM_UNDEFINED;
+  if (SCM_UNBNDP (var))
+    var = scm_c_public_lookup ("emacs tty-output",
+                               "tty-handle-write-all-borrowed");
+  if (scm_is_false (scm_variable_bound_p (var)))
+    return SCM_BOOL_F;
+  return m61_tty_scheme_guard_2 (scm_variable_ref (var), identity, bytes);
 }
 
 /* The ONE Scheme dispatcher of the routed flush (M61 imp-2).  IDENTITY is
@@ -1602,25 +1799,30 @@ C owns the struct tty_display_info and its FILE *output stream, so no
 Lisp_Object, char *, FILE *, or struct crosses the layer
 (docs/kb.org =passthrough-leaf-is-not-a-port=).
 
-Return a plain fixnum: the =fwrite= count, or a negative fixnum holding
-the negated errno (-EBADF when the identity is closed or unknown,
--EINVAL when BYTES is not a bytevector or the tty holds no output
-stream).  A short write is reported as its count, so Scheme decides
-retry / give-up through tty-write-verdict.  This leaf writes the output
-stream only: the termscript copy and the fflush points stay at their
-call sites (M61 imp-2).  */)
+Return the ONE plain carrier #(count errno) of this leaf layer
+(milestone.org =findings= F3 and F6): COUNT is the =fwrite= count that
+moved, ALSO on a hard failure, and ERRT is the positive errno of a hard
+failure or 0.  ERRT is EBADF when the identity is closed or unknown, and
+EINVAL when IDENTITY is not a fixnum or BYTES is not a bytevector.  A
+short write is reported as its count, so Scheme decides retry / give-up
+through tty-handle-write-verdict.  This leaf writes the output stream
+only: the termscript copy and the fflush points stay at their call sites
+(M61 imp-2).  */)
   (Lisp_Object identity, Lisp_Object bytes)
 {
   if (!FIXNUMP (identity))
-    return make_fixnum (-EINVAL);
+    return m61_tty_outcome_make (0, EINVAL);
   if (!scm_is_bytevector (bytes))
-    return make_fixnum (-EINVAL);
+    return m61_tty_outcome_make (0, EINVAL);
 
-  return make_fixnum
-    (m61_tty_handle_write_bytes_1
-     ((int) XFIXNUM (identity),
-      (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytes),
-      scm_c_bytevector_length (bytes)));
+  size_t written = 0;
+  ptrdiff_t answer
+    = m61_tty_handle_write_bytes_1
+    ((int) XFIXNUM (identity),
+     (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytes),
+     scm_c_bytevector_length (bytes), &written);
+
+  return m61_tty_outcome_make (written, answer < 0 ? (int) -answer : 0);
 }
 
 DEFUN ("--tty-handle-flush", Fc_tty_handle_flush, Sc_tty_handle_flush,
@@ -1692,6 +1894,95 @@ from an error.  */)
      scm_c_bytevector_length (bytes), &copied);
 
   return m61_tty_outcome_make (copied, answer < 0 ? (int) -answer : 0);
+}
+
+DEFUN ("--tty-glyph-run", Fc_tty_glyph_run, Sc_tty_glyph_run, 2, 2, 0,
+       doc: /* FIX-20261031-guilemacs: Internal: M61 imp-2g -- run ONE
+glyph run of the ordered output path for DEVICE and answer its result.
+
+DEVICE is the M52 convention: a terminal object, a frame, or nil for the
+selected frame.  BYTES is a plain bytevector.
+
+This leaf runs the ONE hub m61_tty_handle_glyph_run_1 that the 3 glyph
+call sites of this file run, so a caller can read the answer of the
+ordered output path on a real terminal.  C owns the FILE * streams; no
+FILE *, char *, struct or Lisp_Object crosses the layer.
+
+Return a plain vector #(STATUS WRITTEN) of 2 plain fixnums:
+
+STATUS 0, WRITTEN == LEN     the whole run moved.
+STATUS 0, WRITTEN < LEN      a short run with no error.  WRITTEN is the
+			     measured prefix, so the terminal holds it.
+STATUS -errno                the run failed.  WRITTEN is the measured
+			     prefix, also on a hard failure (F6).
+STATUS -EIO                  the progress is UNKNOWN.  WRITTEN is 0 and
+			     it is NOT a measurement.
+
+The termscript copy of the run takes the same length as WRITTEN, so the
+2 streams agree (milestone.org =findings= F5).  A bad BYTES answers
+STATUS = -EINVAL and WRITTEN = 0, and a DEVICE that does not resolve to
+a tty answers STATUS = -EBADF and WRITTEN = 0: the errno is the STATUS
+and never the count (review cr.org C2).
+The RECOVERY (=SET_FRAME_GARBAGED=) belongs to the call sites, not to
+this leaf.  */)
+  (Lisp_Object device, Lisp_Object bytes)
+{
+  struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  Lisp_Object answer = scm_c_make_vector (2, SCM_INUM0);
+  size_t written = 0;
+  bool unknown = false;
+  ptrdiff_t status;
+
+  /* Slot 0 is STATUS and slot 1 is WRITTEN, so a bad argument answers
+     the NEGATED errno in slot 0 and the count 0 in slot 1, the same rule
+     as the hub.  A positive errno in slot 1 would read as "status 0 and
+     N bytes moved", which is the confusion that imp-2g repairs
+     (review cr.org C2).  */
+  if (!scm_is_bytevector (bytes))
+    {
+      scm_c_vector_set_x (answer, 0, scm_from_int (-EINVAL));
+      scm_c_vector_set_x (answer, 1, scm_from_int (0));
+      return answer;
+    }
+
+  if (!tty)
+    {
+      scm_c_vector_set_x (answer, 0, scm_from_int (-EBADF));
+      scm_c_vector_set_x (answer, 1, scm_from_int (0));
+      return answer;
+    }
+
+  status = m61_tty_handle_glyph_run_1
+    (tty, (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytes),
+     scm_c_bytevector_length (bytes), &written, &unknown);
+
+  scm_c_vector_set_x (answer, 0, scm_from_ptrdiff_t (status));
+  scm_c_vector_set_x (answer, 1, scm_from_ptrdiff_t ((ptrdiff_t) written));
+  return answer;
+}
+
+DEFUN ("--frame-garbaged-p", Fc_frame_garbaged_p, Sc_frame_garbaged_p,
+       1, 1, 0,
+       doc: /* FIX-20261031-guilemacs: Internal: M61 imp-2g -- answer the
+plain repaint request of DEVICE.
+
+DEVICE is a frame, or nil for the selected frame.  Return t when the
+frame asks for a full repaint (its garbaged flag is set), else nil, and
+nil for a non-frame DEVICE.  The 3 glyph call sites of this file set that
+flag when a glyph run is incomplete, so a caller can read the RECOVERY of
+a failed output dispatch at a safe boundary (brief.org section 5.2).  */)
+  (Lisp_Object device)
+{
+  struct frame *f = SELECTED_FRAME ();
+
+  if (!NILP (device))
+    {
+      if (!FRAMEP (device))
+	return Qnil;
+      f = XFRAME (device);
+    }
+
+  return FRAME_GARBAGED_P (f) ? Qt : Qnil;
 }
 
 DEFUN ("--tty-handle", Fc_tty_handle, Sc_tty_handle, 1, 1, 0,
@@ -1777,9 +2068,37 @@ tty_write_glyphs (struct frame *f, struct glyph *string, int len)
 	     operations.  The order is the contract: the output write
 	     first, the termscript copy second.  C keeps the
 	     block_input region, the FILE * streams and the clearerr
-	     (brief.org section 3).  */
-	  m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
-				      coding->produced);
+	     (brief.org section 3).
+
+	     M61 imp-2g: the call site owns the RECOVERY (brief.org
+	     section 5.2).  A short run or a failed run leaves a wrong
+	     picture on the screen and no local repair restores the
+	     missing bytes, so the frame asks for a repaint.  A run of
+	     unknown progress is REPORTED and not repainted; the rule
+	     below states why.  */
+	  size_t written;
+	  bool unknown;
+	  ptrdiff_t status
+	    = m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
+					  coding->produced, &written,
+					  &unknown);
+	  /* FIX-20261031-guilemacs: M61 imp-2g, review cr.org C1 -- the RECOVERY
+	     rule (brief.org section 5.2, DESIGN 2).  A MEASURED incomplete run
+	     asks for a repaint: the terminal holds a prefix or nothing, and no
+	     later write restores the missing bytes.  The request CONVERGES:
+	     xdisp.c bounds the retry of a garbaged frame
+	     (MAX_GARBAGED_FRAME_RETRIES, src/xdisp.c :17221) and clears
+	     f->garbaged when the frame is up to date (src/xdisp.c :17879).
+	     An UNKNOWN progress does NOT repaint: that state can repeat at every
+	     run, so a repaint would never settle.  It is reported through the
+	     no-repaint seam m61_tty_output_failed_report instead.
+	     A complete run never touches the frame.  A batch frame and a frame
+	     with no text terminal can not reach a termcap write_glyphs, and a tty
+	     that the identity table does not hold answers a MEASURED count, so it
+	     obeys the same rule.  */
+	  if (!unknown
+	      && (status != 0 || written < (size_t) coding->produced))
+	    SET_FRAME_GARBAGED (f);
 	  unblock_input ();
 	}
 
@@ -1838,9 +2157,35 @@ tty_write_glyphs_with_face (struct frame *f, struct glyph *string,
       /* M61 imp-2: ONE bytevector per glyph run, shared by the 2
          operations.  The order is the contract: the output write first,
          the termscript copy second.  C keeps the block_input region, the
-         FILE * streams and the clearerr (brief.org section 3).  */
-      m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
-				  coding->produced);
+         FILE * streams and the clearerr (brief.org section 3).
+
+         M61 imp-2g: the call site owns the RECOVERY (brief.org section
+         5.2).  A short run or a failed run leaves a wrong picture on the
+         screen and no local repair restores the missing bytes, so the
+         frame asks for a repaint.  A run of unknown progress is REPORTED
+         and not repainted; the rule below states why.  */
+      size_t written;
+      bool unknown;
+      ptrdiff_t status
+        = m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
+                                      coding->produced, &written, &unknown);
+      /* FIX-20261031-guilemacs: M61 imp-2g, review cr.org C1 -- the RECOVERY
+         rule (brief.org section 5.2, DESIGN 2).  A MEASURED incomplete run
+         asks for a repaint: the terminal holds a prefix or nothing, and no
+         later write restores the missing bytes.  The request CONVERGES:
+         xdisp.c bounds the retry of a garbaged frame
+         (MAX_GARBAGED_FRAME_RETRIES, src/xdisp.c :17221) and clears
+         f->garbaged when the frame is up to date (src/xdisp.c :17879).
+         An UNKNOWN progress does NOT repaint: that state can repeat at every
+         run, so a repaint would never settle.  It is reported through the
+         no-repaint seam m61_tty_output_failed_report instead.
+         A complete run never touches the frame.  A batch frame and a frame
+         with no text terminal can not reach a termcap write_glyphs, and a tty
+         that the identity table does not hold answers a MEASURED count, so it
+         obeys the same rule.  */
+      if (!unknown
+          && (status != 0 || written < (size_t) coding->produced))
+        SET_FRAME_GARBAGED (f);
       unblock_input ();
     }
 
@@ -1931,9 +2276,37 @@ tty_insert_glyphs (struct frame *f, struct glyph *start, int len)
 	     operations.  The order is the contract: the output write
 	     first, the termscript copy second.  C keeps the
 	     block_input region, the FILE * streams and the clearerr
-	     (brief.org section 3).  */
-	  m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
-				      coding->produced);
+	     (brief.org section 3).
+
+	     M61 imp-2g: the call site owns the RECOVERY (brief.org
+	     section 5.2).  A short run or a failed run leaves a wrong
+	     picture on the screen and no local repair restores the
+	     missing bytes, so the frame asks for a repaint.  A run of
+	     unknown progress is REPORTED and not repainted; the rule
+	     below states why.  */
+	  size_t written;
+	  bool unknown;
+	  ptrdiff_t status
+	    = m61_tty_handle_glyph_run_1 (tty, conversion_buffer,
+					  coding->produced, &written,
+					  &unknown);
+	  /* FIX-20261031-guilemacs: M61 imp-2g, review cr.org C1 -- the RECOVERY
+	     rule (brief.org section 5.2, DESIGN 2).  A MEASURED incomplete run
+	     asks for a repaint: the terminal holds a prefix or nothing, and no
+	     later write restores the missing bytes.  The request CONVERGES:
+	     xdisp.c bounds the retry of a garbaged frame
+	     (MAX_GARBAGED_FRAME_RETRIES, src/xdisp.c :17221) and clears
+	     f->garbaged when the frame is up to date (src/xdisp.c :17879).
+	     An UNKNOWN progress does NOT repaint: that state can repeat at every
+	     run, so a repaint would never settle.  It is reported through the
+	     no-repaint seam m61_tty_output_failed_report instead.
+	     A complete run never touches the frame.  A batch frame and a frame
+	     with no text terminal can not reach a termcap write_glyphs, and a tty
+	     that the identity table does not hold answers a MEASURED count, so it
+	     obeys the same rule.  */
+	  if (!unknown
+	      && (status != 0 || written < (size_t) coding->produced))
+	    SET_FRAME_GARBAGED (f);
 	  unblock_input ();
 	}
 
@@ -6616,6 +6989,78 @@ m54_tty_termscript_verdict (size_t copied, size_t len, int err, bool failed)
   m54_tty_termscript_handle_scheme (make_fixnum (copied), make_fixnum (len),
                                     make_fixnum (e));
   (void) verdict;
+}
+
+/* --- M61 imp-2g: the ONE report site of a failed OUTPUT run ---------- */
+
+/* FIX-20261031-guilemacs: M61 imp-2g -- the OUTPUT write of 1 glyph run
+   can move a prefix and then fail, or fail with an unknown progress
+   (milestone.org =findings= F5).  C owns the mechanism and the store;
+   Scheme owns the POLICY: whether the run is fatal, whether the session
+   reports it, and how much of the run the termscript may hold.
+   The seam takes PLAIN values only: 1 measured count, 1 length, 1 errno
+   and 1 "progress unknown" flag.  No Lisp_Object, no char *, no FILE *
+   and no struct crosses it (docs/kb.org
+   =passthrough-leaf-is-not-a-port=).
+   The m61_tty_output_ name reuses no static helper (docs/kb.org
+   =term-hub-helper-name-collision=).
+
+   FIX-20261031-guilemacs: review cr.org C4 -- this hub RESOLVES the
+   binding at EACH call and caches no procedure value, so this report is
+   the SECOND late-bound injection point of the act: a (module-set!) of
+   tty-glyph-run-policy reaches the real C hub, which the PTY cases
+   m61-imp2g/raise-e2e and m61-imp2g/raise-first-e2e use.  The old cached
+   value was justified by a source count of this tree, and M61 imp-2g
+   removed that count from the touched suites (findings F7: a source count
+   is removed, not re-pinned).  The cost is ONE resolve per FAILED run,
+   and a complete run pays nothing.  A raise of the policy is stopped by
+   the guard, so the answer is #f and m61_tty_output_failed_report falls
+   back to the local copy rule.  */
+static Lisp_Object
+m61_tty_output_failed_scheme (Lisp_Object written, Lisp_Object len,
+			      Lisp_Object err, Lisp_Object unknown)
+{
+  return m61_tty_scheme_guard_4 (scm_c_public_ref ("emacs tty-output",
+						   "tty-glyph-run-policy"),
+				 written, len, err, unknown);
+}
+
+/* The ONE report of a failed output run.  WRITTEN is the measured count
+   of the run (0 when the progress is unknown), LEN the requested count,
+   ERR the plain errno (0 when there is none) and UNKNOWN says that the
+   progress is unknown.  Answer the number of bytes of the run that the
+   termscript may hold: the measured prefix, or 0 when the progress is
+   unknown.
+   Scheme answers the plain carrier #(copy-len word).  C reads COPY-LEN
+   and does not act on WORD: the CALL SITE owns the RECOVERY
+   (brief.org section 5.2).  An unusable answer -- no Guile runtime, or a
+   raise that the guard stopped -- falls back to the local rule, so the
+   copy never claims progress that nobody measured.  */
+static size_t
+m61_tty_output_failed_report (size_t written, size_t len, int err,
+			      bool unknown)
+{
+  Lisp_Object answer;
+
+  if (!guile_runtime_up ())
+    return m61_glyph_copy_len_1 (written, len, unknown);
+
+  answer = m61_tty_output_failed_scheme (make_fixnum (written),
+					 make_fixnum (len),
+					 make_fixnum (err),
+					 unknown ? SCM_BOOL_T : SCM_BOOL_F);
+
+  if (scm_is_vector (answer) && scm_c_vector_length (answer) == 2
+      && scm_is_integer (scm_c_vector_ref (answer, 0))
+      && scm_is_false (scm_negative_p (scm_c_vector_ref (answer, 0))))
+    {
+      ptrdiff_t copy_len = scm_to_ptrdiff_t (scm_c_vector_ref (answer, 0));
+
+      if ((size_t) copy_len <= len)
+	return (size_t) copy_len;
+    }
+
+  return m61_glyph_copy_len_1 (written, len, unknown);
 }
 
 /* --- M54 imp-4: the input stream TAB policy dispatcher --------------- */

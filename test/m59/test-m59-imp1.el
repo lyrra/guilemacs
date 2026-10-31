@@ -156,26 +156,6 @@ so this skips a line whose first non-blank character is `;'."
                       (not (looking-at-p "[ \t]*;")))))
         hit))))
 
-(defun m59-imp1--pty-case-pins ()
-  "Read the `test/pty-driver.py' case-count pins as (TOTAL . SUM).
-TOTAL is the `total-case-count' pin; SUM is the sum of the per-group
-`-case-count' pins.  Return nil when a pin is absent.  A plain string
-search for the pin line proves nothing about the number of cases, so the
-corpus checks that the two numbers agree."
-  (m59-imp1--with "test/pty-driver.py"
-    (lambda ()
-      (goto-char (point-min))
-      (let ((total nil) (sum 0) (n 0))
-        (while (re-search-forward "check(\"\\([a-z0-9-]*-case-count\\)\", " nil t)
-          (let ((name (match-string 1))
-                (pin (progn (re-search-forward "), \\([0-9]+\\))" nil t)
-                           (match-string 1))))
-            (if (string= name "total-case-count")
-                (setq total (string-to-number (or pin "0")))
-              (setq sum (+ sum (string-to-number (or pin "0"))))
-              (setq n (1+ n)))))
-        (and total (> n 0) (cons total sum))))))
-
 (defun m59-imp1--ordered-p (rel needles)
   "Non-nil when the TRACKED file REL holds every NEEDLE in the GIVEN
 ORDER: each search starts after the previous match."
@@ -403,11 +383,10 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 ;; M59 imp-1 adds NO PTY case.  The counted surface stays 32.  The group
 ;; pins must add up to the total, so a group pin that moves without the
 ;; total FAILS.
-(m59-imp1--check "pty-driver-cases-42"
-                 (let ((pins (m59-imp1--pty-case-pins)))
-                   (and (consp pins)
-                        (eql 42 (car pins))
-                        (eql (car pins) (cdr pins)))))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the pty-driver
+;; case-count pin is REMOVED, not re-pinned.  A case count is not a
+;; behavior, and the driver's own --selftest holds the count checks at
+;; :3470 ... :3472.
 (m59-imp1--check "corpus-dir-present"
                  (and (m59-imp1--exists-p "test/m59")
                       (m59-imp1--exists-p "test/m59/test-m59-imp1.el")))
@@ -594,22 +573,23 @@ host limit is a skip, never a pass (docs/m59-plan.org)."
 
 (setq m59-imp1--group 's5)
 
-(m59-imp1--check "reg/min-s1-checks-9" (>= (m59-imp1--group-count 's1) 9))
+(m59-imp1--check "reg/min-s1-checks-8" (>= (m59-imp1--group-count 's1) 8))
 (m59-imp1--check "reg/min-s2-checks-9" (>= (m59-imp1--group-count 's2) 9))
 (m59-imp1--check "reg/min-s3-checks-2" (>= (m59-imp1--group-count 's3) 2))
 (m59-imp1--check "reg/min-s4-checks-4" (>= (m59-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m59-imp1 tests is 29: 28 registered checks
-;; (S1 9, S2 9, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m59-imp1 tests is 28: 27 registered checks
+;; (S1 8, S2 9, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.
 
-(defvar m59-imp1--min-gate-total 29
-  "The exact number of m59-imp1 ERT tests: 28 registered checks (S1 9,
-S2 9, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
+(defvar m59-imp1--min-gate-total 28
+  "The exact number of m59-imp1 ERT tests: 27 registered checks (S1 8,
+S2 9, S3 2, S4 4, S5 4) plus the group-total deftest itself.  M61
+imp-2g removed the pty-driver case-count pin.")
 
 (ert-deftest m59-imp1/gate-m59-total ()
   "The m59-imp1 corpus registers at least its docs-independent floor."

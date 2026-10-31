@@ -40,7 +40,8 @@
 ;;;   S4 -- the registration: the (m57) group holds this corpus AFTER
 ;;;         test/m57/test-m57-imp1.el, the imp-1 corpus stays present,
 ;;;         the (m56) group stays present, and the base e2423fcb0 is an
-;;;         ANCESTOR of HEAD.  S4 holds 4 checks.
+;;;         ANCESTOR of HEAD.  S4 holds 4 checks.  The pty-driver
+;;;         case-count pin is REMOVED (M61 imp-2g), so S1 holds 3.
 ;;;   S5 -- the guards: 4 checks -- one per-group min-count guard for
 ;;;         each of S1 .. S4.  The in-process group-total `ert-deftest'
 ;;;         is a separate test in the same phase; it is NOT one of the
@@ -253,9 +254,9 @@ host limit is a skip, never a pass (brief.org section 7)."
                  (and (eql 51 (m57-imp5--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m57-imp5--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m57-imp5--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m57-imp5--check "pty-driver-cases-42"
-                 (m57-imp5--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.
+;; The driver's own --selftest holds the count checks at :3470 ... :3472.
 ;;; --- S2. The C2 result (brief.org section 3) ------------------------
 
 ;; The C2 result, pinned against the TRACKED C source (NOT docs/).  The
@@ -463,27 +464,28 @@ host limit is a skip, never a pass (brief.org section 7)."
 ;; tests, so a green m57 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 4 checks,
+;; because every check is registered at load time.  S1 holds 3 checks,
 ;; S2 holds 13, S3 holds 2, and S4 holds 4.
 
 (setq m57-imp5--group 's5)
 
-(m57-imp5--check "reg/min-s1-checks-4" (>= (m57-imp5--group-count 's1) 4))
+(m57-imp5--check "reg/min-s1-checks-3" (>= (m57-imp5--group-count 's1) 3))
 (m57-imp5--check "reg/min-s2-checks-13" (>= (m57-imp5--group-count 's2) 13))
 (m57-imp5--check "reg/min-s3-checks-2" (>= (m57-imp5--group-count 's3) 2))
 (m57-imp5--check "reg/min-s4-checks-4" (>= (m57-imp5--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m57-imp5 tests is 34: 33 registered checks
-;; (S1 4, S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m57-imp5 tests is 33: 32 registered checks
+;; (S1 3, S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.
 
-(defvar m57-imp5--min-gate-total 28
-  "The exact number of m57-imp5 ERT tests: 33 registered checks (S1 4,
-S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
+(defvar m57-imp5--min-gate-total 27
+  "The exact number of m57-imp5 ERT tests: 32 registered checks (S1 3,
+S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.  M61
+imp-2g removed the pty-driver case-count pin.")
 
 (ert-deftest m57-imp5/gate-m57-total ()
   "The m57-imp5 corpus registers at least its docs-independent floor."

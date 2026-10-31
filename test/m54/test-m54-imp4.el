@@ -27,7 +27,7 @@
 ;;;         tool/run-tests.scm, after test-m54-imp3.el, and the (m52) and
 ;;;         (m53) groups stay present.  S3 holds 3 checks.
 ;;;   S4 -- the pty driver pins: the m54-imp4 group, the case
-;;;         m54-imp4/tab-policy-e2e, and the case-count pins.  S4 holds 3
+;;;         m54-imp4/tab-policy-e2e.  S4 holds 2
 ;;;         checks.
 ;;;   S5 -- the guards: a per-group min-count guard for S1 .. S4, and the
 ;;;         in-process group-total `ert-deftest'.  S5 holds 4 checks.
@@ -229,13 +229,10 @@ error, not a pass."
 (m54-imp4--check "pty-driver-case-name"
                  (m54-imp4--contains-p
                   "test/pty-driver.py" "m54-imp4/tab-policy-e2e"))
-(m54-imp4--check "pty-driver-case-count-pins"
-                 (and (m54-imp4--contains-p
-                       "test/pty-driver.py"
-                       "\"m54-imp4-case-count\", len(group_cases(\"m54-imp4\")), 1")
-                      (m54-imp4--contains-p
-                       "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 42")))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the 2 case-count
+;; pins are REMOVED, not re-pinned.  A case count is not a behavior, and
+;; the driver's own --selftest holds the count checks at
+;; :3470 ... :3472.
 
 ;;; --- S5. The guards -------------------------------------------------
 
@@ -243,23 +240,23 @@ error, not a pass."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  S1 holds 2 checks, S2
-;; holds 5, S3 holds 3, and S4 holds 3.
+;; holds 5, S3 holds 3, and S4 holds 2.
 
 (setq m54-imp4--group 's5)
 
 (m54-imp4--check "reg/min-s1-checks-2" (>= (m54-imp4--group-count 's1) 2))
 (m54-imp4--check "reg/min-s2-checks-5" (>= (m54-imp4--group-count 's2) 5))
 (m54-imp4--check "reg/min-s3-checks-3" (>= (m54-imp4--group-count 's3) 3))
-(m54-imp4--check "reg/min-s4-checks-3" (>= (m54-imp4--group-count 's4) 3))
+(m54-imp4--check "reg/min-s4-checks-2" (>= (m54-imp4--group-count 's4) 2))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The floor is the measured count of m54-imp4 tests: 17 registered
-;; checks (S1 2, S2 5, S3 3, S4 3, S5 4) plus the group-total deftest,
-;; allowing one slack.
+;; The floor is the measured count of m54-imp4 tests: 16 registered
+;; checks (S1 2, S2 5, S3 3, S4 2, S5 4) plus the group-total deftest,
+;; allowing one slack.  M61 imp-2g removed the 2 case-count pins.
 
-(defvar m54-imp4--min-gate-total 17
-  "The minimum number of m54-imp4 ERT tests: 17 registered checks plus
+(defvar m54-imp4--min-gate-total 16
+  "The minimum number of m54-imp4 ERT tests: 16 registered checks plus
 the group-total deftest, allowing one slack.")
 
 (ert-deftest m54-imp4/gate-m54-imp4-total ()

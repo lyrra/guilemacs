@@ -29,7 +29,9 @@
 ;;;         the M58_IMP4_CASES tuple, the CASES and GROUPS entries,
 ;;;         the expectation "8 0 8", the frame switch, the NARROW
 ;;;         info_report_prefix skip, and the case-count pins (TOTAL 32
-;;;         = the SUM of the 19 group pins).  T2 holds 6 checks.
+;;;         = the SUM of the 19 group pins); the case-count pin and the
+;;;         case-wiring source scan are REMOVED (M61 imp-2g).  T2 holds
+;;;         4 checks.
 ;;;   T3 -- the REAL path: run the case on the built src/emacs through
 ;;;         a real PTY.  A PASS or an explicit INFO skip, never a pass
 ;;;         on a skip.  A bad run retries once.  T3 holds 1 check.
@@ -38,7 +40,8 @@
 ;;;         holds 2 checks.
 ;;;   T5 -- the cross-corpus re-pins: the PTY case total moves from 31
 ;;;         to 32, so every older pin must hold 32 in the SAME commit.
-;;;         T5 holds 5 checks (the last one scans EVERY corpus file);
+;;;         T5 holds 2 checks (M61 imp-2g removed the 3 cross-corpus
+;;;         re-pins; the last one still scans EVERY corpus file);
 ;;;         the fifth pins the MEASURED delta of the (m58-imp4) group
 ;;;         comment, so a stale number fails a check.
 ;;;   T6 -- the guards: 9 per-group min-count guards, plus the
@@ -183,24 +186,6 @@ When TO is nil the region runs to the end of the file."
       (setq n (1+ n) start (match-end 0)))
     n))
 
-(defun m58-imp4--pty-case-pins ()
-  "Read the `test/pty-driver.py' case-count pins as (TOTAL . SUM).
-TOTAL is the `total-case-count' pin; SUM is the sum of the per-group
-`-case-count' pins.  Return nil when a pin is absent."
-  (m58-imp4--with "test/pty-driver.py"
-    (lambda ()
-      (goto-char (point-min))
-      (let ((total nil) (sum 0) (n 0))
-        (while (re-search-forward "check(\"\\([a-z0-9-]*-case-count\\)\", " nil t)
-          (let ((name (match-string 1))
-                (pin (progn (re-search-forward "), \\([0-9]+\\))" nil t)
-                           (match-string 1))))
-            (if (string= name "total-case-count")
-                (setq total (string-to-number (or pin "0")))
-              (setq sum (+ sum (string-to-number (or pin "0"))))
-              (setq n (1+ n)))))
-        (and total (> n 0) (cons total sum))))))
-
 (defun m58-imp4--run (prog args)
   "Run PROG with ARGS in a subprocess from the repo root and return its
 combined output as a string, or the symbol `m58-imp4-prog-absent'."
@@ -323,29 +308,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (setq m58-imp4--group 't2)
 
-(m58-imp4--check "pty/case-and-group"
-                 (and (m58-imp4--holds-all
-                       "test/pty-driver.py"
-                       '("\"m58-imp4/color-mode-e2e\""
-                         "M58_IMP4_CASES = ("
-                         "\"expect\": \"8 0 8\""
-                         "\"info_report_prefix\": M58_IMP4_SKIP"
-                         "\"pty_contains\": M58_IMP4_END"
-                         "\"m58-imp4\","))
-                      (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       "+ M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES")
-                      (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       ;; M61 imp-1 re-pin: the aggregate now names the
-                       ;; m61-imp1 group after M58_IMP4_CASES.
-                       "+ M61_IMP1_CASES + M61_IMP2_CASES)")))
-
-(m58-imp4--check "pty/case-counts-42"
-                 (let ((pins (m58-imp4--pty-case-pins)))
-                   (and (consp pins)
-                        (eql 42 (car pins))
-                        (eql (car pins) (cdr pins)))))
+;; M61 imp-2g (review cr.org CR1 / CR2): the case-wiring source scan is
+;; REMOVED.  It pinned the text of test/pty-driver.py, including the tail
+;; of the CASES expression, so the M61 imp-2g case made it red with no
+;; behavior change (finding F7 again).  The runtime proof of this case is
+;; `pty-real-path-color-mode' below.
 
 (m58-imp4--check "pty/case-pins-value-not-bytes"
                  (let ((case-region (m58-imp4--region
@@ -462,31 +429,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (setq m58-imp4--group 't5)
 
-(m58-imp4--check "repin/imp1-cases-42"
-                 (and (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-42\"")
-                      (m58-imp4--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 42 (car pins))")))
-
-(m58-imp4--check "repin/imp2-cases-42"
-                 (and (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "\"pty-case-counts-42\"")
-                      (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "(eql 42 (car pins))")
-                      (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "\"imp1-repinned-36\"")
-                      (m58-imp4--live-p "test/m58/test-m58-imp2.el"
-                                        "pty-driver-cases-42")))
-
-(m58-imp4--check "repin/imp3-cases-42"
-                 (and (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "\"pty/case-counts-42\"")
-                      (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "(eql 42 (car pins))")
-                      (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-driver-cases-42")
-                      (m58-imp4--live-p "test/m58/test-m58-imp3.el"
-                                        "pty-case-counts-42")))
+;; M61 imp-2g (review cr.org CR1): the 3 cross-corpus re-pins are
+;; REMOVED.  They read the source text of test/m58/test-m58-imp1.el,
+;; test-m58-imp2.el and test-m58-imp3.el, and they named case-count
+;; checks that no longer exist.  A corpus must not pin another corpus's
+;; text.
 
 (defun m58-imp4--stale-pinners (needles)
   "Return the base names of the test/*/m*/*.el files that hold a NEEDLE."
@@ -728,10 +675,10 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 (setq m58-imp4--group 't6)
 
 (m58-imp4--check "reg/min-t1-checks-5" (>= (m58-imp4--group-count 't1) 5))
-(m58-imp4--check "reg/min-t2-checks-6" (>= (m58-imp4--group-count 't2) 6))
+(m58-imp4--check "reg/min-t2-checks-4" (>= (m58-imp4--group-count 't2) 4))
 (m58-imp4--check "reg/min-t3-checks-1" (>= (m58-imp4--group-count 't3) 1))
 (m58-imp4--check "reg/min-t4-checks-2" (>= (m58-imp4--group-count 't4) 2))
-(m58-imp4--check "reg/min-t5-checks-5" (>= (m58-imp4--group-count 't5) 5))
+(m58-imp4--check "reg/min-t5-checks-2" (>= (m58-imp4--group-count 't5) 2))
 (m58-imp4--check "reg/min-t7-checks-4" (>= (m58-imp4--group-count 't7) 4))
 (m58-imp4--check "reg/min-t8-checks-4" (>= (m58-imp4--group-count 't8) 4))
 (m58-imp4--check "reg/min-t9-checks-3" (>= (m58-imp4--group-count 't9) 3))
@@ -741,17 +688,18 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m58-imp4 tests: 41 registered checks (T1 5,
-;; T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 3) plus the
+;; The measured count of m58-imp4 tests: 34 registered checks (T1 5,
+;; T2 4, T3 1, T4 2, T5 2, T6 9, T7 4, T8 4, T9 3) plus the
 ;; group-total deftest itself.  The T3 and T7 checks may fold to a
 ;; controlled INFO skip on a host with no built src/emacs, no PTY, or
 ;; no guile, and a controlled skip is still a registered test.
 
-(defvar m58-imp4--gate-total 40
-  "The EXACT number of m58-imp4 ERT tests: 41 registered checks (T1 5,
-T2 6, T3 1, T4 2, T5 5, T6 9, T7 4, T8 4, T9 3) plus the group-total
+(defvar m58-imp4--gate-total 35
+  "The EXACT number of m58-imp4 ERT tests: 34 registered checks (T1 5,
+T2 4, T3 1, T4 2, T5 2, T6 9, T7 4, T8 4, T9 3) plus the group-total
 deftest itself.  The guard uses `equal', not `>=', so a DUPLICATE
-registration fails too.")
+registration fails too.  M61 imp-2g removed the pty-driver case-count pin
+and the 3 cross-corpus re-pins (4 checks).")
 
 (ert-deftest m58-imp4/gate-m58-total ()
   "The m58-imp4 corpus registers exactly its docs-independent count."

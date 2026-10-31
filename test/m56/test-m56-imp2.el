@@ -27,7 +27,8 @@
 ;;;         group, the M56_IMP2_CASES tuple, the CASES / GROUPS entries,
 ;;;         the selftest group-count and total-case-count pins (26), the
 ;;;         output span and its pinned bytes, the resize, and the absence
-;;;         of a stale literal 24 case-count.  S1 holds 9 checks.
+;;;         of a stale literal 24 case-count.  S1 holds 8 checks (the 2
+;;;         case-count pins are REMOVED, M61 imp-2g).
 ;;;   S2 -- the real path: python3 test/pty-driver.py --selftest passes,
 ;;;         and the case m56-imp2/tty-init-e2e PASSES on the built
 ;;;         src/emacs on a real PTY.  A missing python3, a missing built
@@ -194,13 +195,10 @@ host limit is a skip, never a pass (brief.org section 2)."
                       (m56-imp2--contains-p
                        "test/pty-driver.py"
                        "\"m61-imp1\")")))
-(m56-imp2--check "selftest-pins"
-                 (and (m56-imp2--contains-p
-                       "test/pty-driver.py"
-                       "\"m56-imp2-case-count\", len(group_cases(\"m56-imp2\")), 1")
-                      (m56-imp2--contains-p
-                       "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 42")))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the 2 case-count
+;; pins are REMOVED, not re-pinned.  A case count is not a behavior, and
+;; the driver's own --selftest holds the count checks at
+;; :3470 ... :3472.
 (m56-imp2--check "output-span"
                  (m56-imp2--contains-p
                   "test/pty-driver.py"
@@ -278,27 +276,27 @@ host limit is a skip, never a pass (brief.org section 2)."
 ;; tests, so a green m56 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 9 checks,
+;; because every check is registered at load time.  S1 holds 8 checks,
 ;; S2 holds 2, and S3 holds 3.
 
 (setq m56-imp2--group 's4)
 
-(m56-imp2--check "reg/min-s1-checks-9" (>= (m56-imp2--group-count 's1) 9))
+(m56-imp2--check "reg/min-s1-checks-8" (>= (m56-imp2--group-count 's1) 8))
 (m56-imp2--check "reg/min-s2-checks-2" (>= (m56-imp2--group-count 's2) 2))
 (m56-imp2--check "reg/min-s3-checks-3" (>= (m56-imp2--group-count 's3) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m56-imp2 tests is 18: 14 registered checks
-;; (S1 9, S2 2, S3 3) plus 3 group guards plus the group-total deftest
+;; The measured count of m56-imp2 tests is 17: 13 registered checks
+;; (S1 8, S2 2, S3 3) plus 3 group guards plus the group-total deftest
 ;; itself.  A counted check is either a real check or a controlled INFO
 ;; skip, so the S2 checks still register on a host with no python3 / no
 ;; built src/emacs / no PTY; the exact pin holds either way.
 
-(defvar m56-imp2--min-gate-total 18
-  "The exact number of m56-imp2 ERT tests: 14 registered checks
-(S1 9, S2 2, S3 3) plus 3 group guards plus the group-total deftest
-itself.")
+(defvar m56-imp2--min-gate-total 17
+  "The exact number of m56-imp2 ERT tests: 13 registered checks
+(S1 8, S2 2, S3 3) plus 3 group guards plus the group-total deftest
+itself.  M61 imp-2g removed the 2 pty-driver case-count pins.")
 
 (ert-deftest m56-imp2/gate-m56-total ()
   "The m56-imp2 corpus registers at least its docs-independent floor."

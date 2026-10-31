@@ -28,7 +28,8 @@
 ;;;         checks.
 ;;;   S4 -- the registration: the corpus is registered in the (m53)
 ;;;         group of tool/run-tests.scm, and test/pty-driver.py holds
-;;;         the 26-case total pin and the --selftest entry.  S4 holds 4
+;;;         the --selftest entry (the case-count pin is REMOVED, M61
+;;;         imp-2g).  S4 holds 3
 ;;;         checks.
 ;;;   S5 -- the guards: a per-group min-count guard for S1 .. S4, and
 ;;;         the group-total `ert-deftest'.  S5 holds 4 checks.
@@ -282,10 +283,10 @@ probe: the loader must read and evaluate a real Elisp file."
                                        "test/m53/test-m53-imp1.el"))
 (m53-imp1--check "run-tests-m53-group"
                  (m53-imp1--contains-p "tool/run-tests.scm" "(group (m53)"))
-(m53-imp1--check "pty-driver-total-42"
-                 (m53-imp1--contains-p
-                  "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.  A
+;; case count is not a behavior, and the driver's own --selftest holds
+;; the 3 count checks at :3470 ... :3472.
 (m53-imp1--check "pty-driver-selftest"
                  (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 
@@ -296,28 +297,29 @@ probe: the loader must read and evaluate a real Elisp file."
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
 ;; because every check is registered at load time.  S1 holds 1 check,
-;; S2 holds 6, S3 holds 3, and S4 holds 4.
+;; S2 holds 6, S3 holds 3, and S4 holds 3.
 
 (setq m53-imp1--group 's5)
 
 (m53-imp1--check "reg/min-s1-checks-1" (>= (m53-imp1--group-count 's1) 1))
 (m53-imp1--check "reg/min-s2-checks-6" (>= (m53-imp1--group-count 's2) 6))
 (m53-imp1--check "reg/min-s3-checks-3" (>= (m53-imp1--group-count 's3) 3))
-(m53-imp1--check "reg/min-s4-checks-4" (>= (m53-imp1--group-count 's4) 4))
+(m53-imp1--check "reg/min-s4-checks-3" (>= (m53-imp1--group-count 's4) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The floor is the measured count of m53-imp1 tests: 23 registered
-;; checks (S1 1, S2 6, S3 3, S4 4, S5 4) plus the group-total deftest
+;; The floor is the measured count of m53-imp1 tests: 22 registered
+;; checks (S1 1, S2 6, S3 3, S4 3, S5 4) plus the group-total deftest
 ;; itself.  The two S2 guile checks may fold to a controlled INFO skip
 ;; on a host with no guile binary, and a controlled skip is still a
 ;; registered test, so the floor holds either way.  This is a coarse
 ;; net, not a tight bound; the per-group reg/min-* guards are the tight
 ;; check.
 
-(defvar m53-imp1--min-gate-total 18
-  "The minimum number of m53-imp1 ERT tests: 23 registered checks plus
-the group-total deftest, allowing one slack for a folded skip.")
+(defvar m53-imp1--min-gate-total 17
+  "The minimum number of m53-imp1 ERT tests: 22 registered checks plus
+the group-total deftest, allowing one slack for a folded skip.  M61
+imp-2g removed the pty-driver case-count pin.")
 
 (ert-deftest m53-imp1/gate-m53-total ()
   "The m53 group registers at least its docs-independent floor."

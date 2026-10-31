@@ -2163,6 +2163,25 @@ M61_IMP2_SHORT_PROBE = M61_IMP2_HELPERS + M61_IMP2_HANDLE_PRELUDE + r"""
                   (else "ok")))))))
 """
 
+# The CARRIER SHAPE of the output leaf itself (review cr.org CR2).  No
+# fixture is needed: an identity that the C table does not hold answers
+# -EBADF before any =fwrite= runs (m61_tty_handle_of_identity_1 answers
+# NULL).  The case pins the CARRIER #(0 9): the probe requires a 2-slot
+# vector and reads its 2 slots, so a return to the plain fixnum answer
+# -9 FAILS.  This is behavior, not a source scan.
+M61_IMP2_LEAF_PROBE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (leaf (c '--tty-handle-write))
+       (answer (leaf 1000000 #vu8(65 66 67))))
+  (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+         "not-a-carrier")
+        ((not (= 0 (vector-ref answer 0))) "closed-count")
+        ;; -EBADF is 9 on this host, as a POSITIVE errno in the carrier.
+        ((not (= 9 (vector-ref answer 1))) "closed-errno")
+        (else "ok")))
+"""
+
 M61_IMP2_CASES = (
     {
         "name": "m61-imp2/byte-order-e2e",
@@ -2247,6 +2266,407 @@ M61_IMP2_CASES = (
         "wait_exit": True,
         "env": {"TERM": "xterm"},
     },
+    {
+        "name": "m61-imp2/leaf-carrier-e2e",
+        "group": "m61-imp2",
+        "probe": M61_IMP2_LEAF_PROBE,
+        "subst": {},
+        # The answer SHAPE of --tty-handle-write is read here: a return to
+        # the plain fixnum -9 can not pass the probe (review cr.org CR2).
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+)
+
+# --- M61 imp-2g: a failed output dispatch is observable (F5) ---------
+#
+# The ordered output path must ANSWER its result and it must hand the
+# measured count to the caller, and the termscript copy of 1 run must
+# agree with the output of that run.  The cases run the built src/emacs
+# on a real PTY and call the ONE hub (src/term.c
+# m61_tty_handle_glyph_run_1) through the leaf --tty-glyph-run, so the
+# answer is read from the real C path and not from a Scheme copy of it.
+#
+# The RECOVERY rule of brief.org section 5.2 is DESIGN 2, and the 3 glyph
+# call sites of src/term.c state it: a MEASURED incomplete run sets
+# SET_FRAME_GARBAGED, and a run of UNKNOWN progress does not, because that
+# state can repeat at every run.  The cases below read the rule with
+# --frame-garbaged-p and the report seam with a redefinition of
+# tty-glyph-run-policy, which the C hub reads at EACH failed run.
+M61_IMP2G_RUN = b"M61-IMP2G-RUN|"          # the clean run, then a newline
+M61_IMP2G_RAISE = b"M61-IMP2G-EIORUN|"     # the run whose write raises
+M61_IMP2G_NEEDLE = b"M61-IMP2G-REPAINT|"   # the text of the failed redisplay
+M61_IMP2G_PREFIX_RUN = b"M61-IMP2G-PREFIX|"  # the run whose write moves 5 bytes
+M61_IMP2G_PREFIX_P = 5                     # the measured prefix of that run
+
+# The shared prelude of the probes: the tty of the session, the leaf that
+# runs ONE glyph run, the leaf that reads the repaint request, and the
+# helper that asks the recorded reports of the seam for an unknown state.
+M61_IMP2G_PRELUDE = M61_IMP2_HELPERS + r"""
+(define (m61-imp2g-unknown-reported? reports)
+  (cond ((null? reports) #f)
+        ((eq? #t (list-ref (car reports) 3)) #t)
+        (else (m61-imp2g-unknown-reported? (cdr reports)))))
+""" + r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (run (c '--tty-glyph-run))
+       (garbaged? (c '--frame-garbaged-p))
+       (open! (c 'open-termscript))
+       (ti (c 'insert))
+       (goto (c 'goto-char))
+       (pmax (c 'point-max))
+       (redisplay! (c 'redisplay))
+       (send (c 'send-string-to-terminal)))
+"""
+
+# A clean session: the answer of the run is 0, the count is the whole
+# run, the bytes of the 2 streams agree, and the frame is NOT garbaged.
+# A hub that drops the answer or the count again can not pass this case,
+# and neither can a call site that repaints a complete run (criterion 3
+# of brief.org section 9, review cr.org C2).
+M61_IMP2G_CLEAN_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (begin
+        (open! "@@TSFILE@@")
+        (let* ((answer (run term #vu8(@@BYTES@@)))
+               (status (vector-ref answer 0))
+               (written (vector-ref answer 1))
+               (garbaged (garbaged? #nil)))
+          (open! #nil)
+          (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
+                 (i (m61-imp2-index text "@@STR@@" 0)))
+            (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+                   "not-an-answer")
+                  ((not (= 0 status)) "status-not-0")
+                  ((not (= @@N@@ written)) "count-not-the-run")
+                  ((< i 0) "termscript-disagrees")
+                  (garbaged "clean-run-garbaged-the-frame")
+                  (else "ok")))))))
+"""
+
+# The PREFIX case: a write that moves P bytes and then answers a hard
+# error.  The fixture is injected at the SAME binding that the C hub
+# reads (tty-handle-write-all-borrowed), so the REAL C hub
+# m61_tty_handle_glyph_run_1 runs: it must answer -ENOSPC with the
+# measured prefix 5, and the termscript must hold exactly that prefix and
+# NOT the whole run (statement 3 of brief.org section 4, prefix case).
+#
+# The injected carrier claims the 5 bytes without moving them, so this
+# case proves the REPORT and the COPY rule of a measured prefix.  The
+# fwrite-level fixture (a real short =fwrite=) stays a GAP: MEASURED HOST
+# LIMIT -- =tty->output= is always a pty in a PTY session.  /dev/full as
+# the OUTPUT stream answers ENOSPC with count 0, which is the
+# ZERO-progress shape and not the prefix shape, and a pty that is full
+# BLOCKS instead of answering a short count.  A regular file at its
+# RLIMIT_FSIZE does give the shape -- MEASURED with 2 =fwrite= calls of
+# 65536 bytes under "ulimit -f 16": n1=16384 e1=27 ferror1=1, then
+# n2=4096 e2=27 -- but no elisp or PTY path can make =tty->output= such a
+# file.  milestone.org section 5 keeps that row.
+M61_IMP2G_PREFIX_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (let* ((injected
+              ;; 1 MEASURED prefix of the run, then a hard ENOSPC.  The
+              ;; real C hub reads the carrier #(count errno), so it reports
+              ;; the errno AND the 5 bytes that moved.  The carrier is built
+              ;; here as the plain vector, so the probe needs no import of
+              ;; the Scheme helper into the child's toplevel.
+              (lambda (identity bytes) (vector @@P@@ @@ERRNO@@))))
+        (open! "@@TSFILE@@")
+        (module-set! output 'tty-handle-write-all-borrowed injected)
+        (let* ((answer (run term #vu8(@@BYTES@@)))
+               (status (vector-ref answer 0))
+               (written (vector-ref answer 1)))
+          (open! #nil)
+          (let ((text (m61-imp2-slurp "@@TSFILE@@")))
+            (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+                   "not-an-answer")
+                  ((not (= @@NEG@@ status)) "status-not-enospc")
+                  ((not (= @@P@@ written)) "prefix-count")
+                  ((< (m61-imp2-index text "@@P5@@" 0) 0)
+                   "termscript-lost-the-prefix")
+                  ((>= (m61-imp2-index text "@@STR@@" 0) 0)
+                   "termscript-holds-the-run")
+                  (else "ok")))))))
+"""
+
+# The CR2 LENGTH case (M61 imp-2g, brief.org A1 / review cr.org CR3): a
+# PARTIAL glyph run whose measured prefix is 5 of 17 bytes.  The case reads
+# the TERMSCRIPT FILE itself and measures the BYTES that the copy added:
+# the copy is COPY_LEN = 5 and NOT LEN = 17.  A whole run in a partial copy
+# is finding F5 itself, so this case is the proof of the length contract of
+# the seam and not an inspection of it.
+#
+# The injection point is the carrier binding that the C hub reads
+# (tty-handle-write-all-borrowed), so the REAL C hub
+# m61_tty_handle_glyph_run_1 runs and it decides the copy length.  The
+# fwrite-level short write stays a named host limit (milestone.org
+# section 5): tty->output is always a pty in a PTY session.
+M61_IMP2G_COPYLEN_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (let* ((injected
+              (lambda (identity bytes) (vector @@P@@ @@ERRNO@@))))
+        (open! "@@TSFILE@@")
+        (module-set! output 'tty-handle-write-all-borrowed injected)
+        (let* ((before (string-length (m61-imp2-slurp "@@TSFILE@@")))
+               (answer (run term #vu8(@@BYTES@@)))
+               (status (vector-ref answer 0))
+               (written (vector-ref answer 1)))
+          (open! #nil)
+          (let* ((text (m61-imp2-slurp "@@TSFILE@@")))
+            ;; NOTE: `string-length' counts CHARACTERS.  The fixture is
+            ;; ASCII, so the count equals the byte count here.  A
+            ;; non-ASCII fixture must read the file as a bytevector.
+            (let ((delta (- (string-length text) before)))
+              (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+                     "not-an-answer")
+                    ((not (= @@NEG@@ status)) "status-not-enospc")
+                    ((not (= @@P@@ written)) "prefix-count")
+                    ;; COPY_LEN = 5 of LEN = 17.  The file must hold the
+                    ;; measured prefix and NOT the whole run.
+                    ((not (= @@P@@ delta)) "copy-len-not-the-prefix")
+                    ((= @@N@@ delta) "termscript-holds-the-run")
+                    ((< (m61-imp2-index text "@@P5@@" 0) 0)
+                     "termscript-lost-the-prefix")
+                    (else "ok"))))))))
+"""
+
+# The -EIO case, through the REAL C hub: a raise AFTER 1 measured call.
+# The injection point is the module procedure that the retry loop
+# resolves: tty-handle-write-all-borrowed.  It answers 1 MEASURED call and
+# then raises, so the prefix is on the terminal and the rest of the run is
+# not.  The C hub must answer -EIO with the count 0 (progress UNKNOWN, NOT
+# a measured 0), the termscript must hold NONE of that run (the 2 streams
+# may differ, and a copy of the whole run would be the defect itself), the
+# report seam must run with UNKNOWN = #t, and the frame must NOT be
+# garbaged: DESIGN 2 of brief.org section 5.2 keeps SET_FRAME_GARBAGED for
+# a MEASURED incomplete run only, because a repaint of an unknown state
+# can not converge.  The second redisplay shows that nothing is left
+# pending.
+#
+# MEASURED 2026-10-31: a redefinition of the LEAF tty-handle-write does
+# NOT reach the hub, because the compiled retry loop calls its leaf
+# directly and a declared module is inlined.
+M61_IMP2G_RAISE_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (let* ((real-all (module-ref output 'tty-handle-write-all-borrowed))
+             (real-policy (module-ref output 'tty-glyph-run-policy))
+             (reports '())
+             (calls 0)
+             (injected
+              (lambda (identity bytes)
+                (set! calls (+ calls 1))
+                (if (= calls 1)
+                    (begin
+                      ;; 1 measured call: a prefix of the run reaches the
+                      ;; terminal, so the rest of the run is NOT known.
+                      (real-all identity bytes)
+                      (error "m61-imp2g: inject a raise after 1 measured call"))
+                    (real-all identity bytes)))))
+        ;; The C hub reads the module VARIABLE at each failed run, so this
+        ;; redefinition observes the report of the real seam.
+        (module-set! output 'tty-glyph-run-policy
+                     (lambda (written len err unknown)
+                       (set! reports (cons (list written len err unknown)
+                                           reports))
+                       (real-policy written len err unknown)))
+        (open! "@@TSFILE@@")
+        (module-set! output 'tty-handle-write-all-borrowed injected)
+        (let* ((answer (run term #vu8(@@BYTES@@)))
+               (status (vector-ref answer 0))
+               (written (vector-ref answer 1)))
+          (set! calls 0)
+          (send "@@BEGIN@@")
+          (goto (pmax))
+          (ti "@@NEEDLE@@")
+          (redisplay! #t)
+          (let ((garbaged (garbaged? #nil)))
+            (redisplay! #t)
+            (let ((still (garbaged? #nil)))
+              (open! #nil)
+              (let ((text (m61-imp2-slurp "@@TSFILE@@")))
+                (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+                       "not-an-answer")
+                      ;; -EIO is 5 on this host: the negated status.
+                      ((not (= -5 status)) "status-not-eio")
+                      ((not (= 0 written)) "unknown-count")
+                      ((>= (m61-imp2-index text "@@STR@@" 0) 0)
+                       "termscript-holds-the-run")
+                      ((not (m61-imp2g-unknown-reported? reports))
+                       "seam-not-reported")
+                      (garbaged "unknown-progress-repainted")
+                      (still "unknown-progress-repainted")
+                      (else "ok")))))))))
+"""
+
+# The -EIO case with a raise BEFORE the first byte (brief.org section 6.4,
+# review cr.org C6).  NOTHING of the run is on the terminal and nothing is
+# on the termscript, so this is a DIFFERENT state from the case above: the
+# measured prefix is 0 because there is no prefix, and the progress is
+# still UNKNOWN.  The F1 rule applies: no byte is replayed and no byte is
+# copied.  The session must survive the raise (the probe reports "ok" and
+# the driver reads exit 0), the seam must report UNKNOWN, and the frame
+# must not be garbaged.
+M61_IMP2G_RAISE_FIRST_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (let* ((real-policy (module-ref output 'tty-glyph-run-policy))
+             (reports '())
+             (injected
+              (lambda (identity bytes)
+                (error "m61-imp2g: inject a raise before the first byte"))))
+        (module-set! output 'tty-glyph-run-policy
+                     (lambda (written len err unknown)
+                       (set! reports (cons (list written len err unknown)
+                                           reports))
+                       (real-policy written len err unknown)))
+        (open! "@@TSFILE@@")
+        (module-set! output 'tty-handle-write-all-borrowed injected)
+        (let* ((answer (run term #vu8(@@BYTES@@)))
+               (status (vector-ref answer 0))
+               (written (vector-ref answer 1))
+               (garbaged (garbaged? #nil)))
+          (open! #nil)
+          (let ((text (m61-imp2-slurp "@@TSFILE@@")))
+            (cond ((not (and (vector? answer) (= 2 (vector-length answer))))
+                   "not-an-answer")
+                  ((not (= -5 status)) "status-not-eio")
+                  ((not (= 0 written)) "unknown-count")
+                  ((>= (m61-imp2-index text "@@STR@@" 0) 0)
+                   "termscript-holds-the-run")
+                  ((not (m61-imp2g-unknown-reported? reports))
+                   "seam-not-reported")
+                  (garbaged "unknown-progress-repainted")
+                  (else "ok")))))))
+"""
+
+# The REPAINT case (brief.org section 6.4, last row): a MEASURED
+# incomplete run must be observable at a safe boundary, and the repaint
+# must CONVERGE.  The injection answers 1 measured prefix and a hard
+# ENOSPC on the FIRST glyph run of one redisplay only, so the real C call
+# site of the run must set the frame garbaged, and the next redisplay must
+# clear the request and reach a stable picture.  A call site that never
+# sets the flag fails this case; a call site that sets it again on every
+# run fails the second read.
+M61_IMP2G_REPAINT_PROBE = M61_IMP2G_PRELUDE + r"""
+  (if (not term)
+      "no-terminal"
+      (let* ((real-all (module-ref output 'tty-handle-write-all-borrowed))
+             (calls 0)
+             (injected
+              (lambda (identity bytes)
+                (set! calls (+ calls 1))
+                (if (= calls 1)
+                    (vector @@P@@ @@ERRNO@@)
+                    (real-all identity bytes)))))
+        (module-set! output 'tty-handle-write-all-borrowed injected)
+        (send "@@BEGIN@@")
+        (goto (pmax))
+        (ti "@@NEEDLE@@")
+        (let ((before calls))
+          (redisplay! #t)
+          (let ((garbaged (garbaged? #nil)))
+            (redisplay! #t)
+            (let ((cleared (garbaged? #nil)))
+              (cond ((= before calls) "injection-not-armed")
+                    ((not garbaged) "no-repaint")
+                    (cleared "repaint-not-cleared")
+                    (else "ok"))))))))
+"""
+
+M61_IMP2G_CASES = (
+    {
+        "name": "m61-imp2g/clean-run-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_CLEAN_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp2g-clean"),
+                  "BYTES": " ".join(str(b) for b in M61_IMP2G_RUN + b"\n"),
+                  "STR": M61_IMP2G_RUN.decode(),
+                  "N": str(len(M61_IMP2G_RUN + b"\n"))},
+        # The negative control: the answer 0, the whole count, the 2
+        # streams agree, and the frame is untouched.
+        "expect": "ok",
+        "pty_contains": M61_IMP2G_RUN,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2g/prefix-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_PREFIX_PROBE,
+        # The real C hub reports the injected prefix: -ENOSPC and 5 moved
+        # bytes, and the termscript holds those 5 bytes only.
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp2g-prefix"),
+                  "BYTES": " ".join(str(b) for b in M61_IMP2G_PREFIX_RUN),
+                  "STR": M61_IMP2G_PREFIX_RUN.decode(),
+                  "P5": M61_IMP2G_PREFIX_RUN[:5].decode(),
+                  "P": str(M61_IMP2G_PREFIX_P),
+                  "ERRNO": str(errno.ENOSPC),
+                  "NEG": str(-errno.ENOSPC)},
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2g/copy-len-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_COPYLEN_PROBE,
+        # CR2: the termscript holds COPY_LEN = 5 bytes of a 17-byte run.
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp2g-copylen"),
+                  "BYTES": " ".join(str(b) for b in M61_IMP2G_PREFIX_RUN),
+                  "STR": M61_IMP2G_PREFIX_RUN.decode(),
+                  "P5": M61_IMP2G_PREFIX_RUN[:5].decode(),
+                  "P": str(M61_IMP2G_PREFIX_P),
+                  "N": str(len(M61_IMP2G_PREFIX_RUN)),
+                  "ERRNO": str(errno.ENOSPC),
+                  "NEG": str(-errno.ENOSPC)},
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2g/raise-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_RAISE_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp2g-raise"),
+                  "BYTES": " ".join(str(b) for b in M61_IMP2G_RAISE),
+                  "STR": M61_IMP2G_RAISE.decode(),
+                  "BEGIN": M61_IMP2_BEGIN.decode(),
+                  "NEEDLE": M61_IMP2G_NEEDLE.decode()},
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2g/raise-first-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_RAISE_FIRST_PROBE,
+        # A raise BEFORE the first byte: no prefix, no copy, and the
+        # session survives (C6).
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp2g-raise-first"),
+                  "BYTES": " ".join(str(b) for b in M61_IMP2G_RAISE),
+                  "STR": M61_IMP2G_RAISE.decode()},
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp2g/repaint-e2e",
+        "group": "m61-imp2g",
+        "probe": M61_IMP2G_REPAINT_PROBE,
+        # A measured incomplete run asks for a repaint, and the next
+        # redisplay clears the request: no loop.
+        "subst": {"BYTES": " ".join(str(b) for b in M61_IMP2G_PREFIX_RUN),
+                  "NEEDLE": M61_IMP2G_NEEDLE.decode(),
+                  "BEGIN": M61_IMP2_BEGIN.decode(),
+                  "P": str(M61_IMP2G_PREFIX_P),
+                  "ERRNO": str(errno.ENOSPC)},
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
 )
 
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
@@ -2254,7 +2674,8 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
-         + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES)
+         + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
+         + M61_IMP2G_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -2263,7 +2684,7 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
-          "m61-imp1", "m61-imp2")
+          "m61-imp1", "m61-imp2", "m61-imp2g")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -3219,8 +3640,9 @@ def selftest():
     check("m58-imp3-case-count", len(group_cases("m58-imp3")), 5)
     check("m58-imp4-case-count", len(group_cases("m58-imp4")), 1)
     check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
-    check("m61-imp2-case-count", len(group_cases("m61-imp2")), 6)
-    check("total-case-count", len(CASES), 42)
+    check("m61-imp2-case-count", len(group_cases("m61-imp2")), 7)
+    check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
+    check("total-case-count", len(CASES), 49)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),

@@ -18,7 +18,7 @@
 ;;;         name, the M58_IMP2_CASES tuple, the (m58-imp2) group, the
 ;;;         case-count pins (TOTAL = 26 = the SUM of the 17 group pins),
 ;;;         the span_requires shape (no hand-copied byte guess), and the
-;;;         PRELUDE hook.  T2 holds 6 checks.
+;;;         PRELUDE hook.  T2 holds 5 checks.
 ;;;   T3 -- the real path: python3 test/pty-driver.py --emacs src/emacs
 ;;;         --group m58-imp2.  A result that is neither PASS nor INFO
 ;;;         RETRIES once, then prints both runs.  A missing python3, a
@@ -27,13 +27,11 @@
 ;;;   T4 -- the registration: this corpus is registered in the (m58)
 ;;;         group of tool/run-tests.scm, directly after the imp-1 line,
 ;;;         and the imp-1 line stays present.  T4 holds 4 checks.
-;;;   T5 -- the cross-corpus re-pin: the new case moves the
-;;;         test/pty-driver.py total from 25 to 26, so
-;;;         test/m58/test-m58-imp1.el must hold pty-driver-cases-42 and
-;;;         must hold no live pty-driver-cases-26.  T5 holds 2 checks.
-;;;   T6 -- the guards: 5 checks -- one per-group min-count guard for each
-;;;         of T1 .. T5.  The in-process group-total `ert-deftest' is a
-;;;         separate test (the floor is 21 checks plus that deftest = 22).
+;;;   T5 -- GONE.  M61 imp-2g removed the 2 cross-corpus re-pins: they
+;;;         read the source text of test/m58/test-m58-imp1.el.
+;;;   T6 -- the guards: 4 checks -- one per-group min-count guard for each
+;;;         of T1 .. T4.  The in-process group-total `ert-deftest' is a
+;;;         separate test.
 ;;;
 ;;; This corpus reads TRACKED files only (src/, mod/,
 ;;; test/pty-driver.py, tool/run-tests.scm, and the older
@@ -156,27 +154,6 @@ key in an older case cannot satisfy a check on the new one."
                         (- (point) (length to)))))
             (and b (< a b) (buffer-substring-no-properties a b))))))))
 
-(defun m58-imp2--pty-case-pins ()
-  "Read the `test/pty-driver.py' case-count pins as (TOTAL . SUM).
-TOTAL is the `total-case-count' pin; SUM is the sum of the per-group
-`-case-count' pins.  Return nil when a pin is absent.  A plain string
-search for the pin line proves nothing about the number of cases, so the
-corpus checks that the two numbers agree.  This is the imp-1 reader
-(reused, not a pin-number string match)."
-  (m58-imp2--with "test/pty-driver.py"
-    (lambda ()
-      (goto-char (point-min))
-      (let ((total nil) (sum 0) (n 0))
-        (while (re-search-forward "check(\"\\([a-z0-9-]*-case-count\\)\", " nil t)
-          (let ((name (match-string 1))
-                (pin (progn (re-search-forward "), \\([0-9]+\\))" nil t)
-                           (match-string 1))))
-            (if (string= name "total-case-count")
-                (setq total (string-to-number (or pin "0")))
-              (setq sum (+ sum (string-to-number (or pin "0"))))
-              (setq n (1+ n)))))
-        (and total (> n 0) (cons total sum))))))
-
 (defun m58-imp2--run (prog args)
   "Run PROG with ARGS in a subprocess from the repo root and return its
 stdout / stderr as a string, or the symbol `m58-imp2-prog-absent' when
@@ -294,13 +271,10 @@ host limit is a skip, never a pass."
                        "test/pty-driver.py"
                        '("GROUPS = (" "\"m58-imp2\")"))))
 
-(m58-imp2--check "pty-case-counts-42"
-                 (let ((pins (m58-imp2--pty-case-pins)))
-                   (and (consp pins)
-                        (eql 42 (car pins))
-                        ;; The 20 group pins must add up to the total, so
-                        ;; a group pin that moves alone FAILS.
-                        (eql (car pins) (cdr pins)))))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the pty-driver
+;; case-count pin is REMOVED, not re-pinned.  A case count is not a
+;; behavior, and the driver's own --selftest holds the count checks at
+;; :3470 ... :3472.
 
 ;; M61 imp-1 re-pin: the region now ends at the m61-imp1 block, because
 ;; the m61-imp1 group legitimately uses output_span_bytes.  Without this
@@ -397,46 +371,39 @@ host limit is a skip, never a pass."
 ;; moved it again, from 26 to 31 (5 new cases).  The older corpus must
 ;; hold the CURRENT re-pin in the SAME commit, so this check reads 31.
 
-(setq m58-imp2--group 't5)
-
-;; M61 imp-1 re-pin (bounded fallback of brief.org section 4 D2 item 3):
-;; the M61 act moves these counts.  Measured on this host.
-(m58-imp2--check "imp1-repinned-36"
-                 (and (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-42\"")
-                      (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "(eql 42 (car pins))")))
-
-(m58-imp2--check "imp1-no-stale-pin-26"
-                 (not (m58-imp2--live-p "test/m58/test-m58-imp1.el"
-                                        "\"pty-driver-cases-26\"")))
+;; M61 imp-2g (review cr.org CR1 / CR2): the cross-corpus re-pin is
+;; REMOVED.  It read the source text of test/m58/test-m58-imp1.el and it
+;; named a case-count check that no longer exists.  A corpus must not pin
+;; another corpus's text; a case count is not a behavior.
 
 ;;; --- T6. The guards -------------------------------------------------
 
 ;; An --filter that matches no group reports exit 0 with 0 tests, so a
 ;; green m58 gate proves nothing until the corpus really registers.  These
 ;; guards fail when the corpus body is truncated.  T1 holds 1 check, T2
-;; holds 6, T3 holds 1, T4 holds 4, and T5 holds 2.
+;; holds 5, T3 holds 1, and T4 holds 4.  T5 is GONE: M61 imp-2g removed
+;; its 2 cross-corpus source-text pins.
 
 (setq m58-imp2--group 't6)
 
 (m58-imp2--check "reg/min-t1-checks-1" (>= (m58-imp2--group-count 't1) 1))
-(m58-imp2--check "reg/min-t2-checks-6" (>= (m58-imp2--group-count 't2) 6))
+(m58-imp2--check "reg/min-t2-checks-5" (>= (m58-imp2--group-count 't2) 5))
 (m58-imp2--check "reg/min-t3-checks-1" (>= (m58-imp2--group-count 't3) 1))
 (m58-imp2--check "reg/min-t4-checks-4" (>= (m58-imp2--group-count 't4) 4))
-(m58-imp2--check "reg/min-t5-checks-2" (>= (m58-imp2--group-count 't5) 2))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m58-imp2 tests is 22: 21 registered checks
-;; (T1 3, T2 6, T3 1, T4 4, T5 2, T6 5) plus the group-total deftest
-;; itself.  The T3 check may fold to a controlled INFO skip on a host with
-;; no python3 / no built src/emacs / no PTY, and a controlled skip is
-;; still a registered test, so the floor holds either way.
+;; The measured floor of m58-imp2 is 16: 15 registered checks
+;; (T1 1, T2 5, T3 1, T4 4, T6 4) plus the group-total deftest itself.
+;; The T3 check may fold to a controlled INFO skip on a host with no
+;; python3 / no built src/emacs / no PTY, and a controlled skip is still a
+;; registered test, so the floor holds either way.  M61 imp-2g lowered it
+;; when review cr.org CR1 / CR2 removed the case-count pin, the
+;; cross-corpus re-pins and the T5 guard.
 
-(defvar m58-imp2--min-gate-total 20
-  "The exact number of m58-imp2 ERT tests: 21 registered checks (T1 3,
-T2 6, T3 1, T4 4, T5 2, T6 5) plus the group-total deftest itself.")
+(defvar m58-imp2--min-gate-total 16
+  "The minimum number of m58-imp2 ERT tests: 15 registered checks
+(T1 1, T2 5, T3 1, T4 4, T6 4) plus the group-total deftest itself.")
 
 (ert-deftest m58-imp2/gate-m58-total ()
   "The m58-imp2 corpus registers at least its docs-independent floor."

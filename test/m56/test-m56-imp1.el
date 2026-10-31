@@ -24,7 +24,8 @@
 ;;;         mod/emacs/tty-output.scm; the tree-wide scm_c_public_ref
 ;;;         count over src/*.[ch] (260); the 3 src/termchar.h FILE *
 ;;;         streams; and the test/pty-driver.py cases (24 at imp-1;
-;;;         imp-2 adds one, so 25 now).  S1 holds 9 checks.
+;;;         imp-2 adds one).  S1 holds 2 checks (the case-count pin is
+;;;         REMOVED, M61 imp-2g).
 ;;;   S2 -- the row map (brief.org section 4): the 3 C1 rows, their C
 ;;;         definitions, their src/term.c call sites, and the tracked C
 ;;;         evidence for each class.  Row 1 and row 3 STAYS C (C state
@@ -268,9 +269,9 @@ host limit is a skip, never a pass (brief.org section 11)."
                  (and (eql 51 (m56-imp1--line-of "src/termchar.h" "FILE \\*input;"))
                       (eql 53 (m56-imp1--line-of "src/termchar.h" "FILE \\*output;"))
                       (eql 61 (m56-imp1--line-of "src/termchar.h" "FILE \\*termscript;"))))
-(m56-imp1--check "pty-driver-cases-42"
-                 (m56-imp1--contains-p
-                  "test/pty-driver.py" "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.
+;; The driver's own --selftest holds the count checks at :3470 ... :3472.
 
 ;;; --- S2. The row map (brief.org section 4) --------------------------
 
@@ -389,29 +390,32 @@ host limit is a skip, never a pass (brief.org section 11)."
 ;; tests, so a green m56 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 3 checks,
+;; because every check is registered at load time.  S1 holds 2 checks,
 ;; S2 holds 7, S3 holds 2, and S4 holds 4.  S1 held 9 until M61 imp-2b
-;; removed the 6 source-text pins (milestone.org findings F2); the guard
-;; name and its bound moved with the count.
+;; removed the 6 source-text pins (milestone.org findings F2), and M61
+;; imp-2g removed the pty-driver count pin; the guard name and its bound
+;; moved with each count.
 
 (setq m56-imp1--group 's5)
 
-(m56-imp1--check "reg/min-s1-checks-3" (>= (m56-imp1--group-count 's1) 3))
+(m56-imp1--check "reg/min-s1-checks-2" (>= (m56-imp1--group-count 's1) 2))
 (m56-imp1--check "reg/min-s2-checks-7" (>= (m56-imp1--group-count 's2) 7))
 (m56-imp1--check "reg/min-s3-checks-2" (>= (m56-imp1--group-count 's3) 2))
 (m56-imp1--check "reg/min-s4-checks-4" (>= (m56-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m56-imp1 tests is 21: 20 registered checks
-;; (S1 3, S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m56-imp1 tests is 20: 19 registered checks
+;; (S1 2, S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.  M61 imp-2b lowered
-;; it from 27 when findings F2 removed the 6 source-text pins.
+;; it from 27 when findings F2 removed the 6 source-text pins, and M61
+;; imp-2g lowered it to 20 when review cr.org CR2 removed the pty-driver
+;; count pin.
 
-(defvar m56-imp1--min-gate-total 21
-  "The exact number of m56-imp1 ERT tests: 20 registered checks (S1 3,
+(defvar m56-imp1--min-gate-total 20
+  "The exact number of m56-imp1 ERT tests: 19 registered checks (S1 2,
 S2 7, S3 2, S4 4, S5 4) plus the group-total deftest itself.")
 
 (ert-deftest m56-imp1/gate-m56-total ()

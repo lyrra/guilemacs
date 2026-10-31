@@ -13,9 +13,11 @@
 ;;;         --tty-* leaf DEFUNs, 10 fwrite ( sites, 36 scm_c_public_ref
 ;;;         sites); mod/emacs/tty-output.scm (454 lines and its 34
 ;;;         #:export names); prelude/load.scm holds (use-modules
-;;;         (emacs tty-output)); the 30-key m52_caps table; and the
-;;;         tree-wide scm_c_public_ref count over src/*.[chm] (260).
-;;;         S1 holds 42 checks.
+;;;         (emacs tty-output)); and the 30-key m52_caps table.  The
+;;;         tree-wide scm_c_public_ref count is REMOVED by M61 imp-2g
+;;;         (review cr.org C4): F7 removes a source count, it does not
+;;;         re-pin it.  S1 holds 36 checks, so the corpus holds 41
+;;;         tracked checks (S1 36, S2 3, 2 S3 guards).
 ;;;   S2 -- the registration: the corpus is registered in the (m52)
 ;;;         group of tool/run-tests.scm after test-m52-imp8.el, and
 ;;;         test/pty-driver.py holds the m52-imp3 .. m52-imp8 groups and
@@ -188,15 +190,6 @@ folds to the symbol `m52-imp9-absent', so `m52-imp9--check' prints FAIL
       (let ((res (m52-imp9--caps-rows-in-buffer)))
         (if res (car res) 'm52-imp9-absent)))))
 
-(defun m52-imp9--count-scm-ref ()
-  "Count scm_c_public_ref over src/*.[chm] (the brief.org section 3.2
-row 10 measure)."
-  (let ((total 0)
-        (dir (expand-file-name "src" m52-imp9--root)))
-    (dolist (f (directory-files dir t "\\.[chm]\\'"))
-      (setq total (+ total (or (m52-imp9--count f "scm_c_public_ref") 0))))
-    total))
-
 (defun m52-imp9--check (name ok)
   "Report and register one check on a TRACKED file.  OK is a boolean.
 The count callers pass `(eql N value)': when the source file is absent
@@ -270,9 +263,9 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; Row 9: the m52_caps table of src/term.c holds 37 keys (M58 imp-3 added 7 face keys).
 (m52-imp9--check "m52-caps-rows-37"
                  (eql 37 (m52-imp9--caps-row-count)))
-;; Row 10: the tree-wide scm_c_public_ref count over src/*.[chm] = 260.
-(m52-imp9--check "tree-wide-scm-ref-270"
-                 (eql 270 (m52-imp9--count-scm-ref)))
+;; Row 10 (the tree-wide scm_c_public_ref count) is REMOVED, not
+;; re-pinned: M61 imp-2g removes a source count (findings F7, review
+;; cr.org C4).  A count of source text is not a behavior.
 
 ;;; --- S2. The registration (brief.org section 3.3) -------------------
 
@@ -295,10 +288,10 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
                                       '("\"m52-imp3\"" "\"m52-imp4\""
                                         "\"m52-imp5\"" "\"m52-imp6\""
                                         "\"m52-imp7\"" "\"m52-imp8\"")))
-(m52-imp9--check "pty-driver-total-42"
-                 (m52-imp9--contains-p
-                  "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.  A
+;; case count is not a behavior, and the driver's own --selftest holds
+;; the 3 count checks at :3470 ... :3472.
 
 ;;; --- S3. The guards (brief.org section 3.4) -------------------------
 
@@ -306,17 +299,18 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; tests, so a green m52 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 37 checks;
+;; because every check is registered at load time.  S1 holds 36 checks;
 ;; S2 holds 4 checks.  S1 held 43 until M61 imp-2b removed the 6
-;; source-text pins (milestone.org findings F2); the guard name and its
-;; bound moved with the count.
+;; source-text pins (milestone.org findings F2), and 1 more until M61
+;; imp-2g removed the tree-wide scm_c_public_ref count (findings F7,
+;; review cr.org C4); the guard name and its bound moved with the count.
 
 (setq m52-imp9--group nil)
 
-(m52-imp9--check "reg/min-s1-checks-37"
-                 (>= (m52-imp9--group-count 's1) 37))
-(m52-imp9--check "reg/min-s2-checks-4"
-                 (>= (m52-imp9--group-count 's2) 4))
+(m52-imp9--check "reg/min-s1-checks-36"
+                 (>= (m52-imp9--group-count 's1) 36))
+(m52-imp9--check "reg/min-s2-checks-3"
+                 (>= (m52-imp9--group-count 's2) 3))
 
 ;;; --- The group-total check (brief.org section 3.4) ------------------
 
@@ -342,13 +336,16 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 
 ;;
 ;; M61 imp-2b lowered the floor from 72 to 66 when findings F2 removed the
-;; 6 source-text pins of this corpus.
+;; 6 source-text pins of this corpus.  M61 imp-2g lowered it to 64 when
+;; review cr.org CR2 removed the pty-driver count pin, and when review
+;; cr.org C4 removed the tree-wide scm_c_public_ref count.
 
-(defvar m52-imp9--min-gate-total 66
+(defvar m52-imp9--min-gate-total 64
   "The minimum number of ERT tests the m52 group registers: the measured
 total (80) minus the 8 gated m52 pty cases (imp-3 holds 3; imp-4 ..
 imp-8 hold 1 each), minus the 6 source-text pins that M61 imp-2b
-removed.")
+removed, minus the pty-driver count pin that M61 imp-2g removed, minus
+the tree-wide scm_c_public_ref count that M61 imp-2g removed.")
 
 (ert-deftest m52-imp9/gate-m52-total ()
   "The m52 group registers at least its docs-independent floor."

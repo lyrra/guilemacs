@@ -17,7 +17,7 @@
 ;;;   S2 -- the registration: the corpus is registered in the (m54)
 ;;;         group of tool/run-tests.scm after test-m54-imp4.el, and
 ;;;         test/pty-driver.py still holds the 26-case total pin.  Read
-;;;         tracked runner files only.  S2 holds 4 checks.
+;;;         tracked runner files only.  S2 holds 3 checks.
 ;;;   S3 -- the guards: a per-group min-count guard for S1 and one for
 ;;;         S2, and the group-total check.  The total check is an
 ;;;         `ert-deftest', so its body runs after every corpus of the
@@ -139,10 +139,9 @@ princ'd FAIL with no ERT test would leave the exit code 0."
                    (and (integerp imp4) (integerp imp5) (< imp4 imp5))))
 (m54-imp5--check "run-tests-m54-group"
                  (m54-imp5--contains-p "tool/run-tests.scm" "(group (m54)"))
-(m54-imp5--check "pty-driver-total-42"
-                 (m54-imp5--contains-p
-                  "test/pty-driver.py"
-                  "\"total-case-count\", len(CASES), 42"))
+;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
+;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.
+;; The driver's own --selftest holds the count checks at :3470 ... :3472.
 
 ;;; --- S3. The guards -------------------------------------------------
 
@@ -150,26 +149,27 @@ princ'd FAIL with no ERT test would leave the exit code 0."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S2 holds 4 checks.
+;; because every check is registered at load time.  S2 holds 3 checks.
 ;; S1 is gone (M61 imp-2b, findings F2), so it has no guard: a group that
 ;; holds no check needs none.
 
 (setq m54-imp5--group 's3)
 
-(m54-imp5--check "reg/min-s2-checks-4" (>= (m54-imp5--group-count 's2) 4))
+(m54-imp5--check "reg/min-s2-checks-3" (>= (m54-imp5--group-count 's2) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
 ;; Select ONLY the m54-imp5 tests (the pattern is "^m54-imp5", not
 ;; "^m54-imp"): the whole (m54) group runs in one emacs process.  The
-;; floor is measured from a real run: 5 registered checks (S2 4, S3 1)
+;; floor is measured from a real run: 4 registered checks (S2 3, S3 1)
 ;; plus the group-total deftest itself.  No check can fold to a
 ;; controlled skip -- this corpus needs no guile and no pty -- so the
 ;; floor is exact.  M61 imp-2b lowered it from 13 when findings F2
-;; removed the 6 S1 source-text pins and the S1 guard.
+;; removed the 6 S1 source-text pins and the S1 guard; M61 imp-2g lowered
+;; it to 5 when review cr.org CR2 removed the pty-driver count pin.
 
-(defvar m54-imp5--min-gate-total 6
-  "The minimum number of m54-imp5 ERT tests: 5 registered checks (S2 4,
+(defvar m54-imp5--min-gate-total 5
+  "The minimum number of m54-imp5 ERT tests: 4 registered checks (S2 3,
 S3 1) plus the group-total deftest.")
 
 (ert-deftest m54-imp5/gate-m54-total ()

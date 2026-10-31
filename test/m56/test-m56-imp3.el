@@ -20,7 +20,8 @@
 ;;;         36 scm_c_public_ref sites; the tree-wide scm_c_public_ref
 ;;;         count over src/*.[chm] (260); mod/emacs/tty-output.scm 454
 ;;;         lines; the 3 src/termchar.h FILE * streams (:51 / :53 / :61);
-;;;         test/pty-driver.py 26 cases.  S1 holds 17 checks.
+;;;         test/pty-driver.py cases (the count pin is REMOVED, M61
+;;;         imp-2g).  S1 holds 7 checks.
 ;;;   S2 -- the registration (brief.org section 5): this corpus is
 ;;;         present in the (m56) group of tool/run-tests.scm, it comes
 ;;;         after test/m56/test-m56-imp2.el, the (m56) group exists, and
@@ -335,15 +336,9 @@ equality check would fail (brief.org section 5).  Return the symbol
                  (and (eql 51 (m56-imp3--line-of "src/termchar.h" "FILE *input;"))
                       (eql 53 (m56-imp3--line-of "src/termchar.h" "FILE *output;"))
                       (eql 61 (m56-imp3--line-of "src/termchar.h" "FILE *termscript;"))))
-;; B8: test/pty-driver.py cases = 26 (the total-case-count pin).  The
-;; close-out adds no PTY case, so the total stays 26 (brief.org section
-;; 9).  This guards against a stale literal 24.
-(m56-imp3--check "pty-driver-cases-42"
-                 (and (m56-imp3--contains-p
-                       "test/pty-driver.py"
-                       "\"total-case-count\", len(CASES), 42")
-                      (= 0 (m56-imp3--count "test/pty-driver.py"
-                                            "len(CASES), 24"))))
+;; B8: M61 imp-2g (review cr.org CR2, finding F2 / F7) REMOVED the
+;; pty-driver case-count pin.  A case count is not a behavior, and the
+;; driver's own --selftest holds the count checks at :3470 ... :3472.
 
 ;;; --- S2. The registration and the base (brief.org sections 5, 7) ----
 
@@ -422,12 +417,12 @@ equality check would fail (brief.org section 5).  Return the symbol
 ;; tests, so a green m56 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 11 checks,
+;; because every check is registered at load time.  S1 holds 7 checks,
 ;; S2 holds 6, and S3 holds 2.
 
 (setq m56-imp3--group 's4)
 
-(m56-imp3--check "reg/min-s1-checks-8" (>= (m56-imp3--group-count 's1) 8))
+(m56-imp3--check "reg/min-s1-checks-7" (>= (m56-imp3--group-count 's1) 7))
 (m56-imp3--check "reg/min-s2-checks-6" (>= (m56-imp3--group-count 's2) 6))
 (m56-imp3--check "reg/min-s3-checks-2" (>= (m56-imp3--group-count 's3) 2))
 
@@ -435,15 +430,16 @@ equality check would fail (brief.org section 5).  Return the symbol
 
 ;; Select ONLY the m56-imp3 tests (the pattern is "^m56-imp3", not
 ;; "^m56-imp"): the whole (m56) group runs in one emacs process.  The
-;; floor is measured from a real run: 19 registered checks (S1 8, S2 6,
+;; floor is measured from a real run: 18 registered checks (S1 7, S2 6,
 ;; S3 2, S4 3) plus the group-total deftest itself.  No check can fold
 ;; to a controlled skip -- the S2 ancestor and audit checks and the S3
 ;; checks register as ERT tests either way (a real check or an INFO
 ;; skip) -- so the floor is exact.
 
-(defvar m56-imp3--min-gate-total 20
-  "The exact number of m56-imp3 ERT tests: 19 registered checks (S1 8,
-S2 6, S3 2, S4 3) plus the group-total deftest itself.")
+(defvar m56-imp3--min-gate-total 19
+  "The exact number of m56-imp3 ERT tests: 18 registered checks (S1 7,
+S2 6, S3 2, S4 3) plus the group-total deftest itself.  M61 imp-2g
+removed the pty-driver case-count pin.")
 
 (ert-deftest m56-imp3/gate-m56-total ()
   "The m56-imp3 corpus registers at least its docs-independent floor."

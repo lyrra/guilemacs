@@ -77,6 +77,7 @@
   #:declarative? #t
   #:export (tty-emit-cap tty-write-bytes tty-flush tty-emit-seq
             tty-write-verdict tty-termscript-copy-handle
+            tty-glyph-run-policy
             tty-tab-verdict
             make-tty-out-handle tty-out-handle? tty-out-handle-bytes
             tty-out-handle-short-writes tty-out-handle-hard-errors
@@ -211,6 +212,49 @@
    (if (and (< copied len) (not (zero? err))
             (not (= err EINTR)) (not (= err EAGAIN)))
        1 0)))
+
+;; --- M61 imp-2g: the policy of a failed OUTPUT run --------------------
+;;
+;; ONE output write of the ordered glyph path can move a prefix and then
+;; fail, and it can fail with an UNKNOWN progress (milestone.org
+;; =findings= F5 and F6).  C owns the mechanism: the FILE *, the =fwrite=,
+;; the =clearerr= and the order of the write and the copy.  Scheme owns
+;; the POLICY: whether the run is fatal, and how much of the run the
+;; termscript may hold.
+;;
+;; The procedure takes PLAIN values only -- 1 measured count, 1 length,
+;; 1 errno and 1 "progress unknown" flag -- and it answers the plain
+;; carrier #(copy-len word) of 2 plain values (src/term.c
+;; m61_tty_output_failed_report).  C reads COPY-LEN and does not act on
+;; WORD: the CALL SITE owns the RECOVERY (=SET_FRAME_GARBAGED=).
+;;
+;; COPY-LEN is the number of bytes of this run that the termscript may
+;; hold: the measured prefix for a failed run, so the 2 streams agree,
+;; and 0 when the progress is UNKNOWN (F1 rule: never replay an unknown
+;; range, and never claim progress that nobody measured).
+;;
+;; WORD is the plain string "complete", "short", "unknown" or "fatal".
+;; The errno question reuses the ONE errno policy of tty-write-verdict, so
+;; no second list of errno values exists, and EINTR / EAGAIN stay a short
+;; run that the retry loop already handles.  A hard errno wins over a full
+;; count (the imp-2g D4 rule), so the check asks the shared verdict with a
+;; count that is definitely short: the answer then reflects the errno
+;; only, and not the count of this run.  The procedure is pure: it calls
+;; no leaf and emits nothing (docs/kb.org =leaf-must-call-the-mechanism=).
+(define (tty-glyph-run-fatal-errno? err)
+  (and (not (zero? err))
+       (string=? "give-up" (tty-write-verdict 0 1 err))))
+
+(define (tty-glyph-run-policy written len err unknown)
+  (let ((copy (if (> written len) len written)))
+    (cond (unknown
+           (vector 0 "unknown"))
+          ((tty-glyph-run-fatal-errno? err)
+           (vector copy "fatal"))
+          ((>= written len)
+           (vector copy "complete"))
+          (else
+           (vector copy "short")))))
 
 ;; --- M54 imp-4: the input stream TAB policy ---------------------------
 ;;
@@ -717,9 +761,10 @@
 ;; state.
 
 ;; The ONE typed C leaf of imp-1: (%--tty-handle-write IDENTITY BYTES)
-;; -> the plain fwrite count, or a negative fixnum holding the negated
-;; errno (-EBADF for a closed or unknown identity, -EINVAL when the tty
-;; holds no output stream).
+;; -> the carrier #(count errno) of the leaf (imp-2g): the fwrite count,
+;; which is correct ALSO on a hard failure, and the positive errno or 0
+;; (-EBADF for a closed or unknown identity, -EINVAL when the tty holds
+;; no output stream).
 (defelisp %--tty-handle-write --tty-handle-write)
 
 ;; The ONE bootstrap leaf: resolve a DEVICE to its identity.  DEVICE
@@ -783,28 +828,29 @@
         (else h)))
 
 ;; The ONE operation of imp-1: write the plain bytevector BYTES to the
-;; output stream that IDENTITY names.  Return the leaf's plain fixnum:
-;; the fwrite count, or the negated errno.  C keeps the FILE *, the
-;; fwrite, the clearerr, the order, and the termscript copy.
+;; output stream that IDENTITY names.  Return the leaf's answer, which is
+;; the carrier #(count errno) since imp-2g, ALSO on a hard failure
+;; (milestone.org =findings= F6).  C keeps the FILE *, the fwrite, the
+;; clearerr, the order, and the termscript copy.
 (define (tty-handle-write h bytes)
   (tty-handle-check-open h)
   ((force %--tty-handle-write) (tty-handle-id h) bytes))
 
 ;; The after-write DECISION of one handle write, through the ONE shared
-;; verdict procedure tty-write-verdict (M54 imp-2).  RC is the plain
-;; leaf answer and LEN the plain requested count.  Return the plain
-;; string "done" / "retry" / "give-up":
+;; verdict procedure tty-write-verdict (M54 imp-2).  ANSWER is the
+;; carrier #(count errno) of the leaf and LEN the plain requested count.
+;; Return the plain string "done" / "retry" / "give-up":
 ;;
-;;   RC >= 0        the leaf moved RC bytes, so the verdict decides from
-;;                  RC and LEN with no error (err = 0)
-;;   RC < 0         a hard failure: the negated errno is a give-up
+;;   ERRT != 0      a hard failure: a give-up.  COUNT is not read here,
+;;                  because the retry loop reports it
+;;   ERRT == 0      the verdict decides from COUNT and LEN with no error
 ;;
 ;; The procedure is pure: it calls no leaf and emits nothing
 ;; (docs/kb.org =leaf-must-call-the-mechanism=).
-(define (tty-handle-write-verdict rc len)
-  (if (< rc 0)
+(define (tty-handle-write-verdict answer len)
+  (if (not (zero? (tty-handle-outcome-errno answer)))
       "give-up"
-      (tty-write-verdict rc len 0)))
+      (tty-write-verdict (tty-handle-outcome-count answer) len 0)))
 
 ;; --- M61 imp-2b: the ONE plain carrier of a count and an error --------
 ;;
@@ -848,12 +894,14 @@
 ;; procedure tty-write-verdict, through tty-handle-write-verdict; the loop
 ;; is the only place that consumes it.  C stays the single writer.
 ;;
-;; WRITE-PROC is the one write operation.  The general form takes it as a
-;; plain procedure, so the loop is PURE and a test can hand it a plain
-;; lambda with no leaf, no stub, and no module state.  The loop catches
-;; NOTHING: a raise of WRITE-PROC leaves this procedure, so the caller
-;; must treat that as "progress unknown" and must not write again
-;; (milestone.org =findings= F1).
+;; WRITE-PROC is the one write operation.  It answers the carrier
+;; #(count errno) of ONE call, so the loop adds COUNT of the failing call
+;; to its total on EVERY branch (imp-2g, milestone.org =findings= F6).
+;; The general form takes WRITE-PROC as a plain procedure, so the loop is
+;; PURE and a test can hand it a plain lambda with no leaf, no stub, and
+;; no module state.  The loop catches NOTHING: a raise of WRITE-PROC
+;; leaves this procedure, so the caller must treat that as "progress
+;; unknown" and must not write again (milestone.org =findings= F1).
 (define (tty-handle-write-all-with write-proc h bytes)
   (let ((len (bytevector-length bytes)))
     (let loop ((offset 0) (total 0))
@@ -871,17 +919,26 @@
                               (bytevector-copy! bytes offset rest 0
                                                 (- len offset))
                               rest)))
-                 (rc (write-proc h slice)))
-            (cond ;; A hard failure: report the errno AND the count that
-                  ;; already moved.
-                  ((< rc 0) (tty-handle-outcome total (- rc)))
+                 (answer (write-proc h slice))
+                 (count (tty-handle-outcome-count answer))
+                 (err (tty-handle-outcome-errno answer)))
+            (cond ;; A hard failure: report the errno AND every byte that
+                  ;; moved, INCLUDING the count of the failing call
+                  ;; (imp-2g, milestone.org =findings= F6).  A write of 5
+                  ;; bytes that then fails reports 5, not 0.
+                  ((not (zero? err))
+                   (tty-handle-outcome (+ total count) err))
                   ;; No progress: report what went out.  A host that can
                   ;; not accept the bytes answers 0, never a spin.
-                  ((zero? rc) (tty-handle-outcome total 0))
-                  ((string=? "give-up" (tty-handle-write-verdict rc
-                                                                (- len offset)))
-                   (tty-handle-outcome total 0))
-                  (else (loop (+ offset rc) (+ total rc)))))))))
+                  ((zero? count) (tty-handle-outcome total 0))
+                  ;; Unreachable with the real leaf: the verdict gives up
+                  ;; only on a nonzero errno, and that branch is above.
+                  ;; It stays for a plain write procedure, and it adds
+                  ;; the count of the failing call too.
+                  ((string=? "give-up" (tty-handle-write-verdict
+                                        answer (- len offset)))
+                   (tty-handle-outcome (+ total count) 0))
+                  (else (loop (+ offset count) (+ total count)))))))))
 
 ;; The thin entry point of the retry loop: the ONE write operation of the
 ;; handle, with the retry of a short write.  It answers the same carrier.
@@ -901,8 +958,15 @@
 ;; moved is not known.  C must not write on #f (milestone.org =findings=
 ;; F1).  A known count and a known error always answer the carrier, so #f
 ;; is rare.
+;;
+;; The identity test is POSITIVE: src/term.c never gives an identity
+;; below 1 (m61_tty_handle_next starts at 1), so an identity of 0 is not
+;; a handle either.  A 0 must not reach a leaf: the leaf raises on it, and
+;; the #f of the catch would report an UNKNOWN progress for a handle that
+;; never existed (review cr.org CR2: the identity > 0 state is the only
+;; state that owns a bytevector).
 (define (tty-handle-write-all-borrowed identity bytes)
-  (if (or (not (integer? identity)) (< identity 0))
+  (if (or (not (integer? identity)) (< identity 1))
       (tty-handle-outcome 0 tty-handle-ebadf)
       (catch #t
         (lambda ()
@@ -937,11 +1001,15 @@
 
 ;; The C-facing form of the flush.  The routed flush in src/term.c passes
 ;; the plain identity fixnum, so C holds no handle value and no state.
-;; The literal -9 is -EBADF on Linux only; src/term.c holds the same
-;; value, and a host with a different EBADF must change both sites.
+;; The negated EBADF comes from the ONE Scheme definition
+;; tty-handle-ebadf; src/term.c holds the same value, and a host with a
+;; different EBADF must change both sites.
+;;
+;; The identity test is POSITIVE, as in the write form above: an identity
+;; of 0 is not a handle (review cr.org CR2).
 (define (tty-handle-flush-borrowed identity)
-  (if (or (not (integer? identity)) (< identity 0))
-      -9                                    ; -EBADF
+  (if (or (not (integer? identity)) (< identity 1))
+      (- tty-handle-ebadf)
       (tty-handle-flush (make-tty-handle identity 'borrowed))))
 
 ;; The C-facing form of the termscript copy, the same shape.  C passes the
@@ -950,8 +1018,16 @@
 ;; #(count errno), or #f when the progress is UNKNOWN, with the same
 ;; single meaning as the write form above (milestone.org =findings= F1 and
 ;; F3).
+;;
+;; THE LENGTH CONTRACT (review cr.org CR2): this form takes the length
+;; from BYTES alone.  It has no separate length argument, so src/term.c
+;; MUST hand it a bytevector of exactly the count that it wants copied on
+;; a partial run.  A copy of the whole run after a partial output write is
+;; the F5 defect.
+;;
+;; The identity test is POSITIVE, as in the write form above.
 (define (tty-handle-termscript-borrowed identity bytes)
-  (if (or (not (integer? identity)) (< identity 0))
+  (if (or (not (integer? identity)) (< identity 1))
       (tty-handle-outcome 0 tty-handle-ebadf)
       (catch #t
         (lambda ()
