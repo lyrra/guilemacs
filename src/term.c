@@ -138,13 +138,69 @@ static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
 
 #ifndef HAVE_ANDROID
 
-#define OUTPUT(tty, a)                                          \
-  emacs_tputs (tty, a,                                        \
-               FRAME_TOTAL_LINES (XFRAME (selected_frame)) - curY (tty),	\
-               cmputc)
+/* The M61 imp-3 capability sink: the ONE writer of the 4 capability
+   macros of this file.  ncurses calls the =tputs= callback one time for
+   EACH byte, and termcap padding uses the same callback, so a per-byte
+   crossing of the M61 handle is not acceptable (brief.org section 2).
+   The sink COLLECTS a run in M61_CAP_CHUNK bytes of static memory and
+   drains it through the ONE imp-2 hub (m61_tty_handle_glyph_run_1), so
+   one capability string costs ONE crossing, plus 1 for each extra chunk.
 
-#define OUTPUT1(tty, a) emacs_tputs (tty, a, 1, cmputc)
-#define OUTPUTL(tty, a, lines) emacs_tputs (tty, a, lines, cmputc)
+   The definitions sit in the M61 imp-2 block below the hub.  The macros
+   are used far above that point (tty_set_terminal_modes, :296), so the
+   prototypes must be declared here.
+
+   The sink is NOT reentrant.  =tputs= is its ONLY caller, and =tputs=
+   runs a capability string synchronously: it calls the callback and it
+   runs no callback of Emacs.  The drain calls the hub, and the hub
+   writes with =fwrite= / a Scheme write, so it never calls =tputs=.  So
+   a nested emit can not occur TODAY, and the flag m61_cap_active is true
+   for every byte of a run.  m61_cap_begin does not trust that: it stops
+   a development build with an assertion, and a release build drains the
+   outer run and restores its state, so a future path that reached the
+   capability sink from inside a drain loses no byte (cr.org C6).  */
+#define M61_CAP_CHUNK 1024
+
+/* The measured reason for 1024: the capability strings of a normal
+   session are short (the bell "bl" is 1 byte, "cm" about 10 bytes, and
+   a scroll region of 100 lines is below 100 bytes), so 1 chunk covers
+   them and the run takes 1 crossing.  A larger chunk would not remove a
+   crossing for those runs and it would take more memory.  A longer
+   string takes 1 extra crossing for each chunk, and the byte order does
+   not change.  */
+static unsigned char m61_cap_buf[M61_CAP_CHUNK];
+static size_t m61_cap_len;
+static struct tty_display_info *m61_cap_tty;
+static bool m61_cap_active;
+static ptrdiff_t m61_cap_status;	/* the FIRST failure of the run */
+
+/* The state of an OUTER run while a nested emit runs.  The sink is not
+   reentrant, so 1 saved copy is enough: a depth of 2 is the most that
+   the release guard can recover.  */
+struct m61_cap_state
+{
+  struct tty_display_info *tty;
+  bool active;
+  ptrdiff_t status;
+};
+
+static struct m61_cap_state m61_cap_saved;
+
+static int m61_cap_putc (int);
+static ptrdiff_t m61_cap_drain_1 (void);
+static void m61_cap_begin (struct tty_display_info *);
+static ptrdiff_t m61_cap_finish (void);
+static ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
+				     const char *, int);
+static ptrdiff_t m61_tty_emit_cap_byte_1 (struct tty_display_info *, int);
+
+#define OUTPUT(tty, a)                                                  \
+  m61_tty_emit_cap_1 (tty, a,                                          \
+                      FRAME_TOTAL_LINES (XFRAME (selected_frame))       \
+                      - curY (tty))
+
+#define OUTPUT1(tty, a) m61_tty_emit_cap_1 (tty, a, 1)
+#define OUTPUTL(tty, a, lines) m61_tty_emit_cap_1 (tty, a, lines)
 
 #define OUTPUT_IF(tty, a)                                               \
   do {                                                                  \
@@ -153,7 +209,7 @@ static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
   } while (0)
 
 #define OUTPUT1_IF(tty, a) \
-  do { if (a) emacs_tputs (tty, a, 1, cmputc); } while (0)
+  do { if (a) m61_tty_emit_cap_1 (tty, a, 1); } while (0)
 
 #endif
 
@@ -291,9 +347,9 @@ tty_set_terminal_modes (struct terminal *terminal)
 		 contents off the screen, so it won't be overwritten and
 		 lost.  */
 	      EMACS_INT i, n = XFIXNUM (XCAR (XCDR (step)));
-	      current_tty = tty;
+	      /* The helper sets current_tty, as the old cmputc site did.  */
 	      for (i = 0; i < n; i++)
-		cmputc ('\n');
+		(void) m61_tty_emit_cap_byte_1 (tty, '\n');
 	    }
 	}
       losecursor (tty);
@@ -328,8 +384,7 @@ tty_reset_terminal_modes (struct terminal *terminal)
 	  else if (m52_tty_step_tag_p (step, "raw-cr"))
 	    {
 	      /* Output raw CR so kernel can track the cursor hpos.  */
-	      current_tty = tty;
-	      cmputc ('\r');
+	      (void) m61_tty_emit_cap_byte_1 (tty, '\r');
 	    }
 	}
       /* M61 imp-2: Scheme checks that the handle is open; C keeps the
@@ -1670,6 +1725,144 @@ m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
     }
 
   return status;
+}
+
+/* --- M61 imp-3: the capability sink -------------------------------- */
+
+/* Drain the collected bytes of ONE chunk through the imp-2 hub and clear
+   the length.  The buffer keeps the byte order: a drain runs BEFORE the
+   byte that would overflow it, so the chunks of a long string leave in
+   order.
+
+   A non-zero status goes into m61_cap_status, and the FIRST failure of
+   the run wins.  The drain CONTINUES after a failure: it does not replay
+   a chunk, and it does not stop the later chunks (milestone.org
+   =findings= F1: a range of unknown progress is never replayed).  The
+   recovered answer leaves through m61_tty_emit_cap_1, and the call sites
+   of the capability macros do not read it, so a failed capability run is
+   REPORTED and not recovered here (brief.org section 5).  */
+static ptrdiff_t
+m61_cap_drain_1 (void)
+{
+  size_t written = 0;
+  bool unknown = false;
+  ptrdiff_t status;
+
+  /* Only an emit collects bytes, so a drain outside an emit has nothing
+     to write.  The test makes the flag a real guard and keeps a stray
+     call harmless.  */
+  if (!m61_cap_active || m61_cap_len == 0)
+    return 0;
+
+  status = m61_tty_handle_glyph_run_1 (m61_cap_tty, m61_cap_buf,
+				       m61_cap_len, &written, &unknown);
+  m61_cap_len = 0;
+  if (status != 0 && m61_cap_status == 0)
+    m61_cap_status = status;
+  return status;
+}
+
+/* The =tputs= callback of the capability path: apply the =cmputc= mask
+   (c & 0177), append the byte, and answer C.  When the buffer is full,
+   drain FIRST and append after, so the byte order does not change.  */
+static int
+m61_cap_putc (int c)
+{
+  if (m61_cap_len >= M61_CAP_CHUNK)
+    (void) m61_cap_drain_1 ();
+  m61_cap_buf[m61_cap_len++] = (unsigned char) (c & 0177);
+  return c;
+}
+
+/* Start ONE run of the sink for TTY: set the identity, clear the length
+   and the status, raise the active flag, and set current_tty, as the old
+   cmputc site did.
+
+   The sink is not reentrant.  A nested emit can not occur today (see the
+   header comment), so a development build stops here.  A release build
+   drains the bytes of the outer run FIRST, then saves its state, so the
+   outer bytes leave in order and m61_cap_finish can resume the outer
+   run.  The 2 branches cost nothing measurable on the normal path.  */
+static void
+m61_cap_begin (struct tty_display_info *tty)
+{
+  eassert (!m61_cap_active);
+
+  if (m61_cap_active)
+    {
+      (void) m61_cap_drain_1 ();
+      m61_cap_saved.tty = m61_cap_tty;
+      m61_cap_saved.status = m61_cap_status;
+      m61_cap_saved.active = true;
+    }
+  else
+    m61_cap_saved.active = false;
+
+  m61_cap_tty = tty;
+  m61_cap_len = 0;
+  m61_cap_status = 0;
+  m61_cap_active = true;
+  current_tty = tty;
+}
+
+/* End ONE run of the sink: drain the remaining bytes, answer the FIRST
+   failure of the run, and resume an outer run if m61_cap_begin saved
+   one.  A resumed outer run keeps its own first failure; the nested
+   answer holds the failure of the nested run.  */
+static ptrdiff_t
+m61_cap_finish (void)
+{
+  ptrdiff_t status;
+
+  (void) m61_cap_drain_1 ();
+  status = m61_cap_status;
+  m61_cap_active = false;
+
+  if (m61_cap_saved.active)
+    {
+      m61_cap_tty = m61_cap_saved.tty;
+      m61_cap_len = 0;
+      m61_cap_status = m61_cap_saved.status;
+      m61_cap_active = true;
+      m61_cap_saved.active = false;
+    }
+
+  return status;
+}
+
+/* Run ONE capability string STR with LINES padding lines through the
+   sink, then drain the rest.  The answer is the FIRST failure of the
+   run, or 0: a plain ptrdiff_t, never a Lisp object and never a raise.
+
+   LINES reaches =tputs= unchanged, so the =lines= argument of OUTPUT and
+   OUTPUTL keeps its padding meaning.
+
+   A NULL STR is no capability byte at all.  The old =emacs_tputs= /
+   =tputs= shape set current_tty and answered -1 without a callback, and
+   the ~40 call sites do not read the answer, so this shape sets
+   current_tty, runs no callback and no drain, and answers 0.  */
+static ptrdiff_t
+m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
+{
+  current_tty = tty;
+  if (!str)
+    return 0;
+
+  m61_cap_begin (tty);
+  tputs (str, lines, m61_cap_putc);
+  return m61_cap_finish ();
+}
+
+/* The 1-byte form of the sink: the 2 raw =cmputc= sites of this file (the
+   newline fallback of tty_set_terminal_modes and the raw CR of
+   tty_reset_terminal_modes) use it, so src/term.c holds no direct
+   =cmputc= call and every capability byte has ONE writer.  */
+static ptrdiff_t
+m61_tty_emit_cap_byte_1 (struct tty_display_info *tty, int c)
+{
+  m61_cap_begin (tty);
+  (void) m61_cap_putc (c);
+  return m61_cap_finish ();
 }
 
 /* The LOCAL copy rule of ONE glyph run: the termscript may hold only the
@@ -6803,11 +6996,13 @@ docs/m48-plan.org section 3.3.  */)
    policy: the selection and the arithmetic stay in C until imp-4.
 
    F3 (for imp-4): the real termcap output path is the OUTPUT
-   macro (src/term.c), which calls emacs_tputs and applies padding.
-   m52_tty_emit_cap_1 calls tparam and a raw fwrite, so it does NOT
-   apply padding.  imp-3 rewires nothing, so there is no regression
-   today.  imp-4 MUST NOT lose the padding behaviour: either call
-   emacs_tputs, or record the padding decision in docs/m52-plan.org.  */
+   macro (src/term.c), which calls tputs with padding through the
+   M61 imp-3 sink m61_tty_emit_cap_1 and keeps the padding lines
+   argument.  m52_tty_emit_cap_1 calls tparam and a raw fwrite, so it
+   does NOT apply padding.  imp-3 rewires nothing, so there is no
+   regression today.  imp-4 MUST NOT lose the padding behaviour: either
+   call the sink (or emacs_tputs), or record the padding decision in
+   docs/m52-plan.org.  */
 
 /* Resolve the plain DEVICE handle to its struct tty_display_info *, or
    NULL.  m22_tty_of_terminal (src/keyboard.c) is static, so it is not

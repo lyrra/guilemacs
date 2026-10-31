@@ -2307,6 +2307,25 @@ M61_IMP2G_PRELUDE = M61_IMP2_HELPERS + r"""
   (cond ((null? reports) #f)
         ((eq? #t (list-ref (car reports) 3)) #t)
         (else (m61-imp2g-unknown-reported? (cdr reports)))))
+;; M61 imp-3: the byte values of a probe literal and a "holds this run"
+;; test.  The capability path now crosses the SAME hub, so a redisplay
+;; makes capability runs before its glyph run.  A case that injects a
+;; failure must NAME the glyph run of its own text, not the first call.
+(define (m61-imp2g-byte-list s)
+  (let loop ((i (- (string-length s) 1)) (acc '()))
+    (if (< i 0) acc
+        (loop (- i 1) (cons (char->integer (string-ref s i)) acc)))))
+(define (m61-imp2g-holds? bytes needle)
+  (let ((n (bytevector-length bytes)) (k (length needle)))
+    (let loop ((i 0))
+      (cond ((> (+ i k) n) #f)
+            ((let inner ((j 0))
+               (cond ((= j k) #t)
+                     ((= (bytevector-u8-ref bytes (+ i j)) (list-ref needle j))
+                      (inner (+ j 1)))
+                     (else #f)))
+             #t)
+            (else (loop (+ i 1)))))))
 """ + r"""
 (let* ((gobble (resolve-module '(emacs gobble)))
        (output (resolve-module '(emacs tty-output)))
@@ -2551,35 +2570,42 @@ M61_IMP2G_RAISE_FIRST_PROBE = M61_IMP2G_PRELUDE + r"""
 # The REPAINT case (brief.org section 6.4, last row): a MEASURED
 # incomplete run must be observable at a safe boundary, and the repaint
 # must CONVERGE.  The injection answers 1 measured prefix and a hard
-# ENOSPC on the FIRST glyph run of one redisplay only, so the real C call
-# site of the run must set the frame garbaged, and the next redisplay must
-# clear the request and reach a stable picture.  A call site that never
-# sets the flag fails this case; a call site that sets it again on every
-# run fails the second read.
+# ENOSPC on the ONE glyph run of this probe's own text in one redisplay,
+# so the real C call site of that run must set the frame garbaged, and the
+# next redisplay must clear the request and reach a stable picture.  A call
+# site that never sets the flag fails this case; a call site that sets it
+# again on every run fails the second read.
+#
+# M61 imp-3: the capability path crosses the SAME hub, so one redisplay
+# makes capability runs BEFORE its glyph run.  The injection therefore
+# names the glyph run by the bytes of NEEDLE, and it does not count calls.
+# A capability call site ignores the answer (brief.org section 5), so a
+# failure on a capability run would never set the flag.
 M61_IMP2G_REPAINT_PROBE = M61_IMP2G_PRELUDE + r"""
   (if (not term)
       "no-terminal"
       (let* ((real-all (module-ref output 'tty-handle-write-all-borrowed))
-             (calls 0)
+             (needle (m61-imp2g-byte-list "@@NEEDLE@@"))
+             (failed #f)
              (injected
               (lambda (identity bytes)
-                (set! calls (+ calls 1))
-                (if (= calls 1)
-                    (vector @@P@@ @@ERRNO@@)
+                (if (and (not failed) (m61-imp2g-holds? bytes needle))
+                    (begin
+                      (set! failed #t)
+                      (vector @@P@@ @@ERRNO@@))
                     (real-all identity bytes)))))
         (module-set! output 'tty-handle-write-all-borrowed injected)
         (send "@@BEGIN@@")
         (goto (pmax))
         (ti "@@NEEDLE@@")
-        (let ((before calls))
+        (redisplay! #t)
+        (let ((garbaged (garbaged? #nil)))
           (redisplay! #t)
-          (let ((garbaged (garbaged? #nil)))
-            (redisplay! #t)
-            (let ((cleared (garbaged? #nil)))
-              (cond ((= before calls) "injection-not-armed")
-                    ((not garbaged) "no-repaint")
-                    (cleared "repaint-not-cleared")
-                    (else "ok"))))))))
+          (let ((cleared (garbaged? #nil)))
+            (cond ((not failed) "glyph-run-not-seen")
+                  ((not garbaged) "no-repaint")
+                  (cleared "repaint-not-cleared")
+                  (else "ok")))))))
 """
 
 M61_IMP2G_CASES = (
@@ -2669,13 +2695,292 @@ M61_IMP2G_CASES = (
     },
 )
 
+# --- M61 imp-3: the capability output runs through the ONE handle ------
+#
+# brief.org section 3 puts ONE sink in front of the 4 capability macros of
+# src/term.c, so a whole capability string crosses the M61 handle ONCE
+# instead of one crossing for each byte.
+#
+# These cases drive a REAL capability from Emacs, so the bytes cross the
+# real OUTPUT macro and the real sink.  They do NOT call the Scheme emitter
+# tty-emit-cap: that is the M52 path, and it does not cross src/term.c.
+#
+# The bell route: (ding t) -> ring_bell -> the tty hook tty_ring_bell ->
+# OUTPUT (tty, tty->TS_bell) after the Scheme selection
+# m52_tty_ring_bell_scheme.  With TERM=xterm and the default visible-bell
+# nil the selection answers "bell", and "bl" is 1 byte.  Each probe checks
+# FIRST that "bl" is a non-empty string and reports the narrow SKIP below
+# when it is not: an empty capability moves no byte, so the case would
+# prove nothing.
+#
+# ORDER CHANGE (brief.org section 6): the termscript copy of a capability
+# run now takes the WHOLE string after the output write of that string.
+# The C path interleaved the 2 streams per byte.  The bytes do not change;
+# the CONTENT ORDER of the termscript does.  The termscript-order case
+# below is the proof, and this comment states the change.
+M61_IMP3_BEGIN = b"M61-IMP3-BEGIN!"
+M61_IMP3_MID = b"M61-IMP3-MID|"
+M61_IMP3_END = b"M61-IMP3-END!"
+M61_IMP3_BELL = b"\x07"
+M61_IMP3_SKIP = "m61-imp3-skip:"
+# The exact narrow-skip text of short-write-e2e (cr.org C9).
+M61_IMP3_SHORT_SKIP = ("m61-imp3-skip: a full pty BLOCKS, so a short "
+                       "capability write can not be forced on this host")
+
+# The measured crossing pair of ONE bell capability run, with 2 crossings
+# of headroom in each direction.  MEASURED 2026-10-31 on the built tree
+# with the bounds set to 0: the reset, the bell run and the read of the
+# counters answer c2s=4 / s2c=3.  A later change that adds a dispatch to
+# the run fails cross-count-e2e.  The case comment states the limit.
+M61_IMP3_CROSS_MAX_C2S = 6
+M61_IMP3_CROSS_MAX_S2C = 6
+
+# The shared prelude: the tty of the session, the "bell" capability string
+# that the C path will emit, the elisp routes to the markers and to the
+# bell, and the routes that move glyphs.  The cond ends with an OPEN
+# "else" clause, so each probe appends 1 expression and the 3 closers of
+# the clause, the cond and the let*.
+M61_IMP3_PRELUDE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (output (resolve-module '(emacs tty-output)))
+       (ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (bell-cap (module-ref output 'tty-ring-bell-cap))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (bl (and term (bell-cap 0 0)))
+       (send (c 'send-string-to-terminal))
+       (ding (c 'ding))
+       (ti (c 'insert))
+       (goto (c 'goto-char))
+       (pmax (c 'point-max))
+       (redisplay! (c 'redisplay))
+       (reset-cross! (c 'debug-reset-guile-cross-count))
+       (cross-count (c 'debug-guile-cross-count))
+       (open! (c 'open-termscript)))
+  (cond ((not term) "no-terminal")
+        ((not (and (string? bl) (> (string-length bl) 0)))
+         "m61-imp3-skip: TERM gives no non-empty bell capability")
+        (else
+"""
+
+# ONE capability run between 2 markers.  The driver reads the pty master,
+# so the bell byte must sit between the markers and in that order.
+M61_IMP3_CAP_PROBE = M61_IMP3_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (ding #t)
+            (send "@@END@@")
+            "ok")
+        )))
+"""
+
+# The control against a sink that eats bytes: a glyph run still moves its
+# bytes while the capability sink is in the path.  A capability byte first,
+# then the glyph text, then the end marker.
+M61_IMP3_GLYPH_PROBE = M61_IMP3_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (ding #t)
+            (goto (pmax))
+            (ti "@@NEEDLE@@")
+            (redisplay! #t)
+            (send "@@END@@")
+            "ok")
+        )))
+"""
+
+# The ORDER of the bell path: 2 capability runs with a marker between
+# them.  The bell byte of the first run precedes the mid marker, and the
+# bell byte of the second run follows it.
+#
+# LIMIT (cr.org C4): that order does NOT prove the routed flush.  Both
+# streams are stdio streams, and a stdio stream keeps the write order with
+# or without fflush.  So this case stays green when the flush of
+# tty_ring_bell is removed.  It proves the byte order only.  The flush has
+# no isolating PTY case; milestone.org section 4 holds that limit.
+M61_IMP3_FLUSH_PROBE = M61_IMP3_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (ding #t)
+            (send "@@MID@@")
+            (ding #t)
+            (send "@@END@@")
+            "ok")
+        )))
+"""
+
+# The CROSSING COUNT of ONE capability run (cr.org C5).  The act exists to
+# replace 1 handle crossing for each capability BYTE with 1 crossing for
+# each capability STRING.  Reset the counters of src/eval.c, run 1 bell,
+# then read the pair and pin an UPPER bound on it.  This checks behavior,
+# not source text.
+#
+# The "bl" string of xterm is 1 byte, so this run can not show the gain of
+# the whole-string sink over a per-byte sink.  It pins the dispatch shape
+# of a run (the bell selection, the sink-to-hub write and the flush) and
+# turns red when a later change adds a crossing to that shape.
+M61_IMP3_CROSS_PROBE = M61_IMP3_PRELUDE + r"""
+          (begin
+            (reset-cross!)
+            (ding #t)
+            (let ((counts (cross-count)))
+              (let ((c2s (car counts)) (s2c (cdr counts)))
+                (if (and (<= c2s @@MAXC2S@@) (<= s2c @@MAXS2C@@))
+                    "ok"
+                    (string-append
+                     "crossing count " (number->string c2s) "/"
+                     (number->string s2c) " exceeds the bound "
+                     "@@MAXC2S@@/@@MAXS2C@@ of ONE capability run")))))
+        )))
+"""
+
+# The termscript ORDER: 2 glyph runs with a bell between them.  The
+# termscript FILE must hold the whole capability string AFTER the output
+# of its run and BEFORE the next run.  This is the declared order change
+# of brief.org section 6: the C path interleaved the 2 streams per byte,
+# the sink writes the whole string and copies it after.
+M61_IMP3_TS_PROBE = M61_IMP2_HELPERS + M61_IMP3_PRELUDE + r"""
+          (begin
+            (open! "@@TSFILE@@")
+            (goto (pmax))
+            (ti "@@A@@")
+            (redisplay! #t)
+            (ding #t)
+            (goto (pmax))
+            (ti "@@B@@")
+            (redisplay! #t)
+            (open! #nil)
+            (let* ((text (m61-imp2-slurp "@@TSFILE@@"))
+                   (bellstr (string (integer->char 7)))
+                   (ia (m61-imp2-index text "@@A@@" 0))
+                   (ibell (if (< ia 0) -1
+                              (m61-imp2-index text bellstr ia)))
+                   (ib (m61-imp2-index text "@@B@@" 0)))
+              (cond ((< ia 0) "a-missing")
+                    ((< ibell 0) "bell-missing")
+                    ((< ib 0) "b-missing")
+                    ((not (< ia ibell)) "bell-before-a")
+                    ((not (< ibell ib)) "b-before-bell")
+                    (else "ok"))))
+        )))
+"""
+
+# LIMIT: a short capability write can not be forced on a host pty.  A pty
+# whose buffer is full BLOCKS the write, so no short count comes back.  The
+# case runs the real capability and then reports the narrow SKIP with that
+# reason: a skip is not a pass.
+M61_IMP3_SHORT_PROBE = M61_IMP3_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (ding #t)
+            (send "@@END@@")
+            (string-append
+             "m61-imp3-skip: a full pty BLOCKS, so a short capability write"
+             " can not be forced on this host"))
+        )))
+"""
+
+M61_IMP3_CASES = (
+    {
+        "name": "m61-imp3/cap-bytes-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_CAP_PROBE,
+        "subst": {"BEGIN": M61_IMP3_BEGIN.decode(),
+                  "END": M61_IMP3_END.decode()},
+        "expect": "ok",
+        # The whole capability string of the real OUTPUT call sits between
+        # the 2 markers, in this order.
+        "pty_in_order": (M61_IMP3_BEGIN, M61_IMP3_BELL, M61_IMP3_END),
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/glyph-bytes-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_GLYPH_PROBE,
+        "subst": {"BEGIN": M61_IMP3_BEGIN.decode(),
+                  "NEEDLE": "M61-IMP3-GLYPH|",
+                  "END": M61_IMP3_END.decode()},
+        "expect": "ok",
+        "pty_in_order": (M61_IMP3_BEGIN, M61_IMP3_BELL,
+                         b"M61-IMP3-GLYPH|", M61_IMP3_END),
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/termscript-order-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_TS_PROBE,
+        "subst": {"TSFILE": _m61_imp2_tsfile("imp3order"),
+                  "A": "M61-IMP3-ORD-A|",
+                  "B": "M61-IMP3-ORD-B|"},
+        "expect": "ok",
+        "pty_in_order": (b"M61-IMP3-ORD-A|", b"M61-IMP3-ORD-B|"),
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/flush-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_FLUSH_PROBE,
+        "subst": {"BEGIN": M61_IMP3_BEGIN.decode(),
+                  "MID": M61_IMP3_MID.decode(),
+                  "END": M61_IMP3_END.decode()},
+        "expect": "ok",
+        # The bell byte leads the mid marker, and the second bell byte
+        # follows it.  This proves the byte order only.  It does not
+        # prove the flush (cr.org C4).
+        "pty_in_order": (M61_IMP3_BEGIN, M61_IMP3_BELL, M61_IMP3_MID,
+                         M61_IMP3_BELL, M61_IMP3_END),
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/cross-count-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_CROSS_PROBE,
+        "subst": {"MAXC2S": str(M61_IMP3_CROSS_MAX_C2S),
+                  "MAXS2C": str(M61_IMP3_CROSS_MAX_S2C)},
+        # An upper bound on the crossing pair of ONE bell run: 4/3
+        # measured, bound 6/6.  An extra dispatch in the run fails this
+        # case.  The 1-byte bell can not show the whole-string gain.
+        "expect": "ok",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/short-write-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_SHORT_PROBE,
+        "subst": {"BEGIN": M61_IMP3_BEGIN.decode(),
+                  "END": M61_IMP3_END.decode()},
+        # "expect" holds the same skip text that the probe answers, so no
+        # value in the case is dead (cr.org C9).  The harness reads
+        # info_report_prefix FIRST, and the NARROW skip is reported for
+        # that text only.
+        "expect": M61_IMP3_SHORT_SKIP,
+        "info_report_prefix": M61_IMP3_SKIP,
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/clean-exit-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_CAP_PROBE,
+        "subst": {"BEGIN": M61_IMP3_BEGIN.decode(),
+                  "END": M61_IMP3_END.decode()},
+        "expect": "ok",
+        "pty_contains": M61_IMP3_END,
+        # Exit 0 and the terminal mode restored.  The capability path
+        # changed, so the restore path is re-proved here, not assumed.
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
-         + M61_IMP2G_CASES)
+         + M61_IMP2G_CASES + M61_IMP3_CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",
@@ -2684,7 +2989,7 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m54-imp2", "m54-imp3", "m54-imp4",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
-          "m61-imp1", "m61-imp2", "m61-imp2g")
+          "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3")
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -3642,7 +3947,8 @@ def selftest():
     check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
     check("m61-imp2-case-count", len(group_cases("m61-imp2")), 7)
     check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
-    check("total-case-count", len(CASES), 49)
+    check("m61-imp3-case-count", len(group_cases("m61-imp3")), 7)
+    check("total-case-count", len(CASES), 56)
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),
