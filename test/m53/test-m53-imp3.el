@@ -175,9 +175,9 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
 (setq m53-imp3--group 's2)
 
 (m53-imp3--check "driver-resize-tiocswinsz"
-                 (m53-imp3--contains-p "test/pty-driver.py" "TIOCSWINSZ"))
+                 (m53-imp3--contains-p "test/pty_session.py" "TIOCSWINSZ"))
 (m53-imp3--check "driver-mode-readback-tcgetattr"
-                 (m53-imp3--contains-p "test/pty-driver.py" "tcgetattr"))
+                 (m53-imp3--contains-p "test/pty_session.py" "tcgetattr"))
 (m53-imp3--check "driver-wait-exit"
                  (m53-imp3--contains-p "test/pty_cases.py" "\"wait_exit\""))
 (m53-imp3--check "driver-load-fixture"

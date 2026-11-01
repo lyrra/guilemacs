@@ -84,14 +84,17 @@
 ;;; parser, and the driver's child probe and report format.
 
 (defun m42-imp3--driver-source ()
-  "Return the driver and case module source, or nil."
+  "Return the driver and its modules' source, or nil."
   (let* ((path (m42-pty--driver))
-         (cases (expand-file-name "pty_cases.py" (file-name-directory path))))
-    (and (file-readable-p path) (file-readable-p cases)
+         (cases (expand-file-name "pty_cases.py" (file-name-directory path)))
+         (session (expand-file-name "pty_session.py" (file-name-directory path))))
+    (and (file-readable-p path) (file-readable-p cases) (file-readable-p session)
          (with-temp-buffer
            (insert-file-contents path)
            (goto-char (point-max))
            (insert-file-contents cases)
+           (goto-char (point-max))
+           (insert-file-contents session)
            (buffer-string)))))
 
 (ert-deftest m42-imp3/parse-pass ()
