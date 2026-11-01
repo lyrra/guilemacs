@@ -10,6 +10,7 @@ import sys
 import unittest
 from unittest import mock
 
+import pty_cases
 from pty_session import SessionResult
 
 
@@ -96,6 +97,47 @@ class DriverStatusTests(unittest.TestCase):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("INFO m42-imp3/case-1-no-input skipped", result.stdout)
+
+
+class TerminfoFixtureTests(unittest.TestCase):
+    def test_fixture_queries_use_each_private_entry(self):
+        xterm = pty_cases.terminfo_fixture("xterm")
+        ansi = pty_cases.terminfo_fixture("ansi")
+        delete = pty_cases.terminfo_fixture("m52-imp8")
+        if xterm is None or ansi is None or delete is None:
+            self.skipTest("tic unavailable or fixture compilation failed")
+        self.assertEqual(driver.terminfo_capability("xterm", "sitm", xterm), b"\x1b[3m")
+        self.assertIsNone(driver.terminfo_capability("ansi", "sitm", ansi))
+        self.assertIsNone(driver.terminfo_capability("ansi", "smcup", ansi))
+        self.assertEqual(driver.terminfo_capability("m52-imp8", "smdc", delete),
+                         b"\x1b[4h")
+        self.assertEqual(driver.terminfo_capability("m52-imp8", "rmdc", delete),
+                         b"\x1b[4l")
+        self.assertEqual(driver.terminfo_capability("xterm", "ht", xterm), b"\t")
+
+    def test_missing_tic_skips_only_fixture_case(self):
+        case = next(c for c in pty_cases.CASES if c["name"] == "m52-imp8/policy-key-e2e")
+        with mock.patch.object(pty_cases, "_fixture_tried", False), \
+             mock.patch.object(pty_cases, "_fixture_dir", None), \
+             mock.patch.object(pty_cases.shutil, "which", return_value=None), \
+             mock.patch.object(driver, "run_session") as session:
+            name, kind, detail = driver.run_case(case, "emacs", 1)
+        self.assertEqual((name, kind), (case["name"], "INFO"))
+        self.assertIn("no terminfo fixture", detail)
+        session.assert_not_called()
+
+    def test_fixture_compile_failure_is_a_skip(self):
+        case = next(c for c in pty_cases.CASES if c["name"] == "m52-imp8/policy-key-e2e")
+        with mock.patch.object(pty_cases, "_fixture_tried", False), \
+             mock.patch.object(pty_cases, "_fixture_dir", None), \
+             mock.patch.object(pty_cases.shutil, "which", return_value="tic"), \
+             mock.patch.object(pty_cases.subprocess, "run",
+                               return_value=subprocess.CompletedProcess([], 1)), \
+             mock.patch.object(driver, "run_session") as session:
+            _, kind, detail = driver.run_case(case, "emacs", 1)
+        self.assertEqual(kind, "INFO")
+        self.assertIn("compilation failed", detail)
+        session.assert_not_called()
 
 
 if __name__ == "__main__":

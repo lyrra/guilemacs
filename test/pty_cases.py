@@ -916,97 +916,42 @@ M52_IMP8_PROBE = r"""
             "flush-failed"))))))
 """
 
-# --- the M52 imp-8 terminfo fixture -----------------------------------
-#
-# The imp-8 group has 2 KEY steps only: "delete-mode" and
-# "end-delete-mode".  m52_caps maps them to tty->TS_delete_mode and
-# tty->TS_end_delete_mode, which C reads from the terminfo strings smdc
-# (enter delete mode) and rmdc (exit delete mode).  No terminfo entry in
-# a normal installation defines those 2 ("infocmp xterm" holds no smdc /
-# rmdc), so on TERM=xterm --tty-emit-cap returns 0 bytes for both keys.
-# The zero-count sentinel would then FAIL, and the case could not tell a
-# correct m52_caps row from a missing one.
-#
-# The case therefore runs a controlled terminfo entry that defines the 2
-# strings.  The base is the host xterm entry, so the child keeps a normal
-# terminal and only the 2 strings are added.  The case still pins NO byte
-# span: the driver compares the reported count with the real pty span.
-# When tic or infocmp is missing, the case INFO-skips, never a PASS.
+# Compile fixed terminfo entries without reading the host database.
 M52_IMP8_TERM = "m52-imp8"
-M52_IMP8_FIXTURE_CAPS = "\tsmdc=\\E[4h, rmdc=\\E[4l,\n"
-# The fallback entry is complete on its own: it is used only when infocmp
-# cannot read the host xterm entry.
-M52_IMP8_FALLBACK_ENTRY = (
-    "m52-imp8|M52 imp-8 delete-mode fixture,\n"
-    "\tam, xenl, cols#80, lines#24,\n"
-    "\tcsr=\\E[%i%p1%d;%p2%dr, el=\\E[K, clear=\\E[H\\E[2J,\n"
-    + M52_IMP8_FIXTURE_CAPS)
-
-_m52_imp8_fixture_env = None
-_m52_imp8_fixture_tried = False
+_fixture_dir = None
+_fixture_tried = False
 
 
-def _m52_imp8_entry_source():
-    """Return the fixture terminfo source text."""
-    infocmp = shutil.which("infocmp")
-    if infocmp is None:
-        return M52_IMP8_FALLBACK_ENTRY
-    try:
-        out = subprocess.run([infocmp, "-L", "xterm"],
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                             check=True)
-    except (OSError, subprocess.CalledProcessError):
-        return M52_IMP8_FALLBACK_ENTRY
-    text = out.stdout.decode("utf-8", "replace")
-    # Drop infocmp's own comment lines, so the first comma is the one that
-    # ends the name field.  Replace that field with the fixture name and
-    # insert the 2 strings there; the rest of the entry is untouched.
-    text = "\n".join(line for line in text.splitlines()
-                     if not line.startswith("#"))
-    head, sep, tail = text.partition(",")
-    if not sep or "xterm" not in head.split("\n")[0]:
-        return M52_IMP8_FALLBACK_ENTRY
-    return M52_IMP8_TERM + ",\n" + M52_IMP8_FIXTURE_CAPS + tail.lstrip("\n")
-
-
-def m52_imp8_env():
-    """Return the child env for the imp-8 terminfo fixture, or None.
-
-    Compile M52_IMP8_TERM with tic into a private TERMINFO directory.  A
-    missing tic, a tic failure, or a missing compiled entry yields None,
-    so the caller reports an explicit INFO skip.
-    """
-    global _m52_imp8_fixture_env, _m52_imp8_fixture_tried
-    if _m52_imp8_fixture_tried:
-        return _m52_imp8_fixture_env
-    _m52_imp8_fixture_tried = True
-    tic = shutil.which("tic")
-    if tic is None:
+def terminfo_fixture(term):
+    """Return the environment for a fixed entry, or None if unavailable."""
+    global _fixture_dir, _fixture_tried
+    if not _fixture_tried:
+        _fixture_tried = True
+        tic = shutil.which("tic")
+        if tic is not None:
+            try:
+                directory = tempfile.mkdtemp(prefix="pty-terminfo-")
+                atexit.register(shutil.rmtree, directory, True)
+                source = os.path.join(os.path.dirname(__file__),
+                                      "fixtures", "pty-terminfo.src")
+                result = subprocess.run([tic, "-x", "-o", directory, source],
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+                compiled = {name for _, _, files in os.walk(directory)
+                            for name in files}
+                if result.returncode == 0 and all(
+                        name in compiled for name in ("xterm", "ansi", M52_IMP8_TERM)):
+                    _fixture_dir = directory
+            except OSError:
+                pass
+    if _fixture_dir is None:
         return None
-    source = _m52_imp8_entry_source()
-    try:
-        outdir = tempfile.mkdtemp(prefix="m52-imp8-terminfo-")
-        atexit.register(shutil.rmtree, outdir, True)
-        src = os.path.join(outdir, M52_IMP8_TERM + ".src")
-        with open(src, "w") as entry_file:
-            entry_file.write(source)
-        rc = subprocess.run([tic, "-o", outdir, src],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL).returncode
-        compiled = None
-        for root, dirs, files in os.walk(outdir):
-            if M52_IMP8_TERM in files:
-                compiled = os.path.join(root, M52_IMP8_TERM)
-                break
-        if rc != 0 or compiled is None:
-            return None
-        _m52_imp8_fixture_env = {"TERM": M52_IMP8_TERM, "TERMINFO": outdir}
-    except OSError:
-        return None
-    return _m52_imp8_fixture_env
+    return {"TERM": term, "TERMINFO": _fixture_dir,
+            "TERMINFO_DIRS": _fixture_dir}
 
 
-TERMINFO_FIXTURES = {M52_IMP8_TERM: m52_imp8_env}
+TERMINFO_FIXTURES = {name: (lambda term=name: terminfo_fixture(term))
+                     for name in ("xterm", "ansi", M52_IMP8_TERM)}
 
 M52_IMP8_CASES = (
     {
@@ -1316,8 +1261,7 @@ M56_IMP2_CASES = (
 # returns A1.  This case is EVIDENCE, not a migration.
 M58_IMP2_BEGIN = b"M58-FACE-BEGIN!"
 M58_IMP2_END = b"M58-FACE-END!"
-# The xterm "bold" capability, MEASURED on this host with
-# terminfo_capability("xterm", "bold"); the selftest pins the equality.
+# The fixed xterm fixture's bold capability.
 M58_IMP2_BOLD = b"\x1b[1m"
 
 M58_IMP2_PRELUDE = r"""
@@ -1374,8 +1318,7 @@ M58_IMP2_CASES = (
 #
 #   face-off-e2e       the exit sequence of turn_off_face alone (the
 #                      "me" path, plus the ("clear-standout") step)
-#   face-italic-e2e    italic, and the dim fallback when the host holds
-#                      no italic capability
+#   face-italic-e2e    italic using the fixed xterm capability
 #   face-underline-e2e plain underline (the styled tparam route needs a
 #                      Smulx capability; a host that has it uses the
 #                      ("tparam" 3 N) step)
@@ -1401,11 +1344,8 @@ M58_IMP3_CAP_END = b"M58I3-CAP-END!"
 # face-off case: the case pins the EXIT bytes, and the bold byte proves
 # the face was on before the exit.
 M58_IMP3_BOLD = b"\x1b[1m"
-# The italic capability (terminfo "sitm"), MEASURED on this host with
-# terminfo_capability("xterm", "sitm"); the selftest pins the equality.
+# The fixed xterm fixture's italic capability (terminfo "sitm").
 M58_IMP3_ITALIC = b"\x1b[3m"
-# The dim fallback (terminfo "dim"), used when the host holds no italic.
-M58_IMP3_DIM = b"\x1b[2m"
 # The exit-attribute capability ("me").  MEASURED on this host from the
 # imp-2 face span (the byte that follows the bold "X"); the emacs
 # terminfo lookup and the Python curses binding do not agree on this
@@ -1475,39 +1415,9 @@ M58_IMP3_CAPABLE_PROBE = r"""
 """
 
 
-def _m58_imp3_host_cap(term, cap):
-    """Return the host terminfo string CAP for TERM, or None.
-
-    The case tuples are built at import time, before the driver's own
-    terminfo_capability helper is defined, so this small query runs here.
-    It performs the same lookup: a None answer means the host cannot
-    supply the capability.
-    """
-    try:
-        import curses
-        curses.setupterm(term)
-    except Exception:
-        return None
-    try:
-        return curses.tigetstr(cap)
-    except Exception:
-        return None
-
-
-def _m58_imp3_italic_needle():
-    """The italic byte when the host holds one, else the dim fallback.
-
-    The C hub emits TS_enter_italic_mode, or TS_enter_dim_mode when the
-    host holds no italic capability.  The needle follows the terminfo
-    entry of the case's TERM, so the case never hand-copies a byte guess
-    (brief.org section 5).
-    """
-    if _m58_imp3_host_cap("xterm", "sitm") is not None:
-        return M58_IMP3_ITALIC, "sitm"
-    return M58_IMP3_DIM, "dim"
-
-
-_M58_IMP3_ITALIC_NEEDLE, M58_IMP3_ITALIC_CAP = _m58_imp3_italic_needle()
+# The fixed xterm entry provides italic mode.
+_M58_IMP3_ITALIC_NEEDLE = M58_IMP3_ITALIC
+M58_IMP3_ITALIC_CAP = "sitm"
 
 M58_IMP3_CASES = (
     {
@@ -3043,10 +2953,9 @@ M61_IMP3_CASES = (
         # E4 of cr.org: the N newline bytes of the run MUST appear in the
         # BEGIN .. END span of the pty master.  The probe sends N as the
         # marker M61-IMP3-N=<n>|, so the count comes from the SAME frame
-        # that the run uses, and no constant pin is needed.  A host whose
-        # `ansi' entry holds smcup runs no newline branch, holds no
-        # newline byte in the span, and FAILS here: the case no longer
-        # passes on an upper bound alone.
+        # that the run uses, and no constant pin is needed.  The fixed
+        # ansi entry omits smcup so terminal initialization uses the
+        # newline branch.
         "span_requires": {"span": (M61_IMP3_BEGIN, M61_IMP3_END),
                           "newline_count_re": r"M61-IMP3-N=(\d+)\|"},
         "env": {"TERM": "ansi"},
@@ -3088,6 +2997,19 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
          + M61_IMP2G_CASES + M61_IMP3_CASES)
+
+# These cases check terminal capabilities or their emitted bytes.
+_FIXTURE_CASES = {
+    "m52-imp3/tty-emit-cap-e2e", "m52-imp3/tty-emit-seq-e2e",
+    "m54-imp4/tab-policy-e2e", "m58-imp2/face-appearance-e2e",
+}
+_FIXTURE_GROUPS = {"m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
+                   "m58-imp3", "m58-imp4", "m61-imp3"}
+CASES = tuple(
+    dict(case, terminfo_fixture=case.get("env", {}).get("TERM", "xterm"))
+    if case["name"] in _FIXTURE_CASES or case["group"] in _FIXTURE_GROUPS
+    else case
+    for case in CASES)
 
 GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m53-imp3",

@@ -260,11 +260,11 @@ def verdict(case, got):
         # derived from the terminfo entry of the case's OWN TERM.  A
         # mismatch is a real FAIL.  A host that cannot load the terminfo
         # entry is an explicit INFO skip, never a pass.
-        want = terminfo_report(case["expect_terminfo"],
-                               (case.get("env") or {}).get("TERM"))
+        env = case.get("env") or {}
+        want = terminfo_report(case["expect_terminfo"], env.get("TERM"), env)
         if want is None:
             return ("INFO",
-                    "host terminfo unavailable for TERM %r: cannot derive "
+                    "terminfo unavailable for TERM %r: cannot derive "
                     "the capability verdict" % ((case.get("env") or {}).get("TERM"),))
         if got == want:
             return ("PASS", "measured %r" % got)
@@ -380,7 +380,28 @@ def check_termscript(case, output, ts_bytes):
     return None
 
 
-def terminfo_capability(term, cap):
+def _fixture_capability(term, cap, env):
+    """Query a fixture in a separate process; curses caches its first TERM."""
+    script = ('import curses, sys\n'
+              'try:\n'
+              ' curses.setupterm(sys.argv[1])\n'
+              ' value = curses.tigetstr(sys.argv[2]) if sys.argv[2] else None\n'
+              ' print("-" if value is None else value.hex())\n'
+              'except (curses.error, OSError):\n'
+              ' sys.exit(1)\n')
+    child_env = os.environ.copy()
+    child_env.update(env)
+    try:
+        result = subprocess.run([sys.executable, "-c", script, term, cap or ""],
+                                env=child_env, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, check=True, text=True)
+        value = result.stdout.strip()
+        return True, None if value == "-" else bytes.fromhex(value)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False, None
+
+
+def terminfo_capability(term, cap, env=None):
     """Return the terminfo string CAP for TERM, or None when undefined.
 
     Load the terminfo entry for TERM and read one capability through the
@@ -391,6 +412,8 @@ def terminfo_capability(term, cap):
     """
     if not term:
         return None
+    if env and env.get("TERMINFO"):
+        return _fixture_capability(term, cap, env)[1]
     try:
         import curses
     except ImportError:
@@ -402,10 +425,12 @@ def terminfo_capability(term, cap):
     return curses.tigetstr(cap)
 
 
-def terminfo_readable(term):
+def terminfo_readable(term, env=None):
     """True when the host terminfo entry of TERM can be loaded."""
     if not term:
         return False
+    if env and env.get("TERMINFO"):
+        return _fixture_capability(term, None, env)[0]
     try:
         import curses
     except ImportError:
@@ -417,29 +442,18 @@ def terminfo_readable(term):
     return True
 
 
-def terminfo_report(pairs, term):
+def terminfo_report(pairs, term, env=None):
     """Build the expected report of a terminfo-derived Lisp verdict.
 
     PAIRS is a sequence of (LABEL, CAP).  Return "<label>:<0|1> ..." as
     the child reports it, or None when the host terminfo entry cannot be
     read at all -- a missing database is not a missing capability.
     """
-    if not terminfo_readable(term):
+    if not terminfo_readable(term, env):
         return None
     return " ".join("%s:%d" % (label,
-                               0 if terminfo_capability(term, cap) is None else 1)
+                               0 if terminfo_capability(term, cap, env) is None else 1)
                     for label, cap in pairs)
-
-
-def terminfo_parameterized(term, cap, arg):
-    """Return the byte string CAP formatted with ARG, or None."""
-    if not terminfo_readable(term):
-        return None
-    try:
-        import curses
-        return curses.tparm(terminfo_capability(term, cap), arg)
-    except Exception:
-        return None
 
 
 def span_required_problem(case, output):
@@ -458,7 +472,7 @@ def span_required_problem(case, output):
         return None
     term = (case.get("env") or {}).get("TERM")
     cap = spec.get("capability")
-    if cap is not None and terminfo_capability(term, cap) is None:
+    if cap is not None and terminfo_capability(term, cap, case.get("env")) is None:
         return ("INFO",
                 "terminfo %s holds no %r capability: no byte can appear"
                 % (term, cap))
@@ -533,8 +547,9 @@ def run_case(case, emacs, timeout):
                     % case["terminfo_fixture"])
         fixture = builder()
         if fixture is None:
-            return (name, "INFO", "no terminfo fixture %r: tic or infocmp missing"
+            return (name, "INFO", "no terminfo fixture %r: tic unavailable or compilation failed"
                     % case["terminfo_fixture"])
+        case = dict(case, env={**case.get("env", {}), **fixture})
     options = SessionOptions(
         input_bytes=case.get("bytes", b""), resize=case.get("resize"),
         close_master=case.get("close_master", False),
@@ -955,25 +970,6 @@ def selftest():
              for c in ("m58-imp3/face-off-e2e", "m58-imp3/face-italic-e2e",
                        "m58-imp3/face-underline-e2e", "m58-imp3/face-color-e2e")]
     check("m58-imp3-distinct-spans", len(set(spans)), len(spans))
-    # The measured needle constants MUST equal the terminfo entry of the
-    # same TERM.  The exception is the "me" byte: this host's emacs
-    # terminfo lookup and the Python curses binding disagree on it, so it
-    # is measured from the imp-2 span instead (a host-independent pin
-    # cannot express that; the PTY case is the authority).
-    check("m58-imp3-bold-needle-eq-terminfo", M58_IMP3_BOLD,
-          terminfo_capability("xterm", "bold"))
-    check("m58-imp3-italic-needle-eq-terminfo", M58_IMP3_ITALIC,
-          terminfo_capability("xterm", "sitm"))
-    check("m58-imp3-underline-needle-eq-terminfo", M58_IMP3_UNDERLINE,
-          terminfo_capability("xterm", "smul"))
-    # This host's tty color map resolves every color NAME to index 0, so
-    # the measured color bytes are setaf 0 / setab 0.  The pin is the
-    # terminfo STRING with that measured index: the case proves the two
-    # color step routes, not the numeric color value (an honest limit).
-    check("m58-imp3-setaf-needle-eq-terminfo", M58_IMP3_SETAF_RED,
-          terminfo_parameterized("xterm", "setaf", 0))
-    check("m58-imp3-setab-needle-eq-terminfo", M58_IMP3_SETAB_BLUE,
-          terminfo_parameterized("xterm", "setab", 0))
     # The capable-p case reports a Lisp value, so it holds no needle: the
     # expectation comes from terminfo (a mismatch FAILS) and a host with
     # no loadable terminfo is an explicit INFO skip.
@@ -982,11 +978,6 @@ def selftest():
           (("bold", "bold"), ("italic", "sitm"), ("underline", "smul")))
     if "span_requires" in cap_case:
         problems.append("m58-imp3/capable-p-e2e must not pin a byte span")
-    # The needle is MEASURED, then pinned: the host terminfo must agree.
-    bold_cap = terminfo_capability("xterm", "bold")
-    if bold_cap is not None and bold_cap != M58_IMP2_BOLD:
-        problems.append("xterm bold capability is %r, want %r"
-                        % (bold_cap, M58_IMP2_BOLD))
     # The m54-imp3 case asks for a termscript file.
     if not _case("m54-imp3/termscript-copy-e2e").get("termscript"):
         problems.append("m54-imp3 does not open a termscript file")
@@ -1027,9 +1018,6 @@ def selftest():
                "env": {"TERM": "xterm"}},
               M54_IMP4_BEGIN + M54_IMP4_END)[0],
           "INFO")
-    tab_cap = terminfo_capability("xterm", "ht")
-    if tab_cap is not None and tab_cap != b"\t":
-        problems.append("xterm ht capability is %r, want b'\\t'" % (tab_cap,))
     check("m52-cap-output-bytes",
           _case("m52-imp3/tty-emit-cap-e2e").get("output_span_bytes"),
           b"\x1b[3;11r")
