@@ -2835,6 +2835,167 @@ M61_IMP3_CROSS_PROBE = M61_IMP3_PRELUDE + r"""
         )))
 """
 
+# The NEWLINE FALLBACK run (cr1.org 2026-11-01 C2).  tty_set_terminal_modes
+# emits N newlines when the terminal carries no termcap mode string:
+#   EMACS_INT n = FRAME_TOTAL_LINES (selected frame);
+#   m61_tty_emit_cap_repeat_1 (tty, '\n', n);
+# The N bytes must collect in the ONE sink and cross the handle ONCE PER
+# CHUNK, that is ceil (N / 1024) times.  A per-byte loop crosses n times,
+# which is the C2 defect.
+#
+# The run is NOT reachable from the startup path of TERM=xterm: xterm
+# holds smcup, so TS_termcap_modes is set and the newline branch does not
+# run.  MEASURED 2026-11-01 on this host: `infocmp ansi | grep -c smcup'
+# answers 0 and `infocmp xterm | grep -c smcup' answers 1.  So TERM=ansi
+# does run the branch at startup, with tty=/dev/tty.  That startup run
+# can not be measured: the counters of src/eval.c can not be reset before
+# init_display, and the crossing count of a whole startup is not stable
+# enough to hold a line-count delta.
+#
+# So this case forces ONE later run: the internal leaf
+# --init-controlling-tty-sys-modes (src/keyboard.c) wraps init_sys_modes
+# on the controlling tty, which calls terminal->set_terminal_modes_hook.
+# The counters are reset before that call and read after it, so the delta
+# covers ONE newline run and the few crossings of the mode-set itself.
+# No new leaf is added for the test.
+#
+# E6 of cr.org: the probe reads the frame height BEFORE it resets the
+# counters, so the crossings of the height read are NOT inside the delta.
+# The height read and the N marker sit outside the measured range.  The
+# BEGIN marker is INSIDE it, so it adds its 1 crossing to the pair; that
+# is the measured reason why the base pair is 9/15 and not 8/15.
+#
+# The case pins an UPPER bound on the pair and derives that bound from
+# the frame line count that it reads, so the bound scales with N
+# (cr1.org 2026-11-01 C2).  It ALSO proves that the run HAPPENED: the
+# probe sends BEGIN, runs the mode set, sends END, and the driver counts
+# the newline bytes of that span on the pty master (E4 of cr.org).  The N
+# newlines are visible there, so this is no one-sided bound.
+#
+# MEASURED 2026-11-01 on the built tree: 9/15 at a frame of 23 lines with
+# the ONE-run sink, and 32/38 with the per-byte loop put back (the
+# negative control of brief.org 2026-11-01 section 7.3).  The N marker
+# and the BEGIN marker of E4 put 1 crossing into the delta, so the base
+# pair moved from 8/15 to 9/15 when that proof was added.  The sink pair
+# does not grow with N; the per-byte pair grows by N, so a DERIVED bound
+# separates them on every frame of 3 lines or more.
+#
+# LIMIT 1 (cr1.org 2026-11-01 C1): this case does not prove C1.
+# current_tty is a C cursor state and no probe can read it.  C1 is
+# proven by code and by the unchanged byte order only.  Claim no
+# coverage for C1 here.
+#
+# LIMIT 2 (cr1.org 2026-11-01 C1): the probe reads the Lisp height
+# (frame-height, lisp/frame.el), and C passes FRAME_TOTAL_LINES (XFRAME
+# (selected_frame)) to the run (src/term.c).  On a tty frame the 2
+# values agree, so the bound describes the real N.  A frame with a menu
+# bar or a minibuffer difference would separate them, and the bound
+# would then describe a different N than the run.
+#
+# LIMIT 3 (the hollow-pass row of E4 of cr.org): CLOSED on this host, and
+# it stays a host value.  `infocmp ansi | grep -c smcup' answers 0 here,
+# so the newline branch runs and the span holds N newline bytes.  On a
+# host whose `ansi' entry holds smcup the branch does not run, the span
+# holds no newline byte, and the case FAILS: it does not pass on an upper
+# bound alone.  MEASURE that value before the case is trusted on a new
+# host.
+#
+# LIMIT 4 (cr.org R6): C3 is proven by code, not by a case.  m61_cap_begin
+# starts with eassert (!m61_cap_active), so a NESTED emit stops there in a
+# development build, and m61_cap_finish restores current_tty.  No nested
+# emit occurs today (milestone.org 2026-10-31 section 4, "the sink is not
+# reentrant"), so no case can reach that branch.  MEASURED 2026-11-01:
+# `grep -c 'define ENABLE_CHECKING' src/config.h' answers 0, so eassert is
+# a no-op in the binary under test.
+M61_IMP3_NEWLINE_PROBE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (reset-cross! (c 'debug-reset-guile-cross-count))
+       (cross-count (c 'debug-guile-cross-count))
+       (init-modes! (c '--init-controlling-tty-sys-modes))
+       (height (c 'frame-height))
+       (send (lambda (s) ((c 'send-string-to-terminal) s))))
+  ;; E6 of cr.org: the height read comes FIRST, so its crossings are
+  ;; outside the delta that the bound describes.
+  (let* ((lines (height)))
+    (if (<= lines @@SKIP_LINES@@)
+        (string-append
+         "m61-imp3-skip: the frame holds @@SKIP_LINES@@ lines or fewer, so"
+         " ONE newline run can not differ from a per-byte run")
+        (begin
+          ;; E4 of cr.org: the N marker carries the line count to the
+          ;; driver, which counts the newline bytes of the BEGIN .. END
+          ;; span on the pty master.  So a run that never happened can not
+          ;; pass on the upper bound alone.
+          (send (string-append "M61-IMP3-N=" (number->string lines) "|"))
+          (reset-cross!)
+          (send "@@BEGIN@@")
+          (init-modes!)
+          (send "@@END@@")
+          (let* ((counts (cross-count))
+                 (c2s (car counts)) (s2c (cdr counts))
+                 ;; The bound is DERIVED from lines, never a constant pin:
+                 ;; a per-byte loop answers base + lines, so a constant
+                 ;; bound stays green on a short frame (cr1.org
+                 ;; 2026-11-01 C2).  MARGIN keeps a slack of 2 crossings
+                 ;; even on the shortest gated frame (cr.org R5).
+                 (slack (+ @@MARGIN@@ (quotient lines @@SLACK_DIV@@)))
+                 (max-c2s (+ @@BASE_C2S@@ slack))
+                 (max-s2c (+ @@BASE_S2C@@ slack)))
+            (cond ((and (<= c2s max-c2s) (<= s2c max-s2c)) "ok")
+                  (else
+                   (string-append
+                    "crossing count " (number->string c2s) "/"
+                    (number->string s2c) " lines " (number->string lines)
+                    " exceeds the bound " (number->string max-c2s) "/"
+                    (number->string max-s2c) " of ONE newline run"))))))))
+"""
+
+# The crossing pair bound of ONE newline run: a CONSTANT base (the
+# crossings of the mode-set itself, which does not grow with N) plus a
+# fixed MARGIN of 2 crossings and a slack of N / 4.
+#
+# Why the slack, and not a constant pin (cr1.org 2026-11-01 C2): a
+# per-byte loop answers base + N / 15 + N.  A constant pin of 20/28 was
+# GREEN on every frame of 12 lines or fewer, so it could not see the
+# defect:
+#   N = 12: per-byte 20/27, constant pin 20/28 -> PASS, defect unseen.
+# Why the MARGIN (cr.org R5): with a slack of N / 4 alone the shortest
+# gated frame (3 lines) has no slack, so the bound equals the base pair
+# and a jitter of 1 crossing on a CORRECT tree answers RED.  MARGIN = 2
+# gives the bound 2 crossings of headroom on every gated frame.
+# The bound sits ABOVE the base pair and BELOW the per-byte pair for
+# every N above 2, so the case holds on every host:
+#   N = 23: bound 16/22, sink 9/15 PASS, per-byte 32/38 RED.
+#   N = 12: bound 14/20, sink 9/15 PASS, per-byte 21/27 RED.
+#   N =  4: bound 12/18, sink 9/15 PASS, per-byte 13/19 RED.
+#   N =  3: bound 11/17, sink 9/15 PASS, per-byte 12/18 RED.
+#
+# The base pair 9/15 is a HOST VALUE, measured on the TERM=ansi termcap of
+# this host.  A different termcap moves it, because the base holds the
+# crossings of the mode-set itself (smkx, ke and the other strings).  The
+# 2 constants are not a fact about the code.  Re-measure the pair on a new
+# host with this command, which sets the 2 constants to 0 in a COPY of the
+# driver so that the case reports the raw pair in its FAIL detail:
+#   cp test/pty-driver.py /tmp/pd_probe.py
+#   # in the COPY only: M61_IMP3_NEWLINE_BASE_C2S = 0, ..._BASE_S2C = 0
+#   python3 /tmp/pd_probe.py --emacs src/emacs \
+#       --case m61-imp3/newline-run-e2e
+# MEASURED that way on 2026-11-01: 9/15 at 23 lines.  The selftest asserts
+# the MARGIN and the SEPARATION (the sink pair inside the bound, the
+# per-byte pair outside it), so a stale base pair that broke either one
+# fails on the host that holds it, and not in the field.
+M61_IMP3_NEWLINE_BASE_C2S = 9
+M61_IMP3_NEWLINE_BASE_S2C = 15
+M61_IMP3_NEWLINE_SLACK_DIV = 4
+M61_IMP3_NEWLINE_MARGIN = 2
+# The SKIP arm of the case.  A frame of 2 lines or fewer can hold no
+# stable measurement of the run (brief.org 2026-11-01 section 6.3).  The
+# MARGIN above keeps the bound 2 crossings above the base pair on the
+# shortest gated frame, so the skip is a measurement limit, not a hole in
+# the derivation (cr.org R5).
+M61_IMP3_NEWLINE_SKIP_LINES = 2
+
 # The termscript ORDER: 2 glyph runs with a bell between them.  The
 # termscript FILE must hold the whole capability string AFTER the output
 # of its run and BEFORE the next run.  This is the declared order change
@@ -2943,6 +3104,34 @@ M61_IMP3_CASES = (
         # case.  The 1-byte bell can not show the whole-string gain.
         "expect": "ok",
         "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m61-imp3/newline-run-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_NEWLINE_PROBE,
+        "subst": {"BASE_C2S": str(M61_IMP3_NEWLINE_BASE_C2S),
+                  "BASE_S2C": str(M61_IMP3_NEWLINE_BASE_S2C),
+                  "SLACK_DIV": str(M61_IMP3_NEWLINE_SLACK_DIV),
+                  "MARGIN": str(M61_IMP3_NEWLINE_MARGIN),
+                  "SKIP_LINES": str(M61_IMP3_NEWLINE_SKIP_LINES),
+                  "BEGIN": M61_IMP3_BEGIN.decode(),
+                  "END": M61_IMP3_END.decode()},
+        # An upper bound on the crossing pair of ONE newline run, forced
+        # by ONE terminal init.  The bound is derived from the frame line
+        # count, so it scales with N.  The per-byte loop of the C2 defect
+        # crosses once for each line and exceeds it on every frame.
+        "expect": "ok",
+        "info_report_prefix": M61_IMP3_SKIP,
+        # E4 of cr.org: the N newline bytes of the run MUST appear in the
+        # BEGIN .. END span of the pty master.  The probe sends N as the
+        # marker M61-IMP3-N=<n>|, so the count comes from the SAME frame
+        # that the run uses, and no constant pin is needed.  A host whose
+        # `ansi' entry holds smcup runs no newline branch, holds no
+        # newline byte in the span, and FAILS here: the case no longer
+        # passes on an upper bound alone.
+        "span_requires": {"span": (M61_IMP3_BEGIN, M61_IMP3_END),
+                          "newline_count_re": r"M61-IMP3-N=(\d+)\|"},
+        "env": {"TERM": "ansi"},
     },
     {
         "name": "m61-imp3/short-write-e2e",
@@ -3441,7 +3630,7 @@ def span_required_problem(case, output):
         return ("FAIL", "pty output did not contain ordered markers %r %r"
                 % (start, end))
     inner = output[a + len(start):b]
-    for needle in spec["needles"]:
+    for needle in spec.get("needles", ()):
         if needle not in inner:
             return ("FAIL", "pty span held no %r (measured %r)"
                     % (needle, inner))
@@ -3456,6 +3645,25 @@ def span_required_problem(case, output):
                 return ("FAIL", "pty span held no ordered run %r after "
                         "offset %d (measured %r)" % (ordered, pos, inner))
             pos = found + len(needle)
+    # E4 of cr.org: prove that a run HAPPENED, not only that it stayed
+    # under an upper bound.  `newline_count_re' extracts the line count N
+    # that the probe sent as a marker before the span, and the span must
+    # then hold at least N newline bytes.  A branch that never ran holds
+    # no newline in the span, and this is a FAIL, not a pass.
+    count_re = spec.get("newline_count_re")
+    if count_re is not None:
+        # The pty output is BYTES, so the marker pattern must be bytes too.
+        pattern = count_re.encode() if isinstance(count_re, str) else count_re
+        match = re.search(pattern, output)
+        if match is None:
+            return ("FAIL", "pty output held no line-count marker %r"
+                    % (count_re,))
+        want = int(match.group(1))
+        held = inner.count(b"\n")
+        if held < want:
+            return ("FAIL", "pty span held %d newline bytes, want at least "
+                    "the %d lines of the frame: the newline run did not "
+                    "happen (measured %r)" % (held, want, inner))
     return None
 
 
@@ -3947,8 +4155,75 @@ def selftest():
     check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
     check("m61-imp2-case-count", len(group_cases("m61-imp2")), 7)
     check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
-    check("m61-imp3-case-count", len(group_cases("m61-imp3")), 7)
-    check("total-case-count", len(CASES), 56)
+    check("m61-imp3-case-count", len(group_cases("m61-imp3")), 8)
+    check("total-case-count", len(CASES), 57)
+    # --- the DERIVED crossing bound of ONE newline run ---------------
+    # The case m61-imp3/newline-run-e2e pins an upper bound of
+    #   base + lines / M61_IMP3_NEWLINE_SLACK_DIV
+    # on the crossing pair.  The derivation is the point: the sink
+    # answers the base pair (it does not grow with N), and the per-byte
+    # loop of the C2 defect answers base + N.  This block asserts the
+    # SEPARATION that the case depends on, for a wide span of line
+    # counts, and the 3 rows that the brief records.  It is plain
+    # arithmetic: it runs on a host with no pty and no build.
+    def newline_bound(lines):
+        slack = (M61_IMP3_NEWLINE_MARGIN
+                 + lines // M61_IMP3_NEWLINE_SLACK_DIV)
+        return (M61_IMP3_NEWLINE_BASE_C2S + slack,
+                M61_IMP3_NEWLINE_BASE_S2C + slack)
+
+    for lines, want in ((23, (16, 22)), (12, (14, 20)), (4, (12, 18)),
+                        (3, (11, 17))):
+        check("newline-bound-derivation-lines-%d" % lines,
+              newline_bound(lines), want)
+    for lines in range(M61_IMP3_NEWLINE_SKIP_LINES + 1, 501):
+        bound = newline_bound(lines)
+        # R5 of cr.org: the bound MUST keep a fixed margin above the base
+        # pair, so a jitter of 1 crossing on a CORRECT tree stays green on
+        # the shortest gated frame.  With a slack of N / 4 alone the frame
+        # of 3 lines had no slack at all.
+        margin = bound[0] - M61_IMP3_NEWLINE_BASE_C2S
+        if margin < M61_IMP3_NEWLINE_MARGIN:
+            problems.append(
+                "newline bound of %d lines %r keeps a margin of %d "
+                "crossings above the base pair, want at least %d"
+                % (lines, bound, margin, M61_IMP3_NEWLINE_MARGIN))
+        if (M61_IMP3_NEWLINE_BASE_C2S > bound[0]
+                or M61_IMP3_NEWLINE_BASE_S2C > bound[1]):
+            problems.append(
+                "newline bound of %d lines %r rejects the ONE-run sink "
+                "pair %r" % (lines, bound, (M61_IMP3_NEWLINE_BASE_C2S,
+                                           M61_IMP3_NEWLINE_BASE_S2C)))
+        per_byte = (M61_IMP3_NEWLINE_BASE_C2S + lines,
+                    M61_IMP3_NEWLINE_BASE_S2C + lines)
+        if per_byte[0] <= bound[0] or per_byte[1] <= bound[1]:
+            problems.append(
+                "newline bound of %d lines %r does not separate the "
+                "per-byte pair %r, so the case can not see the C2 defect"
+                % (lines, bound, per_byte))
+    # The MARGIN costs separation on the shortest frames, so the SKIP arm
+    # must cover every frame where the bound does NOT separate the 2
+    # shapes (cr.org R5).  The selftest DERIVES that threshold from the
+    # constants; it does not pin it.
+    def newline_separates(lines):
+        bound = newline_bound(lines)
+        per_byte = (M61_IMP3_NEWLINE_BASE_C2S + lines,
+                    M61_IMP3_NEWLINE_BASE_S2C + lines)
+        return per_byte[0] > bound[0] and per_byte[1] > bound[1]
+
+    first_gated = next(n for n in range(1, 100) if newline_separates(n))
+    check("newline-skip-covers-the-blind-frames",
+          M61_IMP3_NEWLINE_SKIP_LINES + 1, first_gated)
+    # E4 of cr.org: the case proves that the run HAPPENED, so its span
+    # spec MUST carry the line-count marker check.  A spec without it
+    # would leave the case on an upper bound alone.
+    newline_case = _case("m61-imp3/newline-run-e2e")
+    newline_span = newline_case.get("span_requires") or {}
+    check("newline-run-e2e-span-markers", newline_span.get("span"),
+          (M61_IMP3_BEGIN, M61_IMP3_END))
+    check("newline-run-e2e-newline-count-re",
+          newline_span.get("newline_count_re"), r"M61-IMP3-N=(\d+)\|")
+
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",
                            (b"M52-WRITE-BEGIN!", b"M52-WRITE-END!")),

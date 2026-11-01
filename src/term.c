@@ -180,6 +180,10 @@ static ptrdiff_t m61_cap_status;	/* the FIRST failure of the run */
 struct m61_cap_state
 {
   struct tty_display_info *tty;
+  /* current_tty of the outer run (cr1.org 2026-11-01 C3).  A nested emit sets
+     current_tty, so the outer run must get it back: current_tty feeds
+     curX, curY and the cursor tracking.  */
+  struct tty_display_info *current;
   bool active;
   ptrdiff_t status;
 };
@@ -192,7 +196,8 @@ static void m61_cap_begin (struct tty_display_info *);
 static ptrdiff_t m61_cap_finish (void);
 static ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
 				     const char *, int);
-static ptrdiff_t m61_tty_emit_cap_byte_1 (struct tty_display_info *, int);
+static ptrdiff_t m61_tty_emit_cap_repeat_1 (struct tty_display_info *, int,
+					    EMACS_INT);
 
 #define OUTPUT(tty, a)                                                  \
   m61_tty_emit_cap_1 (tty, a,                                          \
@@ -346,10 +351,15 @@ tty_set_terminal_modes (struct terminal *terminal)
 	      /* Output enough newlines to scroll all the old screen
 		 contents off the screen, so it won't be overwritten and
 		 lost.  */
-	      EMACS_INT i, n = XFIXNUM (XCAR (XCDR (step)));
-	      /* The helper sets current_tty, as the old cmputc site did.  */
-	      for (i = 0; i < n; i++)
-		(void) m61_tty_emit_cap_byte_1 (tty, '\n');
+	      EMACS_INT n = XFIXNUM (XCAR (XCDR (step)));
+	      /* The N newlines collect in the sink and cross the handle
+		 ONCE per chunk, that is ceil (N / M61_CAP_CHUNK) times,
+		 not once for each newline (cr1.org 2026-11-01 C2).  At the
+		 chunk of 1024 bytes and a normal frame N is below 1024, so
+		 the run takes ONE crossing.  current_tty is set also when
+		 N is 0 (cr1.org 2026-11-01 C1), as the old cmputc site
+		 did.  */
+	      (void) m61_tty_emit_cap_repeat_1 (tty, '\n', n);
 	    }
 	}
       losecursor (tty);
@@ -384,7 +394,7 @@ tty_reset_terminal_modes (struct terminal *terminal)
 	  else if (m52_tty_step_tag_p (step, "raw-cr"))
 	    {
 	      /* Output raw CR so kernel can track the cursor hpos.  */
-	      (void) m61_tty_emit_cap_byte_1 (tty, '\r');
+	      (void) m61_tty_emit_cap_repeat_1 (tty, '\r', 1);
 	    }
 	}
       /* M61 imp-2: Scheme checks that the handle is open; C keeps the
@@ -1764,7 +1774,11 @@ m61_cap_drain_1 (void)
 
 /* The =tputs= callback of the capability path: apply the =cmputc= mask
    (c & 0177), append the byte, and answer C.  When the buffer is full,
-   drain FIRST and append after, so the byte order does not change.  */
+   drain FIRST and append after, so the byte order does not change.
+
+   The answer is the UNMASKED C, as the old =cmputc= answered C, and
+   =tputs= discards the answer of its callback (cr1.org 2026-11-01 C5).  The
+   stored byte is the masked one; do not read the answer as the byte.  */
 static int
 m61_cap_putc (int c)
 {
@@ -1792,6 +1806,7 @@ m61_cap_begin (struct tty_display_info *tty)
     {
       (void) m61_cap_drain_1 ();
       m61_cap_saved.tty = m61_cap_tty;
+      m61_cap_saved.current = current_tty;
       m61_cap_saved.status = m61_cap_status;
       m61_cap_saved.active = true;
     }
@@ -1821,6 +1836,7 @@ m61_cap_finish (void)
   if (m61_cap_saved.active)
     {
       m61_cap_tty = m61_cap_saved.tty;
+      current_tty = m61_cap_saved.current;
       m61_cap_len = 0;
       m61_cap_status = m61_cap_saved.status;
       m61_cap_active = true;
@@ -1840,28 +1856,58 @@ m61_cap_finish (void)
    A NULL STR is no capability byte at all.  The old =emacs_tputs= /
    =tputs= shape set current_tty and answered -1 without a callback, and
    the ~40 call sites do not read the answer, so this shape sets
-   current_tty, runs no callback and no drain, and answers 0.  */
+   current_tty, runs no callback and no drain, and answers 0.
+
+   current_tty has ONE store per run: m61_cap_begin sets it, and the
+   restore of m61_cap_finish puts back the value of the outer run when a
+   run is nested.  A NULL STR starts no run, so that branch sets it here,
+   and only here (cr1.org 2026-11-01 C4).  This file holds 3 stores in
+   all: the NULL branch, m61_cap_begin, and that restore.  */
 static ptrdiff_t
 m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
 {
-  current_tty = tty;
   if (!str)
-    return 0;
+    {
+      current_tty = tty;
+      return 0;
+    }
 
   m61_cap_begin (tty);
   tputs (str, lines, m61_cap_putc);
   return m61_cap_finish ();
 }
 
-/* The 1-byte form of the sink: the 2 raw =cmputc= sites of this file (the
-   newline fallback of tty_set_terminal_modes and the raw CR of
-   tty_reset_terminal_modes) use it, so src/term.c holds no direct
-   =cmputc= call and every capability byte has ONE writer.  */
+/* The N-byte form of the sink: the newline fallback of
+   tty_set_terminal_modes calls it with N, and the raw CR of
+   tty_reset_terminal_modes calls it with 1.  It is the ONE shape of a
+   run of repeated bytes, so src/term.c holds no direct =cmputc= call and
+   every capability byte has ONE writer.  The N bytes collect in the sink
+   and the run crosses the handle ONCE PER CHUNK, not once for each
+   newline (cr1.org 2026-11-01 C2).  BOUND of that "once": the sink
+   holds M61_CAP_CHUNK = 1024 bytes, so a run of N bytes crosses
+   ceil (N / 1024) times, not 1.  Write "ONCE per chunk", never "ONCE"
+   for a run that can exceed the chunk.  A chunk that overflows drains
+   before the byte that overflows it, so the byte order does not change.
+
+   N is NOT bounded by the chunk.  The newline fallback takes N from
+   FRAME_TOTAL_LINES (XFRAME (selected_frame)), so a tall frame gives N
+   above 1024 and more than ONE crossing.  The loop below is the ONLY
+   place where the chunk bound can split a run: m61_cap_putc drains
+   before it appends the byte that would overflow the chunk.  A caller
+   that needs a run in ONE crossing must bound N to the chunk.
+
+   N = 0 starts and ends a run with no byte, so current_tty is set, as
+   the old =cmputc= site set it before its loop (cr1.org 2026-11-01 C1),
+   and no crossing happens: m61_cap_drain_1 answers 0 for an empty
+   sink.  */
 static ptrdiff_t
-m61_tty_emit_cap_byte_1 (struct tty_display_info *tty, int c)
+m61_tty_emit_cap_repeat_1 (struct tty_display_info *tty, int c, EMACS_INT n)
 {
+  EMACS_INT i;
+
   m61_cap_begin (tty);
-  (void) m61_cap_putc (c);
+  for (i = 0; i < n; i++)
+    (void) m61_cap_putc (c);
   return m61_cap_finish ();
 }
 
