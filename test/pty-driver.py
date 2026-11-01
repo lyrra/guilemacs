@@ -811,74 +811,70 @@ def selftest():
     check("m61-imp1-case-count", len(group_cases("m61-imp1")), 4)
     check("m61-imp2-case-count", len(group_cases("m61-imp2")), 7)
     check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
-    check("m61-imp3-case-count", len(group_cases("m61-imp3")), 8)
-    check("total-case-count", len(CASES), 57)
-    # --- the DERIVED crossing bound of ONE newline run ---------------
-    # The case m61-imp3/newline-run-e2e pins an upper bound of
-    #   base + lines / M61_IMP3_NEWLINE_SLACK_DIV
-    # on the crossing pair.  The derivation is the point: the sink
-    # answers the base pair (it does not grow with N), and the per-byte
-    # loop of the C2 defect answers base + N.  This block asserts the
-    # SEPARATION that the case depends on, for a wide span of line
-    # counts, and the 3 rows that the brief records.  It is plain
-    # arithmetic: it runs on a host with no pty and no build.
-    def newline_bound(lines):
-        slack = (M61_IMP3_NEWLINE_MARGIN
-                 + lines // M61_IMP3_NEWLINE_SLACK_DIV)
-        return (M61_IMP3_NEWLINE_BASE_C2S + slack,
-                M61_IMP3_NEWLINE_BASE_S2C + slack)
+    check("m61-imp3-case-count", len(group_cases("m61-imp3")), 9)
+    check("total-case-count", len(CASES), 58)
+    # --- the 2-RUN separation of the newline case --------------------
+    # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
+    # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
+    # n1 + K lines.  It answers ok when BOTH counters hold
+    #   |B - A| <= M61_IMP3_NEWLINE_MARGIN.
+    # A sink does not grow with N, so it answers |B - A| = 0 plus the
+    # jitter of 2 mode-set runs.  A per-byte loop crosses once for each
+    # line, so it answers |B - A| = K.  This block asserts that rule for
+    # a range of K values and a range of pairs.  It is plain arithmetic:
+    # it needs no pty, no build, and no value of a host terminfo entry.
+    margin = M61_IMP3_NEWLINE_MARGIN
+    step = M61_IMP3_NEWLINE_FRAME_STEP
 
-    for lines, want in ((23, (16, 22)), (12, (14, 20)), (4, (12, 18)),
-                        (3, (11, 17))):
-        check("newline-bound-derivation-lines-%d" % lines,
-              newline_bound(lines), want)
-    for lines in range(M61_IMP3_NEWLINE_SKIP_LINES + 1, 501):
-        bound = newline_bound(lines)
-        # R5 of cr.org: the bound MUST keep a fixed margin above the base
-        # pair, so a jitter of 1 crossing on a CORRECT tree stays green on
-        # the shortest gated frame.  With a slack of N / 4 alone the frame
-        # of 3 lines had no slack at all.
-        margin = bound[0] - M61_IMP3_NEWLINE_BASE_C2S
-        if margin < M61_IMP3_NEWLINE_MARGIN:
-            problems.append(
-                "newline bound of %d lines %r keeps a margin of %d "
-                "crossings above the base pair, want at least %d"
-                % (lines, bound, margin, M61_IMP3_NEWLINE_MARGIN))
-        if (M61_IMP3_NEWLINE_BASE_C2S > bound[0]
-                or M61_IMP3_NEWLINE_BASE_S2C > bound[1]):
-            problems.append(
-                "newline bound of %d lines %r rejects the ONE-run sink "
-                "pair %r" % (lines, bound, (M61_IMP3_NEWLINE_BASE_C2S,
-                                           M61_IMP3_NEWLINE_BASE_S2C)))
-        per_byte = (M61_IMP3_NEWLINE_BASE_C2S + lines,
-                    M61_IMP3_NEWLINE_BASE_S2C + lines)
-        if per_byte[0] <= bound[0] or per_byte[1] <= bound[1]:
-            problems.append(
-                "newline bound of %d lines %r does not separate the "
-                "per-byte pair %r, so the case can not see the C2 defect"
-                % (lines, bound, per_byte))
-    # The MARGIN costs separation on the shortest frames, so the SKIP arm
-    # must cover every frame where the bound does NOT separate the 2
-    # shapes (cr.org R5).  The selftest DERIVES that threshold from the
-    # constants; it does not pin it.
-    def newline_separates(lines):
-        bound = newline_bound(lines)
-        per_byte = (M61_IMP3_NEWLINE_BASE_C2S + lines,
-                    M61_IMP3_NEWLINE_BASE_S2C + lines)
-        return per_byte[0] > bound[0] and per_byte[1] > bound[1]
+    def two_run_ok(a, b):
+        return (abs(b[0] - a[0]) <= margin
+                and abs(b[1] - a[1]) <= margin)
 
-    first_gated = next(n for n in range(1, 100) if newline_separates(n))
-    check("newline-skip-covers-the-blind-frames",
-          M61_IMP3_NEWLINE_SKIP_LINES + 1, first_gated)
-    # E4 of cr.org: the case proves that the run HAPPENED, so its span
+    # K MUST be > MARGIN, else the case can not separate the 2 shapes.
+    check("newline-frame-step-exceeds-margin", step > margin, True)
+    for k in range(1, 33):
+        for base in ((0, 0), (3, 1), (40, 60)):
+            # A sink answers the pair of RUN-1 again, with up to MARGIN
+            # crossings of jitter on either counter.
+            for jitter in range(margin + 1):
+                if not two_run_ok(base, (base[0] + jitter,
+                                         base[1] - jitter)):
+                    problems.append(
+                        "the 2-run rule rejects the sink pair %r with a "
+                        "jitter of %d at a frame step of %d lines"
+                        % (base, jitter, k))
+            # A per-byte loop answers pair A + K, so every step larger
+            # than MARGIN is outside the rule.
+            per_byte = (base[0] + k, base[1] + k)
+            if k > margin and two_run_ok(base, per_byte):
+                problems.append(
+                    "the 2-run rule accepts the per-byte pair %r at a frame "
+                    "step of %d lines, so the case can not see the C2 defect"
+                    % (per_byte, k))
+    # E4 of cr.org: the case proves that RUN-1 HAPPENED, so its span
     # spec MUST carry the line-count marker check.  A spec without it
-    # would leave the case on an upper bound alone.
+    # would leave the case on the 2-run rule alone.
     newline_case = _case("m61-imp3/newline-run-e2e")
     newline_span = newline_case.get("span_requires") or {}
     check("newline-run-e2e-span-markers", newline_span.get("span"),
           (M61_IMP3_BEGIN, M61_IMP3_END))
     check("newline-run-e2e-newline-count-re",
           newline_span.get("newline_count_re"), r"M61-IMP3-N=(\d+)\|")
+    # The narrow SKIP arm stays: the probe reports INFO, never ok, when
+    # it can not measure the 2 heights.
+    check("newline-run-e2e-skip-arm",
+          newline_case.get("info_report_prefix"), M61_IMP3_SKIP)
+    # F8: the case may hold no absolute crossing pair of a host.  A pair
+    # in the substitutions would need a re-measure on every new host.
+    check("newline-run-e2e-no-host-constant",
+          [key for key in (newline_case.get("subst") or {})
+           if key.startswith("BASE")], [])
+    # F8 demand 2: the smcup case runs the same probe on an entry that
+    # DOES hold smcup, where the newline branch does not run.  A newline
+    # count check there would refuse a correct run, so it must be absent.
+    smcup_case = _case("m61-imp3/newline-smcup-e2e")
+    check("newline-smcup-case-requires-no-newline",
+          "span_requires" in smcup_case, False)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

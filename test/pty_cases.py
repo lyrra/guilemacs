@@ -2688,25 +2688,28 @@ M61_IMP3_CROSS_PROBE = M61_IMP3_PRELUDE + r"""
 # No new leaf is added for the test.
 #
 # E6 of cr.org: the probe reads the frame height BEFORE it resets the
-# counters, so the crossings of the height read are NOT inside the delta.
-# The height read and the N marker sit outside the measured range.  The
-# BEGIN marker is INSIDE it, so it adds its 1 crossing to the pair; that
-# is the measured reason why the base pair is 9/15 and not 8/15.
+# counters, so the crossings of the height read are NOT inside a measured
+# range.  The BEGIN and END markers of a run are INSIDE it, so their
+# crossings are part of the pair of that run.  Both runs use the same
+# shape, so those crossings cancel in B - A.
 #
-# The case pins an UPPER bound on the pair and derives that bound from
-# the frame line count that it reads, so the bound scales with N
-# (cr1.org 2026-11-01 C2).  It ALSO proves that the run HAPPENED: the
-# probe sends BEGIN, runs the mode set, sends END, and the driver counts
-# the newline bytes of that span on the pty master (E4 of cr.org).  The N
-# newlines are visible there, so this is no one-sided bound.
+# The case compares 2 runs of the SAME child and needs no absolute pair:
+# RUN-1 on a frame of n1 lines, RUN-2 on a frame of n1 + K lines.  A sink
+# answers |B - A| <= MARGIN, the per-byte loop of the C2 defect answers
+# |B - A| = K.  So the case holds on any host and on any terminfo entry,
+# and no developer edits a baseline to re-measure it (F8).
 #
-# MEASURED 2026-11-01 on the built tree: 9/15 at a frame of 23 lines with
-# the ONE-run sink, and 32/38 with the per-byte loop put back (the
-# negative control of brief.org 2026-11-01 section 7.3).  The N marker
-# and the BEGIN marker of E4 put 1 crossing into the delta, so the base
-# pair moved from 8/15 to 9/15 when that proof was added.  The sink pair
-# does not grow with N; the per-byte pair grows by N, so a DERIVED bound
-# separates them on every frame of 3 lines or more.
+# The case ALSO proves that RUN-1 HAPPENED: the probe sends BEGIN, runs
+# the mode set, sends END, and the driver counts the newline bytes of
+# that span on the pty master (E4 of cr.org).  The N newlines are visible
+# there, so this is no one-sided rule.
+#
+# MEASURED 2026-11-02 on the built tree, TERM=ansi fixture, K = 8,
+# MARGIN = 2 (`python3 test/pty-driver.py --emacs src/emacs --case
+# m61-imp3/newline-run-e2e`): RUN-1 9/15 at n1 = 23 lines, RUN-2 9/15 at
+# n2 = 31 lines, so |B - A| is 0/0 and the case is ok.  With the per-byte
+# loop of the negative control put back: RUN-1 32/38, RUN-2 40/46, so
+# |B - A| is 8/8 = K and the case is RED.
 #
 # LIMIT 1 (cr1.org 2026-11-01 C1): this case does not prove C1.
 # current_tty is a C cursor state and no probe can read it.  C1 is
@@ -2716,17 +2719,18 @@ M61_IMP3_CROSS_PROBE = M61_IMP3_PRELUDE + r"""
 # LIMIT 2 (cr1.org 2026-11-01 C1): the probe reads the Lisp height
 # (frame-height, lisp/frame.el), and C passes FRAME_TOTAL_LINES (XFRAME
 # (selected_frame)) to the run (src/term.c).  On a tty frame the 2
-# values agree, so the bound describes the real N.  A frame with a menu
-# bar or a minibuffer difference would separate them, and the bound
-# would then describe a different N than the run.
+# values agree, so the 2 runs describe the real n1 and n2.  A frame with
+# a menu bar or a minibuffer difference would separate them, and the
+# probe would then report a SKIP because n2 is not n1 + K.
 #
-# LIMIT 3 (the hollow-pass row of E4 of cr.org): CLOSED on this host, and
-# it stays a host value.  `infocmp ansi | grep -c smcup' answers 0 here,
-# so the newline branch runs and the span holds N newline bytes.  On a
-# host whose `ansi' entry holds smcup the branch does not run, the span
-# holds no newline byte, and the case FAILS: it does not pass on an upper
-# bound alone.  MEASURE that value before the case is trusted on a new
-# host.
+# LIMIT 3 (the hollow-pass row of E4 of cr.org): FIXED by the controlled
+# fixture.  The `ansi' entry of test/fixtures/pty-terminfo.src holds no
+# smcup, so the newline branch runs on every host that can compile the
+# fixture, and the span holds the N newline bytes.  The case
+# m61-imp3/newline-smcup-e2e runs the same probe on the `xterm' entry,
+# which DOES hold smcup: there the branch does not run, so that case
+# drops the newline count check and proves the other side, that an smcup
+# entry reports no false failure (F8 demand 2).
 #
 # LIMIT 4 (cr.org R6): C3 is proven by code, not by a case.  m61_cap_begin
 # starts with eassert (!m61_cap_active), so a NESTED emit stops there in a
@@ -2742,87 +2746,104 @@ M61_IMP3_NEWLINE_PROBE = r"""
        (cross-count (c 'debug-guile-cross-count))
        (init-modes! (c '--init-controlling-tty-sys-modes))
        (height (c 'frame-height))
-       (send (lambda (s) ((c 'send-string-to-terminal) s))))
-  ;; E6 of cr.org: the height read comes FIRST, so its crossings are
-  ;; outside the delta that the bound describes.
-  (let* ((lines (height)))
-    (if (<= lines @@SKIP_LINES@@)
-        (string-append
-         "m61-imp3-skip: the frame holds @@SKIP_LINES@@ lines or fewer, so"
-         " ONE newline run can not differ from a per-byte run")
-        (begin
-          ;; E4 of cr.org: the N marker carries the line count to the
-          ;; driver, which counts the newline bytes of the BEGIN .. END
-          ;; span on the pty master.  So a run that never happened can not
-          ;; pass on the upper bound alone.
-          (send (string-append "M61-IMP3-N=" (number->string lines) "|"))
-          (reset-cross!)
-          (send "@@BEGIN@@")
-          (init-modes!)
-          (send "@@END@@")
-          (let* ((counts (cross-count))
-                 (c2s (car counts)) (s2c (cdr counts))
-                 ;; The bound is DERIVED from lines, never a constant pin:
-                 ;; a per-byte loop answers base + lines, so a constant
-                 ;; bound stays green on a short frame (cr1.org
-                 ;; 2026-11-01 C2).  MARGIN keeps a slack of 2 crossings
-                 ;; even on the shortest gated frame (cr.org R5).
-                 (slack (+ @@MARGIN@@ (quotient lines @@SLACK_DIV@@)))
-                 (max-c2s (+ @@BASE_C2S@@ slack))
-                 (max-s2c (+ @@BASE_S2C@@ slack)))
-            (cond ((and (<= c2s max-c2s) (<= s2c max-s2c)) "ok")
-                  (else
-                   (string-append
-                    "crossing count " (number->string c2s) "/"
-                    (number->string s2c) " lines " (number->string lines)
-                    " exceeds the bound " (number->string max-c2s) "/"
-                    (number->string max-s2c) " of ONE newline run"))))))))
+       (set-height! (c 'set-frame-height))
+       (redisplay! (c 'redisplay))
+       (flush! (c 'flush-standard-output))
+       (send (lambda (s) ((c 'send-string-to-terminal) s)))
+       (dist (lambda (x) (if (< x 0) (- 0 x) x)))
+       (info (lambda (n1 a n2 b)
+               (string-append
+                "m61-imp3-two-run: n1=" (number->string n1)
+                " a=" (number->string (car a)) "/" (number->string (cdr a))
+                " n2=" (number->string n2)
+                " b=" (number->string (car b)) "/" (number->string (cdr b)))))
+       ;; ONE mode-set run between 2 markers.  Both runs of this child use
+       ;; the SAME shape, so the difference of their pairs holds the line
+       ;; count of the frame only.
+       (run (lambda (open close)
+              (reset-cross!)
+              (send open)
+              (init-modes!)
+              (send close)
+              (cross-count))))
+  ;; The HEIGHT read comes first, so its crossings are outside both runs.
+  (let ((n1 (height)))
+    (cond
+      ((<= n1 @@SKIP_LINES@@)
+       (string-append
+        "m61-imp3-skip: the frame holds @@SKIP_LINES@@ lines or fewer, so"
+        " ONE newline run can not differ from a per-byte run"))
+      ((<= @@K@@ @@MARGIN@@)
+       (string-append
+        "m61-imp3-skip: the frame step K=@@K@@ lines is not larger than the"
+        " separation MARGIN=@@MARGIN@@, so the 2 runs can not separate a"
+        " sink from a per-byte loop"))
+      (else
+       (begin
+         ;; The N marker carries the line count of RUN-1 to the driver,
+         ;; which counts the newline bytes of the BEGIN .. END span on the
+         ;; pty master.  So a run that never happened can not pass on the
+         ;; 2-run rule alone.
+         (send (string-append "M61-IMP3-N=" (number->string n1) "|"))
+         (let ((a (run "@@BEGIN@@" "@@END@@")))
+           ;; RUN-2 uses a TALLER frame of the SAME child.  The resize is
+           ;; INSIDE the probe, so the case stays 1 child and the driver
+           ;; needs no new option.  A sink answers pair A again, a
+           ;; per-byte loop answers pair A + K.
+           (if (catch #t
+                 (lambda () (set-height! #nil (+ n1 @@K@@)) #t)
+                 (lambda args #f))
+               (begin (redisplay! #t) (flush!) #t)
+               #f)
+           (let* ((n2 (height))
+                  (b (run "@@BEGIN2@@" "@@END2@@")))
+             (cond
+               ((not (= n2 (+ n1 @@K@@)))
+                (string-append
+                 "m61-imp3-skip: the frame did not take the requested height"
+                 " (n1=" (number->string n1) " n2=" (number->string n2) "),"
+                 " so the 2 runs can not measure a different line count"))
+               ((and (<= (dist (- (car b) (car a))) @@MARGIN@@)
+                     (<= (dist (- (cdr b) (cdr a))) @@MARGIN@@))
+                "ok")
+               (else
+                (string-append
+                 (info n1 a n2 b)
+                 " grows with the frame, so the run crosses once for each"
+                 " line and not once for the whole string"))))))))))
 """
 
-# The crossing pair bound of ONE newline run: a CONSTANT base (the
-# crossings of the mode-set itself, which does not grow with N) plus a
-# fixed MARGIN of 2 crossings and a slack of N / 4.
-#
-# Why the slack, and not a constant pin (cr1.org 2026-11-01 C2): a
-# per-byte loop answers base + N / 15 + N.  A constant pin of 20/28 was
-# GREEN on every frame of 12 lines or fewer, so it could not see the
-# defect:
-#   N = 12: per-byte 20/27, constant pin 20/28 -> PASS, defect unseen.
-# Why the MARGIN (cr.org R5): with a slack of N / 4 alone the shortest
-# gated frame (3 lines) has no slack, so the bound equals the base pair
-# and a jitter of 1 crossing on a CORRECT tree answers RED.  MARGIN = 2
-# gives the bound 2 crossings of headroom on every gated frame.
-# The bound sits ABOVE the base pair and BELOW the per-byte pair for
-# every N above 2, so the case holds on every host:
-#   N = 23: bound 16/22, sink 9/15 PASS, per-byte 32/38 RED.
-#   N = 12: bound 14/20, sink 9/15 PASS, per-byte 21/27 RED.
-#   N =  4: bound 12/18, sink 9/15 PASS, per-byte 13/19 RED.
-#   N =  3: bound 11/17, sink 9/15 PASS, per-byte 12/18 RED.
-#
-# The base pair 9/15 is a HOST VALUE, measured on the TERM=ansi termcap of
-# this host.  A different termcap moves it, because the base holds the
-# crossings of the mode-set itself (smkx, ke and the other strings).  The
-# 2 constants are not a fact about the code.  Re-measure the pair on a new
-# host with this command, which sets the 2 constants to 0 in a COPY of the
-# driver so that the case reports the raw pair in its FAIL detail:
-#   cp test/pty-driver.py /tmp/pd_probe.py
-#   # in the COPY only: M61_IMP3_NEWLINE_BASE_C2S = 0, ..._BASE_S2C = 0
-#   python3 /tmp/pd_probe.py --emacs src/emacs \
-#       --case m61-imp3/newline-run-e2e
-# MEASURED that way on 2026-11-01: 9/15 at 23 lines.  The selftest asserts
-# the MARGIN and the SEPARATION (the sink pair inside the bound, the
-# per-byte pair outside it), so a stale base pair that broke either one
-# fails on the host that holds it, and not in the field.
-M61_IMP3_NEWLINE_BASE_C2S = 9
-M61_IMP3_NEWLINE_BASE_S2C = 15
-M61_IMP3_NEWLINE_SLACK_DIV = 4
+# The 2-run rule of the case.  The case runs the SAME mode-set init
+# TWICE in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
+# n1 + K lines.  Both pairs hold the crossings of the mode-set itself
+# (the capability strings of the terminfo entry), so the case compares 2
+# runs of the same child and holds NO absolute pair:
+#   a sink (the ONE-run batch) answers |B - A| <= MARGIN, because it does
+#   not grow with the line count of the frame,
+#   a per-byte loop (the C2 defect) answers |B - A| = K, because it
+#   crosses once for each line.
+# So K MUST be > MARGIN.  MARGIN covers the jitter of 2 mode-set runs.
+# A different terminfo entry moves the pair of BOTH runs and cancels in
+# B - A, so a new host needs no re-measure of a baseline pair.
+M61_IMP3_NEWLINE_FRAME_STEP = 8
 M61_IMP3_NEWLINE_MARGIN = 2
 # The SKIP arm of the case.  A frame of 2 lines or fewer can hold no
-# stable measurement of the run (brief.org 2026-11-01 section 6.3).  The
-# MARGIN above keeps the bound 2 crossings above the base pair on the
-# shortest gated frame, so the skip is a measurement limit, not a hole in
-# the derivation (cr.org R5).
+# stable measurement of the run, so the probe reports INFO, never ok.
 M61_IMP3_NEWLINE_SKIP_LINES = 2
+
+# The probe substitutions of the 2 newline cases (TERM=ansi runs the
+# newline branch, TERM=xterm holds smcup and does not).  Both cases hold
+# the same probe, so they share 1 table.  The table holds no crossing
+# pair of a host: F8 forbids a host re-measure.
+_M61_IMP3_NEWLINE_SUBST = {
+    "K": str(M61_IMP3_NEWLINE_FRAME_STEP),
+    "MARGIN": str(M61_IMP3_NEWLINE_MARGIN),
+    "SKIP_LINES": str(M61_IMP3_NEWLINE_SKIP_LINES),
+    "BEGIN": M61_IMP3_BEGIN.decode(),
+    "END": M61_IMP3_END.decode(),
+    "BEGIN2": "M61-IMP3-BEGIN2!",
+    "END2": "M61-IMP3-END2!",
+}
 
 # The termscript ORDER: 2 glyph runs with a bell between them.  The
 # termscript FILE must hold the whole capability string AFTER the output
@@ -2937,17 +2958,11 @@ M61_IMP3_CASES = (
         "name": "m61-imp3/newline-run-e2e",
         "group": "m61-imp3",
         "probe": M61_IMP3_NEWLINE_PROBE,
-        "subst": {"BASE_C2S": str(M61_IMP3_NEWLINE_BASE_C2S),
-                  "BASE_S2C": str(M61_IMP3_NEWLINE_BASE_S2C),
-                  "SLACK_DIV": str(M61_IMP3_NEWLINE_SLACK_DIV),
-                  "MARGIN": str(M61_IMP3_NEWLINE_MARGIN),
-                  "SKIP_LINES": str(M61_IMP3_NEWLINE_SKIP_LINES),
-                  "BEGIN": M61_IMP3_BEGIN.decode(),
-                  "END": M61_IMP3_END.decode()},
-        # An upper bound on the crossing pair of ONE newline run, forced
-        # by ONE terminal init.  The bound is derived from the frame line
-        # count, so it scales with N.  The per-byte loop of the C2 defect
-        # crosses once for each line and exceeds it on every frame.
+        "subst": _M61_IMP3_NEWLINE_SUBST,
+        # The 2-run rule of M61_IMP3_NEWLINE_PROBE: RUN-1 on a frame of n1
+        # lines and RUN-2 on a frame of n1 + K lines of the SAME child.
+        # A sink answers |B - A| <= MARGIN; the per-byte loop of the C2
+        # defect answers |B - A| = K.  No absolute pair appears here.
         "expect": "ok",
         "info_report_prefix": M61_IMP3_SKIP,
         # E4 of cr.org: the N newline bytes of the run MUST appear in the
@@ -2959,6 +2974,21 @@ M61_IMP3_CASES = (
         "span_requires": {"span": (M61_IMP3_BEGIN, M61_IMP3_END),
                           "newline_count_re": r"M61-IMP3-N=(\d+)\|"},
         "env": {"TERM": "ansi"},
+    },
+    {
+        # F8 demand 2: an entry that DOES hold smcup must not report a
+        # false failure.  The TERM=xterm fixture entry holds smcup, so the
+        # newline fallback does not run and the span holds no newline
+        # byte.  The case therefore drops the newline_count_re check and
+        # keeps the 2-run rule only: a mode set that does not grow with
+        # the frame must stay ok on this entry too.
+        "name": "m61-imp3/newline-smcup-e2e",
+        "group": "m61-imp3",
+        "probe": M61_IMP3_NEWLINE_PROBE,
+        "subst": _M61_IMP3_NEWLINE_SUBST,
+        "expect": "ok",
+        "info_report_prefix": M61_IMP3_SKIP,
+        "env": {"TERM": "xterm"},
     },
     {
         "name": "m61-imp3/short-write-e2e",

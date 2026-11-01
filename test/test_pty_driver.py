@@ -45,6 +45,27 @@ class CaseVerdictTests(unittest.TestCase):
             self.assertEqual(driver.run_case(case, "emacs", 1)[1], "PASS")
 
 
+    def test_newline_count_check_refuses_a_run_that_did_not_happen(self):
+        # The m61-imp3 newline cases send the frame line count as a marker
+        # and the span must then hold that many newline bytes, so a run
+        # that never happened can not pass on the crossing count alone.
+        case = {"name": "newline", "probe": "", "expect": "ok",
+                "span_requires": {"span": (b"BEGIN", b"END"),
+                                  "newline_count_re": r"M61-IMP3-N=(\d+)\|"}}
+        result = SessionResult(report=b'"ok"\n',
+                               output=b"M61-IMP3-N=4|BEGIN\n\n\n\nEND",
+                               ready_seen=True, input_sent=True)
+        with mock.patch.object(driver, "run_session", return_value=result):
+            self.assertEqual(driver.run_case(case, "emacs", 1)[:2],
+                             (case["name"], "PASS"))
+            # Fewer newlines than the marker names: the branch did not run.
+            result.output = b"M61-IMP3-N=4|BEGIN\nEND"
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
+            # No line-count marker at all: the count can not be checked.
+            result.output = b"BEGIN\nEND"
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
+
+
 class DriverStatusTests(unittest.TestCase):
     def test_case_results_control_status_and_all_are_reported(self):
         cases = [{"name": "first"}, {"name": "second"}, {"name": "third"}]
