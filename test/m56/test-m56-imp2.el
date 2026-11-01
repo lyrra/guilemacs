@@ -33,6 +33,7 @@
 (princ "=== m56 imp-2 real-path PTY check suite ===\n")
 
 (require 'imp-ert-report)
+(require 'cl-lib)
 
 (defvar m56-imp2--root
   (file-name-as-directory
@@ -120,19 +121,22 @@ PROG is not on PATH.  The default directory is the repo root."
               (buffer-substring-no-properties (point-min) (point-max))))
         (kill-buffer buf)))))
 
-(defun m56-imp2--check (name ok)
+(defun m56-imp2--check (name ok &optional detail)
   "Report and register one check on a TRACKED file.  OK is a boolean.
-When OK is the symbol `m56-imp2-absent' the source file is absent, and
-this prints FAIL too: an absent TRACKED file is a real error, not a
-pass.  Either way this registers a real ERT test."
+When OK is the symbol `m56-imp2-absent', the source file is absent.
+DETAIL is included in the report and ERT failure when OK is nil."
   (let* ((absent (eq ok 'm56-imp2-absent))
          (pass (and (not absent) (and ok t))))
     (if absent
         (princ (format "FAIL m56/imp2/%s (source file absent)\n" name))
-      (princ (format "%s m56/imp2/%s\n" (if pass "PASS" "FAIL") name)))
+      (princ (format "%s m56/imp2/%s%s\n" (if pass "PASS" "FAIL") name
+                     (if (and (not pass) detail) (concat " " detail) ""))))
     (setq m56-imp2--registered (1+ m56-imp2--registered))
     (m56-imp2--bump-group)
-    (imp-register-bool-as-ert-test (format "m56-imp2/%s" name) pass)))
+    (if (and (not pass) detail)
+        (imp-register-check-as-ert-test (format "m56-imp2/%s" name)
+                                        (cons 'FAIL detail))
+      (imp-register-bool-as-ert-test (format "m56-imp2/%s" name) pass))))
 
 (defun m56-imp2--info-skip (name reason)
   "Register one explicit INFO skip, counted into the current group.  A
@@ -141,6 +145,19 @@ host limit is a skip, never a pass (brief.org section 2)."
   (setq m56-imp2--registered (1+ m56-imp2--registered))
   (m56-imp2--bump-group)
   (imp-register-skip-as-ert-test (format "m56-imp2/%s" name) reason))
+
+(ert-deftest m56-imp2/failure-preserves-driver-detail ()
+  (let ((m56-imp2--registered 0)
+        (m56-imp2--group nil)
+        (captured nil)
+        (detail "FAIL example measured 0 want 2"))
+    (cl-letf (((symbol-function 'imp-register-check-as-ert-test)
+               (lambda (_name status) (setq captured status))))
+      (with-temp-buffer
+        (let ((standard-output (current-buffer)))
+          (m56-imp2--check "example" nil detail))
+        (should (string-match-p (regexp-quote detail) (buffer-string)))))
+    (should (equal captured (cons 'FAIL detail)))))
 
 ;;; --- S1. The case wiring in test/pty-driver.py ----------------------
 
@@ -188,9 +205,9 @@ host limit is a skip, never a pass (brief.org section 2)."
        ((string-match-p "PASS m56-imp2/tty-init-e2e" out)
         (m56-imp2--check "pty-real-path-tty-init" t))
        ((string-match-p "INFO m56-imp2/tty-init-e2e" out)
-        (m56-imp2--info-skip "pty-real-path-tty-init" "no PTY on this host"))
+        (m56-imp2--info-skip "pty-real-path-tty-init" out))
        (t
-        (m56-imp2--check "pty-real-path-tty-init" nil)))))))
+        (m56-imp2--check "pty-real-path-tty-init" nil out)))))))
 
 ;;; --- S3. The registration -------------------------------------------
 

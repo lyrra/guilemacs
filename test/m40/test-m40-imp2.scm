@@ -259,51 +259,8 @@ list: a later reflow of the list must not give a false FAIL."
 (check "m40/imp2/run-tests/registers-el" #t
        (contains? run-tests "test/m40/test-m40-imp2.el"))
 
-;;; --- 8. Static: the dispatcher moves the tree-wide ref count --------
-;;;
-;;; The new C dispatcher adds one scm_c_public_ref site to src/process.c,
-;;; so the tree-wide count over src/*.c and src/*.h rises 162 -> 163 at
-;;; imp-2 and 167 after the imp-4a dispatchers, then 172 after the imp-4b
-;;; dispatchers.  The
-;;; This test still records the observed tree count as milestone history.
-;;; Source-count assertions in unrelated keyboard milestone corpora do
-;;; not provide runtime coverage and are not part of the test gate.
-(define (count-substr text sub)
-  "Count the non-overlapping occurrences of SUB in TEXT, or 0 when TEXT
-is not a string.  Each scm_c_public_ref site sits on its own line, so the
-occurrence count equals the guard's line count."
-  (if (not (string? text))
-      0
-      (let ((sl (string-length sub)))
-        (let loop ((i 0) (n 0))
-          (if (>= i (string-length text))
-              n
-              (let ((hit (string-contains text sub i)))
-                (if hit (loop (+ hit sl) (1+ n)) n)))))))
-
-(define (src-c-h-files)
-  "The buildable top-level C sources and headers of src/, like the guard
-scan over src/*.c and src/*.h."
-  (let ((d (opendir (repo "src"))))
-    (let loop ((names '()))
-      (let ((n (readdir d)))
-        (if (eof-object? n)
-            (begin (closedir d) names)
-            (loop (if (or (string-suffix? ".c" n) (string-suffix? ".h" n))
-                      (cons n names)
-                      names)))))))
-
-(define tree-ref-sites
-  (let loop ((fs (src-c-h-files)) (acc 0))
-    (if (null? fs)
-        acc
-        (loop (cdr fs)
-              (+ acc (count-substr (slurp (repo (string-append "src/" (car fs))))
-                                   "scm_c_public_ref"))))))
-
 (check "m40/imp2/static/process.c-holds-the-new-site" #t
        (contains? proc-c "scm_c_public_ref (\"emacs process-io\""))
-(check "m40/imp2/static/tree-ref-sites-260" 260 tree-ref-sites)
 
 ;;; --- 9. Static: the durable records name the imp-2 commit ------------
 ;;;

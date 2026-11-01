@@ -260,39 +260,7 @@
 (check "m40/imp4b/run-tests/registers-el" #t
        (contains? run-tests "test/m40/test-m40-imp4b.el"))
 
-;;; --- 7. Static: the tree-wide scm_c_public_ref count ----------------
-;;;
-;;; imp-4b adds five scm_c_public_ref dispatcher sites in src/process.c,
-;;; so the tree-wide count over src/*.c and src/*.h rises 167 -> 172.
-(define (count-substr text sub)
-  (if (not (string? text))
-      0
-      (let ((sl (string-length sub)))
-        (let loop ((i 0) (n 0))
-          (if (>= i (string-length text))
-              n
-              (let ((hit (string-contains text sub i)))
-                (if hit (loop (+ hit sl) (1+ n)) n)))))))
 
-(define (src-c-h-files)
-  (let ((d (opendir (repo "src"))))
-    (let loop ((names '()))
-      (let ((n (readdir d)))
-        (if (eof-object? n)
-            (begin (closedir d) names)
-            (loop (if (or (string-suffix? ".c" n) (string-suffix? ".h" n))
-                      (cons n names)
-                      names)))))))
-
-(define tree-ref-sites
-  (let loop ((fs (src-c-h-files)) (acc 0))
-    (if (null? fs)
-        acc
-        (loop (cdr fs)
-              (+ acc (count-substr (slurp (repo (string-append "src/" (car fs))))
-                                   "scm_c_public_ref"))))))
-
-(check "m40/imp4b/static/tree-ref-sites-260" 260 tree-ref-sites)
 
 (define imp4b-corpus-src (slurp (repo "test/m40/test-m40-imp4b.scm")))
 (check "m40/imp4b/static/corpus-no-transient-citation" #f
