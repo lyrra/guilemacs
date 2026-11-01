@@ -34,6 +34,7 @@
 (princ "=== m42 imp-3 (the pty harness, cases 1-2) test suite ===\n")
 
 (require 'imp-ert-report)
+(require 'cl-lib)
 
 ;; pty-runner.el sits next to this file; test/m42/ is not on load-path.
 (let ((dir (file-name-directory (or load-file-name default-directory))))
@@ -103,6 +104,18 @@
 (ert-deftest m42-imp3/parse-many ()
   (should (equal (m42-imp3--parse "PASS a\nINFO b skipped (x)\n")
                  '(("a" . PASS) ("b" INFO "skipped (x)")))))
+
+(ert-deftest m42-imp3/runner-parses-reports-after-nonzero-exit ()
+  (cl-letf (((symbol-function 'executable-find) (lambda (_) "python3"))
+            ((symbol-function 'm42-imp3--emacs) (lambda () "emacs"))
+            ((symbol-function 'file-readable-p) (lambda (_) t))
+            ((symbol-function 'call-process)
+             (lambda (&rest _)
+               (insert "PASS a\nFAIL b bad result\nINFO c skipped (no pty)\n")
+               1)))
+    (should (equal (m42-pty--run-driver "m42-imp3" '("a" "b" "c"))
+                   '(("a" . PASS) ("b" FAIL . "bad result")
+                     ("c" INFO "skipped (no pty)"))))))
 
 (ert-deftest m42-imp3/skip-status-is-info-not-pass ()
   ;; The no-pty / no-emacs path must never look like a PASS (brief.org D3).

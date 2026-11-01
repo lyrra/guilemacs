@@ -51,6 +51,7 @@ The driver prints one report line per case on its stdout:
 A host that cannot allocate a pty (/dev/ptmx gives EACCES, errno 13)
 prints one INFO line per case and exits 0.  That is an environment-gated
 skip: never a PASS and never a FAIL.
+The driver exits 1 if any case reports FAIL, and 0 otherwise.
 
 ADDING A CASE.  Write a probe whose value is a string, give the case a
 `probe`, a `group` and an `expect`, and add it to CASES.  A probe may
@@ -1328,10 +1329,12 @@ def main(argv):
         skip_all(cases, "no pty: errno %d %s" % (err.errno, err.strerror))
         return 0
 
+    failed = False
     for case in cases:
         name, kind, detail = run_case(case, opts.emacs, opts.timeout)
         emit(kind, name, detail)
-    return 0
+        failed = failed or kind == "FAIL"
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
