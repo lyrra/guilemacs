@@ -263,7 +263,7 @@ probe: the loader must read and evaluate a real Elisp file."
                                       '("FILE *input" "FILE *output"
                                         "FILE *termscript")))
 (m53-imp1--check "pty-driver-groups"
-                 (m53-imp1--holds-all "test/pty-driver.py"
+                 (m53-imp1--holds-all "test/pty_cases.py"
                                       '("\"m42-imp3\"" "\"m42-imp4\""
                                         "\"m43-imp3\"" "\"m43-imp4\""
                                         "\"m43-imp5\""

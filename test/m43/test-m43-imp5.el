@@ -290,10 +290,10 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
 ;;; 11.4).
 
 (m43-imp5--check "pty/driver-present"
-                 (m43-imp5--file-has "test/pty-driver.py"
+                 (m43-imp5--file-has "test/pty_cases.py"
                                      "set-tty-size"))
 (m43-imp5--check "pty/driver-size-probe"
-                 (m43-imp5--file-has "test/pty-driver.py"
+                 (m43-imp5--file-has "test/pty_cases.py"
                                      "module-ref mod 'tty-size"))
 
 ;;; --- The observable size check (brief.org section 11.3) --------------

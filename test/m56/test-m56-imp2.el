@@ -176,21 +176,21 @@ host limit is a skip, never a pass (brief.org section 2)."
 
 (m56-imp2--check "case-name"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py" "\"name\": \"m56-imp2/tty-init-e2e\""))
+                  "test/pty_cases.py" "\"name\": \"m56-imp2/tty-init-e2e\""))
 (m56-imp2--check "case-group"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py" "\"group\": \"m56-imp2\""))
+                  "test/pty_cases.py" "\"group\": \"m56-imp2\""))
 (m56-imp2--check "cases-tuple"
-                 (m56-imp2--contains-p "test/pty-driver.py" "M56_IMP2_CASES = ("))
+                 (m56-imp2--contains-p "test/pty_cases.py" "M56_IMP2_CASES = ("))
 (m56-imp2--check "cases-entry"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py" "+ M58_IMP2_CASES + M58_IMP3_CASES"))
+                  "test/pty_cases.py" "+ M58_IMP2_CASES + M58_IMP3_CASES"))
 (m56-imp2--check "groups-entry"
                  ;; M58 follows this entry, and M61 follows M58.  Pin the
                  ;; adjacent pairs inside GROUPS, not the earlier case
                  ;; declaration.
                  (and (m56-imp2--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"m58-imp3\", \"m58-imp4\",")
                       (m56-imp2--contains-p
                        "test/pty-driver.py"
@@ -201,14 +201,14 @@ host limit is a skip, never a pass (brief.org section 2)."
 ;; :3470 ... :3472.
 (m56-imp2--check "output-span"
                  (m56-imp2--contains-p
-                  "test/pty-driver.py"
+                  "test/pty_cases.py"
                   "\"output_span\": (M56_IMP2_BEGIN, M56_IMP2_END)"))
 (m56-imp2--check "output-span-bytes-and-resize"
                  (and (m56-imp2--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"output_span_bytes\": M56_IMP2_OUT_BYTES")
                       (m56-imp2--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"resize\": (M56_IMP2_ROWS, M56_IMP2_COLS)")))
 (m56-imp2--check "no-stale-24-case-pin"
                  ;; The case total is 26 now (imp-2 adds one case).  Guard

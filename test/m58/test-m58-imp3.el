@@ -463,16 +463,16 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 
 (m58-imp3--check "pty/cases-and-group"
                  (and (m58-imp3--holds-all
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        '("\"m58-imp3/face-off-e2e\""
                          "\"m58-imp3/face-italic-e2e\""
                          "\"m58-imp3/face-underline-e2e\""
                          "\"m58-imp3/face-color-e2e\""
                          "\"m58-imp3/capable-p-e2e\""
                          "M58_IMP3_CASES = ("
-                         "\"m58-imp3\")"))
+                         "\"m58-imp3\""))
                       (m58-imp3--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "+ M58_IMP3_CASES")))
 
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the pty-driver
@@ -484,7 +484,7 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 ;; one, or a byte of one case could satisfy the other.
 (m58-imp3--check "pty/distinct-spans"
                  (m58-imp3--holds-all
-                  "test/pty-driver.py"
+                  "test/pty_cases.py"
                   '("M58_IMP3_OFF_BEGIN = b\"M58I3-OFF-BEGIN!\""
                     "M58_IMP3_ITALIC_BEGIN = b\"M58I3-ITA-BEGIN!\""
                     "M58_IMP3_UL_BEGIN = b\"M58I3-UL-BEGIN!\""
@@ -496,13 +496,13 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 ;; prefix.  The capable-p case reports a Lisp value, not a byte.
 (m58-imp3--check "pty/color-order-and-capable-value"
                  (and (m58-imp3--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"needles_in_order\": (M58_IMP3_BOLD, M58_IMP3_SETAF_RED,")
                       (m58-imp3--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"expect_terminfo\": ((\"bold\", \"bold\"), (\"italic\", \"sitm\"),")
                       (m58-imp3--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "display-supports-face-attributes-p")))
 
 ;;; --- U5. The cross-corpus re-pins -----------------------------------

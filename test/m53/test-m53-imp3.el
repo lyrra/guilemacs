@@ -161,10 +161,10 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
 
 (m53-imp3--check "driver-case-name"
                  (m53-imp3--contains-p
-                  "test/pty-driver.py" "m53-imp3/vertical-slice-e2e"))
+                  "test/pty_cases.py" "m53-imp3/vertical-slice-e2e"))
 (m53-imp3--check "driver-group"
                  (m53-imp3--contains-p
-                  "test/pty-driver.py" "\"m53-imp3\""))
+                  "test/pty_cases.py" "\"m53-imp3\""))
 
 ;;; --- S2. The slice pins ---------------------------------------------
 
@@ -179,7 +179,7 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
 (m53-imp3--check "driver-mode-readback-tcgetattr"
                  (m53-imp3--contains-p "test/pty-driver.py" "tcgetattr"))
 (m53-imp3--check "driver-wait-exit"
-                 (m53-imp3--contains-p "test/pty-driver.py" "\"wait_exit\""))
+                 (m53-imp3--contains-p "test/pty_cases.py" "\"wait_exit\""))
 (m53-imp3--check "driver-load-fixture"
                  (m53-imp3--contains-p "test/pty-driver.py" "load_fixture"))
 

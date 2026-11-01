@@ -309,10 +309,10 @@ nil, which prints FAIL (an absent src/ file is a real error, not a pass)."
 ;;; 11.4).
 
 (m43-imp4--check "pty/driver-present"
-                 (m43-imp4--file-has "test/pty-driver.py"
+                 (m43-imp4--file-has "test/pty_cases.py"
                                      "reset-tty-mode"))
 (m43-imp4--check "pty/driver-mode-save"
-                 (m43-imp4--file-has "test/pty-driver.py"
+                 (m43-imp4--file-has "test/pty_cases.py"
                                      "module-ref mod 'tty-get-mode"))
 
 ;;; --- The observable restore check (brief.org section 11.3) -----------

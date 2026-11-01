@@ -284,7 +284,7 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
                                                 "test/m52/test-m52-imp9.el")))
                    (and (integerp imp8) (integerp imp9) (< imp8 imp9))))
 (m52-imp9--check "pty-driver-groups-m52"
-                 (m52-imp9--holds-all "test/pty-driver.py"
+                 (m52-imp9--holds-all "test/pty_cases.py"
                                       '("\"m52-imp3\"" "\"m52-imp4\""
                                         "\"m52-imp5\"" "\"m52-imp6\""
                                         "\"m52-imp7\"" "\"m52-imp8\"")))

@@ -225,10 +225,10 @@ error, not a pass."
 (setq m54-imp4--group 's4)
 
 (m54-imp4--check "pty-driver-group-m54-imp4"
-                 (m54-imp4--contains-p "test/pty-driver.py" "\"m54-imp4\""))
+                 (m54-imp4--contains-p "test/pty_cases.py" "\"m54-imp4\""))
 (m54-imp4--check "pty-driver-case-name"
                  (m54-imp4--contains-p
-                  "test/pty-driver.py" "m54-imp4/tab-policy-e2e"))
+                  "test/pty_cases.py" "m54-imp4/tab-policy-e2e"))
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the 2 case-count
 ;; pins are REMOVED, not re-pinned.  A case count is not a behavior, and
 ;; the driver's own --selftest holds the count checks at

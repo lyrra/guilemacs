@@ -316,7 +316,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (m58-imp4--check "pty/case-pins-value-not-bytes"
                  (let ((case-region (m58-imp4--region
-                                     "test/pty-driver.py"
+                                     "test/pty_cases.py"
                                      "M58_IMP4_CASES = ("
                                      "# M61 imp-1: the opaque per-TTY handle")))
                    (and (stringp case-region)
@@ -344,7 +344,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;; canonicalization; the third switch pins a gate that fires twice.
 (m58-imp4--check "pty/switch-is-the-trigger"
                  (let ((probe (m58-imp4--region
-                               "test/pty-driver.py"
+                               "test/pty_cases.py"
                                "M58_IMP4_PROBE = r\"\"\""
                                "\"\"\"")))
                    (and (stringp probe)
@@ -360,7 +360,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 
 (m58-imp4--check "pty/skip-is-narrow"
                  (let ((probe (m58-imp4--region
-                               "test/pty-driver.py"
+                               "test/pty_cases.py"
                                "M58_IMP4_PROBE = r\"\"\""
                                "\"\"\"")))
                    (and (stringp probe)
@@ -368,7 +368,7 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
                         (eql 1 (m58-imp4--count-in probe "catch"))
                         (string-match-p "(catch #t (lambda () (make-frame))" probe)
                         ;; The skip prefix is the child's OWN report.
-                        (m58-imp4--contains-p "test/pty-driver.py"
+                        (m58-imp4--contains-p "test/pty_cases.py"
                                               "M58_IMP4_SKIP = \"m58-imp4-skip:\""))))
 
 ;;; --- T3. The real path ----------------------------------------------
@@ -650,13 +650,13 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;; result is in the M58_IMP4 group comment of test/pty-driver.py.
 (m58-imp4--check "negative-control-record"
                  (and (m58-imp4--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "Negative control")
                       (m58-imp4--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "forced to return 0")
                       (m58-imp4--contains-p
-                       "test/pty-driver.py"
+                       "test/pty_cases.py"
                        "\"8 8 8\", not \"8 0 8\"")))
 
 ;; cr.org sections 7 and 9.3: the 3 limits must be in the durable

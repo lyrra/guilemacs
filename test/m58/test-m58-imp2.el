@@ -256,20 +256,20 @@ host limit is a skip, never a pass."
 (setq m58-imp2--group 't2)
 
 (m58-imp2--check "pty-case-name-live"
-                 (m58-imp2--live-p "test/pty-driver.py"
+                 (m58-imp2--live-p "test/pty_cases.py"
                                    "\"m58-imp2/face-appearance-e2e\""))
 
 (m58-imp2--check "pty-case-tuple-and-CASES"
-                 (m58-imp2--holds-all "test/pty-driver.py"
+                 (m58-imp2--holds-all "test/pty_cases.py"
                                       '("M58_IMP2_CASES = ("
                                         "+ M58_IMP2_CASES")))
 
 (m58-imp2--check "pty-case-group-registered"
-                 (and (m58-imp2--live-p "test/pty-driver.py"
-                                        "\"m58-imp2\")")
+                 (and (m58-imp2--live-p "test/pty_cases.py"
+                                        "\"m58-imp2\"")
                       (m58-imp2--holds-all
-                       "test/pty-driver.py"
-                       '("GROUPS = (" "\"m58-imp2\")"))))
+                       "test/pty_cases.py"
+                       '("GROUPS = (" "\"m58-imp2\""))))
 
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the pty-driver
 ;; case-count pin is REMOVED, not re-pinned.  A case count is not a
@@ -279,7 +279,7 @@ host limit is a skip, never a pass."
 ;; M61 imp-1 re-pin: the region now ends at the m61-imp1 block, because
 ;; the m61-imp1 group legitimately uses output_span_bytes.  Without this
 ;; the pin would read a later act's case and fail for the wrong reason.
-(let ((face-region (m58-imp2--region "test/pty-driver.py"
+(let ((face-region (m58-imp2--region "test/pty_cases.py"
                                      "M58_IMP2_BEGIN = "
                                      "# M61 imp-1: the opaque per-TTY handle")))
   (m58-imp2--check "pty-case-span-requires-shape"
@@ -304,7 +304,7 @@ host limit is a skip, never a pass."
                       (m58-imp2--contains-p "test/pty-driver.py"
                                             "%(prelude)s")
                       (let ((face-region
-                             (m58-imp2--region "test/pty-driver.py"
+                             (m58-imp2--region "test/pty_cases.py"
                                                "M58_IMP2_PRELUDE = r\"\"\""
                                                "\"\"\"")))
                         (and (stringp face-region)
