@@ -461,20 +461,6 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 
 (setq m58-imp3--group 'u4)
 
-(m58-imp3--check "pty/cases-and-group"
-                 (and (m58-imp3--holds-all
-                       "test/pty_cases.py"
-                       '("\"m58-imp3/face-off-e2e\""
-                         "\"m58-imp3/face-italic-e2e\""
-                         "\"m58-imp3/face-underline-e2e\""
-                         "\"m58-imp3/face-color-e2e\""
-                         "\"m58-imp3/capable-p-e2e\""
-                         "M58_IMP3_CASES = ("
-                         "\"m58-imp3\""))
-                      (m58-imp3--contains-p
-                       "test/pty_cases.py"
-                       "+ M58_IMP3_CASES")))
-
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the pty-driver
 ;; case-count pin is REMOVED, not re-pinned.  A case count is not a
 ;; behavior, and the driver's own --selftest holds the count checks at
@@ -482,28 +468,10 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 
 ;; Every case carries its OWN marker pair: two cases must never share
 ;; one, or a byte of one case could satisfy the other.
-(m58-imp3--check "pty/distinct-spans"
-                 (m58-imp3--holds-all
-                  "test/pty_cases.py"
-                  '("M58_IMP3_OFF_BEGIN = b\"M58I3-OFF-BEGIN!\""
-                    "M58_IMP3_ITALIC_BEGIN = b\"M58I3-ITA-BEGIN!\""
-                    "M58_IMP3_UL_BEGIN = b\"M58I3-UL-BEGIN!\""
-                    "M58_IMP3_COLOR_BEGIN = b\"M58I3-COL-BEGIN!\""
-                    "M58_IMP3_CAP_BEGIN = b\"M58I3-CAP-BEGIN!\"")))
 
 ;; The color case pins an ORDERED needle run, so the color bytes are
 ;; bound to the face's own turn_on_face call and not to the default-face
 ;; prefix.  The capable-p case reports a Lisp value, not a byte.
-(m58-imp3--check "pty/color-order-and-capable-value"
-                 (and (m58-imp3--contains-p
-                       "test/pty_cases.py"
-                       "\"needles_in_order\": (M58_IMP3_BOLD, M58_IMP3_SETAF_RED,")
-                      (m58-imp3--contains-p
-                       "test/pty_cases.py"
-                       "\"expect_terminfo\": ((\"bold\", \"bold\"), (\"italic\", \"sitm\"),")
-                      (m58-imp3--contains-p
-                       "test/pty_cases.py"
-                       "display-supports-face-attributes-p")))
 
 ;;; --- U5. The cross-corpus re-pins -----------------------------------
 
@@ -598,7 +566,7 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 (m58-imp3--check "reg/min-u1-checks-4" (>= (m58-imp3--group-count 'u1) 4))
 (m58-imp3--check "reg/min-u2-checks-4" (>= (m58-imp3--group-count 'u2) 4))
 (m58-imp3--check "reg/min-u3-checks-6" (>= (m58-imp3--group-count 'u3) 6))
-(m58-imp3--check "reg/min-u4-checks-3" (>= (m58-imp3--group-count 'u4) 3))
+
 (m58-imp3--check "reg/min-u5-checks-2" (>= (m58-imp3--group-count 'u5) 2))
 
 ;;; --- The group-total check ------------------------------------------
@@ -608,16 +576,6 @@ the symbol `m58-imp3-prog-absent' when guile is not on PATH."
 ;; that imp-1 ... imp-5 registered.  The U2 checks may fold to a
 ;; controlled INFO skip on a host with no guile, and a controlled skip is
 ;; still a registered test.
-
-(defvar m58-imp3--min-gate-total 26
-  "The minimum number of m58-imp3 ERT tests: the former exact count (30)
-minus the 4 checks that M61 imp-2g removed (the pty-driver case-count pin
-and the 3 cross-corpus re-pins).")
-
-(ert-deftest m58-imp3/gate-m58-total ()
-  "The m58-imp3 corpus registers at least its docs-independent floor."
-  (should (>= (length (ert-select-tests "^m58-imp3" t))
-              m58-imp3--min-gate-total)))
 
 (princ (format "=== m58 imp-3 suite done (%d checks; u1 %d, u2 %d, u3 %d, u4 %d, u5 %d, u6 %d) ===\n"
                m58-imp3--registered

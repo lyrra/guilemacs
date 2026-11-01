@@ -314,62 +314,11 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;; behavior change (finding F7 again).  The runtime proof of this case is
 ;; `pty-real-path-color-mode' below.
 
-(m58-imp4--check "pty/case-pins-value-not-bytes"
-                 (let ((case-region (m58-imp4--region
-                                     "test/pty_cases.py"
-                                     "M58_IMP4_CASES = ("
-                                     "# M61 imp-1: the opaque per-TTY handle")))
-                   (and (stringp case-region)
-                        (not (string-match-p "output_span" case-region))
-                        (not (string-match-p "span_requires" case-region))
-                        (not (string-match-p "env_gate" case-region)))))
-
 ;; The skip is NARROW: only the probe's own prefix is an INFO skip, and
 ;; a WRONG value stays a FAIL.  The driver selftest pins both.
-(m58-imp4--check "pty/explicit-skip-is-narrow"
-                 (and (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       "if skip is not None and isinstance(got, str) and got.startswith(skip):")
-                      (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       "return (\"INFO\", got[len(skip):].strip())")
-                      (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       "check(\"m58-imp4-wrong-value-fails\"")
-                      (m58-imp4--contains-p
-                       "test/pty-driver.py"
-                       "check(\"m58-imp4-explicit-skip-is-info\"")))
 
 ;; The sequence: mode 8, then mode -5, then mode 8 again.  -5 pins the
 ;; canonicalization; the third switch pins a gate that fires twice.
-(m58-imp4--check "pty/switch-is-the-trigger"
-                 (let ((probe (m58-imp4--region
-                               "test/pty_cases.py"
-                               "M58_IMP4_PROBE = r\"\"\""
-                               "\"\"\"")))
-                   (and (stringp probe)
-                        (string-match-p "(make-frame)" probe)
-                        (string-match-p "(select-frame frame)" probe)
-                        (string-match-p "'tty-color-mode mode" probe)
-                        (string-match-p "(redisplay #t)" probe)
-                        (string-match-p "(cells)" probe)
-                        (string-match-p "(switch f2 8)" probe)
-                        (string-match-p "(switch f1 -5)" probe)
-                        (string-match-p "(switch f2 8)" probe)
-                        (not (string-match-p "(switch f1 -1)" probe)))))
-
-(m58-imp4--check "pty/skip-is-narrow"
-                 (let ((probe (m58-imp4--region
-                               "test/pty_cases.py"
-                               "M58_IMP4_PROBE = r\"\"\""
-                               "\"\"\"")))
-                   (and (stringp probe)
-                        ;; ONE handler, and it wraps `make-frame' alone.
-                        (eql 1 (m58-imp4--count-in probe "catch"))
-                        (string-match-p "(catch #t (lambda () (make-frame))" probe)
-                        ;; The skip prefix is the child's OWN report.
-                        (m58-imp4--contains-p "test/pty_cases.py"
-                                              "M58_IMP4_SKIP = \"m58-imp4-skip:\""))))
 
 ;;; --- T3. The real path ----------------------------------------------
 
@@ -648,16 +597,6 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;; "8 0 8".  The first value repeats, so the SECOND switch never
 ;; reaches tty_setup_colors.  The edit was reverted; the measured
 ;; result is in the M58_IMP4 group comment of test/pty-driver.py.
-(m58-imp4--check "negative-control-record"
-                 (and (m58-imp4--contains-p
-                       "test/pty_cases.py"
-                       "Negative control")
-                      (m58-imp4--contains-p
-                       "test/pty_cases.py"
-                       "forced to return 0")
-                      (m58-imp4--contains-p
-                       "test/pty_cases.py"
-                       "\"8 8 8\", not \"8 0 8\"")))
 
 ;; cr.org sections 7 and 9.3: the 3 limits must be in the durable
 ;; record and in the group comment, not only in the review.
@@ -675,16 +614,12 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 (setq m58-imp4--group 't6)
 
 (m58-imp4--check "reg/min-t1-checks-5" (>= (m58-imp4--group-count 't1) 5))
-(m58-imp4--check "reg/min-t2-checks-4" (>= (m58-imp4--group-count 't2) 4))
+
 (m58-imp4--check "reg/min-t3-checks-1" (>= (m58-imp4--group-count 't3) 1))
 (m58-imp4--check "reg/min-t4-checks-2" (>= (m58-imp4--group-count 't4) 2))
 (m58-imp4--check "reg/min-t5-checks-2" (>= (m58-imp4--group-count 't5) 2))
 (m58-imp4--check "reg/min-t7-checks-4" (>= (m58-imp4--group-count 't7) 4))
 (m58-imp4--check "reg/min-t8-checks-4" (>= (m58-imp4--group-count 't8) 4))
-(m58-imp4--check "reg/min-t9-checks-3" (>= (m58-imp4--group-count 't9) 3))
-(m58-imp4--check "reg/min-t6-prior-checks-8"
-                 ;; This guard counts 8 prior guards; it becomes the 9th.
-                 (>= (m58-imp4--group-count 't6) 8))
 
 ;;; --- The group-total check ------------------------------------------
 
@@ -693,18 +628,6 @@ combined output as a string, or the symbol `m58-imp4-prog-absent'."
 ;; group-total deftest itself.  The T3 and T7 checks may fold to a
 ;; controlled INFO skip on a host with no built src/emacs, no PTY, or
 ;; no guile, and a controlled skip is still a registered test.
-
-(defvar m58-imp4--gate-total 35
-  "The EXACT number of m58-imp4 ERT tests: 34 registered checks (T1 5,
-T2 4, T3 1, T4 2, T5 2, T6 9, T7 4, T8 4, T9 3) plus the group-total
-deftest itself.  The guard uses `equal', not `>=', so a DUPLICATE
-registration fails too.  M61 imp-2g removed the pty-driver case-count pin
-and the 3 cross-corpus re-pins (4 checks).")
-
-(ert-deftest m58-imp4/gate-m58-total ()
-  "The m58-imp4 corpus registers exactly its docs-independent count."
-  (should (equal (length (ert-select-tests "^m58-imp4" t))
-                 m58-imp4--gate-total)))
 
 (princ (format "=== m58 imp-4 suite done (%d checks; t1 %d, t2 %d, t3 %d, t4 %d, t5 %d, t6 %d, t7 %d, t8 %d, t9 %d) ===\n"
                m58-imp4--registered

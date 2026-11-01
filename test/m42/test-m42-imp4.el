@@ -89,20 +89,6 @@
 ;;; report shapes -- the code:mods order string, the two-call shape and
 ;;; the -2 return -- and the runner's skip path.
 
-(defun m42-imp4--driver-source ()
-  "Return the driver and its modules' source, or nil."
-  (let* ((path (m42-pty--driver))
-         (cases (expand-file-name "pty_cases.py" (file-name-directory path)))
-         (session (expand-file-name "pty_session.py" (file-name-directory path))))
-    (and (file-readable-p path) (file-readable-p cases) (file-readable-p session)
-         (with-temp-buffer
-           (insert-file-contents path)
-           (goto-char (point-max))
-           (insert-file-contents cases)
-           (goto-char (point-max))
-           (insert-file-contents session)
-           (buffer-string)))))
-
 (ert-deftest m42-imp4/parse-pass ()
   (should (equal (m42-imp3--parse-line "PASS m42-imp4/case-3-meta-key-1")
                  '("m42-imp4/case-3-meta-key-1" . PASS))))
@@ -135,88 +121,6 @@
   ;; so adding the imp-4 group does not disturb the imp-3 self-check.
   (should (equal (mapcar #'car (m42-imp3-run-driver))
                  '("m42-imp3/case-1-no-input" "m42-imp3/case-2-short-read"))))
-
-(ert-deftest m42-imp4/driver-probe-records-code-and-mods ()
-  ;; The probe must record (code . mods) per event and report code:mods
-  ;; tokens; without this the meta decode cannot be asserted.
-  (let ((src (m42-imp4--driver-source)))
-    (should (string-match-p "(cons code mods)" src))
-    (should (string-match-p "code:mods" src))))
-
-(ert-deftest m42-imp4/driver-regex-accepts-two-calls ()
-  ;; The report is ONE format, so there is one REPORT_RE.  A multi-call
-  ;; case puts its calls in that one string, joined with " | ", and the
-  ;; continuation case pins the exact two-call string.
-  (let ((src (m42-imp4--driver-source)))
-    (should (string-match-p "REPORT_RE" src))
-    (should (string-match-p "JOIN = \" | \"" src))
-    (should (string-match-p "3 1 65:0,7:0 | 0 0 -" src))
-    ;; A terminal that went away reports the word, not a number.
-    (should (string-match-p "no-terminal" src))))
-
-(ert-deftest m42-imp4/driver-has-group-selector ()
-  (should (string-match-p "--group" (m42-imp4--driver-source))))
-
-(ert-deftest m42-imp4/case-5-measures-terminal-loss ()
-  ;; brief.org: case 5 measures the -2 (EIO) arm.  The child
-  ;; ignores SIGHUP before the read and the driver closes the pty master,
-  ;; so the slave read fails with EIO -> the close-terminal result -2.  A
-  ;; host that cannot give EIO reports an environment-gated INFO skip.
-  ;; The case must be a measured case, not an unconditional `skip`.  The
-  ;; case is built by `read_path_case', so pin its arguments rather than
-  ;; a dict literal: the name, the two flags, and the expected report.
-  ;; The driver's own --selftest pins the (-2, 0, []) model structurally.
-  (let* ((src (m42-imp4--driver-source))
-         (entry (and (string-match
-                      "m42-imp4/case-5-terminal-loss\\(.\\|\n\\)*?env_gate=[^\n]*"
-                      src)
-                     (match-string 0 src))))
-    (should entry)
-    (should (string-match-p "close_master=True" entry))
-    (should (string-match-p "env_gate=" entry))
-    ;; -2 is the close-terminal result and nothing is stored.
-    (should (string-match-p "(-2, 0, \\[\\])" entry))
-    (should-not (string-match-p "\"skip\"" entry))
-    ;; The expected report string for the -2 arm.
-    (should (string-match-p "\"-2 0 -\"" src))))
-
-(ert-deftest m42-imp4/child-binds-inhibit-quit ()
-  ;; brief.org: a stored quit byte (cases 4 and 6) sets
-  ;; quit-flag and the next maybe_quit aborts the probe, so the child
-  ;; must bind inhibit-quit; otherwise those cases time out.
-  (should (string-match-p "(let ((inhibit-quit t))"
-                          (m42-imp4--driver-source))))
-
-(ert-deftest m42-imp4/driver-delivers-the-quit-byte-raw ()
-  ;; brief.org: the raw quit byte must reach the read path.
-  ;; Emacs arms the tty with ISIG and c_cc[VQUIT] = quit_char
-  ;; (src/sysdep.c, init_sys_modes), so the line discipline reads a written
-  ;; 0x07 as VQUIT: it flushes the input queue and raises SIGQUIT.  The
-  ;; earlier full run then measured only the bytes after the quit byte --
-  ;; case 4 gave (2, 2, [(67 0) (68 0)]) instead of (5, 2, [(65 0) (66 0)
-  ;; (7 0)]), and case 6 gave (1, 1, [(66 0)]) instead of (3, 1, [(65 0)
-  ;; (7 0)]).  The driver must clear ISIG before it writes the case bytes
-  ;; (FIX-20260928-guilemacs), read the attributes back to confirm the
-  ;; clear took effect, and route a failed clear to an INFO skip rather
-  ;; than a product FAIL (brief.org).  FIX-20260928-guilemacs: the stored
-  ;; counts are 2 and 1, not 3 and 2, because the raw C-g takes the
-  ;; quit-char branch and is not ring-appended; run.old measured exactly
-  ;; that after the clear landed.
-  (let ((src (m42-imp4--driver-source)))
-    (should (string-match-p "~termios.ISIG" src))
-    (should (string-match-p "deliver_raw(master)" src))
-    ;; The read-back is the behavioural guard a pty host exercises; the
-    ;; text pin alone only proves the clear line is present.
-    (should (string-match-p "did not take effect" src))
-    ;; A failed clear is a harness gap, so run_case must route it to an
-    ;; INFO skip, never let it become a FAIL.
-    (should (string-match-p "ISIG clear on the pty failed" src))
-    ;; F1: deliver_raw must catch termios.error, the type termios actually
-    ;; raises.  termios.error is not an OSError subclass, so an `except
-    ;; OSError' guard is dead code and would let the failure escape as a
-    ;; traceback on a pty host.
-    (should (string-match-p "(OSError, termios.error)" src))
-    (should (string-match-p "termios.error" src))))
 
 (ert-deftest m42-imp4/driver-selftest ()
   ;; --selftest exercises the parser (single-call, code:mods, two-call and

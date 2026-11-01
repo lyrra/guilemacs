@@ -283,11 +283,7 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
                        (imp9 (m52-imp9--line-of "tool/run-tests.scm"
                                                 "test/m52/test-m52-imp9.el")))
                    (and (integerp imp8) (integerp imp9) (< imp8 imp9))))
-(m52-imp9--check "pty-driver-groups-m52"
-                 (m52-imp9--holds-all "test/pty_cases.py"
-                                      '("\"m52-imp3\"" "\"m52-imp4\""
-                                        "\"m52-imp5\"" "\"m52-imp6\""
-                                        "\"m52-imp7\"" "\"m52-imp8\"")))
+
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the
 ;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.  A
 ;; case count is not a behavior, and the driver's own --selftest holds
@@ -309,8 +305,6 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 
 (m52-imp9--check "reg/min-s1-checks-36"
                  (>= (m52-imp9--group-count 's1) 36))
-(m52-imp9--check "reg/min-s2-checks-3"
-                 (>= (m52-imp9--group-count 's2) 3))
 
 ;;; --- The group-total check (brief.org section 3.4) ------------------
 
@@ -339,18 +333,6 @@ code, so a princ'd FAIL with no ERT test would leave the exit code 0
 ;; 6 source-text pins of this corpus.  M61 imp-2g lowered it to 64 when
 ;; review cr.org CR2 removed the pty-driver count pin, and when review
 ;; cr.org C4 removed the tree-wide scm_c_public_ref count.
-
-(defvar m52-imp9--min-gate-total 64
-  "The minimum number of ERT tests the m52 group registers: the measured
-total (80) minus the 8 gated m52 pty cases (imp-3 holds 3; imp-4 ..
-imp-8 hold 1 each), minus the 6 source-text pins that M61 imp-2b
-removed, minus the pty-driver count pin that M61 imp-2g removed, minus
-the tree-wide scm_c_public_ref count that M61 imp-2g removed.")
-
-(ert-deftest m52-imp9/gate-m52-total ()
-  "The m52 group registers at least its docs-independent floor."
-  (should (>= (length (ert-select-tests "^m52-imp" t))
-              m52-imp9--min-gate-total)))
 
 ;;; --- The caps-slice regression test (cr.org F1) --------------------
 

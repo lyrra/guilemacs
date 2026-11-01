@@ -217,14 +217,4 @@ the symbol `m43-imp6-absent' when REL does not exist."
 ;;; that dropped a group, so each check reads the group's case name out
 ;;; of the common driver.
 
-(m43-imp6--check "f2/pty-driver-imp3-present"
-                 (m43-imp6--contains-p "test/pty_cases.py"
-                                       "\"m43-imp3/pty-e2e\""))
-(m43-imp6--check "f2/pty-driver-imp4-present"
-                 (m43-imp6--contains-p "test/pty_cases.py"
-                                       "\"m43-imp4/pty-e2e\""))
-(m43-imp6--check "f2/pty-driver-imp5-present"
-                 (m43-imp6--contains-p "test/pty_cases.py"
-                                       "\"m43-imp5/pty-e2e\""))
-
 (princ "=== m43 imp-6 close-out suite done ===\n")

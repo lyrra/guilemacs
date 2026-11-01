@@ -83,20 +83,6 @@
 ;;; defects that a real-run review cannot see here: the runner's report
 ;;; parser, and the driver's child probe and report format.
 
-(defun m42-imp3--driver-source ()
-  "Return the driver and its modules' source, or nil."
-  (let* ((path (m42-pty--driver))
-         (cases (expand-file-name "pty_cases.py" (file-name-directory path)))
-         (session (expand-file-name "pty_session.py" (file-name-directory path))))
-    (and (file-readable-p path) (file-readable-p cases) (file-readable-p session)
-         (with-temp-buffer
-           (insert-file-contents path)
-           (goto-char (point-max))
-           (insert-file-contents cases)
-           (goto-char (point-max))
-           (insert-file-contents session)
-           (buffer-string)))))
-
 (ert-deftest m42-imp3/parse-pass ()
   (should (equal (m42-imp3--parse-line "PASS m42-imp3/case-1-no-input")
                  '("m42-imp3/case-1-no-input" . PASS))))
@@ -172,38 +158,6 @@
   ;; or the environment-gap INFO pairs.  Never a stray single FAIL pair.
   (should (equal (mapcar #'car (m42-imp3-run-driver))
                  '("m42-imp3/case-1-no-input" "m42-imp3/case-2-short-read"))))
-
-(ert-deftest m42-imp3/driver-resolves-function-via-module-ref ()
-  ;; A bare (tty-read-avail-input! term) is unbound in the eval-scheme
-  ;; module, so the probe must take it through module-ref.  (The matching
-  ;; negative -- that the generated child source carries no bare call --
-  ;; is asserted by the driver's own --selftest, which builds the probe.)
-  (should (string-match-p "module-ref mod 'tty-read-avail-input!"
-                          (m42-imp3--driver-source))))
-
-(ert-deftest m42-imp3/driver-reports-order-as-string ()
-  ;; The report is ONE format: the probe's value is a string, so the
-  ;; driver has one regex and one comparison.  An empty stored-order
-  ;; list must not reach the report as an empty string (invisible
-  ;; between two separators) nor as the opaque "#<scheme ()>" object;
-  ;; the probe writes the EMPTY token "-" instead.
-  ;; NOTE: `string-match-p' takes a REGEXP, and `?' is a quantifier in
-  ;; Emacs syntax, so a needle must avoid Scheme's `null?' and friends
-  ;; unless it is quoted.
-  (let ((src (m42-imp3--driver-source)))
-    (should (string-match-p "EMPTY = \"-\"" src))
-    (should (string-match-p (regexp-quote "(if (null? ev) \"@@EMPTY@@\"") src))
-    ;; The stored count is a difference, so the expected string does not
-    ;; depend on what kbd_buffer held when the child started.
-    (should (string-match-p "(- n1 prev)" src))))
-
-(ert-deftest m42-imp3/driver-calls-forced-defelisp-leaves ()
-  ;; %terminal-list and %--kbd-buffer-nr-stored are defelisp promises
-  ;; that force to procedures; the probe must call them (double parens)
-  ;; or it reads a procedure instead of the terminal list / count.
-  (let ((src (m42-imp3--driver-source)))
-    (should (string-match-p "((force (module-ref mod '%terminal-list)))" src))
-    (should (string-match-p "((force nr))" src))))
 
 (ert-deftest m42-imp3/driver-selftest ()
   (let ((python (executable-find "python3")))

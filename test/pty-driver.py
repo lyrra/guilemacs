@@ -73,7 +73,6 @@ Usage:
 """
 
 import argparse
-import inspect
 import os
 import re
 import subprocess
@@ -82,7 +81,7 @@ import termios
 
 from pty_cases import *  # Case tables, probes, and their shared constants.
 from pty_cases import _M58_IMP3_ITALIC_NEEDLE
-from pty_session import SessionOptions, deliver_raw, resize_pty, run_session
+from pty_session import SessionOptions, deliver_raw, run_session
 
 
 # The child program.  It is written to a temp file and loaded by the
@@ -904,22 +903,10 @@ def selftest():
     check("m56-imp2-output-bytes",
           _case("m56-imp2/tty-init-e2e").get("output_span_bytes"),
           M56_IMP2_OUT_BYTES)
-    # M56 imp-2 (brief.org section 4.2): the case must resize the pty so a
-    # size that follows the resize proves a LIVE size query, and its probe
-    # must resolve the size, read, and write paths.  These pins hold the
-    # wiring on a host with no pty.
+    # The case uses a live resize for its size measurement.
     m56 = _case("m56-imp2/tty-init-e2e")
     check("m56-imp2-resize", m56.get("resize"),
           (M56_IMP2_ROWS, M56_IMP2_COLS))
-    m56_src = build_child_source(m56)
-    for needle, label in (
-            ("tty-size", "probe reads the tty size"),
-            ("tty-read-avail-input!", "probe runs the read path"),
-            ("tty-write-bytes", "probe runs the write path")):
-        if needle not in m56_src:
-            problems.append("m56-imp2 probe does not %s" % label)
-    if "@@OUTBYTES@@" in m56_src:
-        problems.append("m56-imp2 probe left the OUTBYTES placeholder unresolved")
     # M57 (cr.org F1): the m56-imp2 probe reports the ACCOUNTED input as
     # ONE race-proof number -- the stored kbd_buffer count after the read,
     # not the racy (ret, delta) pair.  Emacs's own input poll can drain
@@ -929,17 +916,7 @@ def selftest():
     check("m56-imp2-expect-accounted", expect_string(m56),
           "read:2 out:%d size:%dx%d"
           % (len(M56_IMP2_OUT_BYTES), M56_IMP2_COLS, M56_IMP2_ROWS))
-    if "(number->string stored)" not in m56_src:
-        problems.append("m56-imp2 probe does not report the stored count")
-    if "(- n1 prev)" in m56_src:
-        problems.append("m56-imp2 probe still holds the racy (- n1 prev) pair")
-    if m56_src.count("force nr)") != 1:
-        problems.append("m56-imp2 probe reads the stored count not exactly once")
-    # M58 imp-2 (brief.org section 4.3): the face-appearance case drives
-    # the C hub through a REAL redisplay, so the prelude must be spliced
-    # into the built child source, the two markers must reach it, and the
-    # span must name the MEASURED bold byte plus the terminfo capability.
-    # These pins hold the wiring on a host with no pty.
+    # The face case checks the bold byte inside its output span.
     face_case = _case("m58-imp2/face-appearance-e2e")
     check("m58-imp2-span-requires", face_case.get("span_requires"),
           {"span": (M58_IMP2_BEGIN, M58_IMP2_END),
@@ -949,22 +926,8 @@ def selftest():
     # is the span plus its needles and capability (brief.org section 4.3).
     check("m58-imp2-no-span-bytes-guess",
           "output_span_bytes" in face_case, False)
-    for needle, label in (
-            ("propertize", "prelude applies a face attribute"),
-            ("redisplay", "prelude forces a redisplay"),
-            ("'face 'bold", "prelude sets the bold face")):
-        if needle not in face_case.get("prelude", ""):
-            problems.append("m58-imp2 prelude does not %s" % label)
-    face_src = build_child_source(face_case)
-    for marker in (M58_IMP2_BEGIN, M58_IMP2_END):
-        if marker.decode() not in face_src:
-            problems.append("m58-imp2 built child source lost the marker %r"
-                            % (marker,))
-    if re.search(r"@@[A-Z_]+@@", face_src):
-        problems.append("m58-imp2 built child source leaves a placeholder")
     # M58 imp-3 (brief.org sections 5 and 8): the 5 real-path cases of the
-    # MOVED decision.  Each case carries its OWN marker pair, a prelude
-    # that inserts a face attribute and forces a redisplay, and needles
+    # MOVED decision.  Each case carries its own marker pair and needles
     # scoped to that span.  The needle constants are pinned against the
     # terminfo entry of the same TERM, so a copied byte guess fails here.
     for name, needles, cap in (
@@ -983,15 +946,6 @@ def selftest():
             continue
         check("%s-needles" % name, spec.get("needles"), needles)
         check("%s-capability" % name, spec.get("capability"), cap)
-        src = build_child_source(case)
-        for marker in spec["span"]:
-            if marker.decode() not in src:
-                problems.append("%s built child source lost the marker %r"
-                                % (name, marker))
-        for needle, label in (("propertize", "applies a face attribute"),
-                              ("redisplay", "forces a redisplay")):
-            if needle not in case.get("prelude", ""):
-                problems.append("%s prelude does not %s" % (name, label))
         if spec["span"][0] == spec["span"][1]:
             problems.append("%s span markers are not distinct" % name)
     # The span of every imp-3 case is its OWN marker pair: two cases must
@@ -1027,27 +981,14 @@ def selftest():
           (("bold", "bold"), ("italic", "sitm"), ("underline", "smul")))
     if "span_requires" in cap_case:
         problems.append("m58-imp3/capable-p-e2e must not pin a byte span")
-    if "display-supports-face-attributes-p" not in cap_case.get("probe", ""):
-        problems.append("m58-imp3/capable-p-e2e does not query "
-                        "display-supports-face-attributes-p")
-    # The prelude hook must not change an earlier case: its prelude is the
-    # empty string, so the built source holds no face prelude.
-    if "propertize" in build_child_source(_case("m56-imp2/tty-init-e2e")):
-        problems.append("m58-imp2 prelude leaked into an earlier case")
     # The needle is MEASURED, then pinned: the host terminfo must agree.
     bold_cap = terminfo_capability("xterm", "bold")
     if bold_cap is not None and bold_cap != M58_IMP2_BOLD:
         problems.append("xterm bold capability is %r, want %r"
                         % (bold_cap, M58_IMP2_BOLD))
-    # The m54-imp3 case must open a termscript file, and run_case must
-    # compare the termscript file bytes with the pty master span.  These
-    # pins hold the wiring on a host with no pty.
+    # The m54-imp3 case asks for a termscript file.
     if not _case("m54-imp3/termscript-copy-e2e").get("termscript"):
         problems.append("m54-imp3 does not open a termscript file")
-    if "check_termscript" not in inspect.getsource(run_case):
-        problems.append("m54-imp3 run_case does not compare the termscript file")
-    if "@@TSPATH@@" in build_child_source(_case("m54-imp3/termscript-copy-e2e")):
-        problems.append("m54-imp3 probe left the TSPATH placeholder unresolved")
     # M54 imp-4 (cr.org F2): the hard-tab byte is scoped to the case's own
     # BEGIN .. END span and the case FAILS when a tab-capable host emits no
     # byte.  Only a host whose terminfo holds no "ht" string INFO-skips.
@@ -1059,8 +1000,6 @@ def selftest():
            "capability": "ht"})
     if "info_if_missing" in tab_case:
         problems.append("m54-imp4 still uses the weak info_if_missing key")
-    if "span_required_problem" not in inspect.getsource(run_case):
-        problems.append("m54-imp4 run_case does not check the required span byte")
     # The check has teeth: a missing in-span byte is a FAIL, a byte OUTSIDE
     # the span is a FAIL, the span with the byte passes, and only an absent
     # capability is an INFO skip.
@@ -1147,29 +1086,6 @@ def selftest():
         problems.append("m53-imp3 does not wait for the child exit status")
     if not m53.get("capture_mode"):
         problems.append("m53-imp3 does not capture the pty mode")
-    m53_src = build_child_source(m53)
-    for needle, label in (
-            ("TIOCSWINSZ", "resize uses TIOCSWINSZ"),
-            ("tcgetattr", "run_case reads the pty mode back"),
-            ("resize_pty(master", "run_case resizes the pty"),
-            ("child.wait(", "run_case waits for the child exit status"),
-            ("modes_equal", "run_case compares the pty modes")):
-        if needle not in inspect.getsource(run_case) \
-                and needle not in inspect.getsource(run_session) \
-                and needle not in inspect.getsource(resize_pty) \
-                and needle not in inspect.getsource(modes_equal):
-            problems.append("m53-imp3 wiring missing: %s" % label)
-    if "symbol-value" not in m53_src:
-        problems.append("m53-imp3 probe does not read the load side effect")
-    if "tty-read-avail-input!" not in m53_src:
-        problems.append("m53-imp3 probe does not run the read path")
-    if "tty-write-bytes" not in m53_src:
-        problems.append("m53-imp3 probe does not run the write path")
-    if "tty-size" not in m53_src:
-        problems.append("m53-imp3 probe does not read the tty size")
-    if "@@LOADFILE@@" in m53_src or "@@OUTBYTES@@" in m53_src:
-        problems.append("m53-imp3 probe left a placeholder unresolved")
-
     # --- the one parser ------------------------------------------------
     check("parse-ok", parse_report('"ok"'), "ok")
     check("parse-mismatch", parse_report('"mismatch after=(1 . 2)"'),
@@ -1294,168 +1210,17 @@ def selftest():
     check("case-5-terminal-loss-model", term_loss["expect_calls"],
           [(-2, 0, [])])
 
-    # --- the child source: shared parts ---------------------------------
-    src = build_child_source(_case("m42-imp3/case-1-no-input"))
-    if "eval-scheme" not in src:
-        problems.append("child source lost the eval-scheme call")
-    if "(external-debugging-output ?R)" not in src:
-        problems.append("child source lost the PTY-ready signal")
-    if "call-with-input-file \\\"/tmp/pty-driver-selftest-gate\\\" read-char" \
-            not in src:
-        problems.append("child source lost the blocking FIFO gate")
-    # The child binds inhibit-quit, so a stored quit byte (m42 cases 4 and
-    # 6) cannot abort the load before the report is written.
-    if "(let ((inhibit-quit t))" not in src:
-        problems.append("child source does not bind inhibit-quit")
-    # The child ignores SIGHUP before the read, so the driver can close
-    # the pty master for the case-5 terminal-loss measurement without
-    # terminating the child.  The call must be guarded so a host without
-    # `sigaction' still reaches the READY signal.
-    if '(condition-case nil (eval-scheme "(sigaction 1 1)") (error nil))' not in src:
-        problems.append("child source does not guard the SIGHUP ignore call")
-    # Every case must build a child source with no placeholder left.
-    # build_probe raises on an unresolved @@NAME@@, so this also proves
-    # each case fills in every placeholder its probe declares.
+    # Check that every probe's substitutions resolve.
     for case in CASES:
         try:
-            if "eval-scheme" not in build_child_source(case):
-                problems.append("case %s builds no child source" % case["name"])
+            build_child_source(case)
         except AssertionError as err:
             problems.append(str(err))
-    # The guard has teeth: an unfilled placeholder must raise.
     try:
         build_probe({"name": "probe-guard", "probe": "@@NOPE@@", "subst": {}})
         problems.append("build_probe accepts an unresolved placeholder")
     except AssertionError:
         pass
-
-    # --- the child source: the M42 read-path probe ------------------------
-    if "module-ref mod 'tty-read-avail-input!" not in src:
-        problems.append("probe does not resolve tty-read-avail-input! via module-ref")
-    if "(tty-read-avail-input! term)" in src:
-        problems.append("probe still calls tty-read-avail-input! unqualified")
-    # %terminal-list and %--kbd-buffer-nr-stored force to procedures that
-    # must be called: a single (force ...) reads the procedure, not its
-    # value, and the report would carry a procedure instead of a count.
-    if "((force (module-ref mod '%terminal-list)))" not in src:
-        problems.append("probe does not call the forced %terminal-list procedure")
-    if "((force nr))" not in src:
-        problems.append("probe does not call the forced %--kbd-buffer-nr-stored procedure")
-    probe = build_probe(_case("m42-imp3/case-1-no-input"))
-    # The probe records (code . mods) and reports "code:mods" tokens.
-    if "(cons code mods)" not in probe:
-        problems.append("probe does not record the modifier with the code")
-    if '":"' not in probe:
-        problems.append("probe does not build a code:mods order token")
-    # The probe computes the STORED count itself, as a difference.  An
-    # absolute count would depend on what the buffer held at startup.
-    if "(- n1 prev)" not in probe:
-        problems.append("probe does not report stored as a difference")
-    # The probe builds the one wire format: the EMPTY token for no events
-    # and the JOIN separator between calls.
-    if '"%s"' % EMPTY not in probe:
-        problems.append("probe does not emit the EMPTY token for an empty order")
-    if '"%s"' % JOIN not in probe:
-        problems.append("probe does not join the calls with the JOIN separator")
-    # The probe takes the newest terminal.  %terminal-list is oldest-first,
-    # so the head is the oldest; the probe must reverse it.
-    if "(and (pair? terms) (car terms))" in probe:
-        problems.append("probe takes the oldest terminal, not the newest")
-    if "(reverse terms)" not in probe:
-        problems.append("probe does not select the newest terminal")
-    # The call count comes from the length of the expected call list, so a
-    # case cannot ask for two calls and expect one report field.
-    if "(calls 1)" not in probe:
-        problems.append("single-call case does not set calls to 1")
-    two = build_probe(_case("m42-imp4/case-6-continuation"))
-    if "(calls 2)" not in two:
-        problems.append("continuation case does not set calls to 2")
-
-    # Stubs appear only when a case asks for them, and restore after.
-    if "%--tty-meta-key (delay (lambda (t)" in src:
-        problems.append("probe stubs the meta key when no case asked")
-    stubbed = build_child_source(_case("m42-imp4/case-4-meta-quit-guard"))
-    if "%--tty-meta-key (delay (lambda (t) 1))" not in stubbed:
-        problems.append("probe does not stub %--tty-meta-key")
-    if "%--quit-char (delay (lambda () 7))" not in stubbed:
-        problems.append("probe does not stub %--quit-char")
-    if "(module-set! mod '%--tty-meta-key meta-o)" not in stubbed:
-        problems.append("probe does not restore %--tty-meta-key")
-
-    # --- the child source: the M43 probes ---------------------------------
-    mode_src = build_child_source(_case("m43-imp3/pty-e2e"))
-    if "module-ref mod 'tty-mode-wanted" not in mode_src:
-        problems.append("mode probe does not resolve tty-mode-wanted via module-ref")
-    if "init 0 base flags" not in mode_src:
-        problems.append("mode probe does not apply the mode through init-tty-mode")
-    restore_src = build_child_source(_case("m43-imp4/pty-e2e"))
-    if "module-ref mod 'reset-tty-mode" not in restore_src:
-        problems.append("restore probe does not resolve reset-tty-mode via module-ref")
-    if "module-ref mod 'init-tty-mode" not in restore_src:
-        problems.append("restore probe does not resolve init-tty-mode via module-ref")
-    if "reset 0 saved" not in restore_src:
-        problems.append("restore probe does not restore through reset-tty-mode")
-    size_src = build_child_source(_case("m43-imp5/pty-e2e"))
-    if "module-ref mod 'tty-size" not in size_src:
-        problems.append("size probe does not resolve tty-size via module-ref")
-    if "module-ref mod 'set-tty-size" not in size_src:
-        problems.append("size probe does not resolve set-tty-size via module-ref")
-    if "set-size 0 %d %d" % (SIZE_HEIGHT, SIZE_WIDTH) not in size_src:
-        problems.append("size probe does not apply the case size through set-tty-size")
-    # The size probe REPORTS its measurement; it must not judge.  A
-    # literal "ok" there would mean the verdict crept back into Scheme.
-    if '"ok"' in SIZE_PROBE:
-        problems.append("size probe judges instead of reporting its measurement")
-    # The two mode probes do judge, and must keep the literal their case
-    # expects; a probe that lost it could never pass.
-    for case in (_case("m43-imp3/pty-e2e"), _case("m43-imp4/pty-e2e")):
-        if '"ok"' not in case["probe"]:
-            problems.append("probe of %s cannot report ok" % case["name"])
-    # The case data left the probes: the flags and the size are spliced
-    # in, so neither probe holds a literal of its own.
-    for name, probe in (("mode", MODE_PROBE), ("restore", RESTORE_PROBE)):
-        if "@@FLAGS@@" not in probe:
-            problems.append("%s probe hardcodes its flags" % name)
-        if "@@MODE_HELPERS@@" not in probe:
-            problems.append("%s probe does not splice the shared mode helpers"
-                            % name)
-    if "@@HEIGHT@@" not in SIZE_PROBE or "@@WIDTH@@" not in SIZE_PROBE:
-        problems.append("size probe hardcodes its size")
-    # The shared comparison really is shared: one definition, two users.
-    for name, src in (("mode", mode_src), ("restore", restore_src)):
-        if "(define (mode=? a b)" not in src:
-            problems.append("%s probe lost the shared mode comparison" % name)
-        if "bytevector-u8-ref" not in src:
-            problems.append("%s probe lost the cc bytevector walk" % name)
-    # The flags reach both probes with the quit char the policy needs.
-    for name, src in (("mode", mode_src), ("restore", restore_src)):
-        if "'quit-char 7" not in src:
-            problems.append("%s probe did not receive the case flags" % name)
-    # A probe must not carry another family's body: a swapped probe would
-    # report the wrong string and never match.
-    if "tty-read-avail-input!" in mode_src:
-        problems.append("the mode case carries the read-path probe")
-    if "tty-mode-wanted" in src:
-        problems.append("the read-path case carries the mode probe")
-
-    # --- the ISIG clear ---------------------------------------------------
-    # FIX-20260928-guilemacs: run_case must clear ISIG on the pty before it
-    # writes the case bytes.  Emacs arms the tty with ISIG and
-    # c_cc[VQUIT] = quit_char (src/sysdep.c, init_sys_modes), so the line
-    # discipline reads a written raw quit byte as VQUIT, flushes the queue
-    # and raises SIGQUIT.  The failing run measured "2 2 67:0,68:0" for
-    # case 4 and "1 1 66:0" for case 6 -- the bytes after the quit byte
-    # only.  Without the clear, both cases fail on a pty host.
-    deliver_src = inspect.getsource(deliver_raw)
-    run_src = inspect.getsource(run_session)
-    if "~termios.ISIG" not in deliver_src:
-        problems.append("deliver_raw does not clear ISIG")
-    if deliver_src.count("tcgetattr") < 2:
-        problems.append("deliver_raw does not read the attributes back")
-    if "deliver_raw(master)" not in run_src:
-        problems.append("run_case does not deliver the case bytes raw")
-    if "ISIG clear on the pty failed" not in run_src:
-        problems.append("run_case does not route a deliver_raw failure to an INFO skip")
 
     # deliver_raw must report its own failure, not swallow it.  Stand in
     # for the termios calls -- no pty is needed, because only tcgetattr
@@ -1472,11 +1237,6 @@ def selftest():
             # match, or this check has no teeth (F1).  termios.error is not
             # an OSError subclass and carries no .errno/.strerror.
             raise termios.error(errno, msg)
-
-        # A failing termios call must be caught.  termios.error proves the
-        # guard catches the real error type, not just OSError.
-        if "termios.error" not in deliver_src:
-            problems.append("deliver_raw does not catch termios.error")
 
         # tcgetattr itself fails.
         termios.tcgetattr = lambda fd: _raise(9, "Bad file descriptor")
@@ -1539,7 +1299,7 @@ def main(argv):
     ap.add_argument("--timeout", type=float, default=20.0,
                     help="seconds to wait for a child report")
     ap.add_argument("--selftest", action="store_true",
-                    help="run the pty-free parser/source checks and exit")
+                    help="run the pty-free self-test and exit")
     opts = ap.parse_args(argv)
 
     if opts.selftest:

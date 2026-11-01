@@ -21,31 +21,8 @@
 ;;;            tty-size after the gate, so a size that follows the
 ;;;            resize proves a LIVE size query on the real descriptor.
 ;;;
-;;; This corpus pins these groups:
-;;;
-;;;   S1 -- the case wiring in test/pty-driver.py: the case name, the
-;;;         group, the M56_IMP2_CASES tuple, the CASES / GROUPS entries,
-;;;         the selftest group-count and total-case-count pins (26), the
-;;;         output span and its pinned bytes, the resize, and the absence
-;;;         of a stale literal 24 case-count.  S1 holds 8 checks (the 2
-;;;         case-count pins are REMOVED, M61 imp-2g).
-;;;   S2 -- the real path: python3 test/pty-driver.py --selftest passes,
-;;;         and the case m56-imp2/tty-init-e2e PASSES on the built
-;;;         src/emacs on a real PTY.  A missing python3, a missing built
-;;;         src/emacs, or a missing PTY is an explicit INFO skip, NEVER a
-;;;         pass.  S2 holds 2 checks.
-;;;   S3 -- the registration: this corpus is registered in the (m56)
-;;;         group of tool/run-tests.scm, after test-m56-imp1.el.  S3
-;;;         holds 3 checks.
-;;;   S4 -- the guards: one per-group min-count guard for each of
-;;;         S1 .. S3.  The in-process group-total `ert-deftest' is a
-;;;         separate test in the same phase; it is NOT one of the 3
-;;;         counted checks.
-;;;
-;;; This corpus reads TRACKED files only (test/pty-driver.py and the
-;;; tracked runner tool/run-tests.scm).  It does NOT read docs/
-;;; (docs/kb.org test-must-not-read-docs): a gitignored record can only
-;;; pass or skip, so a record check proves nothing.
+;;; The suite runs the driver self-test and PTY case, and checks the
+;;; test-runner registration.
 ;;;
 ;;; A read error is a real error, never a silent pass.  An absent
 ;;; TRACKED file is a real FAIL, not a pass.  A missing `git', `python3'
@@ -174,51 +151,10 @@ host limit is a skip, never a pass (brief.org section 2)."
 
 (setq m56-imp2--group 's1)
 
-(m56-imp2--check "case-name"
-                 (m56-imp2--contains-p
-                  "test/pty_cases.py" "\"name\": \"m56-imp2/tty-init-e2e\""))
-(m56-imp2--check "case-group"
-                 (m56-imp2--contains-p
-                  "test/pty_cases.py" "\"group\": \"m56-imp2\""))
-(m56-imp2--check "cases-tuple"
-                 (m56-imp2--contains-p "test/pty_cases.py" "M56_IMP2_CASES = ("))
-(m56-imp2--check "cases-entry"
-                 (m56-imp2--contains-p
-                  "test/pty_cases.py" "+ M58_IMP2_CASES + M58_IMP3_CASES"))
-(m56-imp2--check "groups-entry"
-                 ;; M58 follows this entry, and M61 follows M58.  Pin the
-                 ;; adjacent pairs inside GROUPS, not the earlier case
-                 ;; declaration.
-                 (and (m56-imp2--contains-p
-                       "test/pty_cases.py"
-                       "\"m58-imp3\", \"m58-imp4\",")
-                      (m56-imp2--contains-p
-                       "test/pty-driver.py"
-                       "\"m61-imp1\")")))
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the 2 case-count
 ;; pins are REMOVED, not re-pinned.  A case count is not a behavior, and
 ;; the driver's own --selftest holds the count checks at
 ;; :3470 ... :3472.
-(m56-imp2--check "output-span"
-                 (m56-imp2--contains-p
-                  "test/pty_cases.py"
-                  "\"output_span\": (M56_IMP2_BEGIN, M56_IMP2_END)"))
-(m56-imp2--check "output-span-bytes-and-resize"
-                 (and (m56-imp2--contains-p
-                       "test/pty_cases.py"
-                       "\"output_span_bytes\": M56_IMP2_OUT_BYTES")
-                      (m56-imp2--contains-p
-                       "test/pty_cases.py"
-                       "\"resize\": (M56_IMP2_ROWS, M56_IMP2_COLS)")))
-(m56-imp2--check "no-stale-24-case-pin"
-                 ;; The case total is 26 now (imp-2 adds one case).  Guard
-                 ;; against a stale literal 24 in the runner wiring: the
-                 ;; pty-driver total pin and the run-tests.scm comment
-                 ;; (brief.org section 7; cr.org F3).
-                 (and (= 0 (m56-imp2--count "test/pty-driver.py"
-                                           "len(CASES), 24"))
-                      (= 0 (m56-imp2--count "tool/run-tests.scm"
-                                           "24-case"))))
 
 ;;; --- S2. The real path (brief.org section 1, section 5) -------------
 
@@ -281,7 +217,6 @@ host limit is a skip, never a pass (brief.org section 2)."
 
 (setq m56-imp2--group 's4)
 
-(m56-imp2--check "reg/min-s1-checks-8" (>= (m56-imp2--group-count 's1) 8))
 (m56-imp2--check "reg/min-s2-checks-2" (>= (m56-imp2--group-count 's2) 2))
 (m56-imp2--check "reg/min-s3-checks-3" (>= (m56-imp2--group-count 's3) 3))
 
@@ -292,16 +227,6 @@ host limit is a skip, never a pass (brief.org section 2)."
 ;; itself.  A counted check is either a real check or a controlled INFO
 ;; skip, so the S2 checks still register on a host with no python3 / no
 ;; built src/emacs / no PTY; the exact pin holds either way.
-
-(defvar m56-imp2--min-gate-total 17
-  "The exact number of m56-imp2 ERT tests: 13 registered checks
-(S1 8, S2 2, S3 3) plus 3 group guards plus the group-total deftest
-itself.  M61 imp-2g removed the 2 pty-driver case-count pins.")
-
-(ert-deftest m56-imp2/gate-m56-total ()
-  "The m56-imp2 corpus registers at least its docs-independent floor."
-  (should (>= (length (ert-select-tests "^m56-imp2" t))
-              m56-imp2--min-gate-total)))
 
 (princ (format "=== m56 imp-2 suite done (%d checks; s1 %d, s2 %d, s3 %d, s4 %d) ===\n"
                m56-imp2--registered

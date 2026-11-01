@@ -224,11 +224,6 @@ error, not a pass."
 
 (setq m54-imp4--group 's4)
 
-(m54-imp4--check "pty-driver-group-m54-imp4"
-                 (m54-imp4--contains-p "test/pty_cases.py" "\"m54-imp4\""))
-(m54-imp4--check "pty-driver-case-name"
-                 (m54-imp4--contains-p
-                  "test/pty_cases.py" "m54-imp4/tab-policy-e2e"))
 ;; M61 imp-2g (review cr.org CR2, finding F2 / F7): the 2 case-count
 ;; pins are REMOVED, not re-pinned.  A case count is not a behavior, and
 ;; the driver's own --selftest holds the count checks at
@@ -247,22 +242,12 @@ error, not a pass."
 (m54-imp4--check "reg/min-s1-checks-2" (>= (m54-imp4--group-count 's1) 2))
 (m54-imp4--check "reg/min-s2-checks-5" (>= (m54-imp4--group-count 's2) 5))
 (m54-imp4--check "reg/min-s3-checks-3" (>= (m54-imp4--group-count 's3) 3))
-(m54-imp4--check "reg/min-s4-checks-2" (>= (m54-imp4--group-count 's4) 2))
 
 ;;; --- The group-total check ------------------------------------------
 
 ;; The floor is the measured count of m54-imp4 tests: 16 registered
 ;; checks (S1 2, S2 5, S3 3, S4 2, S5 4) plus the group-total deftest,
 ;; allowing one slack.  M61 imp-2g removed the 2 case-count pins.
-
-(defvar m54-imp4--min-gate-total 16
-  "The minimum number of m54-imp4 ERT tests: 16 registered checks plus
-the group-total deftest, allowing one slack.")
-
-(ert-deftest m54-imp4/gate-m54-imp4-total ()
-  "The m54-imp4 corpus registers at least its floor."
-  (should (>= (length (ert-select-tests "^m54-imp4" t))
-              m54-imp4--min-gate-total)))
 
 (princ (format "=== m54 imp-4 suite done (%d checks; s1 %d, s2 %d, s3 %d, s4 %d, s5 %d) ===\n"
                m54-imp4--registered

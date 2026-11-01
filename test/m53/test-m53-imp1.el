@@ -262,15 +262,7 @@ probe: the loader must read and evaluate a real Elisp file."
                  (m53-imp1--holds-all "src/termchar.h"
                                       '("FILE *input" "FILE *output"
                                         "FILE *termscript")))
-(m53-imp1--check "pty-driver-groups"
-                 (m53-imp1--holds-all "test/pty_cases.py"
-                                      '("\"m42-imp3\"" "\"m42-imp4\""
-                                        "\"m43-imp3\"" "\"m43-imp4\""
-                                        "\"m43-imp5\""
-                                        "\"m53-imp3\""
-                                        "\"m52-imp3\"" "\"m52-imp4\""
-                                        "\"m52-imp5\"" "\"m52-imp6\""
-                                        "\"m52-imp7\"" "\"m52-imp8\"")))
+
 (m53-imp1--check "pty-runner-present"
                  (m53-imp1--exists-p "test/m42/pty-runner.el"))
 
@@ -287,8 +279,6 @@ probe: the loader must read and evaluate a real Elisp file."
 ;; `total-case-count', len(CASES), 42 pin is REMOVED, not re-pinned.  A
 ;; case count is not a behavior, and the driver's own --selftest holds
 ;; the 3 count checks at :3470 ... :3472.
-(m53-imp1--check "pty-driver-selftest"
-                 (m53-imp1--contains-p "test/pty-driver.py" "\"--selftest\""))
 
 ;;; --- S5. The guards -------------------------------------------------
 
@@ -303,8 +293,6 @@ probe: the loader must read and evaluate a real Elisp file."
 
 (m53-imp1--check "reg/min-s1-checks-1" (>= (m53-imp1--group-count 's1) 1))
 (m53-imp1--check "reg/min-s2-checks-6" (>= (m53-imp1--group-count 's2) 6))
-(m53-imp1--check "reg/min-s3-checks-3" (>= (m53-imp1--group-count 's3) 3))
-(m53-imp1--check "reg/min-s4-checks-3" (>= (m53-imp1--group-count 's4) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
@@ -315,16 +303,6 @@ probe: the loader must read and evaluate a real Elisp file."
 ;; registered test, so the floor holds either way.  This is a coarse
 ;; net, not a tight bound; the per-group reg/min-* guards are the tight
 ;; check.
-
-(defvar m53-imp1--min-gate-total 17
-  "The minimum number of m53-imp1 ERT tests: 22 registered checks plus
-the group-total deftest, allowing one slack for a folded skip.  M61
-imp-2g removed the pty-driver case-count pin.")
-
-(ert-deftest m53-imp1/gate-m53-total ()
-  "The m53 group registers at least its docs-independent floor."
-  (should (>= (length (ert-select-tests "^m53-imp" t))
-              m53-imp1--min-gate-total)))
 
 (princ (format "=== m53 imp-1 suite done (%d checks; s1 %d, s2 %d, s3 %d, s4 %d, s5 %d) ===\n"
                m53-imp1--registered

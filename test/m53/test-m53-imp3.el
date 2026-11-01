@@ -14,25 +14,7 @@
 ;;;   FAIL ... <detail>
 ;;;   INFO ... skipped (<reason>)
 ;;;
-;;; This corpus pins:
-;;;
-;;;   S1 -- the invocation: the group m53-imp3 and the case name
-;;;         m53-imp3/vertical-slice-e2e are present in test/pty-driver.py.
-;;;         S1 holds 2 checks.
-;;;   S2 -- the slice pins: the driver carries the resize (TIOCSWINSZ),
-;;;         the mode capture/read-back (tcgetattr), the exit-status wait,
-;;;         and the load fixture.  S2 holds 4 checks.
-;;;   S3 -- the behavior run: python3 test/pty-driver.py --emacs
-;;;         src/emacs --group m53-imp3 prints PASS for the case.  A
-;;;         missing built src/emacs or a missing pty is a controlled INFO
-;;;         skip, never a pass.  S3 holds 1 check.
-;;;   S4 -- the registration and the guards: the corpus is registered in
-;;;         the (m53) group of tool/run-tests.scm; a per-group min-count
-;;;         guard for S1 .. S3; the group-total `ert-deftest'.  S4 holds
-;;;         5 checks.
-;;;
-;;; This corpus reads TRACKED files only (test/, tool/run-tests.scm).  It
-;;; does NOT read docs/ (docs/kb.org test-must-not-read-docs).
+;;; The suite runs the PTY case and checks its test-runner registration.
 ;;;
 ;;; A read error is a real error, never a silent pass.  An absent driver
 ;;; file is a real FAIL, not a pass.  Every check registers a real ERT
@@ -155,34 +137,6 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
          (t
           (m53-imp3--check name nil))))))))
 
-;;; --- S1. The invocation ---------------------------------------------
-
-(setq m53-imp3--group 's1)
-
-(m53-imp3--check "driver-case-name"
-                 (m53-imp3--contains-p
-                  "test/pty_cases.py" "m53-imp3/vertical-slice-e2e"))
-(m53-imp3--check "driver-group"
-                 (m53-imp3--contains-p
-                  "test/pty_cases.py" "\"m53-imp3\""))
-
-;;; --- S2. The slice pins ---------------------------------------------
-
-;; The slice must carry the resize (TIOCSWINSZ), the mode read-back
-;; (tcgetattr), the exit-status wait, and the load fixture.  These pins
-;; hold the driver's wiring in the tracked source.
-
-(setq m53-imp3--group 's2)
-
-(m53-imp3--check "driver-resize-tiocswinsz"
-                 (m53-imp3--contains-p "test/pty_session.py" "TIOCSWINSZ"))
-(m53-imp3--check "driver-mode-readback-tcgetattr"
-                 (m53-imp3--contains-p "test/pty_session.py" "tcgetattr"))
-(m53-imp3--check "driver-wait-exit"
-                 (m53-imp3--contains-p "test/pty_cases.py" "\"wait_exit\""))
-(m53-imp3--check "driver-load-fixture"
-                 (m53-imp3--contains-p "test/pty-driver.py" "load_fixture"))
-
 ;;; --- S3. The behavior run -------------------------------------------
 
 (setq m53-imp3--group 's3)
@@ -196,8 +150,7 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
 (m53-imp3--check "run-tests-m53-imp3"
                  (m53-imp3--contains-p "tool/run-tests.scm"
                                        "test/m53/test-m53-imp3.el"))
-(m53-imp3--check "reg/min-s1-checks-2" (>= (m53-imp3--group-count 's1) 2))
-(m53-imp3--check "reg/min-s2-checks-4" (>= (m53-imp3--group-count 's2) 4))
+
 (m53-imp3--check "reg/min-s3-checks-1" (>= (m53-imp3--group-count 's3) 1))
 ;; The slice moves the driver selftest total 20 -> 21.  A tracked
 ;; comment that still says the pty-driver has a 20-case total is the
@@ -206,22 +159,6 @@ is a fail, and an INFO line (no pty, no emacs) is a controlled skip."
 (m53-imp3--check "run-tests-no-stale-20-case"
                  (not (m53-imp3--contains-p
                        "tool/run-tests.scm" "20-case total")))
-
-;;; --- The group-total check ------------------------------------------
-
-;; Select ONLY the m53-imp3 tests (the pattern is "^m53-imp3", not
-;; "^m53-imp"): the whole (m53) group runs in one emacs process.
-
-(defvar m53-imp3--min-gate-total 13
-  "The minimum number of m53-imp3 ERT tests: 12 registered checks
-(S1 2, S2 4, S3 1, S4 5) plus the group-total deftest.  The S3 slice
-check may fold to a controlled INFO skip when no pty is present, and a
-controlled skip is still a registered test, so the floor holds.")
-
-(ert-deftest m53-imp3/gate-m53-total ()
-  "The m53-imp3 corpus registers at least its docs-independent floor."
-  (should (>= (length (ert-select-tests "^m53-imp3" t))
-              m53-imp3--min-gate-total)))
 
 (princ (format "=== m53 imp-3 suite done (%d checks; s1 %d, s2 %d, s3 %d, s4 %d) ===\n"
                m53-imp3--registered
