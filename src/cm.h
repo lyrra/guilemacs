@@ -160,11 +160,32 @@ struct cm
 extern int cost;
 extern int evalcost (int c);
 
-#define emacs_tputs(tty, str, affcnt, putc) (current_tty = (tty), tputs (str, affcnt, putc))
+/* The cursor path of a TTY takes the ONE capability sink of the TTY
+   (m61_tty_emit_cap_1, src/term.c), and NO caller passes a callback.
+   cmputc is GONE (M62 imp-1).
+
+   The 2 effects of the old 4-argument shape stay, and each one stays in
+   ONE place: a routed emit sets current_tty inside the sink, and
+   emacs_tputs_cost keeps the current_tty store and the cost answer of
+   tputs with evalcost for the ONE site that measures a cost
+   (src/cm.c:388).
+
+   INCLUDE RULE (brief.org 3.3, option 2): this header holds NO #include,
+   so a NEW file that expands emacs_tputs MUST put
+   #include "termchar.h" ABOVE #include "cm.h".  The prototype of the
+   sink is needed at the EXPANSION only, not at the #define, because a
+   #define names no function.  The 6 includers of today obey the rule:
+   src/cm.c :24 :27, src/sysdep.c :121 :124, src/frame.c :42 :49,
+   src/dispnew.c :28 :31, and src/term.c :31 :58.  termchar.h is not
+   included here because it pulls dispextern.h, and src/dispnew.c :29
+   states that the order of dispextern.h matters on Windows.  */
+#define emacs_tputs(tty, str, lines) \
+  (m61_tty_emit_cap_1 ((tty), (str), (lines)))
+#define emacs_tputs_cost(tty, str, lines) \
+  (current_tty = (tty), tputs ((str), (lines), evalcost))
 
 extern struct tty_display_info *current_tty;
 extern void cmcheckmagic (struct tty_display_info *);
-extern int cmputc (int);
 extern void cmcostinit (struct tty_display_info *);
 extern void cmgoto (struct tty_display_info *, int, int);
 extern void Wcm_clear (struct tty_display_info *);

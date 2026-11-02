@@ -812,7 +812,8 @@ def selftest():
     check("m61-imp2-case-count", len(group_cases("m61-imp2")), 7)
     check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
     check("m61-imp3-case-count", len(group_cases("m61-imp3")), 9)
-    check("total-case-count", len(CASES), 58)
+    check("m62-imp1-case-count", len(group_cases("m62-imp1")), 3)
+    check("total-case-count", len(CASES), 61)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
@@ -875,6 +876,57 @@ def selftest():
     smcup_case = _case("m61-imp3/newline-smcup-e2e")
     check("newline-smcup-case-requires-no-newline",
           "span_requires" in smcup_case, False)
+
+    # --- M62 imp-1: the cursor path crosses the ONE sink ----------------
+    # The group runs ONE isolated reset_sys_modes run on the FIXED ansi
+    # entry.  The count case is the discriminator, so its WINDOW must hold
+    # a lower bound above 0: the deleted per-byte writer crossed nothing,
+    # and a window with a lower bound of 0 accepts both shapes.
+    count_case = _case("m62-imp1/cursor-count-e2e")
+    count_subst = count_case.get("subst") or {}
+    for key in ("MIN_S2C", "MAX_S2C", "MIN_C2S", "MAX_C2S"):
+        check("m62-imp1-count-window-%s" % key, key in count_subst, True)
+    check("m62-imp1-count-window-non-empty",
+          (int(count_subst["MIN_S2C"]) > 0
+           and int(count_subst["MIN_C2S"]) > 0), True)
+    check("m62-imp1-count-window-ordered",
+          (int(count_subst["MIN_S2C"]) <= int(count_subst["MAX_S2C"])
+           and int(count_subst["MIN_C2S"]) <= int(count_subst["MAX_C2S"])),
+          True)
+    # An ISOLATED design: no markers and no redisplay, so the range holds
+    # the crossings of the cursor path only (cr.org F2).
+    check("m62-imp1-count-case-isolated",
+          "span_requires" in count_case, False)
+    # The probe reuses the crossing counter of src/eval.c and invents no
+    # new counter (brief.org 5.2, cr.org F3).
+    count_probe = count_case.get("probe", "")
+    check("m62-imp1-count-reuses-the-counter",
+          "debug-guile-cross-count" in count_probe, True)
+    check("m62-imp1-count-invents-no-counter",
+          "cap-run" in count_probe, False)
+    # The byte case proves that the TS_clr_line string reached the pty
+    # INSIDE its own span, on the entry that holds the capability.
+    bytes_case = _case("m62-imp1/cursor-bytes-e2e")
+    bytes_span = bytes_case.get("span_requires") or {}
+    check("m62-imp1-bytes-case-span", bytes_span.get("span"),
+          (M62_IMP1_BEGIN, M62_IMP1_END))
+    check("m62-imp1-bytes-case-capability", bytes_span.get("capability"),
+          "el")
+    check("m62-imp1-bytes-case-needle", bytes_span.get("needles"),
+          (M62_IMP1_CLR_LINE,))
+    # Every case of the group runs on a controlled terminfo entry, so the
+    # capability bytes do not depend on the host database.
+    for _c in group_cases("m62-imp1"):
+        check("m62-imp1-fixture-%s" % _c["name"],
+              _c.get("terminfo_fixture") in TERMINFO_FIXTURES, True)
+        check("m62-imp1-term-%s" % _c["name"],
+              (_c.get("env") or {}).get("TERM"), "ansi")
+    # The restore path of the cursor changed, so the exit status and the
+    # terminal mode are re-proved.
+    check("m62-imp1-clean-exit-waits",
+          _case("m62-imp1/clean-exit-e2e").get("wait_exit"), True)
+    check("m62-imp1-clean-exit-mode",
+          _case("m62-imp1/clean-exit-e2e").get("capture_mode"), True)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

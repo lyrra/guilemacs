@@ -249,4 +249,14 @@ struct input_event;
 extern Lisp_Object tty_handle_tab_bar_click (struct frame *, int, int, bool,
 					     struct input_event *);
 
+/* The ONE capability sink of a TTY (src/term.c).  The cursor path of
+   src/cm.c and the capability write of src/sysdep.c:1426 reach it, so
+   every capability byte of a TTY has ONE writer.  It answers the FIRST
+   failure of the run as a plain ptrdiff_t, and no caller reads that
+   answer (M62 imp-1).  This header names neither the capability macro of
+   src/cm.h nor the callback that the act deleted: the include rule in
+   src/cm.h is the place that holds that coupling.  */
+extern ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
+				     const char *, int);
+
 #endif /* EMACS_TERMCHAR_H */

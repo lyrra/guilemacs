@@ -1423,7 +1423,7 @@ reset_sys_modes (struct tty_display_info *tty_out)
   /* Code adapted from tty_clear_end_of_line. */
   if (tty_out->TS_clr_line)
     {
-      emacs_tputs (tty_out, tty_out->TS_clr_line, 1, cmputc);
+      emacs_tputs (tty_out, tty_out->TS_clr_line, 1);
     }
   else
     {			/* have to do it the hard way */

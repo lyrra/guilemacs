@@ -194,8 +194,10 @@ static int m61_cap_putc (int);
 static ptrdiff_t m61_cap_drain_1 (void);
 static void m61_cap_begin (struct tty_display_info *);
 static ptrdiff_t m61_cap_finish (void);
-static ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
-				     const char *, int);
+/* The ONE capability sink of a TTY.  It is exported to src/cm.h and
+   src/sysdep.c through the emacs_tputs macro (M62 imp-1).  */
+ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
+			      const char *, int);
 static ptrdiff_t m61_tty_emit_cap_repeat_1 (struct tty_display_info *, int,
 					    EMACS_INT);
 
@@ -357,8 +359,10 @@ tty_set_terminal_modes (struct terminal *terminal)
 		 not once for each newline (cr1.org 2026-11-01 C2).  At the
 		 chunk of 1024 bytes and a normal frame N is below 1024, so
 		 the run takes ONE crossing.  current_tty is set also when
-		 N is 0 (cr1.org 2026-11-01 C1), as the old cmputc site
-		 did.  */
+		 N is 0 (cr1.org 2026-11-01 C1), as the deleted cmputc
+		 site did.  cmputc is GONE (M62 imp-1):
+		 m61_tty_emit_cap_1 is the ONE capability sink, and
+		 m61_tty_emit_cap_repeat_1 is its N-byte form.  */
 	      (void) m61_tty_emit_cap_repeat_1 (tty, '\n', n);
 	    }
 	}
@@ -1772,9 +1776,12 @@ m61_cap_drain_1 (void)
   return status;
 }
 
-/* The =tputs= callback of the capability path: apply the =cmputc= mask
-   (c & 0177), append the byte, and answer C.  When the buffer is full,
-   drain FIRST and append after, so the byte order does not change.
+/* The =tputs= callback of the capability path: apply the mask of the
+   DELETED =cmputc= (c & 0177), append the byte, and answer C.  cmputc
+   is GONE (M62 imp-1): this callback and m61_tty_emit_cap_1 are its
+   successors, and the cursor path of src/cm.c reaches them through the
+   emacs_tputs macro.  When the buffer is full, drain FIRST and append
+   after, so the byte order does not change.
 
    The answer is the UNMASKED C, as the old =cmputc= answered C, and
    =tputs= discards the answer of its callback (cr1.org 2026-11-01 C5).  The
@@ -1789,8 +1796,9 @@ m61_cap_putc (int c)
 }
 
 /* Start ONE run of the sink for TTY: set the identity, clear the length
-   and the status, raise the active flag, and set current_tty, as the old
-   cmputc site did.
+   and the status, raise the active flag, and set current_tty, as the
+   deleted cmputc site did.  cmputc is GONE (M62 imp-1), so this is the
+   ONE store that keeps current_tty live for a whole routed run.
 
    The sink is not reentrant.  A nested emit can not occur today (see the
    header comment), so a development build stops here.  A release build
@@ -1863,7 +1871,7 @@ m61_cap_finish (void)
    run is nested.  A NULL STR starts no run, so that branch sets it here,
    and only here (cr1.org 2026-11-01 C4).  This file holds 3 stores in
    all: the NULL branch, m61_cap_begin, and that restore.  */
-static ptrdiff_t
+ptrdiff_t
 m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
 {
   if (!str)
@@ -1880,14 +1888,15 @@ m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
 /* The N-byte form of the sink: the newline fallback of
    tty_set_terminal_modes calls it with N, and the raw CR of
    tty_reset_terminal_modes calls it with 1.  It is the ONE shape of a
-   run of repeated bytes, so src/term.c holds no direct =cmputc= call and
-   every capability byte has ONE writer.  The N bytes collect in the sink
-   and the run crosses the handle ONCE PER CHUNK, not once for each
-   newline (cr1.org 2026-11-01 C2).  BOUND of that "once": the sink
-   holds M61_CAP_CHUNK = 1024 bytes, so a run of N bytes crosses
-   ceil (N / 1024) times, not 1.  Write "ONCE per chunk", never "ONCE"
-   for a run that can exceed the chunk.  A chunk that overflows drains
-   before the byte that overflows it, so the byte order does not change.
+   run of repeated bytes, so src/term.c holds no call of the deleted
+   =cmputc= (GONE, M62 imp-1) and every capability byte has ONE writer.
+   The N bytes collect in the sink and the run crosses the handle ONCE
+   PER CHUNK, not once for each newline (cr1.org 2026-11-01 C2).
+   BOUND of that "once": the sink holds M61_CAP_CHUNK = 1024 bytes, so a
+   run of N bytes crosses ceil (N / 1024) times, not 1.  Write "ONCE per
+   chunk", never "ONCE" for a run that can exceed the chunk.  A chunk
+   that overflows drains before the byte that overflows it, so the byte
+   order does not change.
 
    N is NOT bounded by the chunk.  The newline fallback takes N from
    FRAME_TOTAL_LINES (XFRAME (selected_frame)), so a tall frame gives N
@@ -1897,9 +1906,9 @@ m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
    that needs a run in ONE crossing must bound N to the chunk.
 
    N = 0 starts and ends a run with no byte, so current_tty is set, as
-   the old =cmputc= site set it before its loop (cr1.org 2026-11-01 C1),
-   and no crossing happens: m61_cap_drain_1 answers 0 for an empty
-   sink.  */
+   the deleted =cmputc= site set it before its loop (cr1.org 2026-11-01
+   C1; cmputc is GONE, M62 imp-1), and no crossing happens:
+   m61_cap_drain_1 answers 0 for an empty sink.  */
 static ptrdiff_t
 m61_tty_emit_cap_repeat_1 (struct tty_display_info *tty, int c, EMACS_INT n)
 {

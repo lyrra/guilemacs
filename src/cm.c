@@ -41,14 +41,13 @@ evalcost (int c)
 /* The terminal to use for low-level output. */
 struct tty_display_info *current_tty;
 
-int
-cmputc (int c)
-{
-  if (current_tty->termscript)
-    putc (c & 0177, current_tty->termscript);
-  putc (c & 0177, current_tty->output);
-  return c;
-}
+/* cmputc is GONE (M62 imp-1).  The cursor path of this file emits its
+   capability strings through the emacs_tputs macro of src/cm.h, and that
+   macro calls m61_tty_emit_cap_1, the ONE capability sink of a TTY
+   (src/term.c).  The sink writes output FIRST and the termscript copy
+   after, where the old cmputc wrote the termscript copy first.  That is
+   the declared order change of M62 imp-1: the bytes and the padding do
+   not change.  */
 
 /* NEXT TWO ARE DONE WITH MACROS */
 #if 0
@@ -215,7 +214,7 @@ calccost (struct tty_display_info *tty,
     totalcost = c * deltay;
     if (doit)
       do
-          emacs_tputs (tty, p, 1, cmputc);
+          emacs_tputs (tty, p, 1);
       while (--deltay > 0);
 x:
     if ((deltax = dstx - srcx) == 0)
@@ -271,7 +270,7 @@ x:
 	totalcost += tabcost;	/* use the tabs */
 	if (doit)
 	    while (--ntabs >= 0)
-              emacs_tputs (tty, tty->Wcm->cm_tab, 1, cmputc);
+              emacs_tputs (tty, tty->Wcm->cm_tab, 1);
 	srcx = tabx;
     }
 
@@ -298,7 +297,7 @@ fail:
     totalcost += c * deltax;
     if (doit)
       do
-          emacs_tputs (tty, p, 1, cmputc);
+          emacs_tputs (tty, p, 1);
       while (--deltax > 0);
 done:
     return totalcost;
@@ -386,10 +385,10 @@ cmgoto (struct tty_display_info *tty, int row, int col)
       p = (dcm == tty->Wcm->cm_habs
            ? tgoto (dcm, row, col)
            : tgoto (dcm, col, row));
-      emacs_tputs (tty, p, 1, evalcost);
+      emacs_tputs_cost (tty, p, 1);
       if (cost <= relcost)
 	{	/* really is cheaper */
-	  emacs_tputs (tty, p, 1, cmputc);
+	  emacs_tputs (tty, p, 1);
 	  curY (tty) = row, curX (tty) = col;
 	  return;
 	}
@@ -398,17 +397,17 @@ cmgoto (struct tty_display_info *tty, int row, int col)
   switch (use)
     {
     case USEHOME:
-      emacs_tputs (tty, tty->Wcm->cm_home, 1, cmputc);
+      emacs_tputs (tty, tty->Wcm->cm_home, 1);
       curY (tty) = 0, curX (tty) = 0;
       break;
 
     case USELL:
-      emacs_tputs (tty, tty->Wcm->cm_ll, 1, cmputc);
+      emacs_tputs (tty, tty->Wcm->cm_ll, 1);
       curY (tty) = tty->Wcm->cm_rows - 1, curX (tty) = 0;
       break;
 
     case USECR:
-      emacs_tputs (tty, tty->Wcm->cm_cr, 1, cmputc);
+      emacs_tputs (tty, tty->Wcm->cm_cr, 1);
       if (tty->Wcm->cm_autolf)
 	curY (tty)++;
       curX (tty) = 0;
