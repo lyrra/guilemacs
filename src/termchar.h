@@ -267,7 +267,9 @@ extern ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
    - N is the byte count of the deleted per-column putc loop for every
      cursorX, also for cursorX = -1 (the loop wrote FrameCols bytes then).
    - N = 0 is a legal run: the sink sets current_tty, writes 0 bytes and
-     crosses 0 times.
+     crosses 0 times.  A NEGATIVE N writes 0 bytes as well, as the deleted
+     per-column loop did, because N is negative when cursorX is above
+     FrameCols - 1, for example after a resize.
    - N <= FrameCols, so 1 run takes 1 chunk crossing (M61_CAP_CHUNK is
      1024) and the byte order of a longer run is not proven.
    - The mask c & 0177 of m61_cap_putc keeps the byte ' ' the same.

@@ -994,9 +994,9 @@ def selftest():
           M62_IMP2_CONTROL_PAIR[0] < int(imp2_subst["MIN_S2C"]), True)
     check("m62-imp2-control-below-min-c2s",
           M62_IMP2_CONTROL_PAIR[1] < int(imp2_subst["MIN_C2S"]), True)
-    # No delta is pinned: only the window RELATION is a contract (brief.org
-    # section 7 item 5).  A per-run product or a fixed delta would encode a
-    # measurement of one tree as a rule.
+    # No delta is pinned: only the window RELATION is a contract
+    # (milestone.org section 6, "the crossing windows").  A per-run product
+    # or a fixed delta would encode a measurement of one tree as a rule.
     # The count case is ISOLATED: a window on the crossing counter only.
     check("m62-imp2-count-case-isolated",
           "span_requires" in imp2_count, False)
