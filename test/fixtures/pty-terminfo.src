@@ -283,3 +283,7 @@ ansi|ansi/pc-term compatible with color,
 
 m52-imp8|PTY delete-mode fixture,
 	smdc=\E[4h, rmdc=\E[4l, use=xterm,
+
+m62-imp2|PTY space-run fixture, no el,
+	use=xterm,
+	el@,

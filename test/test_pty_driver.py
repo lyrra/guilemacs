@@ -161,5 +161,45 @@ class TerminfoFixtureTests(unittest.TestCase):
         session.assert_not_called()
 
 
+class M62Imp2ContractTests(unittest.TestCase):
+    """The pty-free contracts of the M62 imp-2 group (the space run)."""
+
+    def _case(self, name):
+        return next(c for c in pty_cases.CASES if c["name"] == name)
+
+    def test_space_run_width_follows_the_pinned_frame(self):
+        # The run is FrameCols - 1 - cursorX bytes, and cursorX is 0 after
+        # cmgoto (row, 0).  The case pins FrameCols through COLUMNS, so the
+        # needle length MUST equal COLUMNS - 1 and not a magic 79.
+        case = self._case("m62-imp2/space-run-bytes-e2e")
+        cols = int(case["env"]["COLUMNS"])
+        self.assertEqual(len(pty_cases.M62_IMP2_SPACES), cols - 1)
+
+    def test_count_window_holds_the_act_and_refuses_the_control(self):
+        case = self._case("m62-imp2/space-run-count-e2e")
+        subst = case["subst"]
+        lo, hi = int(subst["MIN_S2C"]), int(subst["MAX_S2C"])
+        clo, chi = int(subst["MIN_C2S"]), int(subst["MAX_C2S"])
+        act = pty_cases.M62_IMP2_ACT_PAIR
+        control = pty_cases.M62_IMP2_CONTROL_PAIR
+        self.assertLessEqual(lo, act[0])
+        self.assertLessEqual(act[0], hi)
+        self.assertLessEqual(clo, act[1])
+        self.assertLessEqual(act[1], chi)
+        self.assertLess(control[0], lo)
+        self.assertLess(control[1], clo)
+
+    def test_every_case_pins_the_fixture_and_the_size(self):
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp2":
+                continue
+            self.assertEqual(case["terminfo_fixture"], pty_cases.M62_IMP2_TERM)
+            self.assertEqual(case["env"]["TERM"], pty_cases.M62_IMP2_TERM)
+            # An inherited COLUMNS/LINES of the host would override the
+            # entry through ncurses setupterm, so each case pins both.
+            self.assertEqual(case["env"]["COLUMNS"], "80")
+            self.assertEqual(case["env"]["LINES"], "24")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -82,6 +82,9 @@ import termios
 
 from pty_cases import *  # Case tables, probes, and their shared constants.
 from pty_cases import _M58_IMP3_ITALIC_NEEDLE
+from pty_cases import M62_IMP1_ACT_PAIR, M62_IMP1_CONTROL_PAIR
+from pty_cases import M62_IMP2_ACT_PAIR, M62_IMP2_CONTROL_PAIR
+from pty_cases import M62_IMP2_COUNT_RUNS
 from pty_session import SessionOptions, deliver_raw, run_session
 
 
@@ -813,7 +816,8 @@ def selftest():
     check("m61-imp2g-case-count", len(group_cases("m61-imp2g")), 6)
     check("m61-imp3-case-count", len(group_cases("m61-imp3")), 9)
     check("m62-imp1-case-count", len(group_cases("m62-imp1")), 3)
-    check("total-case-count", len(CASES), 61)
+    check("m62-imp2-case-count", len(group_cases("m62-imp2")), 3)
+    check("total-case-count", len(CASES), 64)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
@@ -893,12 +897,39 @@ def selftest():
           (int(count_subst["MIN_S2C"]) <= int(count_subst["MAX_S2C"])
            and int(count_subst["MIN_C2S"]) <= int(count_subst["MAX_C2S"])),
           True)
+
+    # The window is the DISCRIMINATOR, and this is the arithmetic proof of
+    # that claim: the window holds the MEASURED act pair and it refuses the
+    # MEASURED per-byte control pair.  It needs no pty and no build, so it
+    # guards the window on a host that can not run the group.  A later edit
+    # that shrinks the window below the act, or widens it over the control,
+    # fails here instead of in a silent PASS.
+    def _in_window(pair):
+        return (int(count_subst["MIN_S2C"]) <= pair[0]
+                <= int(count_subst["MAX_S2C"])
+                and int(count_subst["MIN_C2S"]) <= pair[1]
+                <= int(count_subst["MAX_C2S"]))
+
+    check("m62-imp1-count-window-holds-the-act",
+          _in_window(M62_IMP1_ACT_PAIR), True)
+    check("m62-imp1-count-window-refuses-the-control",
+          any(_in_window(pair) for pair in
+              ((M62_IMP1_CONTROL_PAIR[0], M62_IMP1_ACT_PAIR[1]),
+               (M62_IMP1_ACT_PAIR[0], M62_IMP1_CONTROL_PAIR[1]),
+               M62_IMP1_CONTROL_PAIR)),
+          False)
+    # The lower bound is the discriminator, so the control sits BELOW it on
+    # both axes.  The file pins no per-run product and no delta.
+    check("m62-imp1-control-below-min-s2c",
+          M62_IMP1_CONTROL_PAIR[0] < int(count_subst["MIN_S2C"]), True)
+    check("m62-imp1-control-below-min-c2s",
+          M62_IMP1_CONTROL_PAIR[1] < int(count_subst["MIN_C2S"]), True)
     # An ISOLATED design: no markers and no redisplay, so the range holds
-    # the crossings of the cursor path only (cr.org F2).
+    # the crossings of the cursor path only.
     check("m62-imp1-count-case-isolated",
           "span_requires" in count_case, False)
     # The probe reuses the crossing counter of src/eval.c and invents no
-    # new counter (brief.org 5.2, cr.org F3).
+    # new counter (milestone.org 4.1).
     count_probe = count_case.get("probe", "")
     check("m62-imp1-count-reuses-the-counter",
           "debug-guile-cross-count" in count_probe, True)
@@ -927,6 +958,74 @@ def selftest():
           _case("m62-imp1/clean-exit-e2e").get("wait_exit"), True)
     check("m62-imp1-clean-exit-mode",
           _case("m62-imp1/clean-exit-e2e").get("capture_mode"), True)
+
+    # --- M62 imp-2: the space run and the 7th flush point ---------------
+    # The same arithmetic proof for the window of the new group: the
+    # window holds the MEASURED act pair and refuses the MEASURED
+    # per-column control pair on both axes.  It needs no pty and no
+    # build, so it guards the window on a host that can not run the group.
+    imp2_count = _case("m62-imp2/space-run-count-e2e")
+    imp2_subst = imp2_count.get("subst") or {}
+    for key in ("MIN_S2C", "MAX_S2C", "MIN_C2S", "MAX_C2S"):
+        check("m62-imp2-count-window-%s" % key, key in imp2_subst, True)
+    check("m62-imp2-count-window-non-empty",
+          (int(imp2_subst["MIN_S2C"]) > 0
+           and int(imp2_subst["MIN_C2S"]) > 0), True)
+    check("m62-imp2-count-window-ordered",
+          (int(imp2_subst["MIN_S2C"]) <= int(imp2_subst["MAX_S2C"])
+           and int(imp2_subst["MIN_C2S"]) <= int(imp2_subst["MAX_C2S"])),
+          True)
+
+    def _in_imp2_window(pair):
+        return (int(imp2_subst["MIN_S2C"]) <= pair[0]
+                <= int(imp2_subst["MAX_S2C"])
+                and int(imp2_subst["MIN_C2S"]) <= pair[1]
+                <= int(imp2_subst["MAX_C2S"]))
+
+    check("m62-imp2-count-window-holds-the-act",
+          _in_imp2_window(M62_IMP2_ACT_PAIR), True)
+    check("m62-imp2-count-window-refuses-the-control",
+          any(_in_imp2_window(pair) for pair in
+              ((M62_IMP2_CONTROL_PAIR[0], M62_IMP2_ACT_PAIR[1]),
+               (M62_IMP2_ACT_PAIR[0], M62_IMP2_CONTROL_PAIR[1]),
+               M62_IMP2_CONTROL_PAIR)),
+          False)
+    check("m62-imp2-control-below-min-s2c",
+          M62_IMP2_CONTROL_PAIR[0] < int(imp2_subst["MIN_S2C"]), True)
+    check("m62-imp2-control-below-min-c2s",
+          M62_IMP2_CONTROL_PAIR[1] < int(imp2_subst["MIN_C2S"]), True)
+    # No delta is pinned: only the window RELATION is a contract (brief.org
+    # section 7 item 5).  A per-run product or a fixed delta would encode a
+    # measurement of one tree as a rule.
+    # The count case is ISOLATED: a window on the crossing counter only.
+    check("m62-imp2-count-case-isolated",
+          "span_requires" in imp2_count, False)
+    check("m62-imp2-count-reuses-the-counter",
+          "debug-guile-cross-count" in imp2_count.get("probe", ""), True)
+    # The byte case pins the WHOLE space run as 1 needle, and it names no
+    # capability: the entry holds no el by design, so a `capability' key
+    # would turn the case into a false INFO skip.
+    imp2_bytes = _case("m62-imp2/space-run-bytes-e2e")
+    imp2_span = imp2_bytes.get("span_requires") or {}
+    check("m62-imp2-bytes-case-span", imp2_span.get("span"),
+          (M62_IMP2_BEGIN, M62_IMP2_END))
+    check("m62-imp2-bytes-case-needle", imp2_span.get("needles"),
+          (M62_IMP2_SPACES,))
+    check("m62-imp2-bytes-case-no-capability",
+          "capability" in imp2_span, False)
+    # Every case of the group runs on the fixed entry that has NO el, so
+    # the space run happens and the host database does not decide it.
+    for _c in group_cases("m62-imp2"):
+        check("m62-imp2-fixture-%s" % _c["name"],
+              _c.get("terminfo_fixture") in TERMINFO_FIXTURES, True)
+        check("m62-imp2-term-%s" % _c["name"],
+              (_c.get("env") or {}).get("TERM"), "m62-imp2")
+    check("m62-imp2-count-runs",
+          int(imp2_subst["RUNS"]), M62_IMP2_COUNT_RUNS)
+    check("m62-imp2-clean-exit-waits",
+          _case("m62-imp2/clean-exit-e2e").get("wait_exit"), True)
+    check("m62-imp2-clean-exit-mode",
+          _case("m62-imp2/clean-exit-e2e").get("capture_mode"), True)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

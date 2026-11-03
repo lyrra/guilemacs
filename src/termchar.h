@@ -259,4 +259,28 @@ extern Lisp_Object tty_handle_tab_bar_click (struct frame *, int, int, bool,
 extern ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
 				     const char *, int);
 
+/* The N-byte form of the sink (src/term.c).  The space run of
+   reset_sys_modes in src/sysdep.c calls it with N = FrameCols - 1 -
+   cursorX, so the run reaches the output stream AND the termscript
+   through ONE writer, in ONE call.  Facts of that caller:
+
+   - N is the byte count of the deleted per-column putc loop for every
+     cursorX, also for cursorX = -1 (the loop wrote FrameCols bytes then).
+   - N = 0 is a legal run: the sink sets current_tty, writes 0 bytes and
+     crosses 0 times.
+   - N <= FrameCols, so 1 run takes 1 chunk crossing (M61_CAP_CHUNK is
+     1024) and the byte order of a longer run is not proven.
+   - The mask c & 0177 of m61_cap_putc keeps the byte ' ' the same.
+
+   No caller reads the answer (M62 imp-2).  */
+extern ptrdiff_t m61_tty_emit_cap_repeat_1 (struct tty_display_info *, int,
+					    EMACS_INT);
+
+/* The ordered-path flush hub (src/term.c).  It runs the Scheme state
+   check of the handle and keeps the FILE * and the fflush in C.  The 7th
+   flush point of reset_sys_modes in src/sysdep.c calls it, at the same
+   position in the order, and DISCARDS the answer as the 6 routed points
+   do: a flush failure is silent in both shapes (M62 imp-2).  */
+extern ptrdiff_t m61_tty_handle_flush_1 (struct tty_display_info *);
+
 #endif /* EMACS_TERMCHAR_H */

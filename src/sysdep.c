@@ -1428,13 +1428,13 @@ reset_sys_modes (struct tty_display_info *tty_out)
   else
     {			/* have to do it the hard way */
       tty_turn_off_insert (tty_out);
-
-      for (int i = cursorX (tty_out); i < FrameCols (tty_out) - 1; i++)
-	putc (' ', tty_out->output);
+      /* M62 imp-2: 1 sink run, FrameCols-1-cursorX bytes, termscript copy.  */
+      (void) m61_tty_emit_cap_repeat_1 (tty_out, ' ', FrameCols (tty_out) - 1
+					- cursorX (tty_out));
     }
 
   cmgoto (tty_out, FrameRows (tty_out) - 1, 0);
-  fflush (tty_out->output);
+  (void) m61_tty_handle_flush_1 (tty_out); /* M62 imp-2: 7th flush point  */
 
   if (tty_out->terminal->reset_terminal_modes_hook)
     tty_out->terminal->reset_terminal_modes_hook (tty_out->terminal);

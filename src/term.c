@@ -194,12 +194,10 @@ static int m61_cap_putc (int);
 static ptrdiff_t m61_cap_drain_1 (void);
 static void m61_cap_begin (struct tty_display_info *);
 static ptrdiff_t m61_cap_finish (void);
-/* The ONE capability sink of a TTY.  It is exported to src/cm.h and
-   src/sysdep.c through the emacs_tputs macro (M62 imp-1).  */
-ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
-			      const char *, int);
-static ptrdiff_t m61_tty_emit_cap_repeat_1 (struct tty_display_info *, int,
-					    EMACS_INT);
+/* The ONE capability sink of a TTY is declared in src/termchar.h
+   (M62 imp-1).  src/cm.h and src/sysdep.c reach it through the
+   emacs_tputs macro.  This file holds no forward declaration (cr.org
+   F5).  */
 
 #define OUTPUT(tty, a)                                                  \
   m61_tty_emit_cap_1 (tty, a,                                          \
@@ -265,10 +263,10 @@ static int last_mouse_x, last_mouse_y;
 
 /* The M61 imp-2 ordered-path hubs of the normal glyph path.  The bell,
    the terminal modes and tty_update_end flush the output stream far above
-   the M61 block of this file, so the hub must be declared here.  The
-   definitions are in that block; section 3 of milestone.org gives the
-   order contract.  */
-static ptrdiff_t m61_tty_handle_flush_1 (struct tty_display_info *);
+   the M61 block of this file.  The definitions are in that block; section
+   3 of milestone.org gives the order contract.  Both hubs are exported
+   through src/termchar.h (M62 imp-2), so this file holds no forward
+   declaration of them.  */
 
 #ifndef HAVE_ANDROID
 
@@ -1908,8 +1906,10 @@ m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
    N = 0 starts and ends a run with no byte, so current_tty is set, as
    the deleted =cmputc= site set it before its loop (cr1.org 2026-11-01
    C1; cmputc is GONE, M62 imp-1), and no crossing happens:
-   m61_cap_drain_1 answers 0 for an empty sink.  */
-static ptrdiff_t
+   m61_cap_drain_1 answers 0 for an empty sink.  It is exported through
+   src/termchar.h (M62 imp-2): the space run of the reset path of
+   src/sysdep.c calls it.  */
+ptrdiff_t
 m61_tty_emit_cap_repeat_1 (struct tty_display_info *tty, int c, EMACS_INT n)
 {
   EMACS_INT i;
@@ -1955,8 +1955,9 @@ m61_tty_output_flush_1 (struct tty_display_info *tty)
 /* Flush the output stream of TTY through its handle.  Scheme checks
    that the handle is open; C keeps the fflush and its position.  Before
    the Guile runtime exists, and when the identity table is full, run the
-   same mechanism directly.  */
-static ptrdiff_t
+   same mechanism directly.  It is exported through src/termchar.h (M62
+   imp-2): the 7th flush point of src/sysdep.c calls it.  */
+ptrdiff_t
 m61_tty_handle_flush_1 (struct tty_display_info *tty)
 {
   int identity;

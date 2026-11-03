@@ -918,6 +918,11 @@ M52_IMP8_PROBE = r"""
 
 # Compile fixed terminfo entries without reading the host database.
 M52_IMP8_TERM = "m52-imp8"
+# The M62 imp-2 entry: xterm with a CANCELLED el.  reset_sys_modes takes
+# the space run only when TS_clr_line is NULL (src/sysdep.c), and every
+# other entry of this file holds el, so this entry is the ONLY one that
+# reaches the space branch.  tic -x accepts the cancelled capability.
+M62_IMP2_TERM = "m62-imp2"
 _fixture_dir = None
 _fixture_tried = False
 
@@ -940,7 +945,9 @@ def terminfo_fixture(term):
                 compiled = {name for _, _, files in os.walk(directory)
                             for name in files}
                 if result.returncode == 0 and all(
-                        name in compiled for name in ("xterm", "ansi", M52_IMP8_TERM)):
+                        name in compiled
+                        for name in ("xterm", "ansi", M52_IMP8_TERM,
+                                     M62_IMP2_TERM)):
                     _fixture_dir = directory
             except OSError:
                 pass
@@ -951,7 +958,8 @@ def terminfo_fixture(term):
 
 
 TERMINFO_FIXTURES = {name: (lambda term=name: terminfo_fixture(term))
-                     for name in ("xterm", "ansi", M52_IMP8_TERM)}
+                     for name in ("xterm", "ansi", M52_IMP8_TERM,
+                                  M62_IMP2_TERM)}
 
 M52_IMP8_CASES = (
     {
@@ -3023,7 +3031,7 @@ M61_IMP3_CASES = (
 # --- M62 imp-1: the cursor path crosses the ONE capability sink ------
 #
 # The observable that separates the 2 shapes of the cursor path is the
-# CROSSING COUNT of the reset_sys_modes run (brief.org 5.2, cr.org F2).
+# CROSSING COUNT of the reset_sys_modes run (milestone.org 4.1).
 # reset_sys_modes (src/sysdep.c) calls cmgoto twice and it emits
 # TS_clr_line once.  With the act, each capability run of that path
 # collects its whole string in the sink and crosses the tty handle ONCE
@@ -3033,13 +3041,13 @@ M61_IMP3_CASES = (
 #
 # The design is isolated on purpose: the draft used a redisplay, and 36
 # of its 38 runs came from the capability macros of src/term.c, which a
-# redisplay drives in BOTH shapes (cr.org F2, MEASURED 103/4674 in both
-# shapes, so that witness separated nothing).
+# redisplay drives in BOTH shapes (MEASURED 103/4674 in both shapes, so
+# that witness separated nothing).
 #
-# 1 unrouted site costs exactly 1 crossing for each reset, so 1 reset is
-# too thin a signal for a window.  The probe repeats the run RUNS times:
-# the gap between the 2 shapes grows with RUNS while the fixed cost of
-# the counter read does not.  MEASURED (see the window below).
+# 1 reset is too thin a signal for a window.  The probe therefore repeats
+# the run RUNS times: the gap between the 2 shapes grows with RUNS while
+# the fixed cost of the counter read does not.  MEASURED (see the window
+# below).
 #
 # The probe reuses the crossing counter of src/eval.c, exactly as
 # m61-imp3/cross-count-e2e does: NO new counter and NO new leaf.
@@ -3054,23 +3062,41 @@ M62_IMP1_CLR_LINE = b"\x1b[K"
 # The number of reset_sys_modes runs of the count case.
 M62_IMP1_COUNT_RUNS = 8
 
-# The MEASURED window of the crossing pair of those runs.  The pair is
-# (s2c . c2s) = (SCHEME-TO-C . C-TO-SCHEME), as src/eval.c
-# debug-guile-cross-count answers it.
+# The 2 MEASURED pairs of the count case: (s2c, c2s) = (SCHEME-TO-C,
+# C-TO-SCHEME), as src/eval.c debug-guile-cross-count answers it.  The act
+# pair is the sink shape; the control pair is the per-byte shape of the 1
+# unrouted TS_clr_line site.  The selftest of test/pty-driver.py proves
+# that the window below holds the act pair and refuses the control pair.
 #
-# MEASURED 2026-11-02 on the built tree, TERM=ansi fixture:
-#   1 reset:   the act 8/10, the negative control 7/9
-#   RUNS = 8:  the act 49/72, the negative control 42/65
-# The negative control puts src/sysdep.c:1426 back on a per-byte write of
-# TS_clr_line.  It loses exactly 1 crossing for each reset, so the LOWER
-# bound is the discriminator and the UPPER bound catches an added
-# dispatch.  Each bound sits 4 crossings above and below the measured
-# act, and the control sits 3 crossings below the lower bound.  The count
-# is deterministic: no jitter was measured in 3 consecutive runs.
-M62_IMP1_COUNT_MIN_S2C = 45
-M62_IMP1_COUNT_MAX_S2C = 53
-M62_IMP1_COUNT_MIN_C2S = 68
-M62_IMP1_COUNT_MAX_C2S = 76
+# MEASURED 2026-11-03 on the built tree of M62 imp-2 (HEAD 05b1f469f plus
+# the act), TERM=ansi fixture, by
+#   python3 test/pty-driver.py --emacs src/emacs --group m62-imp1
+# with the temporary window 100000..62/77..85, which makes the probe
+# report its value: act (58, 81).  The control is the same tree with the
+# TS_clr_line site of src/sysdep.c replaced by a per-byte putc loop, built
+# again and measured with the same command: control (50, 73).  The pairs
+# of the imp-1 tree were (49, 72) and (42, 65).
+M62_IMP1_ACT_PAIR = (58, 81)
+M62_IMP1_CONTROL_PAIR = (50, 73)
+
+# The MEASURED window of the crossing pair of those runs.
+#
+# The measurement is the command above: 1
+# `debug-reset-guile-cross-count` before the loop, RUNS = 8 calls of the
+# `--reset-sys-modes` leaf of src/keyboard.c, and 1
+# `debug-guile-cross-count` after the loop.  The act answers
+# M62_IMP1_ACT_PAIR and the negative control answers M62_IMP1_CONTROL_PAIR.
+#
+# The window is the measured act plus and minus 1 crossing.  BOUNDS: the
+# lower bound rejects the per-byte shape, which sits 8 crossings below the
+# act over the 8 runs.  The upper bound admits 1 crossing of jitter over
+# the 8 runs, so a dispatch that adds 1 crossing for EACH run (8 crossings)
+# fails it; an addition below 1 crossing for each 8 runs stays inside the
+# window.  The count was deterministic in the measurements of this act.
+M62_IMP1_COUNT_MIN_S2C = 57
+M62_IMP1_COUNT_MAX_S2C = 59
+M62_IMP1_COUNT_MIN_C2S = 80
+M62_IMP1_COUNT_MAX_C2S = 82
 
 # The shared prelude: the tty of the session, the 2 mode leaves of
 # src/keyboard.c and the crossing counter of src/eval.c.  A probe uses
@@ -3162,9 +3188,10 @@ M62_IMP1_CASES = (
                   "MAX_S2C": str(M62_IMP1_COUNT_MAX_S2C),
                   "MIN_C2S": str(M62_IMP1_COUNT_MIN_C2S),
                   "MAX_C2S": str(M62_IMP1_COUNT_MAX_C2S)},
-        # A window on the pair of ONE reset_sys_modes run: the act 8/6,
-        # the control 4/3.  A per-byte write of 1 of the 3 runs of the
-        # path answers the pair of the 2 routed runs, below MIN.
+        # A window on the pair of RUNS = 8 reset_sys_modes runs: the act
+        # M62_IMP1_ACT_PAIR and the per-byte control M62_IMP1_CONTROL_PAIR,
+        # as the window note above states.  The control sits 8 crossings
+        # below MIN on both axes.
         "expect": "ok",
         "info_report_prefix": M62_IMP1_SKIP,
         # The ansi entry holds el (\E[K) and no smcup, so the run makes
@@ -3202,13 +3229,217 @@ M62_IMP1_CASES = (
     },
 )
 
+# --- M62 imp-2: the space run of reset_sys_modes and the 7th flush point --
+#
+# The act routes the space run and the 7th flush point of reset_sys_modes
+# (src/sysdep.c) through the ONE sink and the flush hub.  The space run
+# takes N = FrameCols - 1 - cursorX bytes in ONE call, so the run reaches
+# the output stream AND the termscript through ONE writer.  Before the act
+# the run wrote putc for each column and crossed the handle 0 times.
+#
+# The 3 cases prove 3 different things: the crossing count separates the 2
+# shapes, the bytes reach the pty, and the restore path still exits clean.
+M62_IMP2_BEGIN = b"M62-IMP2-BEGIN!"
+M62_IMP2_END = b"M62-IMP2-END!"
+M62_IMP2_SKIP = "m62-imp2-skip:"
+
+# The number of reset_sys_modes runs of the count case.
+M62_IMP2_COUNT_RUNS = 8
+
+# The case env of this group.  ncurses setupterm reads COLUMNS and LINES
+# from the ENVIRONMENT and they OVERRIDE cols#80/lines#24 of the entry,
+# so a COLUMNS of the host would decide the width of the space run.
+# MEASURED on the built tree of this act: without the 2 keys the child
+# inherited COLUMNS=191 and the run was 190 bytes; with them the frame is
+# 80x24 (`frame-width` / `frame-height`) and the run is 79 bytes.
+M62_IMP2_ENV = {"TERM": M62_IMP2_TERM, "COLUMNS": "80", "LINES": "24"}
+
+# The space run of the entry with cols#80.  reset_sys_modes calls cmgoto
+# (row, 0) before the run, so cursorX is 0 and the run is FrameCols - 1
+# bytes.  MEASURED 2026-11-03 on the built tree with M62_IMP2_ENV: the
+# BEGIN .. END span held `\E[24d' plus 79 space bytes, and no other run.
+# The needle is the whole run, so a run of another width, and a run split
+# into single bytes, both fail the case.
+M62_IMP2_SPACES = b" " * 79
+
+# The shared prelude: the tty of the session, the 2 mode leaves of
+# src/keyboard.c and the crossing counter of src/eval.c.  It has the same
+# shape as M62_IMP1_PRELUDE and its own skip prefix, so a skip of this
+# group can not be read as a skip of m62-imp1.
+M62_IMP2_PRELUDE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the session terminal is the
+       ;; last element.
+       (term (and (pair? terms) (car (reverse terms))))
+       (reset-modes! (c '--reset-sys-modes))
+       (init-modes! (c '--init-sys-modes))
+       (reset-cross! (c 'debug-reset-guile-cross-count))
+       (cross-count (c 'debug-guile-cross-count))
+       (send (c 'send-string-to-terminal))
+       (line (lambda (label a b)
+               (string-append label " s2c=" (number->string a)
+                              " c2s=" (number->string b)))))
+  (cond ((not term) "no-terminal")
+        ;; A terminal without a tty (or with no output stream) is
+        ;; suspended: reset_sys_modes returns before any capability, so
+        ;; the pair proves nothing.  State the skip, never a pass.
+        ((not ((c '--decode-tty-terminal-p) term))
+         "m62-imp2-skip: the session terminal does not decode to a tty")
+        (else
+"""
+
+# RUNS reset_sys_modes runs and their crossing pair, on the entry WITHOUT
+# el, so the space run happens.  The counters are reset BEFORE the first
+# run and read right after the last one, so the range holds those runs
+# only.  The init runs after the read, so the terminal is left as the run
+# found it.
+M62_IMP2_COUNT_PROBE = M62_IMP2_PRELUDE + r"""
+          (begin
+            (reset-cross!)
+            (let loop ((i @@RUNS@@))
+              (if (> i 0) (begin (reset-modes! term) (loop (- i 1))) #f))
+            (let ((counts (cross-count)))
+              (let ((s2c (car counts)) (c2s (cdr counts)))
+                (init-modes! term)
+                (if (and (<= @@MIN_S2C@@ s2c) (<= s2c @@MAX_S2C@@)
+                         (<= @@MIN_C2S@@ c2s) (<= c2s @@MAX_C2S@@))
+                    "ok"
+                    (string-append
+                     (line "m62-imp2-cross:" s2c c2s)
+                     " is outside the window @@MIN_S2C@@..@@MAX_S2C@@/"
+                     "@@MIN_C2S@@..@@MAX_C2S@@ of @@RUNS@@ routed runs: the"
+                     " space run or the flush point left the sink")))))
+        )))
+"""
+
+# The SAME run between 2 markers.  The driver then looks for the whole
+# space run INSIDE the span, so a run that eats its bytes or splits them
+# fails here.
+M62_IMP2_BYTES_PROBE = M62_IMP2_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (reset-modes! term)
+            (send "@@END@@")
+            (init-modes! term)
+            "ok")
+        )))
+"""
+
+# The same run, and the driver checks the exit status and the restored
+# terminal mode.  The reset path changed, so it is re-proved here.
+M62_IMP2_CLEAN_EXIT_PROBE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       (term (and (pair? terms) (car (reverse terms))))
+       (reset-modes! (c '--reset-sys-modes))
+       (init-modes! (c '--init-sys-modes))
+       (send (c 'send-string-to-terminal)))
+  (cond ((not term) "no-terminal")
+        ((not ((c '--decode-tty-terminal-p) term))
+         "m62-imp2-skip: the session terminal does not decode to a tty")
+        (else
+         (begin
+           (send "@@BEGIN@@")
+           (reset-modes! term)
+           (send "@@END@@")
+           (init-modes! term)
+           "ok"))))
+"""
+
+# The 2 MEASURED pairs of the count case: (s2c, c2s) = (SCHEME-TO-C,
+# C-TO-SCHEME), as src/eval.c debug-guile-cross-count answers it.  The act
+# pair is the sink shape; the control pair is the per-column putc shape of
+# the space run.  The selftest of test/pty-driver.py proves that the
+# window below holds the act pair and refuses the control pair.
+#
+# MEASURED 2026-11-03 on the built tree of this act, TERM=m62-imp2 fixture
+# (xterm with a cancelled el) and M62_IMP2_ENV, by
+#   python3 test/pty-driver.py --emacs src/emacs --group m62-imp2
+# with the temporary window 100000..86/109..117, which makes the probe
+# report its value: act (82, 113).  The control is the same tree with the
+# space loop of src/sysdep.c put back (per-column putc), built again and
+# measured with the same command: control (74, 105).
+M62_IMP2_ACT_PAIR = (82, 113)
+M62_IMP2_CONTROL_PAIR = (74, 105)
+
+# The MEASURED window of the crossing pair of those runs.
+#
+# The measurement is the command above: 1
+# `debug-reset-guile-cross-count` before the loop, RUNS = 8 calls of the
+# `--reset-sys-modes` leaf of src/keyboard.c, and 1
+# `debug-guile-cross-count` after the loop.
+#
+# The window is the measured act plus and minus 1 crossing.  BOUNDS: the
+# lower bound rejects the per-column shape, which sits 8 crossings below
+# the act over the 8 runs.  The upper bound admits 1 crossing of jitter
+# over the 8 runs, so a dispatch that adds 1 crossing for EACH run (8
+# crossings) fails it; an addition below 1 crossing for each 8 runs stays
+# inside the window.  The count was deterministic in the measurements of
+# this act.
+M62_IMP2_COUNT_MIN_S2C = 81
+M62_IMP2_COUNT_MAX_S2C = 83
+M62_IMP2_COUNT_MIN_C2S = 112
+M62_IMP2_COUNT_MAX_C2S = 114
+
+M62_IMP2_CASES = (
+    {
+        "name": "m62-imp2/space-run-count-e2e",
+        "group": "m62-imp2",
+        "probe": M62_IMP2_COUNT_PROBE,
+        "subst": {"RUNS": str(M62_IMP2_COUNT_RUNS),
+                  "MIN_S2C": str(M62_IMP2_COUNT_MIN_S2C),
+                  "MAX_S2C": str(M62_IMP2_COUNT_MAX_S2C),
+                  "MIN_C2S": str(M62_IMP2_COUNT_MIN_C2S),
+                  "MAX_C2S": str(M62_IMP2_COUNT_MAX_C2S)},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP2_SKIP,
+        # The entry holds no el, so reset_sys_modes takes the space run
+        # and not TS_clr_line.  M62_IMP2_ENV pins the frame to 80x24.
+        "env": dict(M62_IMP2_ENV),
+    },
+    {
+        "name": "m62-imp2/space-run-bytes-e2e",
+        "group": "m62-imp2",
+        "probe": M62_IMP2_BYTES_PROBE,
+        "subst": {"BEGIN": M62_IMP2_BEGIN.decode(),
+                  "END": M62_IMP2_END.decode()},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP2_SKIP,
+        # The plain needle arm: the entry holds NO el by design, so a
+        # `capability' key would answer a false INFO skip.  The needle
+        # proves the byte and the count, not the termscript copy.
+        "span_requires": {"span": (M62_IMP2_BEGIN, M62_IMP2_END),
+                          "needles": (M62_IMP2_SPACES,)},
+        "env": dict(M62_IMP2_ENV),
+    },
+    {
+        "name": "m62-imp2/clean-exit-e2e",
+        "group": "m62-imp2",
+        "probe": M62_IMP2_CLEAN_EXIT_PROBE,
+        "subst": {"BEGIN": M62_IMP2_BEGIN.decode(),
+                  "END": M62_IMP2_END.decode()},
+        "expect": "ok",
+        "pty_contains": M62_IMP2_END,
+        "info_report_prefix": M62_IMP2_SKIP,
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": dict(M62_IMP2_ENV),
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
          + M52_IMP8_CASES + M54_IMP2_CASES + M54_IMP3_CASES + M54_IMP4_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
-         + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES)
+         + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES
+         + M62_IMP2_CASES)
 
 # These cases check terminal capabilities or their emitted bytes.
 _FIXTURE_CASES = {
@@ -3216,7 +3447,8 @@ _FIXTURE_CASES = {
     "m54-imp4/tab-policy-e2e", "m58-imp2/face-appearance-e2e",
 }
 _FIXTURE_GROUPS = {"m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
-                   "m58-imp3", "m58-imp4", "m61-imp3", "m62-imp1"}
+                   "m58-imp3", "m58-imp4", "m61-imp3", "m62-imp1",
+                   "m62-imp2"}
 CASES = tuple(
     dict(case, terminfo_fixture=case.get("env", {}).get("TERM", "xterm"))
     if case["name"] in _FIXTURE_CASES or case["group"] in _FIXTURE_GROUPS
@@ -3231,4 +3463,4 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
           "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3",
-          "m62-imp1")
+          "m62-imp1", "m62-imp2")
