@@ -66,6 +66,143 @@ class CaseVerdictTests(unittest.TestCase):
             self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
 
 
+class M62Imp1bTimeGapTests(unittest.TestCase):
+    """The pure helpers of the padded-order case (M62 imp-1b)."""
+
+    def test_largest_gap_counts_the_chunk_that_covers_the_span_start(self):
+        # The mark of the case and the bytes of the run can arrive in ONE
+        # chunk, so the chunk that starts before the span still counts.
+        marks = [(0, 10.0), (6, 10.05), (20, 10.10), (40, 10.101)]
+        self.assertAlmostEqual(driver.largest_gap(marks, 8, 39), 0.05)
+        # A span that arrived as ONE chunk has no gap at all.  None is not
+        # a gap of 0 seconds: the caller must not read it as a pass.
+        self.assertIsNone(driver.largest_gap([(0, 10.0), (40, 10.06)], 8, 39))
+        self.assertIsNone(driver.largest_gap([], 8, 39))
+        self.assertIsNone(driver.largest_gap(None, 8, 39))
+
+    def test_pad_marker_reads_every_marker_form(self):
+        self.assertEqual(driver.pad_marker_seconds(b"\x1b[K$<50/>"), 0.05)
+        self.assertEqual(driver.pad_marker_seconds(b"\x1b[K$<50>"), 0.05)
+        self.assertEqual(driver.pad_marker_seconds(b"$<2.5*>"), 0.0025)
+        self.assertIsNone(driver.pad_marker_seconds(b"\x1b[K"))
+        self.assertIsNone(driver.pad_marker_seconds(b""))
+
+    def test_the_case_takes_its_padding_from_the_fixture_entry(self):
+        # The case holds no 50 ms of its own: the value must come from the
+        # entry, so a host with another declared padding is measured on its
+        # own value.
+        case = next(c for c in pty_cases.CASES
+                    if c["name"] == "m62-imp1b/padded-order-e2e")
+        spec = case["time_gap"]
+        self.assertEqual(spec["capability"], "el")
+        self.assertNotIn("padding", spec)
+        self.assertTrue(case["time_marks"])
+
+    def test_the_order_holds_when_the_run_bytes_precede_the_sleep(self):
+        # The fixed shape: BEGIN and the run bytes ESC [ K reach the pty at
+        # ~t0, then the 50 ms sleep of the marker runs, then END arrives.
+        case = {"name": "gap", "env": {"TERM": "xterm"},
+                "time_gap": {"span": (b"B", b"E"), "capability": "el"}}
+        marks = [(0, 10.0), (4, 10.050)]
+        gap_before, gap_after = driver.order_gaps(marks, 1, 7, 1, 4)
+        self.assertAlmostEqual(gap_before, 0.0)
+        self.assertAlmostEqual(gap_after, 0.050)
+        with mock.patch.object(driver, "terminfo_capability",
+                               return_value=b"\x1b[K$<50/>"):
+            self.assertIsNone(driver.time_gap_problem(
+                case, b"B\x1b[KxyzE", marks))
+        # A burst inside 1 chunk can not prove an order, so it is a FAIL
+        # and never a pass.
+        with mock.patch.object(driver, "terminfo_capability",
+                               return_value=b"\x1b[K$<50/>"):
+            problem = driver.time_gap_problem(
+                case, b"B\x1b[KxyzE", [(0, 10.0), (1, 10.050)])
+        self.assertEqual(problem[0], "FAIL")
+        self.assertIn("fewer than 2 chunks", problem[1])
+
+    def test_the_order_fails_when_the_run_bytes_follow_the_sleep(self):
+        # The collecting shape: the whole burst leaves at the flush point,
+        # so the run bytes and END arrive together and no sleep follows
+        # them.  The largest gap of the span proves nothing here; only
+        # gap_after names the defect.
+        case = {"name": "gap", "env": {"TERM": "xterm"},
+                "time_gap": {"span": (b"B", b"E"), "capability": "el"}}
+        with mock.patch.object(driver, "terminfo_capability",
+                               return_value=b"\x1b[K$<50/>"):
+            problem = driver.time_gap_problem(
+                case, b"B\x1b[KxyzE", [(0, 10.0), (4, 10.0001)])
+        self.assertEqual(problem[0], "FAIL")
+        self.assertIn("gap_after", problem[1])
+        # The false pass that the LARGEST gap gives: the 60 ms sleep sits
+        # BETWEEN the span start and the run bytes, so the span holds a gap
+        # of 60 ms and the old form passed.  The sub-gap form names
+        # gap_before, because the run bytes did not arrive before it.
+        marks = [(0, 10.0), (3, 10.06), (6, 10.16)]
+        self.assertAlmostEqual(driver.largest_gap(marks, 1, 7), 0.10)
+        with mock.patch.object(driver, "terminfo_capability",
+                               return_value=b"\x1b[K$<50/>"):
+            problem = driver.time_gap_problem(case, b"Bxy\x1b[KzE", marks)
+        self.assertEqual(problem[0], "FAIL")
+        self.assertIn("gap_before", problem[1])
+
+    def test_time_gap_refuses_a_span_that_holds_no_run(self):
+        case = {"name": "gap", "env": {"TERM": "xterm"},
+                "time_gap": {"span": (b"B", b"E"), "capability": "el"}}
+        with mock.patch.object(driver, "terminfo_capability",
+                               return_value=b"\x1b[K$<50/>"):
+            # The run is absent: a gap would prove nothing.
+            problem = driver.time_gap_problem(
+                case, b"BxxE", [(0, 1.0), (3, 1.05)])
+            self.assertEqual(problem[0], "FAIL")
+            # The run is there and one chunk holds its start: the gap is
+            # below the declared padding, so the order is wrong.
+            problem = driver.time_gap_problem(
+                case, b"B\x1b[KxE", [(0, 1.0), (4, 1.001)])
+            self.assertEqual(problem[0], "FAIL")
+            self.assertIn("0.0010", problem[1])
+            # The order holds.
+            self.assertIsNone(driver.time_gap_problem(
+                case, b"B\x1b[KxE", [(0, 1.0), (4, 1.051)]))
+            # A span that arrived as ONE chunk holds no gap, so the case
+            # can not pass.
+            problem = driver.time_gap_problem(
+                case, b"B\x1b[KxE", [(0, 1.0)])
+            self.assertEqual(problem[0], "FAIL")
+            # No time marks at all: the case asked for a gap it can not
+            # measure.
+            problem = driver.time_gap_problem(case, b"B\x1b[KxE", None)
+            self.assertEqual(problem[0], "FAIL")
+
+    def test_time_gap_without_the_capability_is_an_info_skip(self):
+        # A host whose entry holds no el can not pad, so the case reports
+        # its own skip and never a pass.  The detail carries the group's
+        # prefix, so the line is readable next to a probe skip.
+        case = next(c for c in pty_cases.CASES
+                    if c["name"] == "m62-imp1b/padded-order-e2e")
+        with mock.patch.object(driver, "terminfo_capability", return_value=None):
+            problem = driver.time_gap_problem(case, b"", None)
+        self.assertEqual(problem[0], "INFO")
+        self.assertTrue(problem[1].startswith(pty_cases.M62_IMP1B_SKIP),
+                        problem[1])
+
+    def test_an_info_time_gap_is_a_skip_that_exits_zero(self):
+        # The driver path of that answer: an INFO line, its own prefix, and
+        # exit status 0.  A FAIL is the only status that exits 1.
+        case = next(c for c in pty_cases.CASES
+                    if c["name"] == "m62-imp1b/padded-order-e2e")
+        with mock.patch.object(driver, "terminfo_capability", return_value=None):
+            result = (case["name"],) + driver.time_gap_problem(case, b"", None)
+        output = io.StringIO()
+        with mock.patch.object(driver, "group_cases", return_value=[case]), \
+             mock.patch.object(driver.os, "openpty", side_effect=os.pipe), \
+             mock.patch.object(driver, "run_case", return_value=result), \
+             contextlib.redirect_stdout(output):
+            status = driver.main(["--emacs", sys.executable])
+        self.assertEqual(status, 0)
+        self.assertIn("INFO %s skipped (%s" % (case["name"], pty_cases.M62_IMP1B_SKIP),
+                      output.getvalue())
+
+
 class DriverStatusTests(unittest.TestCase):
     def test_case_results_control_status_and_all_are_reported(self):
         cases = [{"name": "first"}, {"name": "second"}, {"name": "third"}]

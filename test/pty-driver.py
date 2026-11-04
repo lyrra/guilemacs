@@ -459,6 +459,182 @@ def terminfo_report(pairs, term, env=None):
                     for label, cap in pairs)
 
 
+def span_chunk_marks(marks, start, end):
+    """The (offset, time) marks of the chunks that reach a byte span.
+
+    MARKS is the (byte offset, monotonic time) list of the session, with
+    1 pair for each chunk read from the pty master.  The span is the byte
+    range [START, END] of the output.  The answer is in stream order.
+
+    A chunk COUNTS when its bytes reach into the span, so the chunk that
+    holds the first byte of the span counts even when it STARTS before the
+    span.  That case is the common one: the marker of the case and the
+    bytes of the run can arrive in 1 chunk, and the delay that follows it
+    is exactly the gap to measure.
+    """
+    marks = marks or ()
+    inside = []
+    for i, (off, when) in enumerate(marks):
+        if off > end:
+            break
+        next_off = marks[i + 1][0] if i + 1 < len(marks) else None
+        # The chunk covers bytes [OFF, NEXT_OFF).  It counts when those
+        # bytes reach START.
+        if next_off is None or next_off > start:
+            inside.append((off, when))
+    return inside
+
+
+def largest_gap(marks, start, end):
+    """The largest time gap (in seconds) between 2 chunks of a byte span.
+
+    Return None when fewer than 2 chunks reach the span: a span that
+    arrived as 1 chunk holds no gap, and that is NOT a gap of 0 seconds.
+    The caller turns None into its own verdict, so this helper stays pure.
+
+    The SIZE of a gap does not prove an order, so the padded-order case of
+    M62 imp-1b uses order_gaps instead.  This helper is kept for a case
+    that measures a size only.
+    """
+    inside = [when for _, when in span_chunk_marks(marks, start, end)]
+    if len(inside) < 2:
+        return None
+    return max(b - a for a, b in zip(inside, inside[1:]))
+
+
+def order_gaps(marks, start, end, run_start, run_end):
+    """The 2 sub-gaps of a byte span around the RUN bytes [RUN_START, RUN_END).
+
+    The span [START, END] holds the marker pair of the case.  A padded
+    capability string sleeps inside =tputs= at its marker, so the order of
+    the run bytes against that sleep is the measured fact:
+
+    - GAP_BEFORE = the time of the first chunk that holds a run byte,
+      minus the time of the first chunk of the span.  It is small when the
+      run bytes reach the terminal BEFORE the sleep.
+    - GAP_AFTER = the time of the last chunk of the span, minus the time
+      of the LAST chunk that holds a run byte.  It holds the sleep when
+      the sleep comes AFTER the run bytes.
+
+    Return (gap_before, gap_after) in seconds, or None when the span
+    arrived in fewer than 2 chunks (1 chunk can not prove an order), or
+    when no chunk of the span holds a run byte.  The caller turns None
+    into its own verdict, so this helper stays pure.
+    """
+    inside = span_chunk_marks(marks, start, end)
+    if len(inside) < 2 or run_end <= run_start:
+        return None
+    first = last = None
+    for i, (off, when) in enumerate(inside):
+        next_off = inside[i + 1][0] if i + 1 < len(inside) else None
+        # The chunk covers bytes [OFF, NEXT_OFF), so its run bytes are the
+        # overlap with [RUN_START, RUN_END).
+        if (next_off is None or next_off > run_start) and off < run_end:
+            if first is None:
+                first = when
+            last = when
+    if first is None:
+        return None
+    return (first - inside[0][1], inside[-1][1] - last)
+
+
+def pad_marker_seconds(cap_bytes):
+    """The padding that a terminfo string DECLARES, in seconds, or None.
+
+    A padding marker is $<NN>, $<NN/>, $<NN*> or $<NN*/>: the number is a
+    count of milliseconds.  The mandatory forms (the "/") apply it
+    without the baud rate.  Only the FIRST marker is read: a case that
+    needs the total of several markers must add them itself.
+    """
+    if not cap_bytes:
+        return None
+    match = re.search(rb"\$<([0-9]+(?:\.[0-9]+)?)[*/]?>", cap_bytes)
+    if match is None:
+        return None
+    return float(match.group(1)) / 1000.0
+
+
+def time_gap_problem(case, output, marks):
+    """Check the time ORDER of a padded capability run (M62 imp-1b).
+
+    A padded string sleeps inside =tputs=, so the bytes BEFORE its marker
+    must reach the terminal BEFORE that sleep.  A byte substring check
+    can not prove that: the same bytes arrive in any order.
+
+    The proof is the 2 SUB-GAPS of the span around the run bytes
+    (order_gaps), NOT the largest gap of the span: the run bytes come
+    first (gap_before is small) and the sleep of the marker follows them
+    (gap_after holds the declared padding).  The MAXIMUM gap proves
+    neither, because a host that flushes the BEGIN marker on its own
+    would answer a false pass on a gap that sits before the run bytes.
+
+    Return ("INFO", evidence) when the host entry holds no capability to
+    pad, ("FAIL", reason) when the span is missing, when it holds no byte
+    of the capability, or when a sub-gap has the wrong size, and None
+    when the order holds.
+    """
+    spec = case.get("time_gap")
+    if spec is None:
+        return None
+    term = (case.get("env") or {}).get("TERM")
+    cap = spec.get("capability")
+    cap_bytes = terminfo_capability(term, cap, case.get("env")) if cap else None
+    if cap_bytes is None:
+        # Prefix the detail with the group's own skip prefix, so this INFO
+        # is recognisable next to a skip that the probe itself reported.
+        skip = case.get("info_report_prefix") or ""
+        return ("INFO",
+                "%sterminfo %s holds no %r capability: no padding to measure"
+                % (skip, term, cap))
+    want = pad_marker_seconds(cap_bytes)
+    if want is None:
+        return ("FAIL", "terminfo %s %r holds no padding marker (measured %r)"
+                % (term, cap, cap_bytes))
+    if not marks:
+        return ("FAIL", "the case asked for a time gap but the session "
+                "holds no time marks")
+    start, end = spec["span"]
+    a = output.find(start)
+    b = output.find(end, a + len(start)) if a >= 0 else -1
+    if a < 0 or b < 0:
+        return ("FAIL", "pty output did not contain ordered markers %r %r"
+                % (start, end))
+    inner_start = a + len(start)
+    inner = output[inner_start:b]
+    # The run must be THERE, or a gap would prove nothing.  The marker is
+    # not on the stream (the library eats it), so the needle is the
+    # capability without its markers.
+    needle = re.sub(rb"\$<[^>]*>", b"", cap_bytes)
+    if needle and needle not in inner:
+        return ("FAIL", "pty span held no %r (measured %r)" % (needle, inner))
+    if needle:
+        run_start = inner_start + inner.find(needle)
+        run_end = run_start + len(needle)
+    else:
+        # A capability that holds ONLY a marker has no byte to put in an
+        # order.  The anchor is then the first byte of the span, so the
+        # verdict reduces to "the padding follows the span start".
+        run_start, run_end = inner_start, inner_start + 1
+    gaps = order_gaps(marks, inner_start, b, run_start, run_end)
+    if gaps is None:
+        return ("FAIL", "the span %r..%r arrived in fewer than 2 chunks, or "
+                "held no run byte, so no order exists (want at least %.3f s "
+                "of padding, measured marks %r)"
+                % (start, end, want, marks))
+    gap_before, gap_after = gaps
+    if gap_after < want:
+        return ("FAIL", "gap_after (run bytes to the end of the span) is "
+                "%.4f s; want at least %.3f s of declared padding, so the "
+                "sleep of the marker did not follow the run bytes"
+                % (gap_after, want))
+    if gap_before > gap_after / 2:
+        return ("FAIL", "gap_before (span start to the run bytes) is %.4f s; "
+                "want at most %.4f s, half of gap_after %.4f s, so the run "
+                "bytes did not reach the terminal before the sleep"
+                % (gap_before, gap_after / 2.0, gap_after))
+    return None
+
+
 def span_required_problem(case, output):
     """Check a case's required bytes INSIDE its own marked span.
 
@@ -559,6 +735,7 @@ def run_case(case, emacs, timeout):
         capture_mode=case.get("capture_mode", False),
         wait_exit=case.get("wait_exit", False),
         termscript=case.get("termscript", False),
+        time_marks=case.get("time_marks", False),
         load_fixture=case.get("load_fixture"), env=case.get("env", {}))
     session = run_session(
         emacs, timeout, options, fixture,
@@ -601,6 +778,11 @@ def run_case(case, emacs, timeout):
         output_problem = check_output(case, got, pty_output)
         if output_problem:
             return (name, "FAIL", output_problem)
+        # M62 imp-1b: the ORDER of the bytes around a padding marker.  A
+        # byte check can not prove it, so the case carries time marks.
+        gap_problem = time_gap_problem(case, pty_output, session.marks)
+        if gap_problem is not None:
+            return (name,) + gap_problem
         # M54 imp-3: the termscript file bytes MUST equal the pty master
         # span (a termscript is a copy of the terminal output).
         if case.get("termscript"):
@@ -817,7 +999,8 @@ def selftest():
     check("m61-imp3-case-count", len(group_cases("m61-imp3")), 9)
     check("m62-imp1-case-count", len(group_cases("m62-imp1")), 3)
     check("m62-imp2-case-count", len(group_cases("m62-imp2")), 3)
-    check("total-case-count", len(CASES), 64)
+    check("m62-imp1b-case-count", len(group_cases("m62-imp1b")), 2)
+    check("total-case-count", len(CASES), 66)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
@@ -1026,6 +1209,33 @@ def selftest():
           _case("m62-imp2/clean-exit-e2e").get("wait_exit"), True)
     check("m62-imp2-clean-exit-mode",
           _case("m62-imp2/clean-exit-e2e").get("capture_mode"), True)
+
+    # --- M62 imp-1b: the order around a padding delay -------------------
+    # The group must run on the entry that DECLARES the padding, and the
+    # padding case must carry the time marks.  Without both, the case
+    # would measure the host entry or no marks at all, and a pass would
+    # prove nothing.  It needs no pty and no build.
+    order_case = _case("m62-imp1b/padded-order-e2e")
+    check("m62-imp1b-order-time-marks", order_case.get("time_marks"), True)
+    check("m62-imp1b-order-gap-capability",
+          (order_case.get("time_gap") or {}).get("capability"), "el")
+    check("m62-imp1b-order-gap-span",
+          (order_case.get("time_gap") or {}).get("span"),
+          (M62_IMP1B_BEGIN, M62_IMP1B_END))
+    for _c in group_cases("m62-imp1b"):
+        check("m62-imp1b-fixture-%s" % _c["name"],
+              _c.get("terminfo_fixture") in TERMINFO_FIXTURES, True)
+        check("m62-imp1b-term-%s" % _c["name"],
+              (_c.get("env") or {}).get("TERM"), "m62-imp1b")
+    check("m62-imp1b-clean-exit-waits",
+          _case("m62-imp1b/clean-exit-e2e").get("wait_exit"), True)
+    check("m62-imp1b-clean-exit-mode",
+          _case("m62-imp1b/clean-exit-e2e").get("capture_mode"), True)
+    # The declared padding comes from the entry, never from a constant of
+    # the case: the pair of the case must not hold a time value.
+    for _key in ("min_gap", "padding", "milliseconds"):
+        check("m62-imp1b-no-host-constant-%s" % _key,
+              _key in (order_case.get("time_gap") or {}), False)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

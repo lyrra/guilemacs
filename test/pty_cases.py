@@ -923,6 +923,10 @@ M52_IMP8_TERM = "m52-imp8"
 # other entry of this file holds el, so this entry is the ONLY one that
 # reaches the space branch.  tic -x accepts the cancelled capability.
 M62_IMP2_TERM = "m62-imp2"
+# The M62 imp-1b entry: xterm with a MANDATORY 50 ms padding on el.  It is
+# the only entry of this file that holds a padding marker, so it is the
+# only one that proves the byte order against the delay of the library.
+M62_IMP1B_TERM = "m62-imp1b"
 _fixture_dir = None
 _fixture_tried = False
 
@@ -947,7 +951,7 @@ def terminfo_fixture(term):
                 if result.returncode == 0 and all(
                         name in compiled
                         for name in ("xterm", "ansi", M52_IMP8_TERM,
-                                     M62_IMP2_TERM)):
+                                     M62_IMP2_TERM, M62_IMP1B_TERM)):
                     _fixture_dir = directory
             except OSError:
                 pass
@@ -959,7 +963,7 @@ def terminfo_fixture(term):
 
 TERMINFO_FIXTURES = {name: (lambda term=name: terminfo_fixture(term))
                      for name in ("xterm", "ansi", M52_IMP8_TERM,
-                                  M62_IMP2_TERM)}
+                                  M62_IMP2_TERM, M62_IMP1B_TERM)}
 
 M52_IMP8_CASES = (
     {
@@ -3432,6 +3436,123 @@ M62_IMP2_CASES = (
     },
 )
 
+# --- M62 imp-1b: the byte order against a mandatory padding delay ------
+#
+# The sink collected a whole capability string and wrote it at
+# m61_cap_finish.  The ncurses =tputs= of this build SLEEPS on a $<NN/>
+# marker, so a SHORT padded string slept while its earlier bytes were
+# still in the sink, and the byte order of the output was wrong.  A string
+# longer than M61_CAP_CHUNK = 1024 hid the defect: its chunks drained
+# during the run.
+#
+# The act drains a PADDED string at each byte, so each byte reaches the
+# terminal before the delay of its own marker.  A string without a marker
+# keeps the collected run and the crossing of ONE chunk.
+#
+# The 2 cases prove 2 different things: the ORDER around the marker (the
+# time marks of the pty master against the padding the entry DECLARES),
+# and the restore path (exit status and terminal mode).
+M62_IMP1B_BEGIN = b"M62-IMP1B-BEGIN!"
+M62_IMP1B_END = b"M62-IMP1B-END!"
+M62_IMP1B_SKIP = "m62-imp1b-skip:"
+
+# The case env of this group: the fixture entry, and the frame size.  The
+# padding of the entry does not depend on the size, but ncurses setupterm
+# reads COLUMNS and LINES from the ENVIRONMENT, so they are pinned as the
+# m62-imp2 group pins them.
+M62_IMP1B_ENV = {"TERM": M62_IMP1B_TERM, "COLUMNS": "80", "LINES": "24"}
+
+# The shared prelude: the tty of the session, the 2 mode leaves of
+# src/keyboard.c and the send leaf.  It has its own skip prefix, so a
+# skip of this group can not be read as a skip of another group.
+#
+# It stays SEPARATE from M62_IMP1_PRELUDE and is not merged into 1
+# builder: the imp-1 prelude also binds the crossing counter
+# (reset-cross!, cross-count) and the `line' helper, which this group
+# does not use, so a shared body would carry 3 dead bindings of a debug
+# leaf into this group.  The skip prefix must stay per group in any case:
+# the driver reports it as an INFO detail, so 2 groups must not answer
+# the same prefix.
+M62_IMP1B_PRELUDE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the session terminal is the
+       ;; last element.
+       (term (and (pair? terms) (car (reverse terms))))
+       (reset-modes! (c '--reset-sys-modes))
+       (init-modes! (c '--init-sys-modes))
+       (send (c 'send-string-to-terminal)))
+  (cond ((not term) "no-terminal")
+        ;; A terminal without a tty is suspended: reset_sys_modes returns
+        ;; before any capability, so no padded string is sent and the
+        ;; case would measure nothing.  State the skip, never a pass.
+        ((not ((c '--decode-tty-terminal-p) term))
+         "m62-imp1b-skip: the session terminal does not decode to a tty")
+        (else
+"""
+
+# ONE reset_sys_modes run between 2 markers.  reset_sys_modes sends
+# TS_clr_line (=el=) of the entry, and that string holds the padding
+# marker, so the run holds ONE padded string.
+#
+# The 2 cases of the group share this ONE probe body: they differ in the
+# driver keys only (the time marks and the time gap of the order case;
+# wait_exit and capture_mode of the restore case).  A second constant
+# with the same text would hold 2 copies of 1 probe with no difference
+# to read.
+M62_IMP1B_PROBE = M62_IMP1B_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (reset-modes! term)
+            (send "@@END@@")
+            (init-modes! term)
+            "ok")
+        )))
+"""
+
+M62_IMP1B_CASES = (
+    {
+        "name": "m62-imp1b/padded-order-e2e",
+        "group": "m62-imp1b",
+        # The driver reads the pty master WITH time marks and measures the
+        # 2 SUB-GAPS of the span around the run bytes, against the padding
+        # that the entry DECLARES: the run bytes come first (gap_before is
+        # small) and the sleep of the marker follows them (gap_after holds
+        # the declared padding).
+        "probe": M62_IMP1B_PROBE,
+        "subst": {"BEGIN": M62_IMP1B_BEGIN.decode(),
+                  "END": M62_IMP1B_END.decode()},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP1B_SKIP,
+        # The time marks of the pty master, and the padding that the
+        # entry DECLARES for el.  The driver takes the declared value from
+        # the fixture entry (terminfo_capability), so no host constant is
+        # held here: a case that pins 50 ms itself would pass on a host
+        # whose entry declares another padding.
+        "time_marks": True,
+        "time_gap": {"span": (M62_IMP1B_BEGIN, M62_IMP1B_END),
+                     "capability": "el"},
+        "env": dict(M62_IMP1B_ENV),
+    },
+    {
+        "name": "m62-imp1b/clean-exit-e2e",
+        "group": "m62-imp1b",
+        # The same run as the order case; this case reads the exit status
+        # and the restored terminal mode instead of the time marks.
+        "probe": M62_IMP1B_PROBE,
+        "subst": {"BEGIN": M62_IMP1B_BEGIN.decode(),
+                  "END": M62_IMP1B_END.decode()},
+        "expect": "ok",
+        "pty_contains": M62_IMP1B_END,
+        "info_report_prefix": M62_IMP1B_SKIP,
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": dict(M62_IMP1B_ENV),
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
@@ -3439,7 +3560,7 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
          + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES
-         + M62_IMP2_CASES)
+         + M62_IMP2_CASES + M62_IMP1B_CASES)
 
 # These cases check terminal capabilities or their emitted bytes.
 _FIXTURE_CASES = {
@@ -3448,7 +3569,7 @@ _FIXTURE_CASES = {
 }
 _FIXTURE_GROUPS = {"m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
                    "m58-imp3", "m58-imp4", "m61-imp3", "m62-imp1",
-                   "m62-imp2"}
+                   "m62-imp2", "m62-imp1b"}
 CASES = tuple(
     dict(case, terminfo_fixture=case.get("env", {}).get("TERM", "xterm"))
     if case["name"] in _FIXTURE_CASES or case["group"] in _FIXTURE_GROUPS
@@ -3463,4 +3584,4 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
           "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3",
-          "m62-imp1", "m62-imp2")
+          "m62-imp1", "m62-imp2", "m62-imp1b")

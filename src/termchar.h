@@ -270,8 +270,13 @@ extern ptrdiff_t m61_tty_emit_cap_1 (struct tty_display_info *,
      crosses 0 times.  A NEGATIVE N writes 0 bytes as well, as the deleted
      per-column loop did, because N is negative when cursorX is above
      FrameCols - 1, for example after a resize.
-   - N <= FrameCols, so 1 run takes 1 chunk crossing (M61_CAP_CHUNK is
-     1024) and the byte order of a longer run is not proven.
+   - N <= FrameCols, so a run takes 1 chunk crossing while
+     FrameCols <= M61_CAP_CHUNK (1024) and the byte order of a longer run
+     is not proven.  A frame wider than 1024 costs 1 crossing for each
+     chunk, and the order still holds.
+   - The repeat run makes 1 repeated byte and no padding marker, so it
+     keeps the collected shape (M62 imp-1b): only a padded capability
+     string drains at each byte.
    - The mask c & 0177 of m61_cap_putc keeps the byte ' ' the same.
 
    No caller reads the answer (M62 imp-2).  */

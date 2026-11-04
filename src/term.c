@@ -138,13 +138,22 @@ static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
 
 #ifndef HAVE_ANDROID
 
-/* The M61 imp-3 capability sink: the ONE writer of the 4 capability
-   macros of this file.  ncurses calls the =tputs= callback one time for
-   EACH byte, and termcap padding uses the same callback, so a per-byte
-   crossing of the M61 handle is not acceptable (brief.org section 2).
+/* The M61 imp-3 capability sink: the ONE writer of the 5 capability
+   macros of this file: OUTPUT, OUTPUT1, OUTPUTL, OUTPUT_IF and
+   OUTPUT1_IF (the last one is a wrapper of OUTPUT1).  ncurses calls the
+   =tputs= callback one time for EACH byte, and termcap padding uses the
+   same callback, so a per-byte crossing of the M61 handle was not
+   acceptable (M61 imp-3).
    The sink COLLECTS a run in M61_CAP_CHUNK bytes of static memory and
    drains it through the ONE imp-2 hub (m61_tty_handle_glyph_run_1), so
    one capability string costs ONE crossing, plus 1 for each extra chunk.
+
+   BOUND (M62 imp-1b): a string WITH a padding marker does NOT collect.
+   =tputs= sleeps on the marker, so a collected string would put its
+   earlier bytes behind the delay.  Such a run drains AND flushes at EACH
+   byte (the flush is required, see m61_cap_putc), so it costs 1 crossing
+   and 1 fflush for each byte.  Only the padded strings pay that
+   (milestone.org section 6).
 
    The definitions sit in the M61 imp-2 block below the hub.  The macros
    are used far above that point (tty_set_terminal_modes, :296), so the
@@ -174,6 +183,22 @@ static struct tty_display_info *m61_cap_tty;
 static bool m61_cap_active;
 static ptrdiff_t m61_cap_status;	/* the FIRST failure of the run */
 
+/* The state of the PADDED run (M62 imp-1b).  The value is true while the
+   current run holds a padding marker ($<NN/>).  m61_cap_begin clears it
+   for every run, and m61_tty_emit_cap_1 sets it from ONE test of the
+   string.  m61_cap_putc then drains at EACH byte, so each byte reaches
+   the hub BEFORE =tputs= runs the delay of its own marker.  A string
+   WITHOUT a marker keeps the collected run and the crossing of ONE
+   chunk: the gain of f4759432f and 05b1f469f does not move.
+
+   The reason for the mode and not only for an extra crossing: the
+   ncurses =tputs= of this build SLEEPS on the marker (src/config.h
+   holds TERMINFO 1).  A collected run holds the bytes of the string in
+   m61_cap_buf while the library sleeps, so the byte order of a SHORT
+   padded string would be wrong.  A string longer than M61_CAP_CHUNK hid
+   the defect: its chunks drained during the run.  */
+static bool m61_cap_each_byte;
+
 /* The state of an OUTER run while a nested emit runs.  The sink is not
    reentrant, so 1 saved copy is enough: a depth of 2 is the most that
    the release guard can recover.  */
@@ -184,6 +209,10 @@ struct m61_cap_state
      current_tty, so the outer run must get it back: current_tty feeds
      curX, curY and the cursor tracking.  */
   struct tty_display_info *current;
+  /* The drain mode of the outer run (M62 imp-1b).  A nested padded emit
+     must not turn the outer run collected, and the reverse must not
+     happen either.  */
+  bool each_byte;
   bool active;
   ptrdiff_t status;
 };
@@ -194,6 +223,10 @@ static int m61_cap_putc (int);
 static ptrdiff_t m61_cap_drain_1 (void);
 static void m61_cap_begin (struct tty_display_info *);
 static ptrdiff_t m61_cap_finish (void);
+static bool m61_cap_padded_p (const char *);
+/* The flush of a padded byte runs through the exported hub
+   m61_tty_handle_flush_1, which src/termchar.h declares, so this file
+   needs no local declaration of the private leaf.  */
 /* The ONE capability sink of a TTY is declared in src/termchar.h
    (M62 imp-1).  src/cm.h and src/sysdep.c reach it through the
    emacs_tputs macro.  This file holds no forward declaration (cr.org
@@ -1741,6 +1774,21 @@ m61_tty_handle_glyph_run_1 (struct tty_display_info *tty,
 
 /* --- M61 imp-3: the capability sink -------------------------------- */
 
+/* True when STR holds a termcap padding marker ($<NN/> or $<NN>) that
+   =tputs= reads (M62 imp-1b).  ONE test for a whole run: the mode of the
+   run is a property of its string, so the callback does not test again.
+
+   The test is a plain scan for the 2 byte prefix.  A marker holds "$<",
+   and a capability string that holds those 2 bytes as LITERAL text is
+   not a capability string of a real terminfo entry, so the scan needs no
+   parse of the number and no parse of the "/".  A false hit costs only
+   the crossings of that 1 string, never a wrong byte.  */
+static bool
+m61_cap_padded_p (const char *str)
+{
+  return strstr (str, "$<") != NULL;
+}
+
 /* Drain the collected bytes of ONE chunk through the imp-2 hub and clear
    the length.  The buffer keeps the byte order: a drain runs BEFORE the
    byte that would overflow it, so the chunks of a long string leave in
@@ -1783,13 +1831,59 @@ m61_cap_drain_1 (void)
 
    The answer is the UNMASKED C, as the old =cmputc= answered C, and
    =tputs= discards the answer of its callback (cr1.org 2026-11-01 C5).  The
-   stored byte is the masked one; do not read the answer as the byte.  */
+   stored byte is the masked one; do not read the answer as the byte.
+
+   M62 imp-1b: after the append, a PADDED run drains.  The sink can not
+   be empty at that point (the append just filled it), and the drain is
+   safe anyway: m61_cap_drain_1 answers 0 for an empty sink.  The run
+   state does not change: m61_cap_active stays true, and m61_cap_status
+   keeps the FIRST failure of the run.  */
 static int
 m61_cap_putc (int c)
 {
   if (m61_cap_len >= M61_CAP_CHUNK)
     (void) m61_cap_drain_1 ();
   m61_cap_buf[m61_cap_len++] = (unsigned char) (c & 0177);
+  if (m61_cap_each_byte)
+    {
+      /* The drain moves the byte out of the sink, and then the stream of
+	 the tty is FLUSHED, so the byte is on the TERMINAL before =tputs=
+	 runs the delay of the marker.
+
+	 The flush goes through the HUB m61_tty_handle_flush_1 and not
+	 through its private leaf, so the handle check of Scheme runs on
+	 this path as it runs on the other flush points.  The hub delegates
+	 to the same leaf, so the emitted bytes do not change.
+
+	 The flush is REQUIRED, and it is not a workaround: tty->output is
+	 a private stream of this tree (src/term.c:6274, emacs_fdopen (fd,
+	 "w+")), and src/sysdep.c:1200 makes it FULLY BUFFERED (_IOFBF).
+	 The ncurses =tputs= of this build does not flush that stream
+	 before its sleep (it would flush stdout, which is another FILE *).
+	 So a drain WITHOUT a flush only moves the byte from the sink
+	 buffer to the libc buffer, and the terminal still receives it
+	 AFTER the delay.
+
+	 MEASURED 2026-11-04 with =python3 test/pty-driver.py --emacs
+	 src/emacs --group m62-imp1b= and 1 change at a time:
+	 - drain AND flush: order holds, gap_before 0.0000 s, gap_after
+	   0.0506 s against the 50 ms of the entry.
+	 - drain WITHOUT the flush: padded-order-e2e FAILS with "gap_after
+	   ... is 0.0001 s; want at least 0.050 s".
+	 So the design costs 1 crossing AND 1 fflush for each byte, but
+	 for a PADDED string only (milestone.org section 6).  A string
+	 without a marker pays neither: it keeps the collected run and 1
+	 crossing for each chunk.
+
+	 MEASURED cost, from the crossing counters of the count probe on
+	 the m62-imp1b entry over 8 reset runs: the collecting shape
+	 answers s2c=82 c2s=105, the per-byte shape answers s2c=122
+	 c2s=145.  The padded el run holds 3 bytes, so it costs 6
+	 crossings (3 drains and 3 flushes) where the collected shape
+	 costs 1: +5 for each run on each axis.  */
+      (void) m61_cap_drain_1 ();
+      (void) m61_tty_handle_flush_1 (m61_cap_tty);
+    }
   return c;
 }
 
@@ -1814,6 +1908,7 @@ m61_cap_begin (struct tty_display_info *tty)
       m61_cap_saved.tty = m61_cap_tty;
       m61_cap_saved.current = current_tty;
       m61_cap_saved.status = m61_cap_status;
+      m61_cap_saved.each_byte = m61_cap_each_byte;
       m61_cap_saved.active = true;
     }
   else
@@ -1822,6 +1917,10 @@ m61_cap_begin (struct tty_display_info *tty)
   m61_cap_tty = tty;
   m61_cap_len = 0;
   m61_cap_status = 0;
+  /* A run starts COLLECTED.  m61_tty_emit_cap_1 raises this flag when
+     its string holds a padding marker, and the repeat run never raises
+     it.  */
+  m61_cap_each_byte = false;
   m61_cap_active = true;
   current_tty = tty;
 }
@@ -1845,6 +1944,7 @@ m61_cap_finish (void)
       current_tty = m61_cap_saved.current;
       m61_cap_len = 0;
       m61_cap_status = m61_cap_saved.status;
+      m61_cap_each_byte = m61_cap_saved.each_byte;
       m61_cap_active = true;
       m61_cap_saved.active = false;
     }
@@ -1879,6 +1979,11 @@ m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
     }
 
   m61_cap_begin (tty);
+  /* M62 imp-1b: a PADDED string drains at each byte, so its bytes reach
+     the hub before the delay of the marker.  The test runs ONE time for
+     the whole string.  A string without the marker keeps the collected
+     run and the crossing of ONE chunk.  */
+  m61_cap_each_byte = m61_cap_padded_p (str);
   tputs (str, lines, m61_cap_putc);
   return m61_cap_finish ();
 }

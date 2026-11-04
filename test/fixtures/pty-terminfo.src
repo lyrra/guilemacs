@@ -287,3 +287,7 @@ m52-imp8|PTY delete-mode fixture,
 m62-imp2|PTY space-run fixture, no el,
 	use=xterm,
 	el@,
+
+m62-imp1b|PTY padded clear-to-end-of-line fixture,
+	use=xterm,
+	el=\E[K$<50/>,

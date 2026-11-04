@@ -23,6 +23,10 @@ class SessionOptions:
     wait_exit: bool = False
     termscript: bool = False
     load_fixture: Optional[str] = None
+    # Record (byte offset, monotonic time) for each chunk read from the
+    # pty master.  It is OFF by default, so a case that needs no time
+    # proof reads exactly the bytes it read before (M62 imp-1b).
+    time_marks: bool = False
     env: dict = field(default_factory=dict)
 
 
@@ -37,6 +41,11 @@ class SessionResult:
     mode_after: object = None
     exit_status: Optional[int] = None
     termscript: Optional[bytes] = None
+    # The time marks of the pty master, 1 (offset, monotonic time) pair
+    # for each chunk: OFFSET is the byte offset of the chunk start in
+    # `output'.  It stays None unless SessionOptions.time_marks asked for
+    # it, so a case that reads no time can not read a stale list.
+    marks: Optional[list] = None
     error: Optional[tuple] = None
 
 
@@ -202,6 +211,7 @@ def run_session(emacs, timeout, options, fixture_env, build_child_source, is_com
         mode_after = None
         exit_status = None
         ts_bytes = None
+        marks = [] if options.time_marks else None
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
@@ -216,6 +226,11 @@ def run_session(emacs, timeout, options, fixture_env, build_child_source, is_com
                 try:
                     chunk = os.read(master, 4096)
                     if chunk:
+                        # The mark of a chunk is the time of its START,
+                        # taken before the append, so OFFSET indexes the
+                        # first byte of that chunk in `output'.
+                        if marks is not None:
+                            marks.append((len(pty_output), time.monotonic()))
                         pty_output += chunk
                     else:
                         pty_eof = True
@@ -331,4 +346,5 @@ def run_session(emacs, timeout, options, fixture_env, build_child_source, is_com
     return SessionResult(report=report, output=pty_output, ready_seen=ready_seen,
                          input_sent=input_sent, timed_out=timed_out,
                          mode_before=mode_before, mode_after=mode_after,
-                         exit_status=exit_status, termscript=ts_bytes)
+                         exit_status=exit_status, termscript=ts_bytes,
+                         marks=marks)
