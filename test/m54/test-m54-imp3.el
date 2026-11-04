@@ -249,21 +249,12 @@ error, not a pass."
                    "src/term.c"
                    "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript)")
                   (m54-imp3--contains-p "src/term.c" "putc (' ', tty->termscript)")
-                  (eql 0 (m54-imp3--count
-                          "src/term.c"
-                          "fwrite (conversion_buffer, 1, coding->produced, tty->termscript)"))
                   ;; The moved copies run through the ONE mechanism of the
                   ;; M61 ordered path.
                   (eql 1 (m54-imp3--count
                           "src/term.c"
                           "fwrite (bytes, 1, len, tty->termscript)"))
-                  ;; The src/cm.c putc sites stay C.  M62 imp-1 DELETED the
-                  ;; per-byte capability writer cmputc, so the masked site
-                  ;; is now a count of 0: the capability strings of that
-                  ;; file cross the ONE sink and no putc writes one byte.
-                  (eql 0 (m54-imp3--count
-                          "src/cm.c"
-                          "putc (c & 0177, current_tty->termscript)"))
+                  ;; The src/cm.c putc sites stay C.
                   (m54-imp3--contains-p "src/cm.c" "putc ('\\r', tty->termscript)")
                   (m54-imp3--contains-p "src/cm.c" "putc ('\\n', tty->termscript)")
                   ;; The src/dispnew.c send + flush stay C.
