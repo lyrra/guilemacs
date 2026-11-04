@@ -1000,7 +1000,8 @@ def selftest():
     check("m62-imp1-case-count", len(group_cases("m62-imp1")), 3)
     check("m62-imp2-case-count", len(group_cases("m62-imp2")), 3)
     check("m62-imp1b-case-count", len(group_cases("m62-imp1b")), 2)
-    check("total-case-count", len(CASES), 66)
+    check("m62-imp4-case-count", len(group_cases("m62-imp4")), 3)
+    check("total-case-count", len(CASES), 69)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
@@ -1236,6 +1237,64 @@ def selftest():
     for _key in ("min_gap", "padding", "milliseconds"):
         check("m62-imp1b-no-host-constant-%s" % _key,
               _key in (order_case.get("time_gap") or {}), False)
+
+    # --- M62 imp-4: the second writer crosses the ONE hub ---------------
+    # The group must run on the fixture entry, must pin the ORDER of the 2
+    # runs of the bytes case, and must separate the hub shape from the raw
+    # shape with the crossing window.  It needs no pty and no build.
+    imp4_route = _case("m62-imp4/m52-leaf-route-e2e")
+    imp4_span = imp4_route.get("span_requires") or {}
+    check("m62-imp4-route-span", imp4_span.get("span"),
+          (M62_IMP4_BEGIN, M62_IMP4_END))
+    check("m62-imp4-route-order", imp4_span.get("needles_in_order"),
+          (M62_IMP4_CAP_BYTES, M62_IMP4_BYTES))
+    # The capability needle is NOT empty: a 0 byte run would satisfy a
+    # presence check on nothing.
+    check("m62-imp4-cap-needle-nonempty",
+          len(M62_IMP4_CAP_BYTES) > 0, True)
+    for _c in group_cases("m62-imp4"):
+        check("m62-imp4-fixture-%s" % _c["name"],
+              _c.get("terminfo_fixture") in TERMINFO_FIXTURES, True)
+        check("m62-imp4-term-%s" % _c["name"],
+              (_c.get("env") or {}).get("TERM"), M62_IMP4_TERM)
+    check("m62-imp4-clean-exit-waits",
+          _case("m62-imp4/clean-exit-e2e").get("wait_exit"), True)
+    check("m62-imp4-clean-exit-mode",
+          _case("m62-imp4/clean-exit-e2e").get("capture_mode"), True)
+    # The termscript case must pin the FILE comparison and the exact
+    # bytes of its span: a missing output_span would make the copy check
+    # vacuous.
+    imp4_ts = _case("m62-imp4/termscript-copy-e2e")
+    check("m62-imp4-termscript-compares-the-file",
+          imp4_ts.get("termscript"), True)
+    check("m62-imp4-termscript-span",
+          (imp4_ts.get("span_requires") or {}).get("span"),
+          (M62_IMP4_BEGIN, M62_IMP4_END))
+    check("m62-imp4-termscript-span-bytes",
+          imp4_ts.get("output_span_bytes"),
+          M62_IMP4_CAP_BYTES + M62_IMP4_BYTES)
+    # The window must hold the MEASURED act pair and refuse the raw shape
+    # of the negative control on both axes.
+    imp4_subst = imp4_route.get("subst") or {}
+    check("m62-imp4-count-window-holds-the-act",
+          (int(imp4_subst["MIN_S2C"]) <= M62_IMP4_ACT_PAIR[0]
+           <= int(imp4_subst["MAX_S2C"])
+           and int(imp4_subst["MIN_C2S"]) <= M62_IMP4_ACT_PAIR[1]
+           <= int(imp4_subst["MAX_C2S"])),
+          True)
+    check("m62-imp4-count-window-refuses-the-control",
+          (int(imp4_subst["MIN_S2C"]) <= M62_IMP4_CONTROL_PAIR[0]
+           <= int(imp4_subst["MAX_S2C"])
+           or int(imp4_subst["MIN_C2S"]) <= M62_IMP4_CONTROL_PAIR[1]
+           <= int(imp4_subst["MAX_C2S"])),
+          False)
+    check("m62-imp4-count-reuses-the-counter",
+          "debug-guile-cross-count" in imp4_route.get("probe", ""), True)
+    # The 3 M52 leaves of the act are read through the elisp-ref %c leaf,
+    # so the case drives the C entry points and not a Scheme wrapper.
+    for _leaf in ("--tty-emit-cap", "--tty-write-bytes", "--tty-flush"):
+        check("m62-imp4-drives-%s" % _leaf,
+              _leaf in imp4_route.get("probe", ""), True)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

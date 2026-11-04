@@ -3553,6 +3553,240 @@ M62_IMP1B_CASES = (
     },
 )
 
+# --- M62 imp-4: the SECOND writer crosses the ONE hub ------------------
+#
+# The act deletes the raw writer m52_tty_write_1 of src/term.c and routes
+# its 3 write sites -- the 2 arms of --tty-emit-cap and --tty-write-bytes
+# -- plus the flush leaf --tty-flush through the ONE hub and the flush
+# hub.  After the act src/term.c holds NO raw `fwrite (str' to output or
+# termscript on the normal output path.
+#
+# A COUNT-ONLY case is not enough here: the hub and the deleted writer
+# answer a count of the same size.  So the bytes case drives 1 capability
+# and 1 bytevector between 2 markers and pins their ORDER, and the
+# crossing counter separates the hub shape from the raw shape: the MEASURED
+# pair is 7/3 for the hub and 5/1 for a raw write (section below).
+#
+# 3 cases: the ORDER case above, the TERMSCRIPT copy of the same 2 runs
+# (the driver compares the file with the pty span), and the clean exit.
+M62_IMP4_TERM = "xterm"
+M62_IMP4_BEGIN = b"M62-IMP4-BEGIN!"
+M62_IMP4_END = b"M62-IMP4-END!"
+M62_IMP4_SKIP = "m62-imp4-skip:"
+
+# The bytevector run of the case: OUR OWN bytes, between the capability
+# and the END marker.
+M62_IMP4_BYTES = b"M62-IMP4-BYTES!"
+
+# The 2 sub-runs of the bytes case: the capability bytes of
+# "set-scroll-region" with args (2 10) on the fixture xterm entry
+# (csr=\E[%i%p1%d;%p2%dr), and then the bytevector run.  The same
+# capability and args are pinned by m52-imp3/tty-emit-cap-e2e.
+M62_IMP4_CAP_BYTES = b"\x1b[3;11r"
+
+# The case env: the fixture xterm entry, and the frame size.  ncurses
+# setupterm lets COLUMNS / LINES of the environment override the entry,
+# so both are pinned as the m62-imp2 group pins them.
+M62_IMP4_ENV = {"TERM": M62_IMP4_TERM, "COLUMNS": "80", "LINES": "24"}
+
+# The shared prelude.  It reads the 3 M52 leaves through the elisp-ref %c
+# leaf (brief.org section 5), the crossing counter of src/eval.c, and the
+# last terminal of (emacs gobble).  It has its own skip prefix, so a skip
+# of this group can never read as a skip of another group.
+M62_IMP4_PRELUDE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the session terminal is the
+       ;; last element.
+       (term (and (pair? terms) (car (reverse terms))))
+       (emit! (c '--tty-emit-cap))
+       (write! (c '--tty-write-bytes))
+       (flush! (c '--tty-flush))
+       (reset-cross! (c 'debug-reset-guile-cross-count))
+       (cross-count (c 'debug-guile-cross-count))
+       (line (lambda (label a b)
+               (string-append label " s2c=" (number->string a)
+                              " c2s=" (number->string b)))))
+  (cond ((not term) "no-terminal")
+        ((not ((c '--decode-tty-terminal-p) term))
+         "m62-imp4-skip: the session terminal does not decode to a tty")
+        (else
+"""
+
+# Drive 1 capability and 1 bytevector between 2 markers, and read the
+# crossing pair of the 2 routed runs.  The counter is reset AFTER the
+# BEGIN marker and read BEFORE the END marker, so the pair holds the
+# capability emit, the bytevector write and the flush, and nothing of the
+# marker runs.
+M62_IMP4_ROUTE_PROBE = M62_IMP4_PRELUDE + r"""
+          (begin
+            (write! term #vu8(@@BEGB@@))
+            (flush! term)
+            (reset-cross!)
+            (let ((cap-bytes (emit! term "set-scroll-region" '(2 10)))
+                  (vec-bytes (write! term #vu8(@@VECB@@)))
+                  (flushed (flush! term))
+                  (counts (cross-count)))
+              (write! term #vu8(@@ENDB@@))
+              (flush! term)
+              (let ((s2c (car counts)) (c2s (cdr counts)))
+                (cond
+                 ((not (= flushed 0)) "m62-imp4-flush-failed")
+                 ;; A 0 byte count is not a signal: the fixture entry
+                 ;; DEFINES csr, so a 0 count is a real gap.  Report it as
+                 ;; a non-"ok" string, so the case FAILS and is not read
+                 ;; as a pass.
+                 ((<= cap-bytes 0) "m62-imp4-no-capability-bytes")
+                 ((not (= vec-bytes @@VECN@@)) "m62-imp4-short-bytevector")
+                 ;; The hub crosses the handle; the raw writer of the
+                 ;; negative control answers a LOWER pair.  The window
+                 ;; below separates the 2 measured shapes.
+                 ((and (<= @@MIN_S2C@@ s2c) (<= s2c @@MAX_S2C@@)
+                       (<= @@MIN_C2S@@ c2s) (<= c2s @@MAX_C2S@@))
+                  "ok")
+                 (else
+                  (string-append
+                   (line "m62-imp4-cross:" s2c c2s)
+                   " is outside the window @@MIN_S2C@@..@@MAX_S2C@@/"
+                   "@@MIN_C2S@@..@@MAX_C2S@@ of the 2 routed runs: a write"
+                   " or the flush left the hub")))))
+        ))))
+"""
+
+# The same drive, and the driver checks the exit status and the restored
+# terminal mode.  The 3 leaves changed, so the restore path is re-proved
+# here.
+M62_IMP4_CLEAN_EXIT_PROBE = M62_IMP4_PRELUDE + r"""
+          (begin
+            (write! term #vu8(@@BEGB@@))
+            (emit! term "set-scroll-region" '(2 10))
+            (write! term #vu8(@@VECB@@))
+            (flush! term)
+            (write! term #vu8(@@ENDB@@))
+            (flush! term)
+            "ok")
+        )))
+"""
+
+# The TERMSCRIPT copy of the routed leaf.  The 2 runs of the bytes case
+# go through a real termscript file (open-termscript), and the driver
+# compares the file bytes with the pty master span, so a copy that is
+# dropped or shortened FAILS.  This is the positive side of behaviour
+# change 2 of review cr.org F2: on a complete run the copy still holds
+# every byte of the run.  The ORDER between the 2 streams is NOT
+# observable here (milestone.org section 5).
+M62_IMP4_TERMSCRIPT_PROBE = M62_IMP4_PRELUDE + r"""
+          (begin
+            (write! term #vu8(@@BEGB@@))
+            (flush! term)
+            ((c 'open-termscript) "@@TSPATH@@")
+            (let* ((cap-bytes (emit! term "set-scroll-region" '(2 10)))
+                   (vec-bytes (write! term #vu8(@@VECB@@)))
+                   (flushed (flush! term)))
+              ((c 'open-termscript) #nil)
+              (write! term #vu8(@@ENDB@@))
+              (flush! term)
+              (cond
+               ((<= cap-bytes 0) "m62-imp4-no-capability-bytes")
+               ((not (= vec-bytes @@VECN@@)) "m62-imp4-short-bytevector")
+               ((not (= flushed 0)) "m62-imp4-flush-failed")
+               ;; Answer the SPAN byte count, so the driver can compare
+               ;; it with the bytes between the 2 markers AND with the
+               ;; termscript FILE.
+               (else (number->string (+ cap-bytes vec-bytes))))))
+        )))
+"""
+
+# The 2 MEASURED pairs of the crossing check: (s2c, c2s), as
+# src/eval.c debug-guile-cross-count answers it.  The probe resets the
+# counter AFTER the BEGIN marker, so the pair holds the capability emit,
+# the bytevector write and the flush.
+#
+# MEASURED 2026-11-04 on the built tree of this act with
+#   python3 test/pty-driver.py --emacs src/emacs --group m62-imp4
+# and a temporary always-report body: act (7, 3).  The CONTROL is the
+# same tree with the adapter of src/term.c put back on a local copy of
+# the raw writer (1 =fwrite=, no hub), built again and measured with the
+# same command: control (5, 1).
+M62_IMP4_ACT_PAIR = (7, 3)
+M62_IMP4_CONTROL_PAIR = (5, 1)
+
+# The window of the act pair: the measured value plus and minus 1
+# crossing.  BOUNDS: the lower bound rejects the raw writer, which sits 2
+# crossings below it on both axes; the upper bound admits 1 crossing of
+# jitter.  The count was deterministic in 3 measurements of this act.
+M62_IMP4_COUNT_MIN_S2C = 6
+M62_IMP4_COUNT_MAX_S2C = 8
+M62_IMP4_COUNT_MIN_C2S = 2
+M62_IMP4_COUNT_MAX_C2S = 4
+
+M62_IMP4_CASES = (
+    {
+        "name": "m62-imp4/m52-leaf-route-e2e",
+        "group": "m62-imp4",
+        # The capability bytes come FIRST and the bytevector bytes come
+        # SECOND, inside the span.  needles_in_order pins the SEQUENCE, so
+        # a run that stays out of order fails.
+        "probe": M62_IMP4_ROUTE_PROBE,
+        "subst": {"BEGB": " ".join(str(b) for b in M62_IMP4_BEGIN),
+                  "VECB": " ".join(str(b) for b in M62_IMP4_BYTES),
+                  "ENDB": " ".join(str(b) for b in M62_IMP4_END),
+                  "VECN": str(len(M62_IMP4_BYTES)),
+                  "MIN_S2C": str(M62_IMP4_COUNT_MIN_S2C),
+                  "MAX_S2C": str(M62_IMP4_COUNT_MAX_S2C),
+                  "MIN_C2S": str(M62_IMP4_COUNT_MIN_C2S),
+                  "MAX_C2S": str(M62_IMP4_COUNT_MAX_C2S)},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP4_SKIP,
+        "span_requires": {"span": (M62_IMP4_BEGIN, M62_IMP4_END),
+                          "needles_in_order": (M62_IMP4_CAP_BYTES,
+                                               M62_IMP4_BYTES),
+                          # The fixture entry DEFINES csr, so an INFO skip
+                          # on "no capability" is impossible here.
+                          "capability": "csr"},
+        "env": dict(M62_IMP4_ENV),
+    },
+    {
+        "name": "m62-imp4/termscript-copy-e2e",
+        "group": "m62-imp4",
+        # The new route copies the run to the termscript stream from the
+        # hub.  A dropped or shortened copy FAILS: the driver compares the
+        # termscript FILE with the pty master span.
+        "probe": M62_IMP4_TERMSCRIPT_PROBE,
+        "subst": {"BEGB": " ".join(str(b) for b in M62_IMP4_BEGIN),
+                  "VECB": " ".join(str(b) for b in M62_IMP4_BYTES),
+                  "ENDB": " ".join(str(b) for b in M62_IMP4_END),
+                  "VECN": str(len(M62_IMP4_BYTES))},
+        "expect_decimal": True,
+        "info_report_prefix": M62_IMP4_SKIP,
+        "span_requires": {"span": (M62_IMP4_BEGIN, M62_IMP4_END),
+                          "needles_in_order": (M62_IMP4_CAP_BYTES,
+                                               M62_IMP4_BYTES),
+                          "capability": "csr"},
+        "output_span": (M62_IMP4_BEGIN, M62_IMP4_END),
+        "output_span_bytes": M62_IMP4_CAP_BYTES + M62_IMP4_BYTES,
+        "termscript": True,
+        "env": dict(M62_IMP4_ENV),
+    },
+    {
+        "name": "m62-imp4/clean-exit-e2e",
+        "group": "m62-imp4",
+        "probe": M62_IMP4_CLEAN_EXIT_PROBE,
+        "subst": {"BEGB": " ".join(str(b) for b in M62_IMP4_BEGIN),
+                  "VECB": " ".join(str(b) for b in M62_IMP4_BYTES),
+                  "ENDB": " ".join(str(b) for b in M62_IMP4_END)},
+        "expect": "ok",
+        "pty_contains": M62_IMP4_END,
+        "info_report_prefix": M62_IMP4_SKIP,
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": dict(M62_IMP4_ENV),
+    },
+)
+
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
@@ -3560,7 +3794,7 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
          + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES
-         + M62_IMP2_CASES + M62_IMP1B_CASES)
+         + M62_IMP2_CASES + M62_IMP1B_CASES + M62_IMP4_CASES)
 
 # These cases check terminal capabilities or their emitted bytes.
 _FIXTURE_CASES = {
@@ -3569,7 +3803,7 @@ _FIXTURE_CASES = {
 }
 _FIXTURE_GROUPS = {"m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
                    "m58-imp3", "m58-imp4", "m61-imp3", "m62-imp1",
-                   "m62-imp2", "m62-imp1b"}
+                   "m62-imp2", "m62-imp1b", "m62-imp4"}
 CASES = tuple(
     dict(case, terminfo_fixture=case.get("env", {}).get("TERM", "xterm"))
     if case["name"] in _FIXTURE_CASES or case["group"] in _FIXTURE_GROUPS
@@ -3584,4 +3818,4 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
           "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3",
-          "m62-imp1", "m62-imp2", "m62-imp1b")
+          "m62-imp1", "m62-imp2", "m62-imp1b", "m62-imp4")

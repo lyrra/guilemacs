@@ -22,7 +22,7 @@
 ;;;   S2 -- the row map of brief.org section 5: the OUTPUT, TERMSCRIPT,
 ;;;         and INPUT stream paths and their src/term.c sites, the
 ;;;         handle contract, and the boundary rule
-;;;         do-not-give-scheme-a-C-descriptor.  S2 holds 13 checks.
+;;;         do-not-give-scheme-a-C-descriptor.  S2 holds 10 checks.
 ;;;   S3 -- the real tty init path: the built src/emacs runs on a real
 ;;;         PTY through test/pty-driver.py, so init_tty runs the stream
 ;;;         sites.  On a result that is neither PASS nor INFO the check
@@ -260,26 +260,6 @@ host limit is a skip, never a pass (brief.org section 7)."
 
 (setq m57-imp1--group 's2)
 
-;; The OUTPUT write path: the termcap fwrite sites, the space putc, and
-;; the M52 leaf write.
-
-(m57-imp1--check "output-write-sites"
-                 (m57-imp1--holds-all
-                  "src/term.c"
-                  '("fwrite (SDATA (string), 1, SBYTES (string), tty->output);"
-                    ;; M61 imp-1 re-pin (bounded fallback of
-                    ;; brief.org section 4 D2 item 3): the 3 normal glyph
-                    ;; fwrite sites moved into the ONE handle call, so
-                    ;; this needle names the new site.  Measured with
-                    ;; `grep -n m61_tty_handle_write_1 src/term.c`.
-                    ;; M61 imp-2 re-pin: the write and the termscript
-                    ;; copy of a glyph run share ONE bytevector, so the
-                    ;; needle names the glyph-run hub.  Measured with
-                    ;; `grep -n 'm61_tty_handle_glyph_run_1 (tty' src/term.c`.
-                    "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
-                    "putc (' ', tty->output);"
-                    "size_t written = fwrite (str, 1, len, tty->output);")))
-
 ;; The OUTPUT flush and clearerr sites.
 
 (m57-imp1--check "output-flush-sites"
@@ -296,33 +276,13 @@ host limit is a skip, never a pass (brief.org section 7)."
 (m57-imp1--check "output-clearerr-sites"
                  (m57-imp1--contains-p "src/term.c" "clearerr (tty->output);"))
 
-;; The TERMSCRIPT copy path: the copy fwrite / putc, the NULL guard, and
-;; the M52 copy write.
+;; The TERMSCRIPT copy path: the NULL guard and the close.
 
-(m57-imp1--check "termscript-write-sites"
-                 (m57-imp1--holds-all
-                  "src/term.c"
-                  '("fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);"
-                    ;; M61 imp-2 re-pin: the 3 glyph termscript
-                    ;; copies moved into the ONE mechanism.  Measured with
-                    ;; `grep -n 'fwrite (bytes, 1, len, tty->termscript)' src/term.c`.
-                    "n = fwrite (bytes, 1, len, tty->termscript);"
-                    "putc (' ', tty->termscript);"
-                    "size_t copied = fwrite (str, 1, len, tty->termscript);")))
 (m57-imp1--check "termscript-guard-and-close"
                  (m57-imp1--holds-all
                   "src/term.c"
                   '("if (tty->termscript)"
                     "emacs_fclose (tty->termscript);")))
-
-;; The short-write path of the M52 leaf write, which touches BOTH the
-;; output and the termscript streams.
-
-(m57-imp1--check "shortwrite-m52-writes"
-                 (m57-imp1--holds-all
-                  "src/term.c"
-                  '("size_t written = fwrite (str, 1, len, tty->output);"
-                    "size_t copied = fwrite (str, 1, len, tty->termscript);")))
 
 ;; The INPUT read handle (the C FILE * itself) and the descriptor reads.
 ;; The descriptor reads (add_keyboard_wait_descriptor, get_tty_size,
@@ -448,26 +408,27 @@ host limit is a skip, never a pass (brief.org section 7)."
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
 ;; because every check is registered at load time.  S1 holds 3 checks,
-;; S2 holds 13, S3 holds 2, and S4 holds 4.
+;; S2 holds 10, S3 holds 2, and S4 holds 4.  M62 imp-4 removed 3 of
+;; the S2 checks: each read source text of the DELETED m52_tty_write_1
 
 (setq m57-imp1--group 's5)
 
 (m57-imp1--check "reg/min-s1-checks-3" (>= (m57-imp1--group-count 's1) 3))
-(m57-imp1--check "reg/min-s2-checks-13" (>= (m57-imp1--group-count 's2) 13))
+(m57-imp1--check "reg/min-s2-checks-10" (>= (m57-imp1--group-count 's2) 10))
 (m57-imp1--check "reg/min-s3-checks-2" (>= (m57-imp1--group-count 's3) 2))
 (m57-imp1--check "reg/min-s4-checks-4" (>= (m57-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The measured count of m57-imp1 tests is 32: 31 registered checks
-;; (S1 3, S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.
+;; The measured count of m57-imp1 tests is 24: 23 registered checks
+;; (S1 3, S2 10, S3 2, S4 4, S5 4) plus the group-total deftest itself.
 ;; The S3 checks may fold to a controlled INFO skip on a host with no
 ;; python3 / no built src/emacs / no PTY, and a controlled skip is still
 ;; a registered test, so the floor holds either way.
 
-(defvar m57-imp1--min-gate-total 27
+(defvar m57-imp1--min-gate-total 24
   "The exact number of m57-imp1 ERT tests: 31 registered checks (S1 3,
-S2 13, S3 2, S4 4, S5 4) plus the group-total deftest itself.  M61
+S2 10, S3 2, S4 4, S5 4) plus the group-total deftest itself.  M61
 imp-2g removed the pty-driver case-count pin.")
 
 (ert-deftest m57-imp1/gate-m57-total ()

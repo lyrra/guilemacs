@@ -4,6 +4,7 @@ import importlib.util
 import contextlib
 import io
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -336,6 +337,116 @@ class M62Imp2ContractTests(unittest.TestCase):
             # entry through ncurses setupterm, so each case pins both.
             self.assertEqual(case["env"]["COLUMNS"], "80")
             self.assertEqual(case["env"]["LINES"], "24")
+
+
+class M62Imp4ContractTests(unittest.TestCase):
+    """The pty-free contracts of the M62 imp-4 group (the 2nd writer)."""
+
+    def _case(self, name):
+        return next(c for c in pty_cases.CASES if c["name"] == name)
+
+    def test_the_group_holds_the_3_declared_cases(self):
+        names = [c["name"] for c in pty_cases.CASES
+                 if c["group"] == "m62-imp4"]
+        self.assertEqual(names,
+                         ["m62-imp4/m52-leaf-route-e2e",
+                          "m62-imp4/termscript-copy-e2e",
+                          "m62-imp4/clean-exit-e2e"])
+
+    def test_a_skip_can_not_read_as_a_pass(self):
+        # Each case of the group carries the group's OWN skip prefix, so a
+        # skip of this group is never read as the skip of another group.
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp4":
+                continue
+            self.assertEqual(case["info_report_prefix"],
+                             pty_cases.M62_IMP4_SKIP)
+        prefixes = [c.get("info_report_prefix") for c in pty_cases.CASES
+                    if c["group"] != "m62-imp4"]
+        self.assertNotIn(pty_cases.M62_IMP4_SKIP, prefixes)
+
+    def test_the_order_case_pins_the_capability_before_the_bytevector(self):
+        # A count-only case would pass on either shape, so the order case
+        # MUST pin the sequence: the capability bytes first.
+        spec = self._case("m62-imp4/m52-leaf-route-e2e")["span_requires"]
+        self.assertEqual(spec["needles_in_order"],
+                         (pty_cases.M62_IMP4_CAP_BYTES,
+                          pty_cases.M62_IMP4_BYTES))
+
+    def test_a_reversed_run_fails_the_order_case(self):
+        # The driver must REJECT the reversed order, not accept a mere
+        # presence: this is the property the negative control relies on.
+        case = dict(self._case("m62-imp4/m52-leaf-route-e2e"))
+        cap, vec = (pty_cases.M62_IMP4_CAP_BYTES,
+                    pty_cases.M62_IMP4_BYTES)
+        begin, end = pty_cases.M62_IMP4_BEGIN, pty_cases.M62_IMP4_END
+        result = SessionResult(report=b'"ok"\n',
+                               output=begin + cap + vec + end,
+                               ready_seen=True, input_sent=True)
+        with mock.patch.object(driver, "run_session", return_value=result):
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "PASS")
+            result.output = begin + vec + cap + end
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
+
+    def test_the_termscript_case_compares_the_file_with_the_span(self):
+        # A dropped or shortened copy must FAIL: the case pins the span
+        # bytes and asks the driver to read a real termscript file.
+        case = self._case("m62-imp4/termscript-copy-e2e")
+        self.assertTrue(case["termscript"])
+        self.assertEqual(case["output_span_bytes"],
+                         pty_cases.M62_IMP4_CAP_BYTES
+                         + pty_cases.M62_IMP4_BYTES)
+        begin, end = case["output_span"]
+        span_bytes = case["output_span_bytes"]
+        result = SessionResult(report=b'"%d"\n' % len(span_bytes),
+                               output=begin + case["output_span_bytes"] + end,
+                               ready_seen=True, input_sent=True,
+                               termscript=case["output_span_bytes"])
+        with mock.patch.object(driver, "run_session", return_value=result):
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "PASS")
+            result.termscript = span_bytes[:-1]
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
+
+    def test_count_window_holds_the_act_and_refuses_the_control(self):
+        subst = self._case("m62-imp4/m52-leaf-route-e2e")["subst"]
+        lo, hi = int(subst["MIN_S2C"]), int(subst["MAX_S2C"])
+        clo, chi = int(subst["MIN_C2S"]), int(subst["MAX_C2S"])
+        act = pty_cases.M62_IMP4_ACT_PAIR
+        control = pty_cases.M62_IMP4_CONTROL_PAIR
+        self.assertLessEqual(lo, act[0])
+        self.assertLessEqual(act[0], hi)
+        self.assertLessEqual(clo, act[1])
+        self.assertLessEqual(act[1], chi)
+        # The negative control is the raw writer, so it MUST sit outside
+        # the window: a window that admits it proves nothing.
+        self.assertLess(control[0], lo)
+        self.assertLess(control[1], clo)
+
+    def test_every_case_pins_the_fixture_and_the_size(self):
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp4":
+                continue
+            self.assertEqual(case["env"]["TERM"], pty_cases.M62_IMP4_TERM)
+            self.assertEqual(case["env"]["COLUMNS"], "80")
+            self.assertEqual(case["env"]["LINES"], "24")
+
+    def test_the_clean_exit_case_waits_for_the_status_and_the_mode(self):
+        case = self._case("m62-imp4/clean-exit-e2e")
+        self.assertTrue(case["wait_exit"])
+        self.assertTrue(case["capture_mode"])
+
+    def test_the_probe_subst_holds_no_unreplaced_field(self):
+        # A probe whose @@FIELD@@ stays unreplaced sends a broken form, and
+        # the run answers a Scheme error instead of a verdict.
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp4":
+                continue
+            # TSPATH is supplied by the driver at run time (the temp path
+            # of the termscript file), so it is not a case field.
+            for field in re.findall(r"@@([A-Z_]+)@@", case["probe"]):
+                if field == "TSPATH":
+                    continue
+                self.assertIn(field, case["subst"], (case["name"], field))
 
 
 if __name__ == "__main__":

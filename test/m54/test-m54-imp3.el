@@ -19,11 +19,10 @@
 ;;;         A): tty-termscript-copy-handle builds the plain imp-2
 ;;;         tty-out-handle from the copy counts; it holds plain fixnums
 ;;;         only and no port and no FILE *.  S2 holds 2 checks.
-;;;   S3 -- the seam.  The REUSED dispatcher, the ONE new call site in
-;;;         m52_tty_write_1, the new m54_tty_termscript_* helper, the
-;;;         scm_c_public_ref site, and the 10 classified copy sites
-;;;         (brief.org section 5), as name checks (not line numbers).
-;;;         S3 holds 7 checks.
+;;;   S3 -- the seam.  The REUSED dispatcher, the new
+;;;         m54_tty_termscript_* helper, the scm_c_public_ref site, and
+;;;         the 10 classified copy sites (brief.org section 5), as name
+;;;         checks (not line numbers).  S3 holds 5 checks.
 ;;;   S4 -- the registration: the corpus is in the (m54) group of
 ;;;         tool/run-tests.scm, after test-m54-imp2.el, and the (m52)
 ;;;         and (m53) groups stay present.  S4 holds 3 checks.
@@ -207,7 +206,8 @@ error, not a pass."
 ;;; --- S3. The seam (brief.org section 4 / section 5) -----------------
 
 ;; Name checks, not line pins.  The copy votes through the REUSED
-;; dispatcher, and the ONE new call site sits in m52_tty_write_1.
+;; dispatcher, and the ONE new call site sits in the write mechanism of
+;; the ONE hub (M62 imp-4 deleted the raw writer m52_tty_write_1).
 
 (setq m54-imp3--group 's3)
 
@@ -223,10 +223,6 @@ error, not a pass."
                  (m54-imp3--contains-p
                   "src/term.c"
                   "m54_tty_termscript_verdict (size_t copied, size_t len, int err, bool failed)"))
-(m54-imp3--check "seam-single-copy-call-site"
-                 (eql 1 (m54-imp3--count
-                         "src/term.c"
-                         "m54_tty_termscript_verdict (copied, len,")))
 (m54-imp3--check "seam-scm-ref-site"
                  (m54-imp3--contains-p
                   "src/term.c"
@@ -263,16 +259,6 @@ error, not a pass."
                    "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript)")
                   (m54-imp3--contains-p "src/dispnew.c" "fflush (tty->termscript)")))
 
-;; FIX-20261012-guilemacs (cr.org F3): the output errno is READ before
-;; the copy seam, because the copy Scheme calls can change errno and the
-;; output short-write path must keep its own value.
-(m54-imp3--check "seam-output-errno-before-copy"
-                 (m54-imp3--ordered-p
-                  "src/term.c"
-                  '("size_t written = fwrite (str, 1, len, tty->output);"
-                    "int out_err = errno;"
-                    "if (tty->termscript)")))
-
 ;;; --- S4. The registration -------------------------------------------
 
 (setq m54-imp3--group 's4)
@@ -294,24 +280,29 @@ error, not a pass."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  S1 holds 2 checks, S2
-;; holds 2, S3 holds 7, and S4 holds 3.
+;; holds 2, S3 holds 5, and S4 holds 3.  M62 imp-4 removed 2 of the S3
+;; checks (seam-single-copy-call-site and seam-output-errno-before-copy):
+;; both read the raw =fwrite= of the DELETED m52_tty_write_1, and a
+;; touched source-inspection assertion is removed and NOT re-pinned
+;; (brief.org section 8).
 
 (setq m54-imp3--group 's5)
 
 (m54-imp3--check "reg/min-s1-checks-2" (>= (m54-imp3--group-count 's1) 2))
 (m54-imp3--check "reg/min-s2-checks-2" (>= (m54-imp3--group-count 's2) 2))
-(m54-imp3--check "reg/min-s3-checks-7" (>= (m54-imp3--group-count 's3) 7))
+(m54-imp3--check "reg/min-s3-checks-5" (>= (m54-imp3--group-count 's3) 5))
 (m54-imp3--check "reg/min-s4-checks-3" (>= (m54-imp3--group-count 's4) 3))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The floor is the measured count of m54-imp3 tests: 18 registered
-;; checks (S1 2, S2 2, S3 7, S4 3, S5 4) plus the group-total deftest,
-;; allowing one slack.
+;; The floor is the measured count of m54-imp3 tests: 16 registered
+;; checks (S1 2, S2 2, S3 5, S4 3, S5 4) plus the group-total deftest.
+;; M62 imp-4 lowered it from 18 when the act removed the 2 S3
+;; source-text checks that its own change touched.
 
-(defvar m54-imp3--min-gate-total 18
-  "The minimum number of m54-imp3 ERT tests: 18 registered checks plus
-the group-total deftest, allowing one slack.")
+(defvar m54-imp3--min-gate-total 16
+  "The minimum number of m54-imp3 ERT tests: 16 registered checks plus
+the group-total deftest.")
 
 (ert-deftest m54-imp3/gate-m54-imp3-total ()
   "The m54-imp3 corpus registers at least its floor."

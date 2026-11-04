@@ -7148,22 +7148,30 @@ docs/m48-plan.org section 3.3.  */)
    DEVICE handle, a plain capability KEY string, a plain fixnum ARGS
    list, and a plain bytevector.  The C-owned struct tty_display_info
    and its FILE *output / *termscript streams stay in C.  Each leaf
-   calls the write mechanism (tparam / fwrite), never a public hub
-   (docs/kb.org =leaf-must-call-the-mechanism=).  A leaf returns a
-   fixnum byte count, or a negative fixnum holding the negated errno
-   (docs/kb.org =leaf-return-shape-preserves-signal=).  C stays the
-   single writer of output / termscript; no Guile port owns a FILE *
-   (docs/kb.org =passthrough-leaf-is-not-a-port=).  imp-3 moves no
-   policy: the selection and the arithmetic stay in C until imp-4.
+   calls the write mechanism, and since M62 imp-4 that mechanism is the
+   ONE output hub m52_tty_write_via_hub_1 (tparam stays in C) and the
+   flush hub -- not a raw =fwrite= (docs/kb.org
+   =leaf-must-call-the-mechanism=).  A leaf returns a fixnum byte count,
+   or a negative fixnum holding the negated errno (docs/kb.org
+   =leaf-return-shape-preserves-signal=).  C stays the single writer of
+   output / termscript; no Guile port owns a FILE * (docs/kb.org
+   =passthrough-leaf-is-not-a-port=).  imp-3 moved no policy; imp-4
+   moves the handle check and the after-write policy to Scheme.
 
    F3 (for imp-4): the real termcap output path is the OUTPUT
    macro (src/term.c), which calls tputs with padding through the
    M61 imp-3 sink m61_tty_emit_cap_1 and keeps the padding lines
    argument.  m52_tty_emit_cap_1 calls tparam and a raw fwrite, so it
    does NOT apply padding.  imp-3 rewires nothing, so there is no
-   regression today.  imp-4 MUST NOT lose the padding behaviour: either
-   call the sink (or emacs_tputs), or record the padding decision in
-   docs/m52-plan.org.  */
+   regression today.
+
+   F3 is CLOSED by M62 imp-4 with the SECOND option of the note: this
+   leaf still runs no =tputs=, so it applies NO termcap padding, and the
+   byte stream of the leaf does not change.  That IS the vanilla
+   behaviour of this leaf, and it stays a property of the =tputs= path
+   only (no =docs/= record: =docs/= is IGNORED by git).  The leaf now
+   routes its bytes through the ONE hub m52_tty_write_via_hub_1, so the
+   write POLICY (handle check, retry, termscript copy) is Scheme's.  */
 
 /* Resolve the plain DEVICE handle to its struct tty_display_info *, or
    NULL.  m22_tty_of_terminal (src/keyboard.c) is static, so it is not
@@ -7444,41 +7452,90 @@ m54_tty_tabs_verdict_scheme (Lisp_Object tabs_safe, Lisp_Object tab_width)
   return SCM_CALL_2 (proc, tabs_safe, tab_width);
 }
 
-/* Write LEN bytes at STR to tty->output and, when set, tty->termscript.
-   Return the number of bytes written, or the negated errno on a hard
-   failure, or -EINVAL when TTY holds no output stream.  C keeps the
-   =clearerr= after each write.  The after-write verdict of a short write
-   runs in Scheme (M54 imp-2): tty-write-verdict decides done / retry /
-   give-up from the plain counts.  The =FILE *= streams stay C, so no
-   port crosses the seam (=passthrough-leaf-is-not-a-port=).  */
+/* M62 imp-4: route LEN bytes at STR through the ONE output hub
+   m61_tty_handle_glyph_run_1 and answer the shape of the DELETED
+   =m52_tty_write_1=: the byte count, or the negated errno of a hard
+   failure, or -EINVAL when TTY holds no output stream.
+
+   The hub owns the same 3 decisions as the deleted writer -- the
+   =fwrite=, the =termscript= copy and the after-write verdict -- plus
+   the handle check of Scheme and the identity registration.  The
+   mapping of the hub answer is:
+
+     status < 0    the negated errno itself (UNKNOWN answers -EIO).
+     status == 0   the plain count of the run, also when it is short.
+
+   The hub COPIES the bytes into its own bytevector, so a read-only
+   termcap string and a =tparam= buffer are both safe here.
+
+   The =-EINVAL= pre-test keeps the return shape of the M52 Scheme
+   callers: the hub answers -EBADF for a NULL tty and -EINVAL for a NULL
+   output, and both of them read -EINVAL.
+
+   This leaf does NOT run =tputs=, so it applies NO termcap padding.  Its
+   byte stream stays that of a raw write (brief.org section 4.4).
+
+   M62 imp-4: 3 BEHAVIOUR changes come with the route, and they are
+   intentional.  The SHAPE of the answer holds; these VALUES, SIDE
+   EFFECTS and COSTS differ from the deleted writer (brief.org section 5).
+   Items 4 and 5 record 2 further points of the route that are NOT
+   behaviour changes:
+
+   1. SHORT WRITE.  The hub asks Scheme, and Scheme RETRIES a short write
+      through tty-handle-write-all, so this leaf answers the FULL count,
+      or waits in the retry loop.  The deleted writer answered the short
+      count and stopped.
+   2. TERMSCRIPT LENGTH.  The deleted writer copied the full LEN bytes on
+      EVERY call.  The hub copies only the MEASURED prefix, and copies
+      NOTHING when the progress is unknown (FIX-20261031 F1).  So after
+      a hard failure the termscript stream holds fewer bytes.
+   3. COST.  Each call registers 1 identity handle and allocates 1 Guile
+      bytevector, and that bytevector is a FULL COPY of the caller's
+      bytes (=scm_c_make_bytevector= plus =memcpy= in the hub).  So
+      =--tty-write-bytes= copies its N bytes TWICE, and =--tty-emit-cap=
+      copies its own bytes once.  =--tty-emit-cap= sits on the bell /
+      newline path, so that cost is now on that path too.
+   4. TERMSCRIPT VERDICT CALLS.  The deleted writer called
+      =m54_tty_termscript_verdict= on EVERY call that had a termscript
+      stream.  The hub calls it only for a short or a failed copy.  This
+      is NO behaviour change: the verdict builds a FRESH tty-out-handle
+      from plain counts (mod/emacs/tty-output.scm
+      =tty-termscript-copy-handle=), it stores no state, and C discards
+      the verdict value.  A complete copy answers the same counts
+      (LEN LEN 0), so the skipped call builds a value that no reader
+      keeps.
+   5. WHERE THE GIVE-UP TEST RUNS.  The deleted writer ran =ferror= and
+      =m54_tty_write_gives_up_p= itself.  With a Guile runtime the hub
+      asks Scheme for a count and an errno, and a nonzero errno leaves as
+      its own negated value (=m61_tty_handle_write_1=, state 2).  Without
+      a runtime (state 1) the C mechanism =m61_tty_output_write_1= keeps
+      the same test, so the no-Scheme answer is unchanged.  Same 1
+      verdict procedure, same caller policy; only the site moved.
+
+   The order BETWEEN the output stream and the termscript stream of a
+   routed run is NOT observable on this host: a termscript is a =FILE *=
+   and both streams are stdio buffers, so no PTY case reads it.  Do NOT
+   claim that the order is preserved.  */
 static ptrdiff_t
-m52_tty_write_1 (struct tty_display_info *tty, const char *str, size_t len)
+m52_tty_write_via_hub_1 (struct tty_display_info *tty, const char *str,
+			 size_t len)
 {
+  size_t written = 0;
+  bool unknown = false;
+  ptrdiff_t status;
+
   if (!tty || !tty->output)
     return -EINVAL;
-  size_t written = fwrite (str, 1, len, tty->output);
-  /* FIX-20261012-guilemacs: M54 imp-3 -- save the output errno
-     before the copy seam, whose Scheme calls can change errno.  */
-  int out_err = errno;
-  if (tty->termscript)
-    {
-      size_t copied = fwrite (str, 1, len, tty->termscript);
-      int copy_err = errno;
-      m54_tty_termscript_verdict (copied, len, copy_err,
-				  ferror (tty->termscript) != 0);
-    }
-  if (written < len && ferror (tty->output))
-    {
-      int e = out_err ? out_err : EIO;
-      Lisp_Object verdict = m54_tty_write_verdict_1 (written, len, e);
-      clearerr (tty->output);
-      /* The nil (no Scheme runtime) case is inside the helper, so both
-	 output writers decide alike.  */
-      if (m54_tty_write_gives_up_p (verdict))
-	return -e;
-      return (ptrdiff_t) written;
-    }
-  clearerr (tty->output);
+
+  status = m61_tty_handle_glyph_run_1 (tty, (const unsigned char *) str,
+				       len, &written, &unknown);
+
+  /* A hard failure is already the negated errno, and it carries the
+     measured count.  UNKNOWN answers -EIO with WRITTEN 0, so it needs no
+     extra test.  */
+  if (status < 0)
+    return status;
+
   return (ptrdiff_t) written;
 }
 
@@ -7503,9 +7560,11 @@ m52_tty_emit_cap_1 (struct tty_display_info *tty, Lisp_Object cap,
       a[n++] = FIXNUMP (x) ? (int) XFIXNUM (x) : 0;
     }
   if (n == 0)
-    return m52_tty_write_1 (tty, str, strlen (str));
+    return m52_tty_write_via_hub_1 (tty, str, strlen (str));
   char *buf = tparam (str, 0, 0, a[0], a[1], a[2], a[3]);
-  ptrdiff_t rc = buf ? m52_tty_write_1 (tty, buf, strlen (buf)) : -ENOMEM;
+  ptrdiff_t rc = (buf
+		  ? m52_tty_write_via_hub_1 (tty, buf, strlen (buf))
+		  : -ENOMEM);
   xfree (buf);
   return rc;
 }
@@ -7548,8 +7607,9 @@ DEVICE holds no output stream).  M52 imp-3, brief.org section 5.1.  */)
   if (!scm_is_bytevector (bytes))
     return make_fixnum (-EINVAL);
   return make_fixnum
-    (m52_tty_write_1 (tty, (const char *) SCM_BYTEVECTOR_CONTENTS (bytes),
-		      scm_c_bytevector_length (bytes)));
+    (m52_tty_write_via_hub_1 (tty,
+			      (const char *) SCM_BYTEVECTOR_CONTENTS (bytes),
+			      scm_c_bytevector_length (bytes)));
 }
 
 DEFUN ("--tty-flush", Fc_tty_flush, Sc_tty_flush, 1, 1, 0,
@@ -7561,11 +7621,13 @@ move it.  M52 imp-3, brief.org section 5.1.  */)
   (Lisp_Object device)
 {
   struct tty_display_info *tty = m52_tty_of_device_1 (device);
+  /* M62 imp-4: the same class of bypass as the 3 write sites.  The
+     =-EINVAL= pre-test and the =-errno= mapping of this leaf stay
+     (the hub answers -EBADF for a NULL tty), and Scheme now checks that
+     the handle is open before the =fflush= of the mechanism.  */
   if (!tty || !tty->output)
     return make_fixnum (-EINVAL);
-  if (fflush (tty->output) != 0)
-    return make_fixnum (-(errno ? errno : EIO));
-  return make_fixnum (0);
+  return make_fixnum (m61_tty_handle_flush_1 (tty));
 }
 
 DEFUN ("--tty-emit-seq", Fc_tty_emit_seq, Sc_tty_emit_seq, 2, 2, 0,

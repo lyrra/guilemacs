@@ -6,8 +6,8 @@
 ;;; records the A1 / A2 verdict (docs/m54-plan.org).
 ;;;
 ;;; This corpus pins the measured surface, the 3 stream fields, the
-;;; src/term.c site map, and the registration in the tree, so a stale
-;;; number or a missing registration fails the run.
+;;; src/term.c leaf DEFUNs and lifecycle anchors, and the registration in
+;;; the tree, so a stale name or a missing registration fails the run.
 ;;;
 ;;; It pins these groups:
 ;;;
@@ -21,15 +21,16 @@
 ;;;         docs/arch.org =Testing=).  The measured numbers live in the
 ;;;         commit message of M61 imp-2b.
 ;;;   S2 -- the 3 stream fields of src/termchar.h: input :51, output
-;;;         :53, termscript :61 (name, FILE * type, and line), plus the
-;;;         boundary rule ("one owner, one writer": no Guile port owns a
-;;;         C FILE *).  S2 holds 4 checks.
-;;;   S3 -- the src/term.c site map: the ordered name / line list of the
-;;;         stream operations (the output / termscript writes, the
-;;;         flushes, the read handle, the open / close, the init, and
-;;;         the size query), the 4 --tty-* leaf DEFUNs, the two M52
-;;;         writer helpers, and the lifecycle anchors.  S3 holds 4
-;;;         checks.
+;;;         :53, termscript :61 (name, FILE * type, and line).  S2 holds
+;;;         3 checks.  M62 imp-4 removed the 4th (the boundary-rule
+;;;         prose pin of src/term.c): the act rewrote that prose, and a
+;;;         source-inspection assertion is removed and NOT re-pinned
+;;;         (brief.org section 8).
+;;;   S3 -- the src/term.c leaf DEFUNs and the lifecycle anchors.  S3
+;;;         holds 2 checks.  M62 imp-4 removed the ordered site map and
+;;;         the 2-writer-helper check: the act deletes m52_tty_write_1
+;;;         and its raw =fwrite= pair, so both read a text that no
+;;;         longer exists.
 ;;;   S4 -- the registration: the corpus is registered in the (m54)
 ;;;         group of tool/run-tests.scm, after the (m53) group, and the
 ;;;         (m52) and (m53) groups stay present.  S4 holds 4 checks.
@@ -174,80 +175,11 @@ pass."
                  (and (m54-imp1--contains-p "src/termchar.h" "FILE *termscript;")
                       (eql 61 (m54-imp1--line-of "src/termchar.h"
                                                  "FILE \\*termscript;"))))
-;; The boundary rule (brief.org section 4.4): a Guile port must NOT own a
-;; C-owned FILE * stream; C stays the single writer.  The tracked source
-;; holds the rule as a FIX marker on the M52 output boundary and in the
-;; (emacs tty-output) module header.
-(m54-imp1--check "boundary-rule-one-writer"
-                 (and (m54-imp1--contains-p
-                       "src/term.c"
-                       "single writer of output / termscript; no Guile port owns a FILE *")
-                      (m54-imp1--contains-p
-                       "mod/emacs/tty-output.scm"
-                       "C stays the single writer")))
 
-;;; --- S3. The src/term.c site map ------------------------------------
-
-;; brief.org section 4.2.  The ordered needle list holds one distinctive
-;; string per stream operation, in file order: every output / termscript
-;; write, every flush, the read handle, the open / close, the init, and
-;; the size / baud queries.  A re-ordered or removed path breaks the
-;; run.  A repeated identical form (for example the 6 routed
-;; `m61_tty_handle_flush_1 (tty);' sites, or the 3 glyph-run calls)
-;; appears once per occurrence, so the removal of one site is caught
-;; too.
+;;; --- S3. The src/term.c leaves and the lifecycle anchors -----------
 
 (setq m54-imp1--group 's3)
 
-(m54-imp1--check "site-map-ordered-operations"
-                 (m54-imp1--ordered-p
-                  "src/term.c"
-                  '(
-                   ;; M61 imp-2: the 6 routed flush sites ask Scheme for
-                   ;; the order decision, and the fflush itself stays C
-                   ;; in the ONE mechanism m61_tty_output_flush_1.
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "fwrite (SDATA (string), 1, SBYTES (string), tty->output);"
-                   "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);"
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "putc (' ', tty->termscript);"
-                   "putc (' ', tty->output);"
-                   ;; M61 imp-2: the 2 mechanisms of the ordered path (the
-                   ;; termscript copy and the flush) and the ONE glyph-run
-                   ;; entry point of the 3 hubs.  The hub call replaces the
-                   ;; old write call plus its bare termscript fwrite.
-                   "m61_tty_output_write_1 (struct tty_display_info *tty,"
-                   "m61_tty_output_termscript_1 (struct tty_display_info *tty,"
-                   "m61_tty_output_flush_1 (struct tty_display_info *tty)"
-                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
-                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
-                   "m61_tty_handle_glyph_run_1 (tty, conversion_buffer,"
-                   "f = t->display_info.tty->input;"
-                   "emacs_fclose (t->display_info.tty->output);"
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "(void) m61_tty_handle_flush_1 (tty);"
-                   "tty->input = tty->output"
-                   "add_keyboard_wait_descriptor (fileno (tty->input));"
-                   "get_tty_size (fileno (tty->input), &width, &height);"
-                   "init_baud_rate (fileno (tty->input));"
-                   "tty->output = stdout;"
-                   "tty->input = stdin;"
-                   "get_tty_size (fileno (tty->input), &width, &height);"
-                   ;; M54 imp-4 moved the tab policy to Scheme: the site
-                   ;; is now the seam call, not the old C one-liner.
-                   "m54_tty_tabs_verdict_scheme (tabs_safe ? Qt : Qnil,"
-                   "init_baud_rate (fileno (tty->input));"
-                   "delete_keyboard_wait_descriptor (fileno (tty->input));"
-                   "emacs_fclose (tty->input);"
-                   "emacs_fclose (tty->output);"
-                   "emacs_fclose (tty->termscript);"
-                   "m52_tty_write_1 (struct tty_display_info *tty"
-                   "fwrite (str, 1, len, tty->output);"
-                   "fwrite (str, 1, len, tty->termscript);"
-                   "m52_tty_emit_cap_1 (struct tty_display_info *tty"
-                   "fflush (tty->output)")))
 ;; The 4 --tty-* leaf DEFUNs (brief.org section 4.3).
 (m54-imp1--check "leaf-defuns"
                  (m54-imp1--holds-all
@@ -256,12 +188,6 @@ pass."
                     "DEFUN (\"--tty-write-bytes\""
                     "DEFUN (\"--tty-flush\""
                     "DEFUN (\"--tty-emit-seq\"")))
-;; The two M52 writer helpers (brief.org section 4.2).
-(m54-imp1--check "writer-helpers"
-                 (m54-imp1--holds-all
-                  "src/term.c"
-                  '("m52_tty_write_1 (struct tty_display_info *tty, const char *str"
-                    "m52_tty_emit_cap_1 (struct tty_display_info *tty, Lisp_Object cap")))
 ;; The lifecycle anchors: init, read, write, flush, suspend, resume, and
 ;; close all live in these functions (brief.org section 4.2).
 (m54-imp1--check "lifecycle-anchors"
@@ -295,27 +221,29 @@ pass."
 ;; tests, so a green m54 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S2 holds 4 checks,
-;; S3 holds 4, and S4 holds 4.  S1 is gone (M61 imp-2b, findings F2), so
+;; because every check is registered at load time.  S2 holds 3 checks,
+;; S3 holds 2, and S4 holds 4.  S1 is gone (M61 imp-2b, findings F2), so
 ;; it has no guard: a group that holds no check needs none.
 
 (setq m54-imp1--group 's5)
 
-(m54-imp1--check "reg/min-s2-checks-4" (>= (m54-imp1--group-count 's2) 4))
-(m54-imp1--check "reg/min-s3-checks-4" (>= (m54-imp1--group-count 's3) 4))
+(m54-imp1--check "reg/min-s2-checks-3" (>= (m54-imp1--group-count 's2) 3))
+(m54-imp1--check "reg/min-s3-checks-2" (>= (m54-imp1--group-count 's3) 2))
 (m54-imp1--check "reg/min-s4-checks-4" (>= (m54-imp1--group-count 's4) 4))
 
 ;;; --- The group-total check ------------------------------------------
 
-;; The floor is the MEASURED count of m54-imp1 tests: 15 registered
-;; checks (S2 4, S3 4, S4 4, S5 3) plus the group-total deftest itself.
+;; The floor is the MEASURED count of m54-imp1 tests: 12 registered
+;; checks (S2 3, S3 2, S4 4, S5 3) plus the group-total deftest itself.
 ;; This is a coarse net, not a tight bound; the per-group reg/min-*
 ;; guards are the tight check.  M61 imp-2b lowered this floor from 22
 ;; when findings F2 removed the 6 S1 source-text pins and the S1 guard.
+;; M62 imp-4 lowered it from 16 when the act removed the 3 S2 / S3
+;; source-text checks that its own change touched.
 
-(defvar m54-imp1--min-gate-total 16
-  "The minimum number of m54-imp1 ERT tests: 15 registered checks plus
-the group-total deftest, allowing one slack.")
+(defvar m54-imp1--min-gate-total 13
+  "The minimum number of m54-imp1 ERT tests: 12 registered checks plus
+the group-total deftest.")
 
 (ert-deftest m54-imp1/gate-m54-total ()
   "The m54 group registers at least its docs-independent floor."
