@@ -3941,6 +3941,15 @@ M62_IMP5_COUNT_PROBE = M62_IMP5_PRELUDE + r"""
 # read a termscript copy: brief.org section 11 keeps the termscript order
 # and length of a routed run an OPEN LIMIT, because both streams are stdio
 # buffers and a termscript is a FILE *.  The pty stream is the proof here.
+#
+# LIMIT (review cr.org F2 of 0dc8fdc33): this case pins the WIDTH and the
+# ORDER of 80 space bytes between 2 markers.  Any 80-byte space run of
+# that span satisfies the needle, so the case does NOT pin the PRODUCER
+# of the run: the display engine also pads a row with space GLYPHS (the
+# m62-imp2 entry measured a run of 36 space bytes from write_glyphs).  Do
+# not read this case as the proof of the hard branch.  The case that pins
+# the arm is hard-clear-count-e2e: 1 crossing for each row can only come
+# from the repeat hub.
 M62_IMP5_BYTES_PROBE = M62_IMP5_PRELUDE + r"""
           (begin
             (send "@@BEGIN@@")
@@ -3969,8 +3978,9 @@ M62_IMP5_CLEAN_EXIT_PROBE = M62_IMP5_PRELUDE + r"""
 # shape that the act deleted.  The selftest of test/pty-driver.py proves
 # that the window below holds the act pair and refuses the control pair.
 #
-# MEASURED 2026-11-05, BOTH halves re-run after the review of the act, each
-# on a fresh build of this tree:
+# MEASURED 2026-11-05, in the CORRECTION ROUND of the act and BEFORE the
+# commit that ships this text, each half on its own fresh build
+# (PATH=.reasonix:$PATH ./m.sh -j8):
 #   python3 test/pty-driver.py --emacs src/emacs --group m62-imp5
 # GREEN on the act (3 PASS, the act pair inside the window), and RED with
 # the deleted per-byte loop put back in src/term.c (1 FAIL, 2 PASS):
@@ -3982,6 +3992,15 @@ M62_IMP5_CLEAN_EXIT_PROBE = M62_IMP5_PRELUDE + r"""
 # on each axis, so the control reads exactly 1 crossing less for each row
 # of each clear run.  The FAIL message reports the pair, so no
 # always-report window is needed.
+#
+# LIMIT of this record (review cr.org F1 of 0dc8fdc33): the act session
+# that made commit 0dc8fdc33 did NOT re-run the control, as its message
+# section 5 states.  The 2 pairs above are the values of the correction
+# round.  The 3 driver units prove the ARITHMETIC of the window only (it
+# holds the act pair, it refuses the control pair, and the delta equals
+# RUNS * LINES); no unit and no re-run of the act session proves that the
+# real per-byte path answers RED.  Do not read this comment as that
+# proof.
 M62_IMP5_ACT_PAIR = (401, 1624)
 M62_IMP5_CONTROL_PAIR = (209, 1432)
 

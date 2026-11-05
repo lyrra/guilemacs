@@ -1993,9 +1993,13 @@ m61_tty_emit_cap_1 (struct tty_display_info *tty, const char *str, int lines)
   return m61_cap_finish ();
 }
 
-/* The N-byte form of the sink: the newline fallback of
-   tty_set_terminal_modes calls it with N, and the raw CR of
-   tty_reset_terminal_modes calls it with 1.  It is the ONE shape of a
+/* The N-byte form of the sink.  It has 4 callers, MEASURED at 0dc8fdc33:
+   the newline fallback of tty_set_terminal_modes calls it with N, the raw
+   CR of tty_reset_terminal_modes calls it with 1, the space run of
+   reset_sys_modes calls it from src/sysdep.c :1432, and the hard-clear
+   space run of tty_clear_end_of_line calls it from src/term.c :885
+   (M62 imp-5).  A comment that counts its callers must count them again.
+   It is the ONE shape of a
    run of repeated bytes, so src/term.c holds no call of the deleted
    =cmputc= (GONE, M62 imp-1) and every capability byte has ONE writer.
    The N bytes collect in the sink and the run crosses the handle ONCE
