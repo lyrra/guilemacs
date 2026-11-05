@@ -843,14 +843,15 @@ tty_clear_frame (struct frame *f)
 static void
 tty_clear_end_of_line (struct frame *f, int first_unused_hpos)
 {
-  register int i;
   struct tty_display_info *tty = FRAME_TTY (f);
 
   /* The 2 guards and the capability selection run in Scheme: the
      returned step is #nil when a guard holds, else the KEY "clear-line"
      or the MARKER ("clear-line-hard").  C reads the state before the
      background highlight (the original order), keeps the background
-     highlight, OUTPUT1, the AutoWrap edge, the putc loop, and cmplus.  */
+     highlight, OUTPUT1, the AutoWrap edge, and cmplus.  The run of N
+     spaces crosses the repeat hub m61_tty_emit_cap_repeat_1, so this
+     function holds no raw putc writer of a tty stream (M62 imp-5).  */
   Lisp_Object step
     = m52_tty_clear_end_of_line_scheme (make_fixnum (tty->costs_set),
 					make_fixnum (curX (tty)),
@@ -873,13 +874,17 @@ tty_clear_end_of_line (struct frame *f, int first_unused_hpos)
 	  && first_unused_hpos == FrameCols (tty))
 	first_unused_hpos--;
 
-      for (i = curX (tty); i < first_unused_hpos; i++)
-	{
-	  if (tty->termscript)
-	    putc (' ', tty->termscript);
-	  putc (' ', tty->output);
-	}
-      cmplus (tty, first_unused_hpos - curX (tty));
+      {
+	/* M62 imp-5: 1 sink run of N spaces and the termscript copy of
+	   the measured prefix, through the ONE writer.  N is the byte
+	   count of the deleted per-column putc loop, so a negative N
+	   writes 0 bytes, as that loop did.  The copy holds the measured
+	   prefix only, and nothing when the progress is unknown
+	   (m61_glyph_copy_len_1).  cmplus keeps N and stays in C.  */
+	EMACS_INT n = first_unused_hpos - curX (tty);
+	(void) m61_tty_emit_cap_repeat_1 (tty, ' ', n);
+	cmplus (tty, n);
+      }
     }
 }
 

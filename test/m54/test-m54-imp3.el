@@ -237,14 +237,15 @@ error, not a pass."
 (m54-imp3--check "stay-c-copy-sites"
                  (and
                   ;; M61 imp-2 moved the 3 conversion_buffer copies of the
-                  ;; normal glyph path into the per-TTY handle, so 2 of the
-                  ;; 5 src/term.c copy sites stay C: the
+                  ;; normal glyph path into the per-TTY handle, so 1 of the
+                  ;; src/term.c copy sites stays C: the
                   ;; tty_send_additional_strings copy (it can run during a
-                  ;; GC emergency escape) and the hard-clear putc loop.
+                  ;; GC emergency escape).  M62 imp-5 moved the 2nd one (the
+                  ;; hard-clear putc loop) into the repeat hub, so this
+                  ;; check no longer reads that loop (brief.org section 6).
                   (m54-imp3--contains-p
                    "src/term.c"
                    "fwrite (SDATA (string), 1, SBYTES (string), tty->termscript)")
-                  (m54-imp3--contains-p "src/term.c" "putc (' ', tty->termscript)")
                   ;; The moved copies run through the ONE mechanism of the
                   ;; M61 ordered path.
                   (eql 1 (m54-imp3--count
@@ -284,7 +285,14 @@ error, not a pass."
 ;; checks (seam-single-copy-call-site and seam-output-errno-before-copy):
 ;; both read the raw =fwrite= of the DELETED m52_tty_write_1, and a
 ;; touched source-inspection assertion is removed and NOT re-pinned
-;; (brief.org section 8).
+;; (the F2 rule, brief.org section 6 and section 10).  M62 imp-5 removed
+;; 1 assertion of the S3 check
+;; =stay-c-copy-sites= (the =putc= loop of =tty_clear_end_of_line= that
+;; its own change deleted) and kept the other 6, so the check stays and
+;; the count does not move.  Do NOT re-pin the text.  All 6 clauses that
+;; stay are source-text reads of text that this act does not touch, so
+;; they are F2 DEBT of the corpus (named in docs/kb.org ** M62), and this
+;; act does not widen for them.
 
 (setq m54-imp3--group 's5)
 
@@ -298,7 +306,9 @@ error, not a pass."
 ;; The floor is the measured count of m54-imp3 tests: 16 registered
 ;; checks (S1 2, S2 2, S3 5, S4 3, S5 4) plus the group-total deftest.
 ;; M62 imp-4 lowered it from 18 when the act removed the 2 S3
-;; source-text checks that its own change touched.
+;; source-text checks that its own change touched.  M62 imp-5 removed 1
+;; assertion of =stay-c-copy-sites= and not the check, so the floor stays
+;; at 16.
 
 (defvar m54-imp3--min-gate-total 16
   "The minimum number of m54-imp3 ERT tests: 16 registered checks plus

@@ -927,6 +927,14 @@ M62_IMP2_TERM = "m62-imp2"
 # the only entry of this file that holds a padding marker, so it is the
 # only one that proves the byte order against the delay of the library.
 M62_IMP1B_TERM = "m62-imp1b"
+# The M62 imp-5 entry: xterm with a cancelled el, ed and clear.  The 3
+# capabilities are the condition of the drive of that group: no el makes
+# TS_clr_line NULL (the HARD branch of clear_end_of_line), and no ed plus
+# no clear make the 2 whole-frame fallbacks run (see the group below).
+# The terminfo names are the terminfo names, NOT the termcap names: =el@=
+# cancels "clr_eol" (termcap "ce"), and a line "ce@" cancels NOTHING.
+M62_IMP5_TERM = "m62-imp5"
+
 _fixture_dir = None
 _fixture_tried = False
 
@@ -951,7 +959,8 @@ def terminfo_fixture(term):
                 if result.returncode == 0 and all(
                         name in compiled
                         for name in ("xterm", "ansi", M52_IMP8_TERM,
-                                     M62_IMP2_TERM, M62_IMP1B_TERM)):
+                                     M62_IMP2_TERM, M62_IMP1B_TERM,
+                                     M62_IMP5_TERM)):
                     _fixture_dir = directory
             except OSError:
                 pass
@@ -963,7 +972,8 @@ def terminfo_fixture(term):
 
 TERMINFO_FIXTURES = {name: (lambda term=name: terminfo_fixture(term))
                      for name in ("xterm", "ansi", M52_IMP8_TERM,
-                                  M62_IMP2_TERM, M62_IMP1B_TERM)}
+                                  M62_IMP2_TERM, M62_IMP1B_TERM,
+                                  M62_IMP5_TERM)}
 
 M52_IMP8_CASES = (
     {
@@ -3786,6 +3796,262 @@ M62_IMP4_CASES = (
     },
 )
 
+# --- M62 imp-5: the hard-clear space run (row 9) -----------------------
+#
+# tty_clear_end_of_line (src/term.c) takes the HARD branch when the entry
+# holds no =el=, i.e. when TS_clr_line is NULL.  Before the act the branch
+# wrote 1 =putc (' ')= to tty->output and 1 =putc (' ')= to tty->termscript
+# for each column.  The act routes the whole run through the repeat hub
+# m61_tty_emit_cap_repeat_1, so src/term.c holds no raw per-byte writer of
+# a tty stream on the normal output path.  tty_turn_off_insert, the
+# AutoWrap edge and cmplus stay in C, in the original order.
+#
+# THE DRIVE (MEASURED 2026-11-05).  A plain "a shorter line" redisplay
+# does NOT reach the hard branch of this engine: with a colored default
+# face the display engine pads EVERY row with space GLYPHS
+# (src/dispnew.c write_row: write_spaces_p), so the row keeps the frame
+# width and the erase of the tail is a glyph write.  MEASURED: the
+# m62-imp2 entry gave a run of 36 space BYTES from write_glyphs, and the
+# hard branch of tty_clear_end_of_line ran 0 times.
+#
+# The drive of this group is the FALLBACK of the whole-frame clear, which
+# reaches tty_clear_end_of_line 1 time for EACH row of the frame:
+#
+#   (redraw-display)
+#     -> clear_frame              (src/dispnew.c)
+#     -> tty_clear_frame          (TS_clr_frame is NULL -> fallback)
+#     -> cursor_to (f, 0, 0), clear_to_end
+#     -> tty_clear_to_end         (TS_clr_to_bottom is NULL -> clear-loop)
+#     -> for i = curY .. TOTAL_LINES - 1:
+#          cursor_to (f, i, 0); clear_end_of_line (f, FRAME_COLS (f))
+#     -> tty_clear_end_of_line    (TS_clr_line is NULL -> clear-line-hard)
+#
+# So ONE redraw writes FRAME_TOTAL_LINES hard runs of FRAME_COLS spaces
+# (the last row holds FRAME_COLS - 1, the AutoWrap edge of src/term.c).
+# The entry must cancel 3 terminfo capabilities for this drive: el
+# (clr_eol), ed (clr_eos) and clear (clr_scr).  The entry is M62_IMP5_TERM.
+#
+# The frame of the drive: the entry answers cols#80 lines#24, and the case
+# env pins the same 2 numbers, because ncurses setupterm lets COLUMNS /
+# LINES of the environment override them.  These are the SINGLE source of
+# the geometry: the env, the run needle and the span arithmetic derive
+# from them, so no needle holds a bare 80 or 79.
+M62_IMP5_FRAME_COLS = 80
+M62_IMP5_FRAME_LINES = 24
+
+M62_IMP5_BEGIN = b"M62-IMP5-BEGIN!"
+M62_IMP5_END = b"M62-IMP5-END!"
+M62_IMP5_SKIP = "m62-imp5-skip:"
+
+M62_IMP5_ENV = {"TERM": M62_IMP5_TERM,
+                "COLUMNS": str(M62_IMP5_FRAME_COLS),
+                "LINES": str(M62_IMP5_FRAME_LINES)}
+
+# The hard-clear run of ONE row: FRAME_COLS space bytes.  MEASURED
+# 2026-11-05, see the drive above.  The needle is the WHOLE run, so a run
+# split into single bytes, a run of another width, and no run all FAIL.
+M62_IMP5_RUN = b" " * M62_IMP5_FRAME_COLS
+
+# The row address of the SECOND row of the clear-loop (the fixture "cup"
+# of the entry, cup=\E[%i%p1%d;%p2%dH) and its run.  The needle pair
+# pins the ORDER: the loop moves to the row and THEN writes the run, so a
+# drive that erases the rows in one blob can not satisfy it.
+M62_IMP5_ROW2 = b"\x1b[2;1H"
+M62_IMP5_ROW2_RUN = M62_IMP5_ROW2 + M62_IMP5_RUN
+M62_IMP5_ROW3_RUN = b"\x1b[3;1H" + M62_IMP5_RUN
+
+# The row address of the LAST row of the clear-loop and its run.  The
+# AutoWrap edge of src/term.c cuts the run of that row by 1, so the last
+# row writes FRAME_COLS - 1 space bytes.  The edge stays in C (brief.org
+# section 3), and 2 needles pin it: the span MUST hold the short run and
+# MUST NOT hold the full-width run, because a longer run CONTAINS the
+# short one.  MEASURED 2026-11-05: the span of 1 redraw holds the run of
+# FRAME_COLS - 1 bytes after \x1b[24;1H and holds no FRAME_COLS run after
+# it.  The row address and the run length come from the pinned frame, not
+# from a host constant.
+M62_IMP5_ROW_LAST = ("\x1b[%d;1H" % M62_IMP5_FRAME_LINES).encode()
+M62_IMP5_LAST_RUN = M62_IMP5_ROW_LAST + M62_IMP5_RUN[:-1]
+M62_IMP5_FORBIDDEN_LAST_RUN = M62_IMP5_ROW_LAST + M62_IMP5_RUN
+
+# The number of whole-frame clear runs of the count case.  ONE run costs
+# FRAME_TOTAL_LINES = 24 crossings of the sink (1 for each row), and the
+# deleted per-byte loop cost NONE.  RUNS = 8 keeps the difference (192)
+# far above the 1 crossing of jitter that the window admits.
+M62_IMP5_COUNT_RUNS = 8
+
+# The shared prelude: the tty of the session, the elisp leaves that drive
+# the redraw, and the crossing counter of src/eval.c.  It holds NO
+# termscript leaf, because no case of this group reads that stream.
+# The skip prefix is the group's OWN, so a skip of this group is never read
+# as the skip of another group.
+M62_IMP5_PRELUDE = r"""
+(let* ((ref (resolve-module '(emacs elisp-ref)))
+       (c (module-ref ref '%c))
+       (gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the session terminal is the
+       ;; last element.
+       (term (and (pair? terms) (car (reverse terms))))
+       (reset-cross! (c 'debug-reset-guile-cross-count))
+       (cross-count (c 'debug-guile-cross-count))
+       (send (c 'send-string-to-terminal))
+       (redraw! (c 'redraw-display))
+       ;; NO open-termscript leaf: this group reads the PTY stream only.
+       ;; The termscript order and length of a routed run are an OPEN LIMIT
+       ;; (brief.org section 11), so no case binds or reads it.
+       (line (lambda (label a b)
+               (string-append label " s2c=" (number->string a)
+                              " c2s=" (number->string b)))))
+  (cond ((not term) "no-terminal")
+        ;; A terminal without a tty is suspended: no capability reaches
+        ;; the stream, so the pair proves nothing.  State the skip, never
+        ;; a pass.
+        ((not ((c '--decode-tty-terminal-p) term))
+         "m62-imp5-skip: the session terminal does not decode to a tty")
+        (else
+"""
+
+# RUNS whole-frame clears and the crossing pair of their clear-loops.  The counter
+# is reset AFTER the BEGIN marker and read BEFORE the END marker, so the
+# range holds those clear-loops only.  No redisplay runs inside the range:
+# the clear-loop of clear_frame writes its rows at once, so the pair is
+# the sink crossings of the runs.
+M62_IMP5_COUNT_PROBE = M62_IMP5_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (reset-cross!)
+            (let loop ((i @@RUNS@@))
+              (if (> i 0) (begin (redraw!) (loop (- i 1))) #f))
+            (let ((counts (cross-count)))
+              (send "@@END@@")
+              (let ((s2c (car counts)) (c2s (cdr counts)))
+                (if (and (<= @@MIN_S2C@@ s2c) (<= s2c @@MAX_S2C@@)
+                         (<= @@MIN_C2S@@ c2s) (<= c2s @@MAX_C2S@@))
+                    "ok"
+                    (string-append
+                     (line "m62-imp5-cross:" s2c c2s)
+                     " is outside the window @@MIN_S2C@@..@@MAX_S2C@@/"
+                     "@@MIN_C2S@@..@@MAX_C2S@@ of @@RUNS@@ clear-loops:"
+                     " the space run left the repeat hub")))))
+        )))
+"""
+
+# ONE redraw between the 2 markers, and the bytes case reads the WHOLE
+# space run of 1 row as 1 needle inside that span.  This case does NOT
+# read a termscript copy: brief.org section 11 keeps the termscript order
+# and length of a routed run an OPEN LIMIT, because both streams are stdio
+# buffers and a termscript is a FILE *.  The pty stream is the proof here.
+M62_IMP5_BYTES_PROBE = M62_IMP5_PRELUDE + r"""
+          (begin
+            (send "@@BEGIN@@")
+            (redraw!)
+            (send "@@END@@")
+            "ok")
+        )))
+"""
+
+# The same drive, and the driver checks the exit status and the restored
+# terminal mode.  The act does not touch the reset path, but the drive
+# runs it, so it is re-proved here.
+M62_IMP5_CLEAN_EXIT_PROBE = M62_IMP5_PRELUDE + r"""
+          (begin
+            (redraw!)
+            (send "@@BEGIN@@")
+            (redraw!)
+            (send "@@END@@")
+            "ok")
+        )))
+"""
+
+# The 2 MEASURED pairs of the count case: (s2c, c2s) = (SCHEME-TO-C,
+# C-TO-SCHEME), as src/eval.c debug-guile-cross-count answers it.  The act
+# pair is the repeat-hub shape; the control pair is the per-byte =putc=
+# shape that the act deleted.  The selftest of test/pty-driver.py proves
+# that the window below holds the act pair and refuses the control pair.
+#
+# MEASURED 2026-11-05, BOTH halves re-run after the review of the act, each
+# on a fresh build of this tree:
+#   python3 test/pty-driver.py --emacs src/emacs --group m62-imp5
+# GREEN on the act (3 PASS, the act pair inside the window), and RED with
+# the deleted per-byte loop put back in src/term.c (1 FAIL, 2 PASS):
+#   FAIL m62-imp5/hard-clear-count-e2e measured 'm62-imp5-cross: s2c=209
+#   c2s=1432 is outside the window 400..402/1623..1625 of 8 clear-loops:
+#   the space run left the repeat hub' want 'ok'
+# The loop was removed again, the tree was rebuilt, and the same command
+# answered 3 PASS.  The 2 pairs differ by 192 = RUNS * FRAME_TOTAL_LINES
+# on each axis, so the control reads exactly 1 crossing less for each row
+# of each clear run.  The FAIL message reports the pair, so no
+# always-report window is needed.
+M62_IMP5_ACT_PAIR = (401, 1624)
+M62_IMP5_CONTROL_PAIR = (209, 1432)
+
+# The MEASURED window of the crossing pair of those runs: the act value
+# plus and minus 1 crossing.  BOUNDS: the lower bound rejects the per-byte
+# shape, which sits 192 crossings below the act for the 8 runs; the upper
+# bound admits 1 crossing of jitter over them.
+M62_IMP5_COUNT_MIN_S2C = 400
+M62_IMP5_COUNT_MAX_S2C = 402
+M62_IMP5_COUNT_MIN_C2S = 1623
+M62_IMP5_COUNT_MAX_C2S = 1625
+
+M62_IMP5_CASES = (
+    {
+        "name": "m62-imp5/hard-clear-count-e2e",
+        "group": "m62-imp5",
+        "probe": M62_IMP5_COUNT_PROBE,
+        "subst": {"BEGIN": M62_IMP5_BEGIN.decode(),
+                  "END": M62_IMP5_END.decode(),
+                  "RUNS": str(M62_IMP5_COUNT_RUNS),
+                  "MIN_S2C": str(M62_IMP5_COUNT_MIN_S2C),
+                  "MAX_S2C": str(M62_IMP5_COUNT_MAX_S2C),
+                  "MIN_C2S": str(M62_IMP5_COUNT_MIN_C2S),
+                  "MAX_C2S": str(M62_IMP5_COUNT_MAX_C2S)},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP5_SKIP,
+        # A count-only case proves no byte, so the span pins the runs too:
+        # row 2, row 3, and the AutoWrap edge of the last row.  The last
+        # row MUST NOT hold a full-width run, so a lost edge FAILS.
+        # LIMIT: the needles start at row 2.  Row 1 is reached by the
+        # 3-byte '\E[A' and not by the cup of the entry, so its address is
+        # not pinned; its run is the same FRAME_COLS run that the row 2
+        # and row 3 needles already pin.  Do not read this case as a
+        # proof of the row 1 address.
+        "span_requires": {"span": (M62_IMP5_BEGIN, M62_IMP5_END),
+                          "needles_in_order": (M62_IMP5_ROW2_RUN,
+                                               M62_IMP5_ROW3_RUN,
+                                               M62_IMP5_LAST_RUN),
+                          "needles_absent": (M62_IMP5_FORBIDDEN_LAST_RUN,)},
+        "env": dict(M62_IMP5_ENV),
+    },
+    {
+        "name": "m62-imp5/hard-clear-bytes-e2e",
+        "group": "m62-imp5",
+        # The WHOLE run of 1 row is 1 needle between the 2 markers, so a
+        # short run, a split run and 1 missing byte FAIL.  The needle
+        # length comes from the pinned frame, so no bare 80 is pinned.
+        "probe": M62_IMP5_BYTES_PROBE,
+        "subst": {"BEGIN": M62_IMP5_BEGIN.decode(),
+                  "END": M62_IMP5_END.decode()},
+        "expect": "ok",
+        "info_report_prefix": M62_IMP5_SKIP,
+        "span_requires": {"span": (M62_IMP5_BEGIN, M62_IMP5_END),
+                          "needles": (M62_IMP5_RUN,)},
+        "env": dict(M62_IMP5_ENV),
+    },
+    {
+        "name": "m62-imp5/clean-exit-e2e",
+        "group": "m62-imp5",
+        "probe": M62_IMP5_CLEAN_EXIT_PROBE,
+        "subst": {"BEGIN": M62_IMP5_BEGIN.decode(),
+                  "END": M62_IMP5_END.decode()},
+        "expect": "ok",
+        "pty_contains": M62_IMP5_END,
+        "info_report_prefix": M62_IMP5_SKIP,
+        "capture_mode": True,
+        "wait_exit": True,
+        "env": dict(M62_IMP5_ENV),
+    },
+)
 
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
@@ -3794,7 +4060,8 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M56_IMP2_CASES + M58_IMP2_CASES + M58_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
          + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES
-         + M62_IMP2_CASES + M62_IMP1B_CASES + M62_IMP4_CASES)
+         + M62_IMP2_CASES + M62_IMP1B_CASES + M62_IMP4_CASES
+         + M62_IMP5_CASES)
 
 # These cases check terminal capabilities or their emitted bytes.
 _FIXTURE_CASES = {
@@ -3803,7 +4070,7 @@ _FIXTURE_CASES = {
 }
 _FIXTURE_GROUPS = {"m52-imp4", "m52-imp5", "m52-imp6", "m52-imp7",
                    "m58-imp3", "m58-imp4", "m61-imp3", "m62-imp1",
-                   "m62-imp2", "m62-imp1b", "m62-imp4"}
+                   "m62-imp2", "m62-imp1b", "m62-imp4", "m62-imp5"}
 CASES = tuple(
     dict(case, terminfo_fixture=case.get("env", {}).get("TERM", "xterm"))
     if case["name"] in _FIXTURE_CASES or case["group"] in _FIXTURE_GROUPS
@@ -3818,4 +4085,5 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m56-imp2",
           "m58-imp2", "m58-imp3", "m58-imp4",
           "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3",
-          "m62-imp1", "m62-imp2", "m62-imp1b", "m62-imp4")
+          "m62-imp1", "m62-imp2", "m62-imp1b", "m62-imp4",
+          "m62-imp5")

@@ -85,6 +85,8 @@ from pty_cases import _M58_IMP3_ITALIC_NEEDLE
 from pty_cases import M62_IMP1_ACT_PAIR, M62_IMP1_CONTROL_PAIR
 from pty_cases import M62_IMP2_ACT_PAIR, M62_IMP2_CONTROL_PAIR
 from pty_cases import M62_IMP2_COUNT_RUNS
+from pty_cases import M62_IMP5_ACT_PAIR, M62_IMP5_CONTROL_PAIR
+from pty_cases import M62_IMP5_COUNT_RUNS
 from pty_session import SessionOptions, deliver_raw, run_session
 
 
@@ -645,6 +647,10 @@ def span_required_problem(case, output):
     when the span or a needle is missing, or None when the span holds
     every needle.  The needle is scoped to the span, so a byte elsewhere
     in the transcript does NOT satisfy the check.
+
+    `needles_in_order' pins the sequence, and `needles_absent' pins a run
+    that MUST NOT appear (the upper bound of a run that a longer run would
+    otherwise satisfy).
     """
     spec = case.get("span_requires")
     if spec is None:
@@ -677,6 +683,15 @@ def span_required_problem(case, output):
                 return ("FAIL", "pty span held no ordered run %r after "
                         "offset %d (measured %r)" % (ordered, pos, inner))
             pos = found + len(needle)
+    # A needle that MUST be absent pins the UPPER bound of a run, which a
+    # presence needle cannot do: a longer run CONTAINS the shorter needle.
+    # M62 imp-5 uses it for the AutoWrap edge, where the last row writes 1
+    # byte less than a normal row, so the full-width run of that row must
+    # never appear.
+    for needle in spec.get("needles_absent", ()):
+        if needle in inner:
+            return ("FAIL", "pty span held the forbidden run %r"
+                    % (needle,))
     # E4 of cr.org: prove that a run HAPPENED, not only that it stayed
     # under an upper bound.  `newline_count_re' extracts the line count N
     # that the probe sent as a marker before the span, and the span must
@@ -1001,7 +1016,8 @@ def selftest():
     check("m62-imp2-case-count", len(group_cases("m62-imp2")), 3)
     check("m62-imp1b-case-count", len(group_cases("m62-imp1b")), 2)
     check("m62-imp4-case-count", len(group_cases("m62-imp4")), 3)
-    check("total-case-count", len(CASES), 69)
+    check("m62-imp5-case-count", len(group_cases("m62-imp5")), 3)
+    check("total-case-count", len(CASES), 72)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of
@@ -1295,6 +1311,98 @@ def selftest():
     for _leaf in ("--tty-emit-cap", "--tty-write-bytes", "--tty-flush"):
         check("m62-imp4-drives-%s" % _leaf,
               _leaf in imp4_route.get("probe", ""), True)
+
+    # --- M62 imp-5: the hard-clear space run ---------------------------
+    # The drive is the fallback of the whole-frame clear, so every case
+    # MUST run on the entry that cancels el, ed and clear: on another
+    # entry the hard branch of tty_clear_end_of_line never runs, and a pass
+    # would prove nothing.  It needs no pty and no build.
+    imp5_count = _case("m62-imp5/hard-clear-count-e2e")
+    imp5_subst = imp5_count.get("subst") or {}
+    for key in ("MIN_S2C", "MAX_S2C", "MIN_C2S", "MAX_C2S"):
+        check("m62-imp5-count-window-%s" % key, key in imp5_subst, True)
+    check("m62-imp5-count-window-non-empty",
+          (int(imp5_subst["MIN_S2C"]) > 0
+           and int(imp5_subst["MIN_C2S"]) > 0), True)
+    check("m62-imp5-count-window-ordered",
+          (int(imp5_subst["MIN_S2C"]) <= int(imp5_subst["MAX_S2C"])
+           and int(imp5_subst["MIN_C2S"]) <= int(imp5_subst["MAX_C2S"])),
+          True)
+    check("m62-imp5-count-redraws",
+          int(imp5_subst["RUNS"]), M62_IMP5_COUNT_RUNS)
+
+    def _in_imp5_window(pair):
+        return (int(imp5_subst["MIN_S2C"]) <= pair[0]
+                <= int(imp5_subst["MAX_S2C"])
+                and int(imp5_subst["MIN_C2S"]) <= pair[1]
+                <= int(imp5_subst["MAX_C2S"]))
+
+    check("m62-imp5-count-window-holds-the-act",
+          _in_imp5_window(M62_IMP5_ACT_PAIR), True)
+    check("m62-imp5-count-window-refuses-the-control",
+          _in_imp5_window(M62_IMP5_CONTROL_PAIR), False)
+    check("m62-imp5-control-below-min-s2c",
+          M62_IMP5_CONTROL_PAIR[0] < int(imp5_subst["MIN_S2C"]), True)
+    check("m62-imp5-control-below-min-c2s",
+          M62_IMP5_CONTROL_PAIR[1] < int(imp5_subst["MIN_C2S"]), True)
+    # The count case is NOT count-only: it pins the hard-clear runs of its
+    # own span too, so a lost run fails the case that reads the crossings
+    # (brief.org section 6).
+    check("m62-imp5-count-case-pins-the-runs",
+          len((imp5_count.get("span_requires") or {})
+              .get("needles_in_order") or ()), 3)
+    # The AutoWrap edge stays in C: the last row writes FRAME_COLS - 1
+    # space bytes.  A needle of FRAME_COLS bytes after the last row
+    # address would hide a lost edge, so the 3rd needle MUST be 1 byte
+    # shorter than the run of a normal row.
+    _imp5_ordered = (imp5_count.get("span_requires") or {}).get(
+        "needles_in_order") or ()
+    check("m62-imp5-autowrap-needle-is-last",
+          _imp5_ordered[-1], M62_IMP5_LAST_RUN)
+    check("m62-imp5-autowrap-needle-is-1-byte-short",
+          len(_imp5_ordered[-1]) - len(M62_IMP5_ROW_LAST),
+          len(M62_IMP5_RUN) - 1)
+    # A presence needle alone can not refuse a PADDED last row, because a
+    # longer run contains the shorter needle.  The full-width run of the
+    # last row MUST be listed as absent.
+    check("m62-imp5-autowrap-forbids-the-full-run",
+          (imp5_count.get("span_requires") or {}).get("needles_absent"),
+          (M62_IMP5_FORBIDDEN_LAST_RUN,))
+    # The recorded pair of a negative control is tied to the drive: 1
+    # crossing for each row of each redraw.  A pair that drifts from the
+    # geometry is a copied number, not a measurement.
+    check("m62-imp5-pair-delta-follows-the-geometry",
+          (M62_IMP5_ACT_PAIR[0] - M62_IMP5_CONTROL_PAIR[0],
+           M62_IMP5_ACT_PAIR[1] - M62_IMP5_CONTROL_PAIR[1]),
+          (M62_IMP5_COUNT_RUNS * int(M62_IMP5_ENV["LINES"]),) * 2)
+    check("m62-imp5-count-reuses-the-counter",
+          "debug-guile-cross-count" in imp5_count.get("probe", ""), True)
+    # The run of one row is FRAME_COLS space bytes, and the case env pins
+    # FRAME_COLS.  A pinned 80 is legal ONLY with that env.
+    for _c in group_cases("m62-imp5"):
+        check("m62-imp5-fixture-%s" % _c["name"],
+              _c.get("terminfo_fixture") in TERMINFO_FIXTURES, True)
+        check("m62-imp5-term-%s" % _c["name"],
+              (_c.get("env") or {}).get("TERM"), M62_IMP5_TERM)
+        check("m62-imp5-cols-%s" % _c["name"],
+              (_c.get("env") or {}).get("COLUMNS"), str(len(M62_IMP5_RUN)))
+    imp5_bytes = _case("m62-imp5/hard-clear-bytes-e2e")
+    _imp5_bytes_spec = imp5_bytes.get("span_requires") or {}
+    check("m62-imp5-bytes-span", _imp5_bytes_spec.get("span"),
+          (M62_IMP5_BEGIN, M62_IMP5_END))
+    check("m62-imp5-bytes-needle-is-the-whole-run",
+          _imp5_bytes_spec.get("needles"), (M62_IMP5_RUN,))
+    check("m62-imp5-bytes-needle-follows-the-frame",
+          len(_imp5_bytes_spec["needles"][0]), M62_IMP5_FRAME_COLS)
+    # brief.org section 11: the termscript order and length of a routed run
+    # stay an OPEN LIMIT, so no case of this group reads a termscript.
+    check("m62-imp5-bytes-reads-no-termscript",
+          (imp5_bytes.get("termscript"),
+           imp5_bytes.get("output_span")), (None, None))
+    check("m62-imp5-clean-exit-waits",
+          _case("m62-imp5/clean-exit-e2e").get("wait_exit"), True)
+    check("m62-imp5-clean-exit-mode",
+          _case("m62-imp5/clean-exit-e2e").get("capture_mode"), True)
 
     write_case = _case("m52-imp3/tty-write-bytes-e2e")
     for name, markers in (("m52-imp3/tty-write-bytes-e2e",

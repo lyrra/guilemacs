@@ -449,5 +449,220 @@ class M62Imp4ContractTests(unittest.TestCase):
                 self.assertIn(field, case["subst"], (case["name"], field))
 
 
+class M62Imp5ContractTests(unittest.TestCase):
+    """The pty-free contracts of the M62 imp-5 group (the hard clear)."""
+
+    def _case(self, name):
+        return next(c for c in pty_cases.CASES if c["name"] == name)
+
+    def test_the_group_holds_the_3_declared_cases(self):
+        names = [c["name"] for c in pty_cases.CASES
+                 if c["group"] == "m62-imp5"]
+        self.assertEqual(names,
+                         ["m62-imp5/hard-clear-count-e2e",
+                          "m62-imp5/hard-clear-bytes-e2e",
+                          "m62-imp5/clean-exit-e2e"])
+
+    def test_every_case_runs_on_the_entry_without_el_ed_clear(self):
+        # The hard branch of tty_clear_end_of_line needs TS_clr_line NULL,
+        # and the drive needs the clear_frame / clear_to_end fallbacks, so
+        # every case MUST run on the group entry and pin the frame size.
+        # The size is compared with the group frame constants, not with a
+        # literal, so the geometry has 1 source.
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp5":
+                continue
+            self.assertEqual(case["terminfo_fixture"], pty_cases.M62_IMP5_TERM)
+            self.assertEqual(case["env"]["TERM"], pty_cases.M62_IMP5_TERM)
+            self.assertEqual(case["env"]["COLUMNS"],
+                             str(pty_cases.M62_IMP5_FRAME_COLS))
+            self.assertEqual(case["env"]["LINES"],
+                             str(pty_cases.M62_IMP5_FRAME_LINES))
+
+    def test_the_run_length_follows_the_pinned_frame(self):
+        # The hard run of one row is FRAME_COLS bytes, so the needle length
+        # MUST equal the pinned COLUMNS and not a magic number.
+        case = self._case("m62-imp5/hard-clear-bytes-e2e")
+        cols = int(case["env"]["COLUMNS"])
+        self.assertEqual(len(pty_cases.M62_IMP5_RUN), cols)
+
+    def test_count_window_holds_the_act_and_refuses_the_control(self):
+        subst = self._case("m62-imp5/hard-clear-count-e2e")["subst"]
+        lo, hi = int(subst["MIN_S2C"]), int(subst["MAX_S2C"])
+        clo, chi = int(subst["MIN_C2S"]), int(subst["MAX_C2S"])
+        act = pty_cases.M62_IMP5_ACT_PAIR
+        control = pty_cases.M62_IMP5_CONTROL_PAIR
+        self.assertLessEqual(lo, act[0])
+        self.assertLessEqual(act[0], hi)
+        self.assertLessEqual(clo, act[1])
+        self.assertLessEqual(act[1], chi)
+        # The negative control is the deleted per-byte loop: it crosses the
+        # sink 0 times, so it MUST sit outside the window.
+        self.assertLess(control[0], lo)
+        self.assertLess(control[1], clo)
+
+    def test_the_count_case_pins_the_bytes_as_well(self):
+        # A count-only case is not enough: the same case requires the hard
+        # runs of its own span, in the order of the clear loop.
+        spec = self._case("m62-imp5/hard-clear-count-e2e")["span_requires"]
+        self.assertEqual(spec["needles_in_order"],
+                         (pty_cases.M62_IMP5_ROW2_RUN,
+                          pty_cases.M62_IMP5_ROW3_RUN,
+                          pty_cases.M62_IMP5_LAST_RUN))
+
+    def test_the_count_case_pins_the_autowrap_edge(self):
+        # The AutoWrap edge stays in C, and it cuts the run of the LAST
+        # row by 1.  The needle MUST hold the last row address and
+        # FRAME_COLS - 1 space bytes: a needle of FRAME_COLS bytes would
+        # accept a build that lost the edge.
+        cols = int(self._case("m62-imp5/hard-clear-count-e2e")["env"]["COLUMNS"])
+        last = pty_cases.M62_IMP5_LAST_RUN
+        self.assertTrue(last.startswith(pty_cases.M62_IMP5_ROW_LAST))
+        self.assertEqual(last[len(pty_cases.M62_IMP5_ROW_LAST):],
+                         b" " * (cols - 1))
+        # The full-width run after the last row address MUST be listed as
+        # absent, so the shorter needle is not satisfied by a padded last
+        # row: a longer run CONTAINS the shorter needle.
+        self.assertEqual(
+            self._case("m62-imp5/hard-clear-count-e2e")["span_requires"]
+            ["needles_absent"],
+            (pty_cases.M62_IMP5_FORBIDDEN_LAST_RUN,))
+        self.assertEqual(
+            pty_cases.M62_IMP5_FORBIDDEN_LAST_RUN,
+            pty_cases.M62_IMP5_ROW_LAST + b" " * cols)
+
+    def test_a_forbidden_run_fails_the_count_case(self):
+        # The absent-run check must be REAL: a span that holds the padded
+        # last row and not the short one is a FAIL, and the act span is a
+        # PASS.  The probe report is mocked, so no pty is needed.
+        case = self._case("m62-imp5/hard-clear-count-e2e")
+        begin, end = pty_cases.M62_IMP5_BEGIN, pty_cases.M62_IMP5_END
+        row = pty_cases.M62_IMP5_RUN
+        act_span = (pty_cases.M62_IMP5_ROW2_RUN
+                    + pty_cases.M62_IMP5_ROW3_RUN
+                    + pty_cases.M62_IMP5_LAST_RUN)
+        padded_span = (pty_cases.M62_IMP5_ROW2_RUN
+                       + pty_cases.M62_IMP5_ROW3_RUN
+                       + pty_cases.M62_IMP5_ROW_LAST + row)
+        result = SessionResult(report=b'"ok"\n',
+                               output=begin + act_span + end,
+                               ready_seen=True, input_sent=True)
+        with mock.patch.object(driver, "run_session", return_value=result):
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "PASS")
+            result.output = begin + padded_span + end
+            kind, detail = driver.run_case(case, "emacs", 1)[1:]
+            self.assertEqual(kind, "FAIL")
+            self.assertIn("forbidden run", detail)
+
+    def test_the_recorded_pair_follows_the_frame_geometry(self):
+        # ONE redraw costs one crossing for each row.  The recorded act and
+        # control pairs MUST differ by RUNS * LINES on each axis, or the
+        # control number is a copy and not a measurement of this drive.
+        case = self._case("m62-imp5/hard-clear-count-e2e")
+        rows = int(case["env"]["LINES"])
+        delta = pty_cases.M62_IMP5_COUNT_RUNS * rows
+        act = pty_cases.M62_IMP5_ACT_PAIR
+        control = pty_cases.M62_IMP5_CONTROL_PAIR
+        self.assertEqual(act[0] - control[0], delta)
+        self.assertEqual(act[1] - control[1], delta)
+
+    def test_the_forbidden_run_outside_the_span_is_ignored(self):
+        # `needles_absent' is scoped to the span, like the presence needles.
+        # The padded last row of ANOTHER redraw sits outside the 2 markers,
+        # so it MUST NOT fail this case: a check that reads the WHOLE
+        # transcript would refuse a legal transcript and would stop being a
+        # measurement of the measured span.
+        case = self._case("m62-imp5/hard-clear-count-e2e")
+        begin, end = pty_cases.M62_IMP5_BEGIN, pty_cases.M62_IMP5_END
+        act_span = (pty_cases.M62_IMP5_ROW2_RUN
+                    + pty_cases.M62_IMP5_ROW3_RUN
+                    + pty_cases.M62_IMP5_LAST_RUN)
+        noisy = pty_cases.M62_IMP5_FORBIDDEN_LAST_RUN
+        for output in (noisy + begin + act_span + end,
+                       begin + act_span + end + noisy):
+            result = SessionResult(report=b'"ok"\n', output=output,
+                                   ready_seen=True, input_sent=True)
+            with mock.patch.object(driver, "run_session",
+                                   return_value=result):
+                self.assertEqual(driver.run_case(case, "emacs", 1)[1],
+                                 "PASS")
+
+    def test_an_absent_run_fails_the_bytes_case(self):
+        # The bytes case must REJECT a span without the whole hard run, so a
+        # build that drops the bytes can not pass.
+        case = self._case("m62-imp5/hard-clear-bytes-e2e")
+        row = pty_cases.M62_IMP5_RUN
+        begin, end = pty_cases.M62_IMP5_BEGIN, pty_cases.M62_IMP5_END
+        body = b"\x1b[2;1H" + row
+        result = SessionResult(report=b'"ok"\n',
+                               output=begin + body + end,
+                               ready_seen=True, input_sent=True)
+        with mock.patch.object(driver, "run_session", return_value=result):
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "PASS")
+            result.output = begin + b"\x1b[2;1H" + b" " * 3 + end
+            self.assertEqual(driver.run_case(case, "emacs", 1)[1], "FAIL")
+
+    def test_a_short_or_a_split_run_fails_the_bytes_case(self):
+        # 1 missing byte and a run split in 2 both FAIL: the needle is the
+        # WHOLE run of 1 row and not a prefix of it.
+        case = self._case("m62-imp5/hard-clear-bytes-e2e")
+        row = pty_cases.M62_IMP5_RUN
+        begin, end = pty_cases.M62_IMP5_BEGIN, pty_cases.M62_IMP5_END
+        for body in (b"\x1b[2;1H" + row[:-1],
+                     b"\x1b[2;1H" + row[:40] + b"\x1b[2;41H" + row[40:]):
+            result = SessionResult(report=b'"ok"\n',
+                                   output=begin + body + end,
+                                   ready_seen=True, input_sent=True)
+            with mock.patch.object(driver, "run_session",
+                                   return_value=result):
+                self.assertEqual(driver.run_case(case, "emacs", 1)[1],
+                                 "FAIL")
+
+    def test_the_clean_exit_case_waits_for_the_status_and_the_mode(self):
+        case = self._case("m62-imp5/clean-exit-e2e")
+        self.assertTrue(case["wait_exit"])
+        self.assertTrue(case["capture_mode"])
+
+    def test_the_probe_subst_holds_no_unreplaced_field(self):
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp5":
+                continue
+            # TSPATH is supplied by the driver at run time.
+            for field in re.findall(r"@@([A-Z_]+)@@", case["probe"]):
+                if field == "TSPATH":
+                    continue
+                self.assertIn(field, case["subst"], (case["name"], field))
+
+    def test_every_prelude_leaf_binding_is_used_by_a_probe(self):
+        # The prelude is shared by the 3 probes, so a leaf that no probe
+        # reads is DEAD code (cr.org D5: the open-termscript binding was
+        # dead, and no case of this group may read a termscript stream --
+        # brief.org section 11).  The body of each probe is the probe text
+        # without its prelude, so a binding that only the prelude names
+        # fails here.
+        def binding_names(text):
+            return re.findall(r"\(([A-Za-z0-9_!-]+) \(c '", text)
+
+        names = binding_names(pty_cases.M62_IMP5_PRELUDE)
+        self.assertTrue(names, "the prelude binds no elisp leaf")
+        prelude = pty_cases.M62_IMP5_PRELUDE
+        bodies = []
+        for case in pty_cases.CASES:
+            if case["group"] != "m62-imp5":
+                continue
+            # Every probe MUST open with the prelude, so the slice below is
+            # the probe body and not the whole probe.
+            self.assertTrue(case["probe"].startswith(prelude), case["name"])
+            bodies.append(case["probe"][len(prelude):])
+        bodies = "".join(bodies)
+        for name in names:
+            self.assertIn(name, bodies,
+                          "%s is bound by the prelude and used by no probe"
+                          % name)
+        # The termscript stream is an OPEN LIMIT of this group, so no probe
+        # may even bind the leaf that opens it.
+        self.assertNotIn("open-termscript", bodies)
+
+
 if __name__ == "__main__":
     unittest.main()
