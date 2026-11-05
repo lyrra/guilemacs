@@ -74,7 +74,10 @@
             handle-async-input!
             process-pending-signals!
             gobble-input!
-            tty-read-avail-input!))
+            tty-read-avail-input!
+            input-handle-id input-handle-state
+            input-handle-open! input-handle-close!
+            prime-input-handle!))
 
 (defelisp %--user-signal-list               --user-signal-list)
 (defelisp %--user-signal-pending            --user-signal-pending)
@@ -124,6 +127,106 @@
 (defelisp %--tty-bytes-readable          --tty-bytes-readable)
 (defelisp %--tty-read-nonblocking        --tty-read-nonblocking)
 (defelisp %--ie-ascii-keystroke-event    --ie-ascii-keystroke-event)
+
+;; M63 imp-2 (the opaque INPUT handle): the 3 leaves take the PLAIN
+;; identity that --tty-handle already answers.  The handle BORROWS that
+;; identity; Scheme holds the state and the byte count, C keeps the
+;; descriptor, the readiness registration, the read leaf and the event
+;; ring.  No descriptor, no FILE * and no struct tty_display_info *
+;; crosses: the identity is the only value on the seam.
+(defelisp %--tty-handle              --tty-handle)
+(defelisp %--m63-input-state         --m63-input-state)
+(defelisp %--m63-input-open!         --m63-input-open!)
+(defelisp %--m63-input-close!        --m63-input-close!)
+
+;; The 3 states of the handle.  C keeps the storage word; the values are
+;; the same 3 numbers on both sides of the seam.
+;;
+;; READER NOTE (review cr.org F8): only +input-closed+ has a production
+;; reader.  +input-borrowed+ and +input-open+ have no production reader:
+;; they name the states that the read path WRITES but does not test.
+;; The state machine has 1 observable production transition: the read
+;; body writes +input-open+ on a positive count.  No production caller
+;; runs input-handle-close!.  That is expected for a BORROWED handle:
+;; this act builds the seam that imp-3 and imp-4 use.
+;; Protection of the 2 copies (the C macros M63_INPUT_* and these
+;; constants): the PTY case m63-imp2/closed-e2e reads the state word
+;; through input-handle-state and pins CLOSED = 2, so a mismatch of
+;; +input-closed+ fails that case.  A mismatch of +input-borrowed+ or
+;; +input-open+ fails no test.  Do not add a test that pins the pair
+;; against the C macros (brief.org section 10, limit 3).
+(define +input-borrowed+ 0)
+(define +input-open+     1)
+(define +input-closed+   2)
+
+;; The "no identity" bound of the RESOLVE step.  It is NOT a state: 0
+;; from the bootstrap leaf means "the tty holds no identity yet", while
+;; the state words of the table are also 0, 1 and 2.  The 2 names stay
+;; apart, so a later change of a state value can not move the identity
+;; bound.
+(define +no-identity+ 0)
+
+;; The ONE Scheme definition of EBADF is tty-handle-ebadf in
+;; (emacs tty-output).  Resolve it LAZILY: prelude/load.scm loads
+;; (emacs gobble) before (emacs tty-output), so an eager #:use-module
+;; would invert that order (the same idiom as %kbd-buffer-store-event!
+;; and read-key-sequence.scm).
+(define %tty-handle-ebadf
+  (delay (module-ref (resolve-module '(emacs tty-output))
+                     'tty-handle-ebadf)))
+
+;; Force the 1 memoized promise of this module OUTSIDE the input path
+;; (review cr.org G4).  (emacs tty-output) calls this 1 time when it
+;; loads, at which point =tty-handle-ebadf= exists: the prelude loads
+;; (emacs gobble) FIRST, so a load-time force here would run too early,
+;; and the warm step must come from the defining module.  Answer the
+;; forced EBADF (a positive fixnum).  It is called for its effect only, so
+;; a failure of the caller's resolve leaves the promise lazy and the
+;; read entry still works.
+(define (prime-input-handle!)
+  (force %tty-handle-ebadf))
+
+;; --- M63 imp-2: the input-handle helpers -----------------------------
+
+;; Resolve DEVICE to the borrowed INPUT identity.  Answer the RAW leaf
+;; value: a positive identity, 0 ("no identity yet"), or a negative
+;; fixnum holding a bootstrap errno (-EBADF no tty, -ENOSPC full table).
+;; Do NOT collapse a failure to #f: 0 and a negative fixnum are 2
+;; DIFFERENT answers and the caller keeps them apart.  This is the ONE
+;; resolve site and the ONE bootstrap call of the read path; the call is
+;; idempotent, so a 2nd resolve of the same tty answers the same number
+;; and moves no state.
+;;
+;; WARNING: the leaf is the REGISTER leaf, not a plain lookup.  A tty that
+;; the table already holds answers the same identity, but a tty that it
+;; does not hold gets a NEW slot, and a full table answers -ENOSPC.  So a
+;; READ can now fill the shared 16-slot table, and an output-only workload
+;; can stall input.  That is limit row 8 and it stays OPEN in imp-2: the
+;; read path has no plain-lookup leaf yet.
+(define (input-handle-id device)
+  ((force %--tty-handle) device))
+
+;; Read the state word: +input-borrowed+, +input-open+ or +input-closed+.
+;; An identity the C table does not hold answers +input-closed+, as a
+;; plain number and not an error.
+(define (input-handle-state id)
+  ((force %--m63-input-state) id))
+
+;; Move the handle to open.  Answer 0, or the negated EBADF when the
+;; identity names no slot or the slot is CLOSED.  It is idempotent on an
+;; open slot and the read body runs it on a POSITIVE count only.  CLOSED
+;; is FINAL, because a closed slot means "the handle names no live
+;; stream", so this call can not revive a handle that input-handle-close!
+;; or delete_tty closed.
+(define (input-handle-open! id)
+  ((force %--m63-input-open!) id))
+
+;; Move the handle to closed.  Answer 0, or the negated EBADF.  It closes
+;; the state word only; the descriptor, the FILE * and the borrowed
+;; identity stay as they are, so the teardown is still imp-4.  CLOSED is
+;; FINAL: a later input-handle-open! answers the negated EBADF.
+(define (input-handle-close! id)
+  ((force %--m63-input-close!) id))
 
 ;; event_kind NO_EVENT is the first enum member (termhooks.h), value 0.
 (define +no-event-kind+ 0)
@@ -231,13 +334,18 @@ signal-handler-written cell respectively)."
               ;; Hookless terminal: skip without touching it.
               (loop rest total err))))))
 
-(define (tty-read-avail-input! terminal)
-  "Port of the post-guard body of tty_read_avail_input
+(define (%tty-read-bytes! terminal id)
+  "Internal port of the post-guard body of tty_read_avail_input
 (src/keyboard.c, pre-imp-4 C body): size a nonblocking read of
 TERMINAL's tty, emacs_read the available bytes, then decode each raw byte's
 meta bit into an ASCII_KEYSTROKE_EVENT and store it via
 kbd-buffer-store-event!, stopping the decode early once a byte equal to
 the (meta-stripped) quit char is seen.
+
+M63 imp-2: this is the BODY only.  The exported tty-read-avail-input!
+runs step 1 (resolve ID) and step 2 (read the state); step 4 (OPEN) runs
+HERE, after the count test, so a read that delivers 0 bytes moves no
+state.  The body then decodes the bytes of the borrowed IDENTITY.
 
 The raw guards — dead terminal, terminal type, term_initted, suspended
 input — already ran in the C entry point tty_read_avail_input before it
@@ -274,30 +382,123 @@ modifier.  See brief.org M25 imp-4."
                                 (meta-key ((force %--tty-meta-key) terminal))
                                 (quit ((force %--quit-char)))
                                 (frame ((force %--tty-top-frame) terminal)))
-                            (let decode ((i 0))
-                              (when (< i nread)
-                                (let* ((b (bytevector-u8-ref bv i))
-                                       ;; Compute modifiers from the
-                                       ;; original byte, strip after.
-                                       (mods (if (and (= meta-key 1)
-                                                      (not (zero? (logand b #x80))))
-                                                 meta-modifier
-                                                 0))
-                                       (code (if (< meta-key 2)
-                                                 (logand b #x7f)
-                                                 b)))
-                                  ((force %kbd-buffer-store-event!)
-                                   ((force %--ie-ascii-keystroke-event)
-                                    code mods frame)
-                                   #f)
-                                  ;; Don't look at input that follows a
-                                  ;; C-g too closely (reduces lossage due
-                                  ;; to autorepeat on C-g).  The matching
-                                  ;; byte is already stored above; bytes
-                                  ;; after it in this batch are dropped.
-                                  (unless (= code quit)
-                                    (decode (+ i 1))))))
-                            ;; Return the read count, not the stored
-                            ;; count — the quit break may have stopped
-                            ;; the decode.
-                            nread))))))))))
+                            ;; M63 imp-2: step 3, OPEN on a POSITIVE count
+                            ;; only.  Idempotent, so a 2nd read of this
+                            ;; handle answers 0 and changes no state.  The
+                            ;; state stays BORROWED until a byte arrives.
+                            ;; The answer is CHECKED: step 2 of the entry
+                            ;; gates a closed handle, but the slot can
+                            ;; close between the 2 steps, and a negative
+                            ;; answer must store no byte.  So both sites
+                            ;; enforce "CLOSED is FINAL".
+                            (let ((open (input-handle-open! id)))
+                              (if (negative? open)
+                                  ;; The slot is gone or CLOSED: answer
+                                  ;; the negated EBADF of the leaf and
+                                  ;; drop the bytes of this read.
+                                  open
+                                  (begin
+                                    (let decode ((i 0))
+                                      (when (< i nread)
+                                        (let* ((b (bytevector-u8-ref bv i))
+                                               ;; Compute modifiers from the
+                                               ;; original byte, strip after.
+                                               (mods (if (and (= meta-key 1)
+                                                              (not (zero? (logand b #x80))))
+                                                         meta-modifier
+                                                         0))
+                                               (code (if (< meta-key 2)
+                                                         (logand b #x7f)
+                                                         b)))
+                                          ((force %kbd-buffer-store-event!)
+                                           ((force %--ie-ascii-keystroke-event)
+                                            code mods frame)
+                                           #f)
+                                          ;; Don't look at input that follows a
+                                          ;; C-g too closely (reduces lossage due
+                                          ;; to autorepeat on C-g).  The matching
+                                          ;; byte is already stored above; bytes
+                                          ;; after it in this batch are dropped.
+                                          (unless (= code quit)
+                                            (decode (+ i 1))))))
+                                    ;; Return the read count, not the stored
+                                    ;; count — the quit break may have stopped
+                                    ;; the decode.
+                                    nread)))))))))))))
+
+;; --- M63 imp-2: the exported read entry ------------------------------
+
+;; The C dispatcher calls this with the terminal object.  The 3 steps at
+;; the head are the whole contract of this act:
+;;
+;;   1. RESOLVE.  ONE resolve site: the body calls (input-handle-id
+;;      terminal) and never %--tty-handle itself.  The identity is
+;;      BORROWED from the table that init_tty already fills, so
+;;      --tty-handle answers the SAME number for a known tty.  The
+;;      helper answers the RAW value, and the 3 answers stay apart: a
+;;      positive fixnum is an identity; 0 is "no identity yet"; a
+;;      negative fixnum is a BOOTSTRAP errno (-ENOSPC full table,
+;;      -EBADF no tty).  The last 2 both answer 0 ("no input now") here
+;;      and neither signals, because the input path has no arm that can
+;;      report an errno.  A full table therefore stalls that terminal;
+;;      the stall is limit row 8 of milestone.org section 5 and it stays
+;;      OPEN.  LIMIT: this arm merges 2 different bootstrap answers (0 and
+;;      a negative errno) into the SAME answer 0, so the "3 answers stay
+;;      apart" rule holds in the helper only.  Add no reader that needs to
+;;      tell them apart without a new leaf.
+;;      A DEAD terminal never reaches here: the C entry point answers 0
+;;      when !terminal->name (src/keyboard.c), and the terminal-list walk
+;;      skips a dead tty.  MEASURED: if it did reach here, --tty-handle
+;;      would NOT register a fresh identity and would NOT answer -EBADF:
+;;      decode_tty_terminal -> decode_live_terminal SIGNALS
+;;      wrong_type_argument (Qterminal_live_p) when t->name is NULL.  So
+;;      a resolve after delete_tty can not bypass the CLOSED gate.  That
+;;      signal is the last line of defence; imp-4 must keep it.
+;;   2. READ THE STATE.  +input-closed+ has 2 sources: delete_tty (the
+;;      identity is gone) and (input-handle-close! id), which closes the
+;;      state while the descriptor stays open.  Answer the negated EBADF
+;;      from the ONE Scheme definition and store no byte; do NOT call the
+;;      read leaf.
+;;   3. OPEN.  Runs inside the body, on a POSITIVE count only, and the
+;;      body CHECKS its answer: step 2 gates most closed handles, but the
+;;      slot can close between step 2 and step 3, so a negative answer
+;;      stores no byte either.  Both sites enforce "CLOSED is FINAL".
+;;      A negative answer here comes AFTER the read leaf took the bytes
+;;      from the descriptor, so that batch is DROPPED and the caller gets
+;;      an errno in place of a count.  This arm is unreachable while 1
+;;      read runs in 1 thread and nothing closes the slot between the 2
+;;      steps; it is defensive.  The answer -EBADF stays, and is not 0,
+;;      because a closed handle must not read as "no input now".  The
+;;      dropped batch is a declared limit.
+;;
+;; The BYTE COUNT stays the return value of the body.  This module is
+;; #:declarative? #t and holds no mutable STATE WORD, so the count can not
+;; outlive the call and is not persisted.  It does hold ONE memoized
+;; promise (%tty-handle-ebadf): after the first force the module holds
+;; that cell, so do not read this rule as "the module is stateless".
+(define (tty-read-avail-input! terminal)
+  "Read the available bytes of TERMINAL through the opaque INPUT handle.
+The C dispatcher already ran the raw guards.  Returns the plain read
+count (0 or a positive fixnum), or a negative fixnum when the handle is
+closed or the read itself fails.  The count is the return value only: no
+copy of it is stored, so C holds none."
+  (let ((id (input-handle-id terminal)))
+    (cond
+     ;; 1. RESOLVE, arm A: not a fixnum at all.  The leaf answers 1 fixnum
+     ;; and SIGNALS a wrong-type error for a bad DEVICE.  It never answers
+     ;; a non-fixnum, so this arm can not run today.  Keep it as a
+     ;; defensive guard only, and do NOT read it as "a bad DEVICE answers
+     ;; no input now": the leaf signals that case, and it stays a signal.
+     ((not (integer? id)) 0)
+     ;; 1. RESOLVE, arm B: no identity yet (0 or a negative bootstrap
+     ;; error).  -ENOSPC (full table) and -EBADF (no tty) are real errors
+     ;; of the BOOTSTRAP, not of the read.  Answer 0 and do not signal;
+     ;; the terminal then stalls.
+     ((<= id +no-identity+) 0)
+     ;; 2. READ THE STATE: closed means delete_tty dropped the identity,
+     ;; or a caller ran input-handle-close!.  CLOSED is FINAL, so no later
+     ;; open! revives it.
+     ((= (input-handle-state id) +input-closed+)
+      (- (force %tty-handle-ebadf)))
+     ;; 3. OPEN (inside the body), then the bytes.
+     (else (%tty-read-bytes! terminal id)))))

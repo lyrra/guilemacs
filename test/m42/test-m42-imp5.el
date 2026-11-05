@@ -107,21 +107,17 @@ corpus pins is tracked, so an absent one means a broken checkout."
 ;;; keyboard surface did not change in M42: imp-2 restored the C leaves
 ;;; and retired the FFI direction, so the M42 net delta is 0 C lines.
 
-(m42-imp5--check "surface/keyboard.c-lines-11233"
-                 (eql 11233 (m42-imp5--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "surface/keyboard.c-lines-11233" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 (m42-imp5--check "surface/keyboard.c-defuns-447"
                  (eql 447 (m42-imp5--count "src/keyboard.c" "^DEFUN (\"")))
 (m42-imp5--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m42-imp5--lines "src/keyboard-globals.c")))
-(m42-imp5--check "surface/keyboard-combined-11723"
-                 (let ((k (m42-imp5--lines "src/keyboard.c"))
-                       (kg (m42-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg) (eql 11723 (+ k kg)))))
-(m42-imp5--check "surface/keyboard-margin-237-under-11960"
-                 (let ((k (m42-imp5--lines "src/keyboard.c"))
-                       (kg (m42-imp5--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg)
-                        (eql 237 (- 11960 (+ k kg))))))
+;; M63 imp-2 REMOVED the "surface/keyboard-combined-11723",
+;; "surface/keyboard-margin-237-under-11960" pins: the 2 Guile runtime guards
+;; of the input handle moved the values.  Not re-pinned (milestone.org section
+;; 7).
 (m42-imp5--check "surface/process.c-lines-9030"
                  (eql 9030 (m42-imp5--lines "src/process.c")))
 (m42-imp5--check "surface/process.c-defuns-50"
@@ -133,20 +129,21 @@ corpus pins is tracked, so an absent one means a broken checkout."
 ;; M61 imp-2b (milestone.org findings F2): the tree-wide
 ;; scm_c_public_ref count over src/*.[chm] is REMOVED, not re-pinned.  A
 ;; source-inspection count proves no behavior (docs/arch.org =Testing=).
-(m42-imp5--check "surface/gobble.scm-lines-303"
-                 (eql 303 (m42-imp5--lines "mod/emacs/gobble.scm")))
+;; M63 imp-2 REMOVED the "surface/gobble.scm-lines-303" pin: this act
+;; added the input-handle helpers to that file.  Not re-pinned
+;; (milestone.org section 7, rule F2).
 
 ;;; --- S2. The two C leaf pins -----------------------------------------
 ;;; The OS hop stays in the two typed C leaves.  Pin the name and the
 ;;; line number of each DEFUN line.  (M43 imp-2 added the --tty-fd
 ;;; accessor below the two leaves; the leaf lines above did not move.)
 
-(m42-imp5--check "pin/leaf/tty-bytes-readable-10371"
-                 (eql 10371 (m42-imp5--defun-line "src/keyboard.c"
-                                                  "--tty-bytes-readable")))
-(m42-imp5--check "pin/leaf/tty-read-nonblocking-10399"
-                 (eql 10399 (m42-imp5--defun-line "src/keyboard.c"
-                                                  "--tty-read-nonblocking")))
+;; M63 imp-2 REMOVED "pin/leaf/tty-bytes-readable-10371" and
+;; "pin/leaf/tty-read-nonblocking-10399": the 2 Guile runtime guards that
+;; this act added above them moved both DEFUN lines by 18.  A moved
+;; source-inspection pin is removed and not re-pinned (milestone.org
+;; section 7, rule F2).  The presence check below stays: it reads no line
+;; number.
 (m42-imp5--check "presence/tty-fd-in-keyboard.c-after-m43-imp2"
                  (let ((n (m42-imp5--count "src/keyboard.c"
                                            "DEFUN (\"--tty-fd\"")))

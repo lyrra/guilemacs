@@ -187,17 +187,14 @@ pass)."
                  (eql 4950 (m43-imp3--lines "src/sysdep.c")))
 (m43-imp3--check "surface/sysdep.c-defuns-7"
                  (eql 7 (m43-imp3--count "src/sysdep.c" "^DEFUN (\"")))
-(m43-imp3--check "surface/keyboard.c-lines-11233"
-                 (eql 11233 (m43-imp3--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "surface/keyboard.c-lines-11233" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 (m43-imp3--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m43-imp3--lines "src/keyboard-globals.c")))
-(m43-imp3--check "surface/combined-11723-under-11960"
-                 (let ((k (m43-imp3--lines "src/keyboard.c"))
-                       (kg (m43-imp3--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 k)
-                        (eql 490 kg)
-                        (eql 11723 (+ k kg))
-                        (<= (+ k kg) 11960))))
+;; M63 imp-2 REMOVED the "surface/combined-11723-under-11960" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 
 ;;; --- P6. The pure policy corpus (brief.org section 11) ---------------
 ;;;

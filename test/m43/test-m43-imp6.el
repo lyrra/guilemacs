@@ -113,18 +113,16 @@ the symbol `m43-imp6-absent' when REL does not exist."
                  (eql 4950 (m43-imp6--lines "src/sysdep.c")))
 (m43-imp6--check "surface/sysdep.c-defuns-7"
                  (eql 7 (m43-imp6--count "src/sysdep.c" "^DEFUN (\"")))
-(m43-imp6--check "surface/keyboard.c-lines-11233"
-                 (eql 11233 (m43-imp6--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "surface/keyboard.c-lines-11233" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 (m43-imp6--check "surface/keyboard.c-defuns-447"
                  (eql 447 (m43-imp6--count "src/keyboard.c" "^DEFUN (\"")))
 (m43-imp6--check "surface/keyboard-globals.c-lines-490"
                  (eql 490 (m43-imp6--lines "src/keyboard-globals.c")))
-(m43-imp6--check "surface/combined-11723-margin-237"
-                 (let ((k (m43-imp6--lines "src/keyboard.c"))
-                       (kg (m43-imp6--lines "src/keyboard-globals.c")))
-                   (and (integerp k) (integerp kg)
-                        (eql 11723 (+ k kg))
-                        (eql 237 (- 11960 (+ k kg))))))
+;; M63 imp-2 REMOVED the "surface/combined-11723-margin-237" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 ;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m43-imp6--check "surface/scm-c-public-ref-270"
@@ -154,9 +152,9 @@ the symbol `m43-imp6-absent' when REL does not exist."
                  (eql 1492 (m43-imp6--line-of "src/sysdep.c" "^setup_pty ")))
 (m43-imp6--check "line/emacs_full_write-2700"
                  (eql 2700 (m43-imp6--line-of "src/sysdep.c" "^emacs_full_write ")))
-(m43-imp6--check "line/tty-fd-keyboard.c-10431"
-                 (eql 10431 (m43-imp6--line-of "src/keyboard.c"
-                                               "^DEFUN (\"--tty-fd\"")))
+;; M63 imp-2 REMOVED "line/tty-fd-keyboard.c-10431": the 2 Guile runtime
+;; guards that this act added to src/keyboard.c moved the DEFUN line by
+;; 18.  Not re-pinned (milestone.org section 7, rule F2).
 (m43-imp6--check "line/tty-get-mode-4651"
                  (eql 4651 (m43-imp6--line-of "src/sysdep.c"
                                               "^DEFUN (\"--tty-get-mode\"")))

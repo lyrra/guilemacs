@@ -113,18 +113,16 @@ so D4 alone does not enforce the decision; the hard checks D1 and D3 do."
 
 ;;; --- D1. The base numbers (brief.org §3) ------------------------------
 
-(m42-imp1--check "keyboard.c-lines-11233"
-                 (eql 11233 (m42-imp1--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m42-imp1--check "keyboard.c-defuns-447"
                  (eql 447 (m42-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m42-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m42-imp1--lines "src/keyboard-globals.c")))
-(m42-imp1--check "combined-keyboard-surface-11723"
-                 (let ((kb (m42-imp1--lines "src/keyboard.c"))
-                       (kg (m42-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 kb)
-                        (eql 490 kg)
-                        (eql 11723 (+ kb kg)))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 
 (m42-imp1--check "read-shims-retained"
                  (and (m42-imp1--contains-p

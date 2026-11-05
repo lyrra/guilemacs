@@ -1143,10 +1143,24 @@ encode_terminal_code (struct glyph *src, int src_len,
 
 #define M61_HANDLE_MAX 16
 
+/* M63 imp-2: the 3 states of the INPUT handle (brief.org section 3).
+   C keeps the storage WORD only; Scheme decides every transition.
+     0 BORROWED  C owns tty->input, the descriptor and the mask bit
+     1 OPEN      Scheme owns the byte count of the last read
+     2 CLOSED    the handle names no live stream  */
+#define M63_INPUT_BORROWED 0
+#define M63_INPUT_OPEN     1
+#define M63_INPUT_CLOSED   2
+
 static struct
 {
   int identity;
   struct tty_display_info *tty;
+  /* M63 imp-2: the INPUT handle state word.  C keeps the storage; Scheme
+     decides every transition (brief.org section 3).  The output path
+     reads .tty and .identity only, so this field is additive.  It is NOT
+     a 2nd table and NOT a 2nd capacity.  */
+  int state;
 } m61_tty_handles[M61_HANDLE_MAX];
 
 static int m61_tty_handle_next = 1;
@@ -1382,6 +1396,8 @@ m61_tty_handle_register_1 (struct tty_display_info *tty)
 
   m61_tty_handles[free_slot].identity = m61_tty_handle_next++;
   m61_tty_handles[free_slot].tty = tty;
+  /* M63 imp-2: a new slot starts BORROWED.  C still owns tty->input.  */
+  m61_tty_handles[free_slot].state = M63_INPUT_BORROWED;
   return m61_tty_handles[free_slot].identity;
 }
 
@@ -1395,11 +1411,32 @@ m61_tty_handle_drop_1 (struct tty_display_info *tty)
       {
 	m61_tty_handles[i].tty = NULL;
 	m61_tty_handles[i].identity = 0;
+	/* M63 imp-2: mark the slot CLOSED.  The write is a MARKER, not a
+	   read path: the scan matches on identity, and that is 0 now, so
+	   --m63-input-state already answers CLOSED for this identity.  The
+	   write keeps no stale OPEN word in the free slot.  imp-2 adds NO
+	   drop site: this is the ONE drop of the borrowed identity
+	   (delete_tty).  */
+	m61_tty_handles[i].state = M63_INPUT_CLOSED;
       }
 }
 
-/* Resolve the plain IDENTITY to its tty, or NULL when the table holds no
-   entry for it (a closed or unknown handle).  */
+/* --- M63 imp-2: the opaque INPUT handle ---------------------------- */
+
+/* FIX-20261105-guilemacs: M63 imp-2 -- the INPUT handle BORROWS the
+   identity that init_tty already registers through
+   m61_tty_handle_register_1 (brief.org sections 2 and 5.1).  There is
+   1 table, 1 capacity (M61_HANDLE_MAX) and 1 drop site (delete_tty).
+   This act adds no table, no capacity, no drop site and no 2nd device
+   crossing: the identity is the only value that crosses.
+
+   The 3 leaves below read and write the state word of m61_tty_handles[]
+   only.  They live in this file because the table is static here and
+   m61_tty_handle_of_identity_1 is static here; a leaf in src/keyboard.c
+   would need a 2nd export of the table (brief.org section 5.1).  C keeps
+   the descriptor, the readiness registration, the read leaf and the
+   event ring.  */
+
 static struct tty_display_info *
 m61_tty_handle_of_identity_1 (int identity)
 {
@@ -1411,6 +1448,114 @@ m61_tty_handle_of_identity_1 (int identity)
       return m61_tty_handles[i].tty;
 
   return NULL;
+}
+
+/* Return the plain state word of IDENTITY: 0 (borrowed), 1 (open) or 2
+   (closed).  An identity that the table does not hold answers 2 as a
+   PLAIN fixnum and not an error, so no caller reads a stale slot
+   (brief.org section 4).  */
+DEFUN ("--m63-input-state", Fc_m63_input_state, Sc_m63_input_state, 1, 1, 0,
+       doc: /* Internal: M63 imp-2 -- return the state of the INPUT handle
+IDENTITY.
+
+Return a plain fixnum: 0 (borrowed), 1 (open) or 2 (closed).  An identity
+that the C table does not hold answers 2.  This leaf signals no error.
+Scheme decides every transition; C stores the word only.  */)
+  (Lisp_Object identity)
+{
+  int id;
+
+  if (!FIXNUMP (identity))
+    return make_fixnum (M63_INPUT_CLOSED);
+  id = (int) XFIXNUM (identity);
+
+  if (id <= 0)
+    return make_fixnum (M63_INPUT_CLOSED);
+
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    if (m61_tty_handles[i].identity == id)
+      return make_fixnum (m61_tty_handles[i].state);
+
+  return make_fixnum (M63_INPUT_CLOSED);
+}
+
+/* Move the state of IDENTITY to OPEN.  Answer 0, or -EBADF when the table
+   holds no slot for IDENTITY or the slot is CLOSED.  The call is
+   IDEMPOTENT: a 2nd call on an open slot answers 0 and changes no state.
+   Scheme runs it on a POSITIVE read count only (brief.org section 6, step 4,
+   read order: a read that stored no byte moves no state).
+
+   CLOSED is FINAL.  CLOSED has 2 sources, and both mean "the handle names
+   no live stream": m61_tty_handle_drop_1 (the tty died, the identity is
+   gone) and --m63-input-close! (Scheme closed the state while the
+   descriptor stays open).  A slot that answered CLOSED must not return to
+   OPEN, or the state word loses its meaning in the second case.  */
+DEFUN ("--m63-input-open!", Fc_m63_input_open, Sc_m63_input_open, 1, 1, 0,
+       doc: /* Internal: M63 imp-2 -- move the INPUT handle IDENTITY to open.
+
+Return 0 on success, or a plain fixnum holding the negated errno (-EBADF)
+when the C table holds no slot for IDENTITY, or when that slot is closed.
+CLOSED is final: a closed slot does not return to open, because CLOSED
+means "the handle names no live stream".  The call is idempotent: a second
+call on an open slot answers 0.  The caller runs it on a POSITIVE read
+count only, because a read that stored no byte moves no state.  */)
+  (Lisp_Object identity)
+{
+  int id;
+
+  if (!FIXNUMP (identity))
+    return make_fixnum (-EBADF);
+  id = (int) XFIXNUM (identity);
+
+  /* ONE "no slot" shape in all 3 leaves: test the identity ONCE, early,
+     then let the scan match the identity only.  A non-positive identity
+     has no slot, so it can not match a free slot (identity 0).  */
+  if (id <= 0)
+    return make_fixnum (-EBADF);
+
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    if (m61_tty_handles[i].identity == id)
+      {
+	if (m61_tty_handles[i].state == M63_INPUT_CLOSED)
+	  return make_fixnum (-EBADF);
+	m61_tty_handles[i].state = M63_INPUT_OPEN;
+	return make_fixnum (0);
+      }
+
+  return make_fixnum (-EBADF);
+}
+
+/* Move the state of IDENTITY to CLOSED.  Answer 0, or -EBADF when the
+   table holds no slot for IDENTITY.  It closes the state WORD only: it
+   does not close the descriptor, free the FILE * or drop the borrowed
+   identity.  The teardown is imp-4 (brief.org section 8).  */
+DEFUN ("--m63-input-close!", Fc_m63_input_close, Sc_m63_input_close, 1, 1, 0,
+       doc: /* Internal: M63 imp-2 -- move the INPUT handle IDENTITY to closed.
+
+Return 0 on success, or a plain fixnum holding the negated errno (-EBADF)
+when the C table holds no slot for IDENTITY.  This closes the state word
+only: the descriptor, the FILE * and the borrowed identity stay as they
+are, so a CLOSED handle gates the read and closes no stream.  */)
+  (Lisp_Object identity)
+{
+  int id;
+
+  if (!FIXNUMP (identity))
+    return make_fixnum (-EBADF);
+  id = (int) XFIXNUM (identity);
+
+  /* The same ONE "no slot" shape as the other 2 leaves.  */
+  if (id <= 0)
+    return make_fixnum (-EBADF);
+
+  for (int i = 0; i < M61_HANDLE_MAX; i++)
+    if (m61_tty_handles[i].identity == id)
+      {
+	m61_tty_handles[i].state = M63_INPUT_CLOSED;
+	return make_fixnum (0);
+      }
+
+  return make_fixnum (-EBADF);
 }
 
 /* Write LEN bytes at BYTES to the output stream of the tty TTY.  Answer

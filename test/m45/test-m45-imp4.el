@@ -152,22 +152,16 @@ of the presence of docs/."
                  (eql 4950 (m45-imp4--lines "src/sysdep.c")))
 (m45-imp4--check "sysdep.c-defuns-7"
                  (eql 7 (m45-imp4--count "src/sysdep.c" "^DEFUN (\"")))
-(m45-imp4--check "keyboard.c-lines-11233"
-                 (eql 11233 (m45-imp4--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m45-imp4--check "keyboard.c-defuns-447"
                  (eql 447 (m45-imp4--count "src/keyboard.c" "^DEFUN (\"")))
 (m45-imp4--check "keyboard-globals.c-lines-490"
                  (eql 490 (m45-imp4--lines "src/keyboard-globals.c")))
-(m45-imp4--check "combined-keyboard-surface-11723"
-                 (let ((kb (m45-imp4--lines "src/keyboard.c"))
-                       (kg (m45-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 11723 (+ kb kg)))))
-(m45-imp4--check "margin-under-budget-237"
-                 (let ((kb (m45-imp4--lines "src/keyboard.c"))
-                       (kg (m45-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "margin-under-budget-237" pins: the 2 Guile runtime guards of the input
+;; handle moved the values.  Not re-pinned (milestone.org section 7).
 (m45-imp4--check "tty-modes.scm-lines-313"
                  (eql 313 (m45-imp4--lines "mod/emacs/tty-modes.scm")))
 
@@ -189,16 +183,22 @@ of the presence of docs/."
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The bound is per group,
 ;; and the counts are stable because every check is registered at load
-;; time.  S1 holds 12 checks; S5 holds 2.
+;; time.  S1 holds 9 checks; S5 holds 2.
 
 (setq m45-imp4--group nil)
 
-(m45-imp4--check "reg/min-s1-checks-12"
-                 (>= (m45-imp4--group-count 's1) 12))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m45-imp4--check "reg/min-s1-checks-9"
+                 (>= (m45-imp4--group-count 's1) 9))
 (m45-imp4--check "reg/min-s5-checks-2"
                  (>= (m45-imp4--group-count 's5) 2))
-(m45-imp4--check "reg/min-total-14"
-                 (>= m45-imp4--registered 14))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m45-imp4--check "reg/min-total-11"
+                 (>= m45-imp4--registered 11))
 
 ;;; --- S3. The gated gate check (brief.org section 5 T3) --------------
 
@@ -219,12 +219,20 @@ of the presence of docs/."
 ;; the harness exits non-zero exactly when one of these tests fails, so
 ;; the check could never observe its own failure.
 ;;
-;; The floor is the docs-independent total: imp-1 54, imp-2 48, imp-3 60
-;; and imp-4 17 (S1 12 + S5 2 + S6 3).  162 + 17 = 179.  The bound is a
+;; The floor is the docs-independent total: imp-1 51, imp-2 45, imp-3 57
+;; and imp-4 14 (S1 9 + S5 2 + S6 3).  153 + 14 = 167.  The bound is a
 ;; minimum, so it fails only when the m45 total drops.  The S2 checks
 ;; register no ERT test, so the total does not depend on docs/.
+;;
+;; M63 imp-2 moved the floor from 179 to 167: the act removed the 3
+;; keyboard surface pins of each of imp-1, imp-2, imp-3 and imp-4 S1, so
+;; the total drops by 12 and the 1-test slack of HEAD stays.  This is NOT
+;; a re-pin (milestone.org section 7).
+;;
+;; MEASURED on the M63 imp-2 tree: the group answers 167 passed and 168
+;; selected tests.
 
-(defvar m45-imp4--min-gate-total 179
+(defvar m45-imp4--min-gate-total 167
   "The minimum number of ERT tests the m45 group registers.")
 
 (ert-deftest m45-imp4/gate-m45-total ()

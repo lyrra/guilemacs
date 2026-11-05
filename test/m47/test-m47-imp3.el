@@ -344,14 +344,14 @@ the forbidden hub.")
                    (dolist (f (directory-files dir t "\\.[chm]\\'"))
                      (setq total (+ total (or (m47-imp3--count f "scm_c_public_ref") 0))))
                    (eql 270 total)))
-(m47-imp3--check "keyboard.c-lines-11233"
-                 (eql 11233 (m47-imp3--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m47-imp3--check "keyboard-globals.c-lines-490"
                  (eql 490 (m47-imp3--lines "src/keyboard-globals.c")))
-(m47-imp3--check "combined-keyboard-surface-11723"
-                 (let ((kb (m47-imp3--lines "src/keyboard.c"))
-                       (kg (m47-imp3--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg) (eql 11723 (+ kb kg)))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 
 ;;; --- T6. The group and the guards -----------------------------------
 
@@ -368,10 +368,16 @@ the forbidden hub.")
                  (>= (m47-imp3--group-count 't3) 3))
 (m47-imp3--check "reg/min-t4-checks-11"
                  (>= (m47-imp3--group-count 't4) 11))
-(m47-imp3--check "reg/min-t5-checks-9"
-                 (>= (m47-imp3--group-count 't5) 9))
-(m47-imp3--check "reg/min-total-72"
-                 (>= (1+ m47-imp3--registered) 72))
+;; M63 imp-2 removed 2 keyboard.c line pin(s) from this group, so
+;; the minimum of this guard moves by 2.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp3--check "reg/min-t5-checks-7"
+                 (>= (m47-imp3--group-count 't5) 7))
+;; M63 imp-2 removed 2 keyboard.c line pin(s) from this group, so
+;; the minimum of this guard moves by 2.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp3--check "reg/min-total-70"
+                 (>= (1+ m47-imp3--registered) 70))
 
 ;;; --- T7. The gated runtime probes (brief.org section 13.3) ----------
 

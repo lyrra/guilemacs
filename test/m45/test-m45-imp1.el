@@ -182,23 +182,16 @@ regression, and must not turn the gate red."
                  (eql 4950 (m45-imp1--lines "src/sysdep.c")))
 (m45-imp1--check "sysdep.c-defuns-7"
                  (eql 7 (m45-imp1--count "src/sysdep.c" "^DEFUN (\"")))
-(m45-imp1--check "keyboard.c-lines-11233"
-                 (eql 11233 (m45-imp1--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m45-imp1--check "keyboard.c-defuns-447"
                  (eql 447 (m45-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m45-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m45-imp1--lines "src/keyboard-globals.c")))
-(m45-imp1--check "combined-keyboard-surface-11723"
-                 (let ((kb (m45-imp1--lines "src/keyboard.c"))
-                       (kg (m45-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 kb)
-                        (eql 490 kg)
-                        (eql 11723 (+ kb kg)))))
-(m45-imp1--check "margin-under-budget-237"
-                 (let ((kb (m45-imp1--lines "src/keyboard.c"))
-                       (kg (m45-imp1--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "margin-under-budget-237" pins: the 2 Guile runtime guards of the input
+;; handle moved the values.  Not re-pinned (milestone.org section 7).
 ;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m45-imp1--check "scm-c-public-ref-270"
@@ -385,9 +378,12 @@ regression, and must not turn the gate red."
 ;; exists and its checks really register.  These guards fail when the
 ;; corpus body is truncated or its core checks do not run.  The bound is
 ;; per group, and the counts are stable because every check is
-;; registered at load time.  D1 holds 11 checks; D2 holds 30.
-(m45-imp1--check "reg/min-d1-checks-11"
-                 (>= m45-imp1--registered-d1 11))
+;; registered at load time.  D1 holds 8 checks; D2 holds 30.
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m45-imp1--check "reg/min-d1-checks-8"
+                 (>= m45-imp1--registered-d1 8))
 (m45-imp1--check "reg/min-d2-checks-30"
                  (>= m45-imp1--registered-d2 30))
 

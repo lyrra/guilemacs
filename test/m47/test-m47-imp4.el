@@ -363,19 +363,14 @@ the forbidden hub.")
                  (eql 27 (m47-imp4--count "src/fileio.c" "scm_c_public_ref")))
 (m47-imp4--check "fileio.scm-lines-370"
                  (eql 370 (m47-imp4--lines "mod/emacs/fileio.scm")))
-(m47-imp4--check "keyboard.c-lines-11233"
-                 (eql 11233 (m47-imp4--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m47-imp4--check "keyboard-globals.c-lines-490"
                  (eql 490 (m47-imp4--lines "src/keyboard-globals.c")))
-(m47-imp4--check "combined-keyboard-surface-11723"
-                 (let ((kb (m47-imp4--lines "src/keyboard.c"))
-                       (kg (m47-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg) (eql 11723 (+ kb kg)))))
-(m47-imp4--check "keyboard-margin-237-under-11960"
-                 (let ((kb (m47-imp4--lines "src/keyboard.c"))
-                       (kg (m47-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "keyboard-margin-237-under-11960" pins: the 2 Guile runtime guards of the
+;; input handle moved the values.  Not re-pinned (milestone.org section 7).
 
 ;;; --- T7. The group and the guards -----------------------------------
 
@@ -394,10 +389,16 @@ the forbidden hub.")
                  (>= (m47-imp4--group-count 't4) 17))
 (m47-imp4--check "reg/min-t5-checks-6"
                  (>= (m47-imp4--group-count 't5) 6))
-(m47-imp4--check "reg/min-t6-checks-9"
-                 (>= (m47-imp4--group-count 't6) 9))
-(m47-imp4--check "reg/min-total-125"
-                 (>= (1+ m47-imp4--registered) 125))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp4--check "reg/min-t6-checks-6"
+                 (>= (m47-imp4--group-count 't6) 6))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp4--check "reg/min-total-122"
+                 (>= (1+ m47-imp4--registered) 122))
 
 ;;; --- T8. The gated runtime probe (brief.org section 10) -------------
 

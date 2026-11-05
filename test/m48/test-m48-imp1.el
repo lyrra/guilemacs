@@ -177,23 +177,16 @@ passes the raw symbol to reach it."
                  (m48-imp1--tracked-p "src/term.c" "#include \"guile.h\""))
 (m48-imp1--check "terminal.scm-lines-266"
                  (eql 266 (m48-imp1--lines "mod/emacs/terminal.scm")))
-(m48-imp1--check "keyboard.c-lines-11233"
-                 (eql 11233 (m48-imp1--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m48-imp1--check "keyboard.c-defuns-447"
                  (eql 447 (m48-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m48-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m48-imp1--lines "src/keyboard-globals.c")))
-(m48-imp1--check "combined-keyboard-surface-11723"
-                 (let ((kb (m48-imp1--lines "src/keyboard.c"))
-                       (kg (m48-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 kb)
-                        (eql 490 kg)
-                        (eql 11723 (+ kb kg)))))
-(m48-imp1--check "margin-under-budget-237"
-                 (let ((kb (m48-imp1--lines "src/keyboard.c"))
-                       (kg (m48-imp1--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "margin-under-budget-237" pins: the 2 Guile runtime guards of the input
+;; handle moved the values.  Not re-pinned (milestone.org section 7).
 
 ;;; --- D2. The block map (docs/m48-plan.org section 3.1) ---------------
 ;;
@@ -281,12 +274,15 @@ passes the raw symbol to reach it."
 ;; checks really register.  These guards fail when the corpus body is
 ;; truncated or its core checks do not run.  The bound is per group, and
 ;; the counts are stable because every check is registered at load time.
-;; D1 holds 7 checks; D2 holds 23 (19 block positions, the exact-list
+;; D1 holds 4 checks; D2 holds 23 (19 block positions, the exact-list
 ;; check, and the 3 ref sites).  D1 held 11 until M61 imp-2b removed the
 ;; 4 src/term.c source-text pins (milestone.org findings F2); the guard
 ;; name and its bound moved with the count.
-(m48-imp1--check "reg/min-d1-checks-7"
-                 (>= m48-imp1--registered-d1 7))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m48-imp1--check "reg/min-d1-checks-4"
+                 (>= m48-imp1--registered-d1 4))
 (m48-imp1--check "reg/min-d2-checks-23"
                  (>= m48-imp1--registered-d2 23))
 

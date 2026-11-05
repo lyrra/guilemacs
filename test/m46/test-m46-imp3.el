@@ -306,11 +306,9 @@ real error, not a pass."
                  (eql 2387 (m46-imp3--lines "src/callproc.c")))
 (m46-imp3--check "sysdep.c-lines-4950"
                  (eql 4950 (m46-imp3--lines "src/sysdep.c")))
-(m46-imp3--check "combined-keyboard-surface-11723"
-                 (let ((kb (m46-imp3--lines "src/keyboard.c"))
-                       (kg (m46-imp3--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 11723 (+ kb kg)))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 
 ;;; --- T8. The shape rule (brief.org section 6) -----------------------
 
@@ -345,12 +343,18 @@ real error, not a pass."
                  (>= (m46-imp3--group-count 't3) 5))
 (m46-imp3--check "reg/min-t4-checks-8"
                  (>= (m46-imp3--group-count 't4) 8))
-(m46-imp3--check "reg/min-t5-checks-6"
-                 (>= (m46-imp3--group-count 't5) 6))
+;; M63 imp-2 removed 1 keyboard.c line pin(s) from this group, so
+;; the minimum of this guard moves by 1.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m46-imp3--check "reg/min-t5-checks-5"
+                 (>= (m46-imp3--group-count 't5) 5))
 (m46-imp3--check "reg/min-t8-checks-4"
                  (>= (m46-imp3--group-count 't8) 4))
-(m46-imp3--check "reg/min-total-50"
-                 (>= m46-imp3--registered 50))
+;; M63 imp-2 removed 1 keyboard.c line pin(s) from this group, so
+;; the minimum of this guard moves by 1.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m46-imp3--check "reg/min-total-49"
+                 (>= m46-imp3--registered 49))
 
 ;;; --- T7. The gated runtime probes (brief.org section 9) -------------
 

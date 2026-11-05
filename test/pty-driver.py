@@ -1017,7 +1017,10 @@ def selftest():
     check("m62-imp1b-case-count", len(group_cases("m62-imp1b")), 2)
     check("m62-imp4-case-count", len(group_cases("m62-imp4")), 3)
     check("m62-imp5-case-count", len(group_cases("m62-imp5")), 3)
-    check("total-case-count", len(CASES), 72)
+    # M63 imp-2: 5 cases (1 typed byte, no input, the state before the
+    # first read, the exported signature, 1 closed identity).  72 + 5.
+    check("m63-imp2-case-count", len(group_cases("m63-imp2")), 5)
+    check("total-case-count", len(CASES), 77)
     # --- the 2-RUN separation of the newline case --------------------
     # The case m61-imp3/newline-run-e2e runs the SAME mode-set init
     # twice in 1 child: RUN-1 on a frame of n1 lines, RUN-2 on a frame of

@@ -875,6 +875,34 @@
 ;; must change both sites.
 (define tty-handle-ebadf 9)
 
+;; M63 imp-2, review cr.org G4: (emacs gobble) holds the SAME EBADF as a
+;; LAZY promise, because prelude/load.scm loads (emacs gobble) before this
+;; module.  A promise that is first forced inside the C input dispatch
+;; runs resolve-module + module-ref there.  Warm it HERE, at the load time
+;; of the module that DEFINES the value: the definition exists now, and
+;; gobble is already loaded in the prelude order.
+;;
+;; M63 imp-2, review cr.org F5: the failure path is NOT silent.  A warm
+;; step that fails leaves the promise LAZY, so the first force moves back
+;; into the C input dispatch -- the exact defect that this step removes.
+;; So the handler prints the reason to the error port and answers #f.  It
+;; does not raise: no load may depend on the load order of the other
+;; module, and a harness that loads this module alone must still work.
+(define %input-handle-ebadf-warm
+  (catch #t
+    (lambda ()
+      ((module-ref (resolve-module '(emacs gobble)) 'prime-input-handle!)))
+    (lambda (key . args)
+      ;; The 2 strings are separate on purpose: no line continuation, so a
+      ;; reader of this file sees the whole message.
+      (display "guilemacs: M63 imp-2: the EBADF warm step failed: "
+               (current-error-port))
+      (write (list key args) (current-error-port))
+      (newline (current-error-port))
+      (display "guilemacs: M63 imp-2: the (emacs gobble) promise stays lazy (forced in the C input dispatch)\n"
+               (current-error-port))
+      #f)))
+
 ;; The bootstrap of the handle layer: build the handle value of DEVICE.
 ;; DEVICE follows the M52 convention (a terminal object, a frame, or nil
 ;; for the selected frame).  Return the plain handle value in the

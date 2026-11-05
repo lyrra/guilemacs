@@ -4072,6 +4072,280 @@ M62_IMP5_CASES = (
     },
 )
 
+# --------------------------------------------------------------------
+# M63 imp-2: the opaque INPUT handle.
+#
+# The handle BORROWS the identity that init_tty already registers, so the
+# probe resolves it with the existing bootstrap leaf --tty-handle and
+# reads the state with the 3 new leaves of src/term.c.  Every binding
+# comes from module-ref: a bare (input-handle-state ...) is unbound in
+# the child.  The probe reports ONE line and reports the state BEFORE and
+# AFTER the call, so a reader sees the transition.
+#
+# ARM selects one of the 5 cases:
+#   typed  -- 1 typed byte: 1 byte is pending before the read, the read
+#             answers 1, the nr-stored DELTA is 1, the stored event's
+#             code comes from --ie-ascii-keystroke-event (kind
+#             ASCII_KEYSTROKE_EVENT), and the state moves BORROWED -> OPEN.
+#             Line: ret:stored-delta:pending:state-before:state-after:codes
+#   idle   -- no byte: the read answers 0, the store count does not move,
+#             and the state stays BORROWED.
+#             Line: ret:stored-delta:state-before:state-after
+#   before -- NO read at all: the state BEFORE the first read, and the
+#             warm value of the (emacs tty-output) EBADF promise.
+#             Line: state:ebadf-warm
+#   sig    -- the exported surface: the entry is a procedure, its minimum
+#             arity is 1, and the 5 read-path names resolve.
+#             Line: proc:min-arity:names
+#   closed -- the REAL identity of the live terminal is closed through
+#             input-handle-close!, then the read answers the negated
+#             tty-handle-ebadf and stores nothing, while the descriptor
+#             stays open.  The STATE gates the read, not a C close.
+#             Line: close-ret:read-ret:stored-delta:state-before:state-after
+#
+# All 5 arms call the exported body DIRECTLY, not through the walk: a
+# -EBADF from a CLOSED handle crosses the walk as a clean end, because
+# --terminal-read-socket-hook! answers nr = -9 and gobble-input! treats
+# neither nr 0 nor nr -1 as an error.  That is a DECLARED LIMIT of imp-2;
+# no walk arm is added in this act.
+M63_IMP2_PROBE = r"""
+(let* ((gobble (resolve-module '(emacs gobble)))
+       (terms ((force (module-ref gobble '%terminal-list))))
+       ;; %terminal-list is oldest-first, so the newest terminal is the
+       ;; last element (see READ_PATH_PROBE).
+       (term (let ((ts (reverse terms))) (and (pair? ts) (car ts))))
+       (nr (module-ref gobble '%--kbd-buffer-nr-stored))
+       (read! (module-ref gobble 'tty-read-avail-input!))
+       (id-of (module-ref gobble 'input-handle-id))
+       (state-of (module-ref gobble 'input-handle-state))
+       (close! (module-ref gobble 'input-handle-close!))
+       (pend-of (module-ref gobble '%--tty-bytes-readable))
+       (mk (module-ref gobble '%--ie-ascii-keystroke-event))
+       (order '()))
+  ;; The report helpers must come before every expression of the body.
+  (define (rep x) (if (number? x) (number->string x) "non-number"))
+  (define (codes)
+    (let loop ((l order) (acc ""))
+      (if (null? l)
+          (if (string=? acc "") "-" acc)
+          (loop (cdr l)
+                (if (string=? acc "")
+                    (number->string (car l))
+                    (string-append acc "," (number->string (car l))))))))
+  (define (id-of-term t)
+    (let ((id (id-of t)))
+      (if (and (number? id) (> id 0)) id 'no-identity)))
+  (cond
+   ((not term) "no-tty-terminal")
+   ((string=? "@@ARM@@" "typed")
+    (let ((id (id-of-term term)))
+      (if (not (number? id))
+          "no-identity"
+          (let ((before ((force nr)))
+                (pend ((force pend-of) term))
+                (s0 (state-of id)))
+            ;; The swap is undone by dynamic-wind and NOT by a trailing
+            ;; module-set!.  A raise inside the read would otherwise leave
+            ;; the promise of this #:declarative? module swapped, so the
+            ;; restore must not depend on the read returning normally.
+            (dynamic-wind
+              (lambda ()
+                (module-set!
+                 gobble '%--ie-ascii-keystroke-event
+                 (delay (let ((f (force mk)))
+                          (lambda (code mods frame)
+                            (set! order (append order (list code)))
+                            (f code mods frame))))))
+              (lambda ()
+                (let* ((ret (read! term))
+                       (delta (- ((force nr)) before))
+                       (s1 (state-of id)))
+                  (string-append "typed:" (rep ret) ":" (rep delta) ":"
+                                 (rep pend) ":" (rep s0) ":" (rep s1) ":"
+                                 (codes))))
+              (lambda ()
+                (module-set! gobble '%--ie-ascii-keystroke-event mk)))))))
+   ((string=? "@@ARM@@" "idle")
+    (let ((id (id-of-term term)))
+      (if (not (number? id))
+          "no-identity"
+          (let* ((before ((force nr)))
+                 (s0 (state-of id))
+                 (ret (read! term))
+                 (delta (- ((force nr)) before))
+                 (s1 (state-of id)))
+            (string-append "idle:" (rep ret) ":" (rep delta) ":"
+                           (rep s0) ":" (rep s1))))))
+   ((string=? "@@ARM@@" "before")
+    ;; STATE-BEFORE (brief.org section 9): NO read runs here.  The state
+    ;; word must still be BORROWED, and the warm value of
+    ;; (emacs tty-output) must be the plain EBADF 9 and not #f.
+    ;;
+    ;; SCOPE OF THE 2nd FIELD (review cr.org F5): this arm calls
+    ;; resolve-module '(emacs tty-output), which LOADS that module when
+    ;; the prelude has not loaded it yet, and a load forces the promise
+    ;; then.  So the field proves that the warm ran BEFORE THIS PROBE; it
+    ;; does NOT prove that the warm ran at the load of the prelude.  The
+    ;; promise is also MEMOIZED: if an earlier case in this child forced
+    ;; it, this field answers 9 again and proves nothing new.
+    ;; A #f means the warm step FAILED (the handler then prints a
+    ;; warning), so a #f is a real FAIL and not a host tolerance.
+    (let ((id (id-of-term term)))
+      (if (not (number? id))
+          "no-identity"
+          (string-append "before:" (rep (state-of id)) ":"
+                         (rep (module-ref (resolve-module '(emacs tty-output))
+                                          '%input-handle-ebadf-warm))))))
+   ((string=? "@@ARM@@" "sig")
+    ;; SIGNATURE (brief.org section 9): the exported surface of the read
+    ;; path.  "proc" says the entry is a procedure, the arity field says
+    ;; it keeps its 1 REQUIRED argument, and the last field counts the 5
+    ;; names that resolve to procedures: the read entry and the 4 handle
+    ;; helpers.
+    ;;
+    ;; review cr.org F6: an arity field of "na" means that
+    ;; procedure-minimum-arity is NOT AVAILABLE on this host (the call
+    ;; raised).  It does NOT mean that the entry takes the wrong number
+    ;; of arguments, so read an "na" as a host limit and keep the value;
+    ;; do not re-pin the expectation to "na".
+    (let* ((arity (catch #t
+                    (lambda ()
+                      (call-with-values
+                          (lambda () (procedure-minimum-arity read!))
+                        (lambda (req opt rest) req)))
+                    (lambda (k . a) 'na)))
+           (found (let loop ((l (list 'input-handle-id 'input-handle-state
+                                      'input-handle-open! 'input-handle-close!
+                                      'tty-read-avail-input!))
+                             (n 0))
+                    (if (null? l)
+                        n
+                        (loop (cdr l)
+                              (if (procedure? (module-ref gobble (car l)))
+                                  (1+ n)
+                                  n))))))
+      (string-append "sig:" (if (procedure? read!) "proc" "not-a-procedure")
+                     ":" (if (eq? arity 'na) "na" (rep arity))
+                     ":" (rep found))))
+   (else
+    ;; The REAL identity, so the case proves the state transition of the
+    ;; handle and not the guard of 1 leaf.
+    (let ((id (id-of-term term)))
+      (if (not (number? id))
+          "no-identity"
+          (let* ((before ((force nr)))
+                 (s0 (state-of id))
+                 (cret (close! id))
+                 (ret (read! term))
+                 (delta (- ((force nr)) before))
+                 (s1 (state-of id)))
+            (string-append "closed:" (rep cret) ":" (rep ret) ":"
+                           (rep delta) ":" (rep s0) ":" (rep s1))))))))
+"""
+
+M63_IMP2_CASES = (
+    {
+        "name": "m63-imp2/typed-byte-e2e",
+        "group": "m63-imp2",
+        "probe": M63_IMP2_PROBE,
+        "subst": {"ARM": "typed"},
+        # One typed byte, written by the driver before the gate opens.
+        "bytes": b"A",
+        # ret 1, nr-stored delta 1, 1 byte pending, BORROWED -> OPEN, and
+        # 1 stored code 65 (A).  state-before is BORROWED because the
+        # child blocks on the gate FIFO and calls no read before the
+        # probe, so no positive count has moved this handle yet.  If a
+        # host ever measures 1 here, a read ran first: keep that value and
+        # say why; never re-pin 0 without a measurement.
+        # LIMIT 1: the "pending" field comes from --tty-bytes-readable
+        # BEFORE the read, so a host that holds the byte in the pty buffer
+        # but not yet in the tty input queue measures 0 there and 1 for the
+        # read.  A 0 here is a host timing limit, not a lost byte: read the
+        # other 3 fields before you call it a defect.
+        # LIMIT 2: "codes" holds the DECODED byte codes only, so a meta
+        # byte and a plain byte with the same low 7 bits look the same.
+        # The modifiers are not reported; 1 plain byte is enough here.
+        # NOT PROVEN: no driver run has confirmed this string yet.
+        "expect": "typed:1:1:1:0:1:65",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m63-imp2/no-input-e2e",
+        "group": "m63-imp2",
+        "probe": M63_IMP2_PROBE,
+        "subst": {"ARM": "idle"},
+        # No byte at all: the read must answer 0 and move no state.
+        "bytes": b"",
+        # ret 0, nr-stored delta 0, BORROWED -> BORROWED.  No byte ever
+        # arrives, so no read can answer a positive count and the state
+        # word can not move.  NOT PROVEN: no driver run yet.
+        "expect": "idle:0:0:0:0",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m63-imp2/state-before-e2e",
+        "group": "m63-imp2",
+        "probe": M63_IMP2_PROBE,
+        "subst": {"ARM": "before"},
+        # NO read in this case: it measures the state of the handle
+        # BEFORE the first read, and the warm value of the EBADF promise.
+        "bytes": b"",
+        # state 0 (BORROWED) and the warm value 9.  rule 1 of brief.org
+        # section 3 says that only a POSITIVE count moves the state, so
+        # a handle that ran no read is BORROWED.  A 1 here would mean that
+        # something read this tty before the probe and would be a FAIL of
+        # that rule, not a tolerance.
+        # The 9 means the warm ran BEFORE THIS PROBE (review cr.org F5).
+        # The arm loads (emacs tty-output) when the prelude did not, and a
+        # load forces the promise, so the field does NOT prove the load
+        # time of the prelude.  A failed warm step answers #f and prints a
+        # warning, so a #f is a real FAIL.
+        # NOT PROVEN: no driver run yet.
+        "expect": "before:0:9",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m63-imp2/signature-e2e",
+        "group": "m63-imp2",
+        "probe": M63_IMP2_PROBE,
+        "subst": {"ARM": "sig"},
+        # No byte: this case measures the exported SURFACE, not the bytes.
+        "bytes": b"",
+        # The read entry is a procedure with 1 required argument, and the
+        # 5 names of the read path resolve to procedures (the entry and
+        # the 4 helpers).  brief.org section 9 orders this case: the read
+        # entry keeps its 1 argument.  An arity of 2 or a name that does
+        # not resolve is a FAIL.  The arity field reads "na" when
+        # procedure-minimum-arity is not available on the host (review
+        # cr.org F6): "na" is a host limit, not a wrong-arity answer.
+        # NOT PROVEN: no driver run yet.
+        "expect": "sig:proc:1:5",
+        "env": {"TERM": "xterm"},
+    },
+    {
+        "name": "m63-imp2/closed-e2e",
+        "group": "m63-imp2",
+        "probe": M63_IMP2_PROBE,
+        "subst": {"ARM": "closed"},
+        # 1 byte is pending: the read must answer -EBADF anyway, because
+        # the state gates it and the descriptor stays open.
+        "bytes": b"B",
+        # close 0, read -9 (the negated tty-handle-ebadf), nr-stored delta
+        # 0, BORROWED -> CLOSED.  This is the only case that proves
+        # BORROWED -> CLOSED, and it uses the REAL identity of the live
+        # terminal.  NOT PROVEN: no driver run yet, so the -9 crossing of
+        # the walk is a code read and not a measurement.
+        # The case CLOSES the real terminal state and does not restore it,
+        # because CLOSED is FINAL and no leaf revives it.  That is safe
+        # here: run_case makes a FRESH child on a FRESH pty for every case
+        # (run_session per case), so the close ends with this session and
+        # can not reach a later case.  Keep this case LAST in the group and
+        # add no read of the same terminal after the close.
+        "expect": "closed:0:-9:0:0:2",
+        "env": {"TERM": "xterm"},
+    },
+)
+
 CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M52_CASES
          + M52_IMP4_CASES + M52_IMP5_CASES + M52_IMP6_CASES + M52_IMP7_CASES
@@ -4080,7 +4354,7 @@ CASES = (M42_IMP3_CASES + M42_IMP4_CASES + M43_CASES + M53_IMP3_CASES
          + M58_IMP4_CASES + M61_IMP1_CASES + M61_IMP2_CASES
          + M61_IMP2G_CASES + M61_IMP3_CASES + M62_IMP1_CASES
          + M62_IMP2_CASES + M62_IMP1B_CASES + M62_IMP4_CASES
-         + M62_IMP5_CASES)
+         + M62_IMP5_CASES + M63_IMP2_CASES)
 
 # These cases check terminal capabilities or their emitted bytes.
 _FIXTURE_CASES = {
@@ -4105,4 +4379,4 @@ GROUPS = ("m42-imp3", "m42-imp4", "m43-imp3", "m43-imp4", "m43-imp5",
           "m58-imp2", "m58-imp3", "m58-imp4",
           "m61-imp1", "m61-imp2", "m61-imp2g", "m61-imp3",
           "m62-imp1", "m62-imp2", "m62-imp1b", "m62-imp4",
-          "m62-imp5")
+          "m62-imp5", "m63-imp2")

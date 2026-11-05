@@ -6693,6 +6693,16 @@ int
 gobble_input (void)
 {
   static SCM proc = SCM_UNDEFINED;
+
+  /* FIX-20261105-guilemacs: M63 imp-2 -- test the Guile runtime BEFORE
+     the public ref (brief.org section 5.2).  A public ref with no
+     runtime is an undefined call.  The answer stays 0, and this build
+     has no C read body to fall back to, so 0 STALLS the terminal.  The
+     guard removes the undefined call; it does NOT remove the stall
+     (milestone.org section 5, limit row 8).  */
+  if (!guile_runtime_up ())
+    return 0;
+
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs gobble", "gobble-input!");
   return scm_to_int (SCM_CALL_0 (proc));
@@ -6784,6 +6794,14 @@ tty_read_avail_input (struct terminal *terminal,
      parameter is not forwarded: the pre-port C body never used it (it
      called kbd_buffer_store_event, which takes no hold_quit), and
      kbd-buffer-store-event! mirrors that with a #f hold-quit.  */
+  /* FIX-20261105-guilemacs: M63 imp-2 -- the same runtime guard as in
+     gobble_input.  It sits AFTER the 4 raw C guards and the GPM arm, so
+     a suspended tty still answers 0 without a dispatch, and it sits
+     BEFORE the public ref.  The answer 0 STALLS the terminal; the stall
+     stays open (milestone.org section 5, limit row 8).  */
+  if (!guile_runtime_up ())
+    return 0;
+
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs gobble", "tty-read-avail-input!");
   XSETTERMINAL (term, terminal);

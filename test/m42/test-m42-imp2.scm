@@ -79,6 +79,16 @@
     (let ((result
            (with-delays!
             (list
+             ;; M63 imp-2: the body resolves the INPUT handle FIRST, so the
+             ;; 3 handle leaves are stubbed too.  The fake terminal is a
+             ;; symbol, so the real --tty-handle would raise a wrong-type
+             ;; error before the first check.  The stubs answer a positive
+             ;; identity (42), the BORROWED state (0) and a clean open (0),
+             ;; so this corpus tests the decode and not the handle: a stub
+             ;; identity proves the guard of 1 leaf, never the handle.
+             (cons '%--tty-handle (lambda (term) 42))
+             (cons '%--m63-input-state (lambda (id) 0))
+             (cons '%--m63-input-open! (lambda (id) 0))
              (cons '%--kbd-buffer-nr-stored (lambda () (get 'stored 0)))
              (cons '%--kbd-on-hold-p (lambda () (get 'hold #nil)))
              (cons '%--tty-bytes-readable (lambda (term) avail))
@@ -144,7 +154,8 @@
 (check "m42/imp2/c/fd-defun-1" 1
        (count-lines-starting kb "DEFUN (\"--tty-fd\""))
 (check "m42/imp2/c/defuns-447" 447 (count-lines-starting kb "DEFUN (\""))
-(check "m42/imp2/c/combined-surface-11723" 11723
-       (+ (line-count kb) (line-count kg)))
+;; M63 imp-2 REMOVED the "m42/imp2/c/combined-surface-11723" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 (bool "m42/imp2/harness-registered"
       (contains? rt "test/m42/test-m42-imp2.el"))

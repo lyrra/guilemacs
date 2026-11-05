@@ -135,18 +135,16 @@ clone this is advisory only -- an absent record registers no ERT test."
                  (eql 4950 (m43-imp1--lines "src/sysdep.c")))
 (m43-imp1--check "sysdep.c-defuns-7"
                  (eql 7 (m43-imp1--count "src/sysdep.c" "^DEFUN (\"")))
-(m43-imp1--check "keyboard.c-lines-11233"
-                 (eql 11233 (m43-imp1--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m43-imp1--check "keyboard.c-defuns-447"
                  (eql 447 (m43-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m43-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m43-imp1--lines "src/keyboard-globals.c")))
-(m43-imp1--check "combined-keyboard-surface-11723"
-                 (let ((kb (m43-imp1--lines "src/keyboard.c"))
-                       (kg (m43-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 kb)
-                        (eql 490 kg)
-                        (eql 11723 (+ kb kg)))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723" pin: the 2 Guile
+;; runtime guards of the input handle moved the value.  Not re-pinned
+;; (milestone.org section 7).
 (m43-imp1--check "process.c-lines-9030"
                  (eql 9030 (m43-imp1--lines "src/process.c")))
 (m43-imp1--check "process.c-defuns-50"
@@ -159,8 +157,9 @@ clone this is advisory only -- an absent record registers no ERT test."
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m43-imp1--check "scm-c-public-ref-270"
                  (eql 270 (m43-imp1--count-scm-ref)))
-(m43-imp1--check "gobble.scm-lines-303"
-                 (eql 303 (m43-imp1--lines "mod/emacs/gobble.scm")))
+;; M63 imp-2 REMOVED the "gobble.scm-lines-303" pin: this act added the
+;; input-handle helpers to that file.  Not re-pinned (milestone.org
+;; section 7, rule F2).
 
 ;;; --- D2. The source map and the termios sites (brief.org §4) ----------
 ;;;

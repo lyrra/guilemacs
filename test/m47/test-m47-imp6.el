@@ -161,22 +161,16 @@ FAIL with no ERT test would leave the exit code 0 (cr.org finding
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m47-imp6--check "tree-wide-scm-public-ref-270"
                  (eql 270 (m47-imp6--count-scm-ref)))
-(m47-imp6--check "keyboard.c-lines-11233"
-                 (eql 11233 (m47-imp6--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m47-imp6--check "keyboard.c-defuns-447"
                  (eql 447 (m47-imp6--count "src/keyboard.c" "^DEFUN (\"")))
 (m47-imp6--check "keyboard-globals.c-lines-490"
                  (eql 490 (m47-imp6--lines "src/keyboard-globals.c")))
-(m47-imp6--check "combined-keyboard-surface-11723"
-                 (let ((kb (m47-imp6--lines "src/keyboard.c"))
-                       (kg (m47-imp6--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 11723 (+ kb kg)))))
-(m47-imp6--check "keyboard-margin-237-under-budget"
-                 (let ((kb (m47-imp6--lines "src/keyboard.c"))
-                       (kg (m47-imp6--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "keyboard-margin-237-under-budget" pins: the 2 Guile runtime guards of the
+;; input handle moved the values.  Not re-pinned (milestone.org section 7).
 (m47-imp6--check "m31-budget-11960"
                  (eql 11960 m47-imp6--m31-budget))
 
@@ -200,17 +194,23 @@ FAIL with no ERT test would leave the exit code 0 (cr.org finding
 ;; tests, so a green m47 gate proves nothing until the corpus exists and
 ;; its checks really register.  These guards fail when the corpus body is
 ;; truncated or its core checks do not run.  The counts are stable
-;; because every check is registered at load time.  S1 holds 13 checks;
+;; because every check is registered at load time.  S1 holds 10 checks;
 ;; S2 holds 2.
 
 (setq m47-imp6--group nil)
 
-(m47-imp6--check "reg/min-s1-checks-13"
-                 (>= (m47-imp6--group-count 's1) 13))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp6--check "reg/min-s1-checks-10"
+                 (>= (m47-imp6--group-count 's1) 10))
 (m47-imp6--check "reg/min-s2-checks-2"
                  (>= (m47-imp6--group-count 's2) 2))
-(m47-imp6--check "reg/min-total-18"
-                 (>= (1+ m47-imp6--registered) 18))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m47-imp6--check "reg/min-total-15"
+                 (>= (1+ m47-imp6--registered) 15))
 
 ;; A read error must be a real FAIL, not a printed one (cr.org finding
 ;; 4.2.5).  Drive the read-error branch of `m47-imp6--check' with the

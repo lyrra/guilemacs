@@ -166,22 +166,16 @@ of the presence of docs/."
                  (eql 4950 (m46-imp4--lines "src/sysdep.c")))
 (m46-imp4--check "sysdep.c-defuns-7"
                  (eql 7 (m46-imp4--count "src/sysdep.c" "^DEFUN (\"")))
-(m46-imp4--check "keyboard.c-lines-11233"
-                 (eql 11233 (m46-imp4--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m46-imp4--check "keyboard.c-defuns-447"
                  (eql 447 (m46-imp4--count "src/keyboard.c" "^DEFUN (\"")))
 (m46-imp4--check "keyboard-globals.c-lines-490"
                  (eql 490 (m46-imp4--lines "src/keyboard-globals.c")))
-(m46-imp4--check "combined-keyboard-surface-11723"
-                 (let ((kb (m46-imp4--lines "src/keyboard.c"))
-                       (kg (m46-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 11723 (+ kb kg)))))
-(m46-imp4--check "margin-under-budget-237"
-                 (let ((kb (m46-imp4--lines "src/keyboard.c"))
-                       (kg (m46-imp4--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "margin-under-budget-237" pins: the 2 Guile runtime guards of the input
+;; handle moved the values.  Not re-pinned (milestone.org section 7).
 (m46-imp4--check "tty-modes.scm-lines-313"
                  (eql 313 (m46-imp4--lines "mod/emacs/tty-modes.scm")))
 
@@ -203,16 +197,22 @@ of the presence of docs/."
 ;; its checks really register.  These guards fail when the corpus body
 ;; is truncated or its core checks do not run.  The bound is per group,
 ;; and the counts are stable because every check is registered at load
-;; time.  S1 holds 17 checks; S5 holds 2.
+;; time.  S1 holds 14 checks; S5 holds 2.
 
 (setq m46-imp4--group nil)
 
-(m46-imp4--check "reg/min-s1-checks-17"
-                 (>= (m46-imp4--group-count 's1) 17))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m46-imp4--check "reg/min-s1-checks-14"
+                 (>= (m46-imp4--group-count 's1) 14))
 (m46-imp4--check "reg/min-s5-checks-2"
                  (>= (m46-imp4--group-count 's5) 2))
-(m46-imp4--check "reg/min-total-19"
-                 (>= m46-imp4--registered 19))
+;; M63 imp-2 removed 3 keyboard surface pin(s) from this group, so
+;; the minimum of this guard moves by 3.  This is NOT a re-pin: the removed
+;; pins are named beside their site, and docs/m63-plan.org 6.4 names each cause.
+(m46-imp4--check "reg/min-total-16"
+                 (>= m46-imp4--registered 16))
 
 ;;; --- S3. The group-total check (brief.org section 5 T3) -------------
 

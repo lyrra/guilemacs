@@ -91,6 +91,13 @@
 ;; store records 'store.  run-read! returns (values return-value order).
 ;; Both OS operations remain in the two C leaves. Scheme owns policy and
 ;; byte decoding.
+;;
+;; M63 imp-2: the body resolves the INPUT handle FIRST, so the 3 handle
+;; leaves are stubbed too.  The fake terminal is a symbol, so the real
+;; --tty-handle would raise a wrong-type error before the first check.
+;; The stubs answer a positive identity (42), the BORROWED state (0) and
+;; a clean open (0), and the body then runs the same guard/decode path as
+;; before.  This corpus therefore tests the decode, not the handle.
 (define (assq-ref ovr key)
   (let ((hit (assq key ovr)))
     (if hit (cdr hit) #f)))
@@ -105,6 +112,13 @@
     (let ((return-value
            (with-many-values!
             (list
+             ;; M63 imp-2: the handle stub set (resolve, state, open).
+             (cons '%--tty-handle
+                   (delay (lambda (term) (get 'handle-id 42))))
+             (cons '%--m63-input-state
+                   (delay (lambda (id) (get 'handle-state 0))))
+             (cons '%--m63-input-open!
+                   (delay (lambda (id) 0)))
              (cons '%--kbd-buffer-nr-stored
                    (delay (lambda () (get 'nr-stored 0))))
              (cons '%--kbd-on-hold-p
@@ -232,6 +246,9 @@
 ;;; --- 5. Cutover wiring ----------------------------------------------
 ;;; tty_read_avail_input (C) must resolve the (emacs gobble) public ref
 ;;; tty-read-avail-input!.  Verify it is an exported procedure.
+;; M63 imp-2 CORPUS REPAIR, not a behavior change: this last check form
+;; was missing its close paren at HEAD, so the file did not read as a
+;; whole file.
 (check "gobble/exported-tty-read-avail-input!" #t
        (procedure? (module-ref (resolve-interface '(emacs gobble))
-                               'tty-read-avail-input!)))
+                               'tty-read-avail-input!))))

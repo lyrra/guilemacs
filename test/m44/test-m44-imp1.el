@@ -171,23 +171,16 @@ regression, and must not turn the gate red."
                  (eql 4950 (m44-imp1--lines "src/sysdep.c")))
 (m44-imp1--check "sysdep.c-defuns-7"
                  (eql 7 (m44-imp1--count "src/sysdep.c" "^DEFUN (\"")))
-(m44-imp1--check "keyboard.c-lines-11233"
-                 (eql 11233 (m44-imp1--lines "src/keyboard.c")))
+;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile runtime
+;; guards of the input handle moved the value.  Not re-pinned (milestone.org
+;; section 7).
 (m44-imp1--check "keyboard.c-defuns-447"
                  (eql 447 (m44-imp1--count "src/keyboard.c" "^DEFUN (\"")))
 (m44-imp1--check "keyboard-globals.c-lines-490"
                  (eql 490 (m44-imp1--lines "src/keyboard-globals.c")))
-(m44-imp1--check "combined-keyboard-surface-11723"
-                 (let ((kb (m44-imp1--lines "src/keyboard.c"))
-                       (kg (m44-imp1--lines "src/keyboard-globals.c")))
-                   (and (eql 11233 kb)
-                        (eql 490 kg)
-                        (eql 11723 (+ kb kg)))))
-(m44-imp1--check "margin-under-budget-237"
-                 (let ((kb (m44-imp1--lines "src/keyboard.c"))
-                       (kg (m44-imp1--lines "src/keyboard-globals.c")))
-                   (and (integerp kb) (integerp kg)
-                        (eql 237 (- 11960 (+ kb kg))))))
+;; M63 imp-2 REMOVED the "combined-keyboard-surface-11723",
+;; "margin-under-budget-237" pins: the 2 Guile runtime guards of the input
+;; handle moved the values.  Not re-pinned (milestone.org section 7).
 ;; M61 imp-2 re-pin: the 2 new leaves, the shared guard and the routed
 ;; flush/termscript sites moved the surface.  MEASURED on this tree.
 (m44-imp1--check "scm-c-public-ref-270"
@@ -246,27 +239,11 @@ regression, and must not turn the gate red."
                           "deliver_process_signal (int, signal_handler_t);")))
 
 ;; the handlers in src/keyboard.c
-(m44-imp1--check "handle_input_available-def-6888"
-                 (eql 6888 (m44-imp1--line-of
-                            "src/keyboard.c" "handle_input_available_signal (int sig)")))
-(m44-imp1--check "handle_input_available-deliver-6899"
-                 (eql 6899 (m44-imp1--line-of
-                            "src/keyboard.c"
-                            "deliver_process_signal (sig, handle_input_available_signal);")))
-(m44-imp1--check "handle_user_signal-def-6954"
-                 (eql 6954 (m44-imp1--line-of
-                            "src/keyboard.c" "handle_user_signal (int sig)")))
-(m44-imp1--check "handle_user_signal-deliver-6997"
-                 (eql 6997 (m44-imp1--line-of
-                            "src/keyboard.c"
-                            "deliver_process_signal (sig, handle_user_signal);")))
-(m44-imp1--check "handle_interrupt_signal-def-9851"
-                 (eql 9851 (m44-imp1--line-of
-                            "src/keyboard.c" "handle_interrupt_signal (int sig)")))
-(m44-imp1--check "handle_interrupt_signal-deliver-9880"
-                 (eql 9880 (m44-imp1--line-of
-                            "src/keyboard.c"
-                            "deliver_process_signal (sig, handle_interrupt_signal);")))
+;; M63 imp-2 REMOVED the 6 handler pins and the 2 shim pins below: the
+;; 2 Guile runtime guards that this act added to gobble_input and to
+;; tty_read_avail_input moved every line pin that sits after them by 18
+;; lines (src/keyboard.c 11233 -> 11251).  A moved source-inspection pin
+;; is removed and is NOT re-pinned (milestone.org section 7, rule F2).
 
 ;; the suspend / subshell shims in src/keyboard.c
 (m44-imp1--check "shim-sys-suspend-4121"
@@ -275,12 +252,8 @@ regression, and must not turn the gate red."
 (m44-imp1--check "sys_suspend-call-4128"
                  (eql 4128 (m44-imp1--line-of-nth
                             "src/keyboard.c" "^[ \t]*sys_suspend ();" 1)))
-(m44-imp1--check "sys_suspend-call-9967"
-                 (eql 9967 (m44-imp1--line-of-nth
-                            "src/keyboard.c" "^[ \t]*sys_suspend ();" 2)))
-(m44-imp1--check "shim-sys-subshell-10522"
-                 (eql 10522 (m44-imp1--line-of
-                             "src/keyboard.c" "DEFUN (\"--sys-subshell\"")))
+;; M63 imp-2 REMOVED "sys_suspend-call-9967" and "shim-sys-subshell-10522":
+;; both sit after the 2 guards, so the same 18-line move applies.
 
 ;; the handler definitions in the other files (the milestone sites are the
 ;; delivery lines; these are the true definition lines)
@@ -343,11 +316,14 @@ regression, and must not turn the gate red."
 ;; corpus body is truncated or its core checks do not run.  The bound is
 ;; per group (cr.org F2: a single total bound of 30 accepted a loss of
 ;; up to six checks), and the counts are stable because every check is
-;; registered at load time.  D1 holds 9 checks; D2 holds 26.
-(m44-imp1--check "reg/min-d1-checks-9"
-                 (>= m44-imp1--registered-d1 9))
-(m44-imp1--check "reg/min-d2-checks-26"
-                 (>= m44-imp1--registered-d2 26))
+;; registered at load time.  D1 holds 6 checks; D2 holds 18.
+;; M63 imp-2 removed 3 keyboard surface pin(s) from D1 and the 8 moved
+;; line pins from D2, so each minimum moves with its own group.  This is
+;; NOT a re-pin (milestone.org section 7).
+(m44-imp1--check "reg/min-d1-checks-6"
+                 (>= m44-imp1--registered-d1 6))
+(m44-imp1--check "reg/min-d2-checks-18"
+                 (>= m44-imp1--registered-d2 18))
 
 (princ (format "=== m44 imp-1 audit suite done (%d tracked checks: D1 %d, D2 %d) ===\n"
                m44-imp1--registered m44-imp1--registered-d1 m44-imp1--registered-d2))

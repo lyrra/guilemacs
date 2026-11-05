@@ -107,9 +107,10 @@
                      (eql 9030 (m41-imp1--lines "src/process.c")))
     (m41-imp1--check "process.c-defuns-50"
                      (eql 50 (m41-imp1--count "src/process.c" "^DEFUN (\"")))
-    (m41-imp1--check "keyboard.c-lines-11233"
-                     ;; M43 imp-2 added the --tty-fd accessor: 11,221 -> 11,233.
-                     (eql 11233 (m41-imp1--lines "src/keyboard.c")))
+    ;; M63 imp-2 REMOVED the "keyboard.c-lines-11233" pin: the 2 Guile
+    ;; runtime guards of the input handle moved the count, so the old
+    ;; number is false.  A moved pin is removed and not re-pinned
+    ;; (milestone.org section 7): a line count encodes an act, not a rule.
     (m41-imp1--check "keyboard-globals.c-lines-490"
                      (eql 490 (m41-imp1--lines "src/keyboard-globals.c")))
     (m41-imp1--check "tree-wide-scm-public-ref-270"
